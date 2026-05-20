@@ -2,10 +2,15 @@
 
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, Iterable, List, Optional
 
 Record = Dict[str, Any]
 TextBuilder = Callable[[Record], str]
+
+
+def searchable_record_text(record: Record) -> str:
+    """Flatten a guidance record into searchable lowercase text."""
+    return " ".join(_flatten_record_values(record.values())).lower()
 
 
 def search_records(
@@ -38,3 +43,13 @@ def search_records(
 
 def _limit(records: List[Record], limit: Optional[int]) -> List[Record]:
     return records[:limit] if limit is not None else records
+
+
+def _flatten_record_values(values: Iterable[Any]) -> Iterable[str]:
+    for value in values:
+        if isinstance(value, dict):
+            yield from _flatten_record_values(value.values())
+        elif isinstance(value, list):
+            yield from (str(item) for item in value)
+        else:
+            yield str(value)

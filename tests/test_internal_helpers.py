@@ -3,6 +3,7 @@
 import pytest
 
 from open_data_products._io import load_jsonl_records, load_mapping
+from open_data_products._search import searchable_record_text
 
 
 def test_load_mapping_reads_json_and_yaml(tmp_path):
@@ -32,3 +33,15 @@ def test_load_jsonl_records_reads_objects_and_reports_line_errors(tmp_path):
 
     path.write_text('{"id": "one"}\n{"id": "two"}\n', encoding="utf-8")
     assert load_jsonl_records(path) == [{"id": "one"}, {"id": "two"}]
+
+
+def test_searchable_record_text_flattens_nested_record_values():
+    record = {
+        "id": "DataProduct",
+        "labels": ["analytics", "trusted"],
+        "metadata": {"domain": "mobility", "owner": "platform"},
+    }
+
+    assert searchable_record_text(record) == (
+        "dataproduct analytics trusted mobility platform"
+    )

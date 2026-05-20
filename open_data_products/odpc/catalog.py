@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional, Union
 import yaml
 
 from open_data_products._io import load_jsonl_records, load_mapping
-from open_data_products._search import search_records
+from open_data_products._search import search_records, searchable_record_text
 
 
 class NoDatesSafeLoader(yaml.SafeLoader):
@@ -61,17 +61,6 @@ def load_object_records(
     return load_jsonl_records(records_path)
 
 
-def searchable_text(record: Dict[str, Any]) -> str:
-    """Flatten an ODPC object record into searchable lowercase text."""
-    values: List[str] = []
-    for value in record.values():
-        if isinstance(value, list):
-            values.extend(str(item) for item in value)
-        else:
-            values.append(str(value))
-    return " ".join(values).lower()
-
-
 def search_objects(
     query: Optional[str] = None,
     *,
@@ -86,7 +75,7 @@ def search_objects(
         query,
         object_id=object_id,
         limit=limit,
-        searchable_text=searchable_text,
+        searchable_text=searchable_record_text,
     )
 
 
