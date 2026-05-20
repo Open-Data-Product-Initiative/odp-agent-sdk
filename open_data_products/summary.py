@@ -39,12 +39,18 @@ def load_summary(path: Union[str, Path]) -> Dict[str, Any]:
     return {
         "path": str(p),
         "byte_size": len(raw),
-        "line_count": text.count("\n") + (0 if text.endswith("\n") else 1),
+        "line_count": _line_count(text),
         "sha256": hashlib.sha256(raw).hexdigest(),
         "spec": spec,
         "kind": kind,
         "id": doc_id,
     }
+
+
+def _line_count(text: str) -> int:
+    if not text:
+        return 0
+    return text.count("\n") + (0 if text.endswith("\n") else 1)
 
 
 def _extract_id(data: Dict[str, Any]) -> str:

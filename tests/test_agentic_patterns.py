@@ -313,6 +313,14 @@ class TestLoadSummary:
         assert "document" not in summary
         assert "body" not in summary
 
+    def test_load_summary_counts_empty_file_as_zero_lines(self, tmp_path):
+        from open_data_products import load_summary
+
+        path = tmp_path / "empty.yaml"
+        path.write_text("", encoding="utf-8")
+
+        assert load_summary(path)["line_count"] == 0
+
 
 # --- Agent Payments (HTTP 402) ----------------------------------------------
 # https://agenticpatterns.veso.ai/agent-payments
