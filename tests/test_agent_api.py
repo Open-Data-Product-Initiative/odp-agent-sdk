@@ -104,6 +104,18 @@ def test_resolve_references_finds_cross_spec_references():
     assert any(ref.pointer.endswith("/graph/nodes/0/$ref") for ref in refs)
 
 
+def test_agent_document_preparation_preserves_explicit_path_for_loaded_document():
+    product = sample_odps_product()
+
+    result = validate_document(product, path=Path("memory-product.yaml"))
+    summary = explain_document(product, path=Path("memory-product.yaml"))
+    refs = resolve_references(product, path=Path("memory-product.yaml"))
+
+    assert result.path == "memory-product.yaml"
+    assert "File: memory-product.yaml" in summary
+    assert all(ref.source_path == "memory-product.yaml" for ref in refs)
+
+
 def test_resources_are_listable_and_retrievable():
     resources = list_resources()
 

@@ -62,14 +62,11 @@ def validate_document(
     path: Optional[Union[str, Path]] = None,
 ) -> ValidationResult:
     """Validate an Open Data Products document using the matching spec helper."""
-    loaded = load_document(document) if isinstance(document, (str, Path)) else document
-    source_path = (
-        str(document) if isinstance(document, (str, Path)) else _path_str(path)
-    )
+    loaded, source_path = _prepare_document(document, path)
     spec, kind = detect_document(loaded)
 
     if spec == "odps":
-        raw_errors = _validate_raw_odps_document(document, path)
+        raw_errors = _validate_raw_odps_document(document)
         if raw_errors:
             return ValidationResult(False, spec, kind, raw_errors, path=source_path)
         try:
@@ -129,8 +126,7 @@ def explain_document(
     path: Optional[Union[str, Path]] = None,
 ) -> str:
     """Return a compact explanation for humans and AI agents."""
-    loaded = load_document(document) if isinstance(document, (str, Path)) else document
-    source_path = Path(document) if isinstance(document, (str, Path)) else path
+    loaded, source_path = _prepare_document(document, path)
     spec, _kind = detect_document(loaded)
     if spec == "odps":
         assert isinstance(loaded, OpenDataProduct)
@@ -211,10 +207,7 @@ def resolve_references(
     path: Optional[Union[str, Path]] = None,
 ) -> List[Reference]:
     """Discover ``ref`` and ``$ref`` values for cross-spec traversal."""
-    loaded = load_document(document) if isinstance(document, (str, Path)) else document
-    source_path = (
-        str(document) if isinstance(document, (str, Path)) else _path_str(path)
-    )
+    loaded, source_path = _prepare_document(document, path)
     spec, _kind = detect_document(loaded)
     data = loaded.to_dict() if isinstance(loaded, OpenDataProduct) else loaded
     refs = []
@@ -236,11 +229,21 @@ def _load_mapping(path: Path) -> Dict[str, Any]:
     return load_mapping(path)
 
 
+def _prepare_document(
+    document: Union[Document, str, Path],
+    path: Optional[Union[str, Path]] = None,
+) -> Tuple[Document, Optional[str]]:
+    loaded = load_document(document) if isinstance(document, (str, Path)) else document
+    source_path = (
+        str(document) if isinstance(document, (str, Path)) else _path_str(path)
+    )
+    return loaded, source_path
+
+
 def _validate_raw_odps_document(
     document: Union[Document, str, Path],
-    path: Optional[Union[str, Path]],
 ) -> List[str]:
-    raw = _raw_mapping(document, path)
+    raw = _raw_mapping(document)
     if raw is None:
         return []
     if not _is_odps_v41(raw):
@@ -294,16 +297,11 @@ def _validate_odps_v41_shape(document: Dict[str, Any]) -> List[str]:
     return errors
 
 
-def _raw_mapping(
-    document: Union[Document, str, Path],
-    path: Optional[Union[str, Path]],
-) -> Optional[Dict[str, Any]]:
+def _raw_mapping(document: Union[Document, str, Path]) -> Optional[Dict[str, Any]]:
     if isinstance(document, (str, Path)):
         return _load_mapping(Path(document))
     if isinstance(document, dict):
         return document
-    if path is not None:
-        return _load_mapping(Path(path))
     return None
 
 
