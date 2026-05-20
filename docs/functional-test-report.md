@@ -1,0 +1,63 @@
+# Functional Test Report
+
+This report describes the functional test layer for the Open Data Products
+Python SDK. The goal is to test the SDK as agents and users consume it: through
+public APIs, CLI commands, and the MCP JSON-RPC surface.
+
+## How To Run
+
+```bash
+pytest -q -m functional
+pytest -q
+```
+
+## Functional Suites
+
+| Suite | Surface | What It Proves |
+|-------|---------|----------------|
+| `tests/test_functional_agent_api.py` | Public Python API | `load_document`, `detect_document`, `validate_document`, `explain_document`, `resolve_references`, `load_summary`, and `list_resources` work across ODPS, ODPC, ODPG, and ODPV fixtures. |
+| `tests/test_functional_cli.py` | Unified CLI | User-facing commands return successful exit codes and parseable JSON for document validation, explanation, summary, resources, manifest, and ODPG reasoning workflows. |
+| `tests/test_functional_mcp.py` | MCP JSON-RPC | The MCP handler initializes, lists tools, calls every registered safe tool with representative inputs, and reports unknown tools through JSON-RPC errors. |
+| `tests/test_functional_report.py` | Documentation guard | This report mentions the functional suites, covered surfaces, and run command. |
+
+## Coverage Matrix
+
+| Capability | API | CLI | MCP |
+|------------|-----|-----|-----|
+| Load/detect documents | Covered | Indirect | Indirect |
+| Validate documents | Covered | Covered | Covered |
+| Explain documents | Covered | Covered | Covered |
+| Resolve references | Covered | Not yet direct | Covered |
+| Lightweight summaries | Covered | Covered | Covered |
+| Resource registry | Covered | Covered | Covered |
+| ODPV search | Not yet direct | Not yet direct | Covered |
+| ODPC object search | Not yet direct | Not yet direct | Covered |
+| ODPG object search | Not yet direct | Not yet direct | Covered |
+| ODPG summary | Covered through spec fixture | Covered | Covered |
+| ODPG traversal | Not yet direct | Covered | Covered |
+| ODPG analysis | Not yet direct | Covered | Covered |
+| ODPG agent context | Not yet direct | Covered | Covered |
+| MCP initialize/list tools | Not applicable | Not applicable | Covered |
+
+## Fixture Strategy
+
+The functional layer uses real package and example artifacts where practical:
+
+- ODPS: `apps/pricing_402_builder/priced_product.yaml`
+- ODPC: a minimal temporary catalog fixture
+- ODPG: `open_data_products/odpg/data/graph/graph.yaml`
+- ODPV: `open_data_products/odpv/data/vocab/odpv.yaml`
+
+The temporary ODPC fixture keeps the suite independent from a larger catalog
+example while still exercising the public loader, detector, validator, explainer,
+and summary behavior.
+
+## Current Intentional Gaps
+
+The current functional layer is the first cross-surface pass. Useful follow-up
+coverage would be:
+
+- Direct CLI tests for `refs` and spec-specific search commands.
+- Direct API tests for ODPC, ODPG, and ODPV namespace helpers.
+- Subprocess-based console-script tests after packaging/install verification.
+- Negative-path functional tests for invalid ODPS, ODPC, ODPG, and ODPV inputs.

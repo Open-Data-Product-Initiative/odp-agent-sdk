@@ -17,6 +17,7 @@ repository.
 - Claude Code project MCP config: `.mcp.json`
 - Main human README: `README.md`
 - API reference: `docs/API.md`
+- Functional test report: `docs/functional-test-report.md`
 
 ## Install Before MCP Launch
 
