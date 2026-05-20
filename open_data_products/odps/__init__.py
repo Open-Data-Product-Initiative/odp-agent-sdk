@@ -68,8 +68,8 @@ Main Classes:
 Modules:
     core: Main OpenDataProduct class and functionality
     models: All ODPS component data models
-    validation: Validation framework and rules
-    validators: Individual validation functions
+    validation: Validation framework, rules, and utilities
+    validators: Compatibility wrapper for ODPSValidator
     protocols: Type protocols for duck typing
     enums: Enumeration classes for constants
     exceptions: Exception hierarchy
@@ -84,7 +84,7 @@ SPEC_NAME = "Open Data Product Specification"
 
 from .core import OpenDataProduct
 from .models import *
-from .validators import ODPSValidator
+from .validation import ODPSValidator
 from .enums import *
 from .exceptions import *
 from .protocols import *

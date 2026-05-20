@@ -24,7 +24,7 @@ if TYPE_CHECKING:
     from .models import KPI
 
 
-from .validators import ODPSValidator
+from ._validators import ODPSValidator
 from .enums import ProductStatus, ProductVisibility, DataContractType
 
 

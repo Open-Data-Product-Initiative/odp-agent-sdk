@@ -4,7 +4,11 @@ import pytest
 from unittest.mock import patch
 
 from open_data_products.odps.validators import ODPSValidator
-from open_data_products.odps.validation import RequiredFieldsValidator, ValidationRule
+from open_data_products.odps.validation import (
+    ODPSValidator as ValidationModuleODPSValidator,
+    RequiredFieldsValidator,
+    ValidationRule,
+)
 from open_data_products.odps.exceptions import ODPSValidationError
 from open_data_products.odps import OpenDataProduct
 from open_data_products.odps.models import ProductDetails
@@ -12,6 +16,9 @@ from open_data_products.odps.models import ProductDetails
 
 class TestODPSValidator:
     """Test cases for ODPSValidator utility class."""
+
+    def test_validator_import_paths_resolve_to_same_class(self):
+        assert ODPSValidator is ValidationModuleODPSValidator
 
     def test_validate_iso639_language_code_valid(self):
         """Test validation of valid ISO 639-1 language codes."""
