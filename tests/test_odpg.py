@@ -102,6 +102,26 @@ def test_upstream_toolkit_summary_traverse_analyze_and_agent_context():
     assert context["governanceSignals"]
 
 
+def test_graph_analysis_helpers_ignore_malformed_items():
+    from open_data_products.odpg.graph import _graph_edges, _graph_nodes, _node_by_id
+
+    graph = load_graph()
+    graph["graph"]["nodes"].append("not-a-node")
+    graph["graph"]["edges"].append("not-an-edge")
+
+    summary = summarize_graph(graph)
+    analysis = analyze_graph(graph)
+    context = agent_context(graph, "AGENT-AVIATION-001", 1)
+
+    assert summary["nodeCount"] == 9
+    assert summary["edgeCount"] == 13
+    assert len(_graph_nodes(graph)) == 9
+    assert len(_graph_edges(graph)) == 13
+    assert _node_by_id(graph)["AGENT-AVIATION-001"]["type"] == "Agent"
+    assert "DP-AVIATION-002" in analysis["ungovernedAssets"]
+    assert context["focusNode"]["id"] == "AGENT-AVIATION-001"
+
+
 def test_validation_reports_upstream_warnings_and_confidence_errors():
     graph = load_graph()
     graph["graph"]["nodes"].append(

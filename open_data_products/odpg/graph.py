@@ -144,6 +144,30 @@ def graph_metadata(document: Dict[str, Any]) -> Dict[str, Any]:
     return metadata if isinstance(metadata, dict) else {}
 
 
+def _graph_nodes(document: Dict[str, Any]) -> List[Dict[str, Any]]:
+    return [
+        node
+        for node in graph_payload(document).get("nodes") or []
+        if isinstance(node, dict)
+    ]
+
+
+def _graph_edges(document: Dict[str, Any]) -> List[Dict[str, Any]]:
+    return [
+        edge
+        for edge in graph_payload(document).get("edges") or []
+        if isinstance(edge, dict)
+    ]
+
+
+def _node_by_id(document: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
+    return {
+        str(node.get("id")): node
+        for node in _graph_nodes(document)
+        if node.get("id")
+    }
+
+
 def localized_text(value: Any) -> str:
     """Return a display string for ODPG localized values."""
     if isinstance(value, dict):
@@ -434,10 +458,9 @@ def build_adjacency(
 
 def summarize_graph(document: Dict[str, Any]) -> Dict[str, Any]:
     """Summarize ODPG graph metadata, node/edge counts, types, and confidence."""
-    payload = graph_payload(document)
     metadata = graph_metadata(document)
-    nodes = [n for n in payload.get("nodes") or [] if isinstance(n, dict)]
-    edges = [e for e in payload.get("edges") or [] if isinstance(e, dict)]
+    nodes = _graph_nodes(document)
+    edges = _graph_edges(document)
 
     node_types: DefaultDict[str, int] = defaultdict(int)
     edge_types: DefaultDict[str, int] = defaultdict(int)
@@ -509,10 +532,8 @@ def traverse_graph(
 
 def analyze_graph(document: Dict[str, Any]) -> Dict[str, Any]:
     """Run ODPG strategic and governance analysis checks."""
-    payload = graph_payload(document)
-    nodes = [n for n in payload.get("nodes") or [] if isinstance(n, dict)]
-    edges = [e for e in payload.get("edges") or [] if isinstance(e, dict)]
-    node_by_id = {str(node.get("id")): node for node in nodes if node.get("id")}
+    edges = _graph_edges(document)
+    node_by_id = _node_by_id(document)
 
     incoming: DefaultDict[str, List[Dict[str, Any]]] = defaultdict(list)
     outgoing: DefaultDict[str, List[Dict[str, Any]]] = defaultdict(list)
@@ -577,9 +598,7 @@ def analyze_graph(document: Dict[str, Any]) -> Dict[str, Any]:
 
 def agent_context(document: Dict[str, Any], node_id: str, depth: int) -> Dict[str, Any]:
     """Extract trusted ODPG graph context around a focus node."""
-    payload = graph_payload(document)
-    nodes = [n for n in payload.get("nodes") or [] if isinstance(n, dict)]
-    node_by_id = {str(node.get("id")): node for node in nodes if node.get("id")}
+    node_by_id = _node_by_id(document)
     forward_paths = traverse_graph(document, node_id, depth)
     reverse_paths = traverse_graph(document, node_id, depth, reverse=True)
     related_ids = {node_id}
