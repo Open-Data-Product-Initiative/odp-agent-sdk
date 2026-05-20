@@ -54,10 +54,8 @@ See Also:
 
 import json
 import yaml
-from typing import Any, Dict, List, Optional, Union, cast
+from typing import Any, Dict, List, Optional, Union
 from pathlib import Path
-import hashlib
-
 from .models import (
     ProductDetails,
     ProductStrategy,
@@ -84,18 +82,15 @@ from .codecs import (
     parse_product_details,
     parse_product_strategy,
     parse_sla,
-    serialize_data_access,
-    serialize_data_contract,
-    serialize_data_holder,
-    serialize_data_quality,
-    serialize_license,
-    serialize_payment_gateways,
-    serialize_pricing_plans,
-    serialize_product_details,
-    serialize_product_strategy,
-    serialize_sla,
 )
+from ._document import build_document
 from .validation import ODPSValidationFramework
+from ._state import (
+    clear_caches,
+    component_count,
+    generate_hash,
+    has_optional_components,
+)
 from .exceptions import (
     ODPSValidationError,
     ODPSJSONParsingError,
@@ -216,31 +211,12 @@ class OpenDataProduct:
     def _generate_hash(self) -> str:
         """Generate hash of current object state for cache invalidation."""
         if self._hash_cache is None:
-            # Create a simple hash based on key object properties
-            state_data = {
-                "schema": self.schema,
-                "version": self.version,
-                "product_details": str(self.product_details),
-                "product_strategy": str(self.product_strategy),
-                "data_contract": str(self.data_contract),
-                "sla": str(self.sla),
-                "data_quality": str(self.data_quality),
-                "pricing_plans": str(self.pricing_plans),
-                "license": str(self.license),
-                "data_access": str(self.data_access),
-                "data_holder": str(self.data_holder),
-                "payment_gateways": str(self.payment_gateways),
-                "extensions": str(self.extensions),
-            }
-            state_str = json.dumps(state_data, sort_keys=True)
-            self._hash_cache = hashlib.sha256(state_str.encode()).hexdigest()
-
+            self._hash_cache = generate_hash(self)
         return self._hash_cache
 
     def _invalidate_cache(self) -> None:
         """Invalidate all caches when object state changes."""
-        self._validation_cache.clear()
-        self._serialization_cache.clear()
+        clear_caches(self._validation_cache, self._serialization_cache)
         self._hash_cache = None
 
     def __init__(self, product_details: ProductDetails):
@@ -446,35 +422,12 @@ class OpenDataProduct:
     @property
     def has_optional_components(self) -> bool:
         """Check if document has any optional components."""
-        return any(
-            [
-                self.data_contract is not None,
-                self.sla is not None,
-                self.data_quality is not None,
-                self.pricing_plans is not None,
-                self.license is not None,
-                self.data_access is not None,
-                self.data_holder is not None,
-                self.payment_gateways is not None,
-                self.extensions is not None,
-            ]
-        )
+        return has_optional_components(self)
 
     @property
     def component_count(self) -> int:
         """Count of non-None optional components."""
-        components = [
-            self.data_contract,
-            self.sla,
-            self.data_quality,
-            self.pricing_plans,
-            self.license,
-            self.data_access,
-            self.data_holder,
-            self.payment_gateways,
-            self.extensions,
-        ]
-        return sum(1 for component in components if component is not None)
+        return component_count(self)
 
     @property
     def is_production_ready(self) -> bool:
@@ -561,44 +514,7 @@ class OpenDataProduct:
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary representation"""
-        result: Dict[str, Any] = {
-            "schema": self.schema,
-            "version": self.version,
-            "product": serialize_product_details(self.product_details),
-        }
-
-        product = cast(Dict[str, Any], result["product"])
-
-        # Add optional components
-        if self.product_strategy:
-            product["productStrategy"] = serialize_product_strategy(
-                self.product_strategy
-            )
-        if self.data_contract:
-            product["dataContract"] = serialize_data_contract(self.data_contract)
-        if self.sla:
-            product["SLA"] = serialize_sla(self.sla)
-        if self.data_quality:
-            product["dataQuality"] = serialize_data_quality(self.data_quality)
-        if self.data_access:
-            product["dataAccess"] = serialize_data_access(self.data_access)
-        if self.license:
-            product["license"] = serialize_license(self.license)
-        if self.data_holder:
-            product["dataHolder"] = serialize_data_holder(self.data_holder)
-        if self.pricing_plans:
-            product["pricingPlans"] = serialize_pricing_plans(self.pricing_plans)
-
-        if self.payment_gateways:
-            product["paymentGateways"] = serialize_payment_gateways(
-                self.payment_gateways
-            )
-
-        # Add extensions (x- prefixed fields)
-        if self.extensions:
-            product.update(self.extensions.extensions)
-
-        return result
+        return build_document(self)
 
     def to_json(self, indent: int = 2) -> str:
         """Convert to JSON string with caching"""

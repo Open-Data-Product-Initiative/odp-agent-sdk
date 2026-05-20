@@ -201,6 +201,28 @@ class TestIntegration:
         assert first_json == second_json
         assert (first_hash, "json", 2) in product._serialization_cache
 
+    def test_mutation_helpers_invalidate_serialization_cache(self):
+        """Test mutation helpers clear cached hashes and serialized output."""
+        details = ProductDetails(
+            name="Cache Mutation Test",
+            product_id="cache-mutation-001",
+            visibility="public",
+            status="draft",
+            type="dataset",
+        )
+        product = OpenDataProduct(details)
+
+        product.to_json()
+        assert product._serialization_cache
+        assert product._hash_cache is not None
+
+        product.add_license(scope_of_use="internal")
+
+        assert product._serialization_cache == {}
+        assert product._validation_cache == {}
+        assert product._hash_cache is None
+        assert '"license"' in product.to_json()
+
     def test_save_and_load(self):
         """Test saving to file and loading back."""
         details = ProductDetails(
