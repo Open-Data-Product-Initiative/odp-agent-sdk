@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import re
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple, Union
 
@@ -47,6 +47,13 @@ class ValidationResult:
     term_count: int
     relationship_count: int
     section_count: int
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Return a JSON-serializable representation."""
+        payload = asdict(self)
+        payload["spec"] = "odpv"
+        payload["kind"] = "Vocabulary"
+        return payload
 
 
 def _data_file(name: str) -> Path:

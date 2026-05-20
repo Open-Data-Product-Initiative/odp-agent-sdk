@@ -19,6 +19,15 @@ def test_validate_vocabulary_reports_expected_counts():
     assert result.relationship_count == 16
     assert result.section_count == 4
     assert result.errors == []
+    assert result.to_dict() == {
+        "valid": True,
+        "spec": "odpv",
+        "kind": "Vocabulary",
+        "errors": [],
+        "term_count": 59,
+        "relationship_count": 16,
+        "section_count": 4,
+    }
 
 
 def test_validate_vocabulary_reports_invalid_section_terms_array():

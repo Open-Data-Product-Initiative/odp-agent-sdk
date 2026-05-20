@@ -47,40 +47,14 @@ def validate_main(argv: Optional[List[str]] = None) -> int:
     result = validate_vocabulary()
     if not result.valid:
         if args.json:
-            print(
-                json.dumps(
-                    {
-                        "valid": False,
-                        "spec": "odpv",
-                        "kind": "Vocabulary",
-                        "errors": result.errors,
-                        "term_count": result.term_count,
-                        "relationship_count": result.relationship_count,
-                        "section_count": result.section_count,
-                    },
-                    indent=2,
-                )
-            )
+            print(json.dumps(result.to_dict(), indent=2))
             return 1
         for error in result.errors:
             print(f"ERROR: {error}", file=sys.stderr)
         return 1
 
     if args.json:
-        print(
-            json.dumps(
-                {
-                    "valid": True,
-                    "spec": "odpv",
-                    "kind": "Vocabulary",
-                    "errors": [],
-                    "term_count": result.term_count,
-                    "relationship_count": result.relationship_count,
-                    "section_count": result.section_count,
-                },
-                indent=2,
-            )
-        )
+        print(json.dumps(result.to_dict(), indent=2))
     else:
         print(
             "Validation OK "
