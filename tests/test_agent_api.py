@@ -123,6 +123,14 @@ def test_resources_are_listable_and_retrievable():
     assert get_resource("odpv.terms").id == "odpv.terms"
 
 
+def test_resource_registry_paths_are_unique_and_existing():
+    resources = list_resources()
+    ids = [resource.id for resource in resources]
+
+    assert len(ids) == len(set(ids))
+    assert all(Path(resource.path).is_file() for resource in resources)
+
+
 def test_unified_validate_and_explain_odpv():
     vocabulary = load_vocabulary()
 

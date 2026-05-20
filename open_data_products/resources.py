@@ -3,84 +3,100 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import List
+from typing import List, Tuple
 
 from .results import Resource
 
 _PACKAGE_ROOT = Path(__file__).resolve().parent
 
-_RESOURCES = [
-    Resource(
-        id="odps.schema.json",
-        spec="odps",
-        type="schema",
-        path=str(_PACKAGE_ROOT / "odps" / "data" / "schema" / "odps.json"),
-        description="Bundled ODPS v4.1 data product schema in JSON format.",
+ResourceDefinition = Tuple[str, str, str, str, str]
+
+
+def _resource(definition: ResourceDefinition) -> Resource:
+    resource_id, spec, resource_type, relative_path, description = definition
+    return Resource(
+        id=resource_id,
+        spec=spec,
+        type=resource_type,
+        path=str(_PACKAGE_ROOT / relative_path),
+        description=description,
+    )
+
+
+_RESOURCE_DEFINITIONS: Tuple[ResourceDefinition, ...] = (
+    (
+        "odps.schema.json",
+        "odps",
+        "schema",
+        "odps/data/schema/odps.json",
+        "Bundled ODPS v4.1 data product schema in JSON format.",
     ),
-    Resource(
-        id="odpc.schema.yaml",
-        spec="odpc",
-        type="schema",
-        path=str(_PACKAGE_ROOT / "odpc" / "data" / "schema" / "odpc.yaml"),
-        description="Bundled ODPC catalog schema in YAML format.",
+    (
+        "odpc.schema.yaml",
+        "odpc",
+        "schema",
+        "odpc/data/schema/odpc.yaml",
+        "Bundled ODPC catalog schema in YAML format.",
     ),
-    Resource(
-        id="odpc.schema.json",
-        spec="odpc",
-        type="schema",
-        path=str(_PACKAGE_ROOT / "odpc" / "data" / "schema" / "odpc.json"),
-        description="Bundled ODPC catalog schema in JSON format.",
+    (
+        "odpc.schema.json",
+        "odpc",
+        "schema",
+        "odpc/data/schema/odpc.json",
+        "Bundled ODPC catalog schema in JSON format.",
     ),
-    Resource(
-        id="odpc.objects",
-        spec="odpc",
-        type="jsonl",
-        path=str(_PACKAGE_ROOT / "odpc" / "data" / "catalog" / "objects.jsonl"),
-        description="Bundled ODPC object guidance records.",
+    (
+        "odpc.objects",
+        "odpc",
+        "jsonl",
+        "odpc/data/catalog/objects.jsonl",
+        "Bundled ODPC object guidance records.",
     ),
-    Resource(
-        id="odpg.schema.yaml",
-        spec="odpg",
-        type="schema",
-        path=str(_PACKAGE_ROOT / "odpg" / "data" / "schema" / "odpg.yaml"),
-        description="Bundled ODPG graph schema in YAML format.",
+    (
+        "odpg.schema.yaml",
+        "odpg",
+        "schema",
+        "odpg/data/schema/odpg.yaml",
+        "Bundled ODPG graph schema in YAML format.",
     ),
-    Resource(
-        id="odpg.schema.json",
-        spec="odpg",
-        type="schema",
-        path=str(_PACKAGE_ROOT / "odpg" / "data" / "schema" / "odpg.json"),
-        description="Bundled ODPG graph schema in JSON format.",
+    (
+        "odpg.schema.json",
+        "odpg",
+        "schema",
+        "odpg/data/schema/odpg.json",
+        "Bundled ODPG graph schema in JSON format.",
     ),
-    Resource(
-        id="odpg.graph",
-        spec="odpg",
-        type="example",
-        path=str(_PACKAGE_ROOT / "odpg" / "data" / "graph" / "graph.yaml"),
-        description="Bundled ODPG example graph used by graph explorer helpers.",
+    (
+        "odpg.graph",
+        "odpg",
+        "example",
+        "odpg/data/graph/graph.yaml",
+        "Bundled ODPG example graph used by graph explorer helpers.",
     ),
-    Resource(
-        id="odpg.objects",
-        spec="odpg",
-        type="jsonl",
-        path=str(_PACKAGE_ROOT / "odpg" / "data" / "graph" / "objects.jsonl"),
-        description="Bundled ODPG graph object guidance records.",
+    (
+        "odpg.objects",
+        "odpg",
+        "jsonl",
+        "odpg/data/graph/objects.jsonl",
+        "Bundled ODPG graph object guidance records.",
     ),
-    Resource(
-        id="odpv.vocabulary",
-        spec="odpv",
-        type="vocabulary",
-        path=str(_PACKAGE_ROOT / "odpv" / "data" / "vocab" / "odpv.yaml"),
-        description="Bundled canonical ODPV vocabulary YAML.",
+    (
+        "odpv.vocabulary",
+        "odpv",
+        "vocabulary",
+        "odpv/data/vocab/odpv.yaml",
+        "Bundled canonical ODPV vocabulary YAML.",
     ),
-    Resource(
-        id="odpv.terms",
-        spec="odpv",
-        type="jsonl",
-        path=str(_PACKAGE_ROOT / "odpv" / "data" / "vocab" / "terms.jsonl"),
-        description="Bundled ODPV term records for retrieval and search.",
+    (
+        "odpv.terms",
+        "odpv",
+        "jsonl",
+        "odpv/data/vocab/terms.jsonl",
+        "Bundled ODPV term records for retrieval and search.",
     ),
-]
+)
+
+_RESOURCES = [_resource(definition) for definition in _RESOURCE_DEFINITIONS]
 
 
 def list_resources() -> List[Resource]:
