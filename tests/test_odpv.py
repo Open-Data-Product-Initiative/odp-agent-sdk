@@ -21,6 +21,24 @@ def test_validate_vocabulary_reports_expected_counts():
     assert result.errors == []
 
 
+def test_validate_vocabulary_reports_invalid_section_terms_array():
+    vocabulary = {
+        "id": "ODPV",
+        "version": "1.0",
+        "sections": [
+            {"id": "core", "name": {"en": "Core"}, "terms": "not-a-list"},
+            {"id": "value", "name": {"en": "Value"}, "terms": []},
+            {"id": "governance", "name": {"en": "Governance"}, "terms": []},
+            {"id": "relationships", "name": {"en": "Relationships"}, "terms": []},
+        ],
+    }
+
+    result = validate_vocabulary(vocabulary)
+
+    assert result.valid is False
+    assert "Section core terms must be an array" in result.errors
+
+
 def test_search_vocabulary_returns_alias_and_example_matches():
     matches = search_vocabulary(
         "customer churn reusable data offering",

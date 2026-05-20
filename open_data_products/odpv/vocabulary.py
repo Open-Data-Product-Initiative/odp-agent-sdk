@@ -92,9 +92,16 @@ def iter_terms(
     """Return ``(section, term)`` pairs from vocabulary data."""
     terms: List[Tuple[Dict[str, Any], Dict[str, Any]]] = []
     for section in iter_sections(data):
-        for term in section.get("terms", []):
+        for term in _section_terms(section):
             terms.append((section, term))
     return terms
+
+
+def _section_terms(section: Dict[str, Any]) -> List[Dict[str, Any]]:
+    terms = section.get("terms", [])
+    if not isinstance(terms, list):
+        return []
+    return [term for term in terms if isinstance(term, dict)]
 
 
 def section_document(
@@ -168,6 +175,11 @@ def validate_data(data: Dict[str, Any]) -> List[str]:
         errors.append(f"Expected sections {list(SECTION_IDS)}, found {section_ids}")
 
     seen_ids: Set[str] = set()
+    for section in iter_sections(data):
+        if not isinstance(section.get("terms", []), list):
+            section_id = section.get("id", "<missing id>")
+            errors.append(f"Section {section_id} terms must be an array")
+
     for section, term in iter_terms(data):
         term_id = term.get("id", "<missing id>")
         if term_id in seen_ids:
