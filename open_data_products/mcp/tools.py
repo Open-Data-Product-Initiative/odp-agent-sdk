@@ -91,19 +91,30 @@ def _h_load_summary(args: Dict[str, Any]) -> Dict[str, Any]:
 
 def _h_search_terms(args: Dict[str, Any]) -> Dict[str, Any]:
     vocab = load_vocabulary()
-    results = search_vocabulary(vocab, args["query"], limit=int(args.get("limit", 10)))
+    results = search_vocabulary(
+        args["query"],
+        limit=int(args.get("limit", 10)),
+        data=vocab,
+    )
     return _json_envelope(results)
 
 
 def _h_search_objects(args: Dict[str, Any]) -> Dict[str, Any]:
     records = load_object_records()
-    results = _search_objects(records, args["query"], limit=int(args.get("limit", 10)))
+    results = _search_objects(
+        args["query"],
+        records=records,
+        limit=int(args.get("limit", 10)),
+    )
     return _json_envelope(results)
 
 
 def _h_search_graph_objects(args: Dict[str, Any]) -> Dict[str, Any]:
-    results = _search_graph_objects(args["query"])
-    return _json_envelope(results[: int(args.get("limit", 10))])
+    results = _search_graph_objects(
+        args["query"],
+        limit=int(args.get("limit", 10)),
+    )
+    return _json_envelope(results)
 
 
 def _h_summarize_graph(args: Dict[str, Any]) -> Dict[str, Any]:

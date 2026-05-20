@@ -17,6 +17,7 @@ Enumeration classes for ODPS v4.1 constants
 """
 
 from enum import Enum
+from typing import List
 
 
 class ProductStatus(Enum):
@@ -40,7 +41,7 @@ class ProductStatus(Enum):
         return _PRODUCT_STATUS_DESCRIPTIONS[self]
 
     @classmethod
-    def values(cls):
+    def values(cls) -> List[str]:
         return [item.value for item in cls]
 
     @classmethod
@@ -74,7 +75,7 @@ class ProductVisibility(Enum):
         return _PRODUCT_VISIBILITY_DESCRIPTIONS[self]
 
     @classmethod
-    def values(cls):
+    def values(cls) -> List[str]:
         return [item.value for item in cls]
 
     @classmethod
@@ -113,7 +114,7 @@ class ProductType(Enum):
         return _PRODUCT_TYPE_DESCRIPTIONS[self]
 
     @classmethod
-    def values(cls):
+    def values(cls) -> List[str]:
         return [item.value for item in cls]
 
     @classmethod
@@ -145,7 +146,7 @@ class DataContractType(Enum):
     DCS = "DCS"  # Data Contract Specification
 
     @classmethod
-    def values(cls):
+    def values(cls) -> List[str]:
         """Return list of all valid contract type values"""
         return [item.value for item in cls]
 
@@ -161,7 +162,7 @@ class OutputPortType(Enum):
     AI = "AI"  # New in v4.1 - AI agent integration via MCP
 
     @classmethod
-    def values(cls):
+    def values(cls) -> List[str]:
         """Return list of all valid output port type values"""
         return [item.value for item in cls]
 
@@ -178,7 +179,7 @@ class AuthenticationMethod(Enum):
     CUSTOM = "custom"
 
     @classmethod
-    def values(cls):
+    def values(cls) -> List[str]:
         """Return list of all valid authentication method values"""
         return [item.value for item in cls]
 
@@ -197,7 +198,7 @@ class DataFormat(Enum):
     PDF = "PDF"
 
     @classmethod
-    def values(cls):
+    def values(cls) -> List[str]:
         """Return list of all valid format values"""
         return [item.value for item in cls]
 
@@ -218,7 +219,7 @@ class SLADimensionType(Enum):
     EMAIL_RESPONSE_TIME = "emailResponseTime"
 
     @classmethod
-    def values(cls):
+    def values(cls) -> List[str]:
         """Return list of all valid SLA dimension types"""
         return [item.value for item in cls]
 
@@ -236,7 +237,7 @@ class DataQualityDimensionType(Enum):
     UNIQUENESS = "uniqueness"
 
     @classmethod
-    def values(cls):
+    def values(cls) -> List[str]:
         """Return list of all valid data quality dimension types"""
         return [item.value for item in cls]
 
@@ -258,7 +259,7 @@ class PricingModel(Enum):
     ON_REQUEST = "on request"
 
     @classmethod
-    def values(cls):
+    def values(cls) -> List[str]:
         """Return list of all valid pricing model values"""
         return [item.value for item in cls]
 
@@ -273,7 +274,7 @@ class KPIDirection(Enum):
     EQUALS = "equals"
 
     @classmethod
-    def values(cls):
+    def values(cls) -> List[str]:
         """Return list of all valid KPI direction values"""
         return [item.value for item in cls]
 
@@ -302,6 +303,6 @@ class KPIUnit(Enum):
     RECORDS = "records"
 
     @classmethod
-    def values(cls):
+    def values(cls) -> List[str]:
         """Return list of all valid KPI unit values"""
         return [item.value for item in cls]

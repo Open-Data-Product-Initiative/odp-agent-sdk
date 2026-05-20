@@ -5,7 +5,6 @@ import yaml
 
 from open_data_products import (
     explain_document,
-    explain_product,
     get_resource,
     list_resources,
     load_document,

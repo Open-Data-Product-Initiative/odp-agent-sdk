@@ -146,6 +146,24 @@ class TestMCPToolDefinitions:
         assert payload["valid"] is True
         assert payload["spec"] == "odps"
 
+    @pytest.mark.parametrize(
+        ("tool_name", "query"),
+        [
+            ("search_terms", "data product"),
+            ("search_objects", "business objective"),
+            ("search_graph_objects", "data product"),
+        ],
+    )
+    def test_search_tools_work_end_to_end(self, tool_name, query):
+        from open_data_products.mcp.tools import TOOLS
+
+        tool = next(t for t in TOOLS if t["name"] == tool_name)
+        result = tool["handler"]({"query": query, "limit": 1})
+        payload = json.loads(result["content"][0]["text"])
+
+        assert isinstance(payload, list)
+        assert len(payload) == 1
+
 
 class TestCodexProjectConfig:
     def test_codex_mcp_config_points_to_sdk_server(self):

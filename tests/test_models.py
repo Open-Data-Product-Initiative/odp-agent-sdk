@@ -1,9 +1,5 @@
 """Tests for ODPS data models."""
 
-import pytest
-from dataclasses import FrozenInstanceError
-from typing import Dict, Any
-
 from open_data_products.odps.models import (
     ProductDetails,
     UseCase,

@@ -54,7 +54,7 @@ See Also:
 
 import json
 import yaml
-from typing import Dict, Any, Optional, Union, List
+from typing import Any, Dict, List, Optional, Union, cast
 from pathlib import Path
 import hashlib
 
@@ -209,6 +209,9 @@ class OpenDataProduct:
 
     REQUIRED_SCHEMA = "https://opendataproducts.org/v4.1/schema/odps.json"
     REQUIRED_VERSION = "4.1"
+    _validation_cache: Dict[str, Any]
+    _serialization_cache: Dict[Any, str]
+    _hash_cache: Optional[str]
 
     def _generate_hash(self) -> str:
         """Generate hash of current object state for cache invalidation."""
@@ -230,9 +233,7 @@ class OpenDataProduct:
                 "extensions": str(self.extensions),
             }
             state_str = json.dumps(state_data, sort_keys=True)
-            self._hash_cache = hashlib.md5(
-                state_str.encode(), usedforsecurity=False
-            ).hexdigest()
+            self._hash_cache = hashlib.sha256(state_str.encode()).hexdigest()
 
         return self._hash_cache
 
@@ -397,7 +398,7 @@ class OpenDataProduct:
             cached_result = self._validation_cache[current_hash]
             if cached_result.get("errors"):
                 raise ODPSValidationError(cached_result["errors"])
-            return cached_result.get("valid", False)
+            return bool(cached_result.get("valid", False))
 
         # First check protocol compliance
         protocol_errors = validate_protocol_compliance(self, "ODPSDocumentProtocol")
@@ -560,13 +561,13 @@ class OpenDataProduct:
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary representation"""
-        result = {
+        result: Dict[str, Any] = {
             "schema": self.schema,
             "version": self.version,
             "product": serialize_product_details(self.product_details),
         }
 
-        product = result["product"]
+        product = cast(Dict[str, Any], result["product"])
 
         # Add optional components
         if self.product_strategy:
@@ -673,13 +674,13 @@ class OpenDataProduct:
         self.sla = SLA(profiles=profiles)
         self._invalidate_cache()
 
-    def add_license(self, scope_of_use: str, **kwargs) -> None:
+    def add_license(self, scope_of_use: str, **kwargs: Any) -> None:
         """Add or update license"""
         self.license = License(scope_of_use=scope_of_use, **kwargs)
         self._invalidate_cache()
 
     def add_data_access(
-        self, default_method: DataAccessMethod, **additional_methods
+        self, default_method: DataAccessMethod, **additional_methods: DataAccessMethod
     ) -> None:
         """Add or update data access methods"""
         self.data_access = DataAccess(

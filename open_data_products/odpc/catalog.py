@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
 import yaml
+
+from open_data_products._io import load_jsonl_records, load_mapping
+from open_data_products._search import search_records
 
 
 class NoDatesSafeLoader(yaml.SafeLoader):
@@ -36,25 +38,17 @@ def _data_file(*parts: str) -> Path:
 
 def load_catalog(path: Union[str, Path]) -> Dict[str, Any]:
     """Load an ODPC catalog from JSON or YAML."""
-    catalog_path = Path(path)
-    with catalog_path.open(encoding="utf-8") as handle:
-        if catalog_path.suffix.lower() == ".json":
-            data = json.load(handle)
-        else:
-            data = yaml.load(handle, Loader=NoDatesSafeLoader)
-    if not isinstance(data, dict):
-        raise ValueError("ODPC catalog must contain an object at the document root")
-    return data
+    return load_mapping(
+        Path(path),
+        yaml_loader=NoDatesSafeLoader,
+        root_name="ODPC catalog",
+    )
 
 
 def load_schema(path: Optional[Union[str, Path]] = None) -> Dict[str, Any]:
     """Load ODPC schema YAML from ``path`` or bundled package data."""
     schema_path = Path(path) if path is not None else _data_file("schema", "odpc.yaml")
-    with schema_path.open(encoding="utf-8") as handle:
-        schema = yaml.safe_load(handle)
-    if not isinstance(schema, dict):
-        raise ValueError("ODPC schema must contain an object at the document root")
-    return schema
+    return load_mapping(schema_path, root_name="ODPC schema")
 
 
 def load_object_records(
@@ -64,28 +58,12 @@ def load_object_records(
     records_path = (
         Path(path) if path is not None else _data_file("catalog", "objects.jsonl")
     )
-    records = []
-    with records_path.open(encoding="utf-8") as handle:
-        for line_number, line in enumerate(handle, start=1):
-            if not line.strip():
-                continue
-            try:
-                record = json.loads(line)
-            except json.JSONDecodeError as exc:
-                raise ValueError(
-                    f"{records_path}:{line_number}: invalid JSONL: {exc}"
-                ) from exc
-            if not isinstance(record, dict):
-                raise ValueError(
-                    f"{records_path}:{line_number}: record is not an object"
-                )
-            records.append(record)
-    return records
+    return load_jsonl_records(records_path)
 
 
 def searchable_text(record: Dict[str, Any]) -> str:
     """Flatten an ODPC object record into searchable lowercase text."""
-    values = []
+    values: List[str] = []
     for value in record.values():
         if isinstance(value, list):
             values.extend(str(item) for item in value)
@@ -99,26 +77,17 @@ def search_objects(
     *,
     object_id: Optional[str] = None,
     records: Optional[List[Dict[str, Any]]] = None,
+    limit: Optional[int] = None,
 ) -> List[Dict[str, Any]]:
     """Search bundled ODPC object records by keyword or exact object id."""
     source_records = records if records is not None else load_object_records()
-    if object_id:
-        wanted = object_id.lower()
-        return [
-            record
-            for record in source_records
-            if record.get("id", "").lower() == wanted
-        ]
-
-    terms = [term.lower() for term in (query or "").split() if term.strip()]
-    if not terms:
-        return source_records
-
-    return [
-        record
-        for record in source_records
-        if all(term in searchable_text(record) for term in terms)
-    ]
+    return search_records(
+        source_records,
+        query,
+        object_id=object_id,
+        limit=limit,
+        searchable_text=searchable_text,
+    )
 
 
 def render_object_records(records: List[Dict[str, Any]]) -> str:
@@ -163,7 +132,9 @@ def collect_ids(items: Any) -> List[str]:
     if not isinstance(items, list):
         return []
     return [
-        item.get("id") for item in items if isinstance(item, dict) and item.get("id")
+        str(item["id"])
+        for item in items
+        if isinstance(item, dict) and isinstance(item.get("id"), str)
     ]
 
 

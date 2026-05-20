@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import json
 import sys
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, TextIO
 
 from .. import __version__
 from .tools import TOOLS, get_tool
@@ -89,7 +89,7 @@ def _err(request_id: Any, code: int, message: str) -> Dict[str, Any]:
     return {"jsonrpc": "2.0", "id": request_id, "error": {"code": code, "message": message}}
 
 
-def serve(stdin=sys.stdin, stdout=sys.stdout) -> int:
+def serve(stdin: TextIO = sys.stdin, stdout: TextIO = sys.stdout) -> int:
     """Run the stdio JSON-RPC loop until EOF or ``exit``."""
     for line in stdin:
         line = line.strip()

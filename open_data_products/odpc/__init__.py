@@ -1,8 +1,5 @@
 """Open Data Product Catalog (ODPC) namespace."""
 
-SPEC_ID = "odpc"
-SPEC_NAME = "Open Data Product Catalog"
-
 from .catalog import (
     CatalogValidationResult,
     collect_ids,
@@ -15,6 +12,9 @@ from .catalog import (
     search_objects,
     validate_catalog,
 )
+
+SPEC_ID = "odpc"
+SPEC_NAME = "Open Data Product Catalog"
 
 __all__ = [
     "SPEC_ID",

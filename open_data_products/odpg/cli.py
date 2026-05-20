@@ -6,9 +6,11 @@ import argparse
 import json
 import sys
 from pathlib import Path
-from typing import List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import yaml
+
+from open_data_products.results import ValidationResult
 
 from .graph import (
     agent_context,
@@ -87,7 +89,7 @@ def validate_main(argv: Optional[List[str]] = None) -> int:
     return 0
 
 
-def _load_valid_graph(graph_path: str):
+def _load_valid_graph(graph_path: str) -> Tuple[Dict[str, Any], ValidationResult]:
     graph = load_graph(graph_path)
     result = validate_graph(graph)
     return graph, result

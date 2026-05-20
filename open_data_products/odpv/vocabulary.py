@@ -10,6 +10,8 @@ from typing import Any, Dict, Iterable, List, Optional, Set, Tuple, Union
 
 import yaml
 
+from open_data_products._io import load_mapping
+
 SECTION_IDS = ("core", "value", "governance", "relationships")
 REQUIRED_TERM_FIELDS = (
     "id",
@@ -57,14 +59,8 @@ def _read_package_text(name: str) -> str:
 
 def load_vocabulary(path: Optional[Union[str, Path]] = None) -> Dict[str, Any]:
     """Load ODPV vocabulary YAML from ``path`` or bundled package data."""
-    if path is None:
-        data = yaml.safe_load(_read_package_text("odpv.yaml"))
-    else:
-        with Path(path).open("r", encoding="utf-8") as handle:
-            data = yaml.safe_load(handle)
-    if not isinstance(data, dict):
-        raise ValueError("ODPV vocabulary must contain a YAML mapping")
-    return data
+    vocabulary_path = _data_file("odpv.yaml") if path is None else Path(path)
+    return load_mapping(vocabulary_path, root_name="ODPV vocabulary")
 
 
 def dump_yaml(data: Dict[str, Any]) -> str:

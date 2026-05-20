@@ -7,10 +7,10 @@ import html
 import json
 from collections import defaultdict, deque
 from pathlib import Path
-from typing import Any, DefaultDict, Dict, FrozenSet, List, Optional, Set, Tuple, Union
+from typing import Any, Deque, DefaultDict, Dict, FrozenSet, List, Optional, Set, Tuple, Union, cast
 
-import yaml
-
+from open_data_products._io import load_jsonl_records, load_mapping
+from open_data_products._search import search_records
 from open_data_products.results import ValidationResult
 
 from . import _explorer_template
@@ -119,10 +119,7 @@ def load_graph(path: Optional[Union[Path, str]] = None) -> Dict[str, Any]:
     graph_path = Path(path) if path is not None else DEFAULT_GRAPH_YAML
     if not graph_path.is_file():
         raise FileNotFoundError(f"Graph YAML not found: {graph_path}")
-    graph = yaml.safe_load(graph_path.read_text(encoding="utf-8"))
-    if not isinstance(graph, dict):
-        raise ValueError("ODPG graph must contain an object at the document root")
-    return graph
+    return load_mapping(graph_path, root_name="ODPG graph")
 
 
 load_graph_from_yaml = load_graph
@@ -131,11 +128,7 @@ load_graph_from_yaml = load_graph
 def load_schema(path: Optional[Union[Path, str]] = None) -> Dict[str, Any]:
     """Load ODPG schema YAML from ``path`` or bundled package data."""
     schema_path = Path(path) if path is not None else DEFAULT_SCHEMA_YAML
-    with schema_path.open(encoding="utf-8") as handle:
-        schema = yaml.safe_load(handle)
-    if not isinstance(schema, dict):
-        raise ValueError("ODPG schema must contain an object at the document root")
-    return schema
+    return load_mapping(schema_path, root_name="ODPG schema")
 
 
 def graph_payload(document: Dict[str, Any]) -> Dict[str, Any]:
@@ -321,11 +314,11 @@ def _edge_line_dashed(type_display: str, edge: dict) -> bool:
 def _build_legend_relationship_html(relationship_types: List[str], graph: dict) -> str:
     edges = graph_payload(graph).get("edges") or []
 
-    def sample_edge(label_raw: str) -> dict:
+    def sample_edge(label_raw: str) -> Dict[str, Any]:
         lo = label_raw.lower()
         for e in edges:
             if _edge_type_raw(e).lower() == lo:
-                return e
+                return cast(Dict[str, Any], e)
         return {}
 
     blocks: List[str] = []
@@ -478,7 +471,7 @@ def traverse_graph(
     """Discover ODPG relationship paths from a node."""
     adjacency = build_adjacency(document, reverse=reverse)
     paths: List[Dict[str, Any]] = []
-    queue = deque([(start, [])])
+    queue: Deque[Tuple[str, List[Dict[str, Any]]]] = deque([(start, [])])
     seen = {(start, 0)}
 
     while queue:
@@ -616,28 +609,12 @@ def load_graph_object_records(
 ) -> List[Dict[str, Any]]:
     """Load ODPG graph object records from JSONL."""
     records_path = Path(path) if path is not None else DEFAULT_OBJECTS_JSONL
-    records = []
-    with records_path.open(encoding="utf-8") as handle:
-        for line_number, line in enumerate(handle, start=1):
-            if not line.strip():
-                continue
-            try:
-                record = json.loads(line)
-            except json.JSONDecodeError as exc:
-                raise ValueError(
-                    f"{records_path}:{line_number}: invalid JSONL: {exc}"
-                ) from exc
-            if not isinstance(record, dict):
-                raise ValueError(
-                    f"{records_path}:{line_number}: record is not an object"
-                )
-            records.append(record)
-    return records
+    return load_jsonl_records(records_path)
 
 
 def searchable_text(record: Dict[str, Any]) -> str:
     """Flatten an ODPG graph object record into searchable lowercase text."""
-    values = []
+    values: List[str] = []
     for value in record.values():
         if isinstance(value, list):
             values.extend(str(item) for item in value)
@@ -653,26 +630,17 @@ def search_graph_objects(
     *,
     object_id: Optional[str] = None,
     records: Optional[List[Dict[str, Any]]] = None,
+    limit: Optional[int] = None,
 ) -> List[Dict[str, Any]]:
     """Search bundled ODPG graph object records by keyword or exact object id."""
     source_records = records if records is not None else load_graph_object_records()
-    if object_id:
-        wanted = object_id.lower()
-        return [
-            record
-            for record in source_records
-            if record.get("id", "").lower() == wanted
-        ]
-
-    terms = [term.lower() for term in (query or "").split() if term.strip()]
-    if not terms:
-        return source_records
-
-    return [
-        record
-        for record in source_records
-        if all(term in searchable_text(record) for term in terms)
-    ]
+    return search_records(
+        source_records,
+        query,
+        object_id=object_id,
+        limit=limit,
+        searchable_text=searchable_text,
+    )
 
 
 def render_graph_object_records(records: List[Dict[str, Any]]) -> str:

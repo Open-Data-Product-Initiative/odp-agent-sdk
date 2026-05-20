@@ -1,6 +1,5 @@
 """Integration tests that work with actual implementation."""
 
-import pytest
 import json
 import tempfile
 from pathlib import Path

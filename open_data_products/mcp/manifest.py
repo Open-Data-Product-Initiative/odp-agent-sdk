@@ -7,7 +7,7 @@ agenticpatterns.veso.ai/arws.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 from .tools import TOOLS
 

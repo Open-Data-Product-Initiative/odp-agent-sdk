@@ -8,8 +8,6 @@ from pathlib import Path
 
 import yaml
 
-from tests.test_agent_api import sample_odps_product
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 

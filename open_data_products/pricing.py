@@ -48,5 +48,6 @@ def pricing_to_402(product: OpenDataProduct) -> Optional[Dict[str, Any]]:
 
 def _flatten_label(name: Any) -> str:
     if isinstance(name, dict):
-        return name.get("en") or next(iter(name.values()), "")
+        value = name.get("en") or next(iter(name.values()), "")
+        return str(value)
     return str(name) if name is not None else ""

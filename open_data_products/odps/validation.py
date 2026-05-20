@@ -21,6 +21,7 @@ from typing import List, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from .core import OpenDataProduct
+    from .models import KPI
 
 
 from .validators import ODPSValidator
@@ -48,7 +49,7 @@ class RequiredFieldsValidator(ValidationRule):
     """Validates that all required fields are present"""
 
     def validate(self, odp: "OpenDataProduct") -> List[str]:
-        errors = []
+        errors: List[str] = []
 
         if not odp.product_details.name:
             errors.append("Product name is required")
@@ -68,7 +69,7 @@ class EnumFieldsValidator(ValidationRule):
     """Validates enum field values"""
 
     def validate(self, odp: "OpenDataProduct") -> List[str]:
-        errors = []
+        errors: List[str] = []
 
         # Validate visibility
         if odp.product_details.visibility not in ProductVisibility.values():
@@ -94,7 +95,7 @@ class DataAccessValidator(ValidationRule):
     """Validates data access requirements"""
 
     def validate(self, odp: "OpenDataProduct") -> List[str]:
-        errors = []
+        errors: List[str] = []
 
         if odp.data_access:
             if not odp.data_access.default:
@@ -465,7 +466,7 @@ class ProductStrategyValidator(ValidationRule):
     """Validates product strategy and KPIs (ODPS v4.1)"""
 
     def validate(self, odp: "OpenDataProduct") -> List[str]:
-        errors = []
+        errors: List[str] = []
 
         if not odp.product_strategy:
             return errors  # Optional component
@@ -499,9 +500,9 @@ class ProductStrategyValidator(ValidationRule):
 
         return errors
 
-    def _validate_kpi(self, kpi, field_name: str) -> List[str]:
+    def _validate_kpi(self, kpi: "KPI", field_name: str) -> List[str]:
         """Validate individual KPI"""
-        errors = []
+        errors: List[str] = []
         from .enums import KPIDirection, KPIUnit
 
         # Name is required
@@ -524,7 +525,7 @@ class ProductStrategyValidator(ValidationRule):
 class ODPSValidationFramework:
     """Main validation framework that orchestrates all validation rules"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize with default set of validation rules"""
         self.validators = [
             RequiredFieldsValidator(),

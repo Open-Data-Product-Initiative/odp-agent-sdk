@@ -37,6 +37,12 @@ def test_search_objects_returns_keyword_matches():
     assert [match["id"] for match in matches] == ["UseCase"]
 
 
+def test_search_objects_honors_limit():
+    matches = search_objects("catalog data", limit=1)
+
+    assert len(matches) == 1
+
+
 def test_load_object_records_reads_bundled_records():
     records = load_object_records()
 

@@ -11,8 +11,7 @@ import hashlib
 from pathlib import Path
 from typing import Any, Dict, Union
 
-import yaml
-
+from ._io import load_mapping
 from .agent import detect_document
 
 
@@ -31,15 +30,9 @@ def load_summary(path: Union[str, Path]) -> Dict[str, Any]:
     kind = ""
     doc_id = ""
     try:
-        if p.suffix.lower() == ".json":
-            import json
-
-            data = json.loads(text)
-        else:
-            data = yaml.safe_load(text)
-        if isinstance(data, dict):
-            spec, kind = detect_document(data)
-            doc_id = _extract_id(data)
+        data = load_mapping(p)
+        spec, kind = detect_document(data)
+        doc_id = _extract_id(data)
     except Exception:
         pass
 
@@ -56,21 +49,27 @@ def load_summary(path: Union[str, Path]) -> Dict[str, Any]:
 
 def _extract_id(data: Dict[str, Any]) -> str:
     for key in ("id", "productID"):
-        if isinstance(data.get(key), str):
-            return data[key]
+        value = data.get(key)
+        if isinstance(value, str):
+            return value
     product = data.get("product")
     if isinstance(product, dict):
         for key in ("productID", "id"):
-            if isinstance(product.get(key), str):
-                return product[key]
+            value = product.get(key)
+            if isinstance(value, str):
+                return value
     catalog = data.get("catalog")
     if isinstance(catalog, dict):
         meta = catalog.get("metadata")
-        if isinstance(meta, dict) and isinstance(meta.get("id"), str):
-            return meta["id"]
+        if isinstance(meta, dict):
+            value = meta.get("id")
+            if isinstance(value, str):
+                return value
     graph = data.get("graph")
     if isinstance(graph, dict):
         meta = graph.get("metadata")
-        if isinstance(meta, dict) and isinstance(meta.get("id"), str):
-            return meta["id"]
+        if isinstance(meta, dict):
+            value = meta.get("id")
+            if isinstance(value, str):
+                return value
     return ""

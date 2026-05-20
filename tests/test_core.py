@@ -5,7 +5,6 @@ import json
 import yaml
 import tempfile
 from pathlib import Path
-from unittest.mock import patch
 
 from open_data_products.odps import OpenDataProduct, ODPSValidationError
 from open_data_products.odps.models import ProductDetails

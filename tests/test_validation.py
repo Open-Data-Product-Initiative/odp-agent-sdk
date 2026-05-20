@@ -233,8 +233,6 @@ class TestValidationFramework:
 
     def test_validation_rule_protocol(self):
         """Test that validation rules conform to protocol."""
-        from open_data_products.odps.protocols import ValidationRuleProtocol
-
         validator = RequiredFieldsValidator()
 
         # Should implement the protocol

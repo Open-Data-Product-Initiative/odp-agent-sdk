@@ -2,8 +2,6 @@
 
 import pytest
 import json
-import yaml
-from pathlib import Path
 
 from open_data_products.odps import OpenDataProduct
 from open_data_products.odps.models import ProductDetails

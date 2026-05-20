@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict
-from typing import Any, Dict, List
+from typing import Any, Dict, List, cast
 
 from .models import (
     DataAccess,
@@ -160,11 +160,12 @@ def clean_none(value: Any) -> Any:
 
 def _preferred_language_block(data: Dict[str, Any]) -> Dict[str, Any]:
     """Return the English language block or the first available block."""
-    if isinstance(data.get("en"), dict):
-        return data["en"]
+    english = data.get("en")
+    if isinstance(english, dict):
+        return cast(Dict[str, Any], english)
     for value in data.values():
         if isinstance(value, dict):
-            return value
+            return cast(Dict[str, Any], value)
     return {}
 
 
@@ -526,7 +527,7 @@ def serialize_sla(sla: SLA) -> Dict[str, Any]:
     convert_snake_to_camel(data, COLLECTION_REF_MAPPING)
     for profile in data.get("profiles", {}).values():
         convert_snake_to_camel(profile, SLA_PROFILE_MAPPING)
-    return clean_none(data)
+    return cast(Dict[str, Any], clean_none(data))
 
 
 def serialize_data_quality(data_quality: DataQuality) -> Dict[str, Any]:
@@ -537,12 +538,12 @@ def serialize_data_quality(data_quality: DataQuality) -> Dict[str, Any]:
         convert_snake_to_camel(profile, DATA_QUALITY_PROFILE_MAPPING)
         for dimension in profile.get("dimensions", []):
             convert_snake_to_camel(dimension, DATA_QUALITY_DIMENSION_MAPPING)
-    return clean_none(data)
+    return cast(Dict[str, Any], clean_none(data))
 
 
 def serialize_data_access(data_access: DataAccess) -> Dict[str, Any]:
     """Serialize data access configuration."""
-    data = {"default": asdict(data_access.default)}
+    data: Dict[str, Any] = {"default": asdict(data_access.default)}
     convert_snake_to_camel(data["default"], DATA_ACCESS_MAPPING)
     for key, method in data_access.additional_methods.items():
         method_dict = asdict(method)
@@ -603,11 +604,11 @@ def serialize_payment_gateways(payment_gateways: PaymentGateways) -> Dict[str, A
         }
     if payment_gateways.dollar_ref:
         data["$ref"] = payment_gateways.dollar_ref
-    return clean_none(data)
+    return cast(Dict[str, Any], clean_none(data))
 
 
 def serialize_payment_gateway(payment_gateway: PaymentGateway) -> Dict[str, Any]:
     """Serialize a single payment gateway."""
     data = asdict(payment_gateway)
     convert_snake_to_camel(data, PAYMENT_GATEWAY_MAPPING)
-    return clean_none(data)
+    return cast(Dict[str, Any], clean_none(data))

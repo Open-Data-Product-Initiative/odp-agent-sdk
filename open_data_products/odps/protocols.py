@@ -17,7 +17,6 @@ Type protocols for ODPS library to enable better duck typing and type checking.
 """
 
 from typing import Protocol, Optional, List, Dict, Any, Union
-from datetime import datetime
 
 
 class ValidatableProtocol(Protocol):

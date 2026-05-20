@@ -46,6 +46,12 @@ def test_search_graph_objects_by_id_and_keywords():
     assert keyword[0]["id"] == "StrategicOpportunity"
 
 
+def test_search_graph_objects_honors_limit():
+    matches = search_graph_objects("data", limit=1)
+
+    assert len(matches) == 1
+
+
 def test_generate_graph_explorer_writes_html(tmp_path):
     output = tmp_path / "graph-explorer.html"
 

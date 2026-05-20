@@ -2,13 +2,11 @@
 
 from __future__ import annotations
 
-import json
 from jsonschema import Draft202012Validator
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 
-import yaml
-
+from ._io import load_mapping
 from .odpc import explain_catalog, load_catalog, validate_catalog
 from .odpg import explain_graph, load_graph, validate_graph
 from .odps import OpenDataProduct
@@ -83,36 +81,36 @@ def validate_document(
 
     if spec == "odpc":
         assert isinstance(loaded, dict)
-        result = validate_catalog(loaded)
+        catalog_result = validate_catalog(loaded)
         return ValidationResult(
-            valid=result.valid,
+            valid=catalog_result.valid,
             spec=spec,
             kind=kind,
-            errors=result.errors,
+            errors=catalog_result.errors,
             path=source_path,
         )
 
     if spec == "odpg":
         assert isinstance(loaded, dict)
-        result = validate_graph(loaded)
+        graph_result = validate_graph(loaded)
         return ValidationResult(
-            valid=result.valid,
+            valid=graph_result.valid,
             spec=spec,
             kind=kind,
-            errors=result.errors,
-            warnings=result.warnings,
-            hints=result.hints,
+            errors=graph_result.errors,
+            warnings=graph_result.warnings,
+            hints=graph_result.hints,
             path=source_path,
         )
 
     if spec == "odpv":
         assert isinstance(loaded, dict)
-        result = validate_vocabulary(loaded)
+        vocabulary_result = validate_vocabulary(loaded)
         return ValidationResult(
-            valid=result.valid,
+            valid=vocabulary_result.valid,
             spec=spec,
             kind=kind,
-            errors=result.errors,
+            errors=vocabulary_result.errors,
             path=source_path,
         )
 
@@ -235,14 +233,7 @@ def resolve_references(
 
 
 def _load_mapping(path: Path) -> Dict[str, Any]:
-    with path.open(encoding="utf-8") as handle:
-        if path.suffix.lower() == ".json":
-            data = json.load(handle)
-        else:
-            data = yaml.safe_load(handle)
-    if not isinstance(data, dict):
-        raise ValueError("Document must contain an object at the root")
-    return data
+    return load_mapping(path)
 
 
 def _validate_raw_odps_document(
@@ -255,7 +246,7 @@ def _validate_raw_odps_document(
     if not _is_odps_v41(raw):
         return []
 
-    schema = json.loads(_ODPS_SCHEMA_PATH.read_text(encoding="utf-8"))
+    schema = load_mapping(_ODPS_SCHEMA_PATH)
     validator = Draft202012Validator(schema)
     errors = sorted(validator.iter_errors(raw), key=lambda error: list(error.path))
     return _validate_odps_v41_shape(raw) + [

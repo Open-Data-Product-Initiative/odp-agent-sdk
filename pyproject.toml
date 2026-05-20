@@ -64,7 +64,9 @@ dev = [
     "pytest-cov>=3.0.0",
     "black>=22.0",
     "flake8>=4.0",
-    "mypy>=0.991",
+    "mypy>=1.14,<1.15",
+    "types-jsonschema",
+    "types-PyYAML",
     "build>=0.8.0",
     "twine>=4.0.0",
 ]

@@ -1,8 +1,5 @@
 """Open Data Product Vocabulary (ODPV) namespace."""
 
-SPEC_ID = "odpv"
-SPEC_NAME = "Open Data Product Vocabulary"
-
 from .vocabulary import (
     ValidationResult,
     build_artifacts,
@@ -15,6 +12,9 @@ from .vocabulary import (
     validate_vocabulary,
     write_artifacts,
 )
+
+SPEC_ID = "odpv"
+SPEC_NAME = "Open Data Product Vocabulary"
 
 __all__ = [
     "SPEC_ID",
