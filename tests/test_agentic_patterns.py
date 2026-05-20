@@ -164,6 +164,16 @@ class TestMCPToolDefinitions:
         assert isinstance(payload, list)
         assert len(payload) == 1
 
+    def test_search_tool_null_limit_uses_default(self):
+        from open_data_products.mcp.tools import TOOLS
+
+        tool = next(t for t in TOOLS if t["name"] == "search_objects")
+        result = tool["handler"]({"query": "catalog data", "limit": None})
+        payload = json.loads(result["content"][0]["text"])
+
+        assert isinstance(payload, list)
+        assert payload
+
 
 class TestCodexProjectConfig:
     def test_codex_mcp_config_points_to_sdk_server(self):

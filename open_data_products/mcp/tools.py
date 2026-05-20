@@ -54,6 +54,25 @@ def _json_envelope(payload: Any) -> Dict[str, Any]:
     return _envelope(json.dumps(payload, indent=2, default=str))
 
 
+def _int_arg(args: Dict[str, Any], name: str, default: int) -> int:
+    value = args.get(name, default)
+    return default if value is None else int(value)
+
+
+def _object_schema(
+    properties: Dict[str, Any],
+    required: Optional[List[str]] = None,
+) -> Dict[str, Any]:
+    schema: Dict[str, Any] = {
+        "type": "object",
+        "properties": properties,
+        "additionalProperties": False,
+    }
+    if required:
+        schema["required"] = required
+    return schema
+
+
 # --- handlers ---------------------------------------------------------------
 # No try/except here — the MCP server's handle() owns the error boundary.
 
@@ -70,7 +89,7 @@ def _h_explain(args: Dict[str, Any]) -> Dict[str, Any]:
 
 def _h_resolve_refs(args: Dict[str, Any]) -> Dict[str, Any]:
     refs = resolve_references(args["path"])
-    limit = int(args.get("limit", 100))
+    limit = _int_arg(args, "limit", 100)
     payload = [ref.to_dict() for ref in refs[:limit]]
     return _json_envelope(
         {"count": len(refs), "returned": len(payload), "refs": payload}
@@ -93,7 +112,7 @@ def _h_search_terms(args: Dict[str, Any]) -> Dict[str, Any]:
     vocab = load_vocabulary()
     results = search_vocabulary(
         args["query"],
-        limit=int(args.get("limit", 10)),
+        limit=_int_arg(args, "limit", 10),
         data=vocab,
     )
     return _json_envelope(results)
@@ -104,7 +123,7 @@ def _h_search_objects(args: Dict[str, Any]) -> Dict[str, Any]:
     results = _search_objects(
         args["query"],
         records=records,
-        limit=int(args.get("limit", 10)),
+        limit=_int_arg(args, "limit", 10),
     )
     return _json_envelope(results)
 
@@ -112,7 +131,7 @@ def _h_search_objects(args: Dict[str, Any]) -> Dict[str, Any]:
 def _h_search_graph_objects(args: Dict[str, Any]) -> Dict[str, Any]:
     results = _search_graph_objects(
         args["query"],
-        limit=int(args.get("limit", 10)),
+        limit=_int_arg(args, "limit", 10),
     )
     return _json_envelope(results)
 
@@ -129,7 +148,7 @@ def _h_traverse_graph(args: Dict[str, Any]) -> Dict[str, Any]:
     paths = _traverse_graph(
         graph,
         args["start"],
-        int(args.get("depth", 2)),
+        _int_arg(args, "depth", 2),
         relationship=args.get("relationship"),
         reverse=bool(args.get("reverse", False)),
     )
@@ -151,7 +170,7 @@ def _h_agent_context(args: Dict[str, Any]) -> Dict[str, Any]:
     result = _validate_graph(graph)
     if not result.valid:
         return _json_envelope(result.to_dict())
-    payload = _agent_context(graph, args["node"], int(args.get("depth", 2)))
+    payload = _agent_context(graph, args["node"], _int_arg(args, "depth", 2))
     payload["warnings"] = result.warnings
     return _json_envelope(payload)
 
@@ -184,133 +203,94 @@ TOOLS: List[Dict[str, Any]] = [
         "name": "validate_document",
         "description": "Detect the ODP spec, validate the document, and return errors/warnings.",
         "class": "safe",
-        "inputSchema": {
-            "type": "object",
-            "properties": {"path": _PATH_PROP},
-            "required": ["path"],
-            "additionalProperties": False,
-        },
+        "inputSchema": _object_schema({"path": _PATH_PROP}, ["path"]),
         "handler": _h_validate,
     },
     {
         "name": "explain_document",
         "description": "Return a compact, line-oriented human+agent summary of any ODP document.",
         "class": "safe",
-        "inputSchema": {
-            "type": "object",
-            "properties": {"path": _PATH_PROP},
-            "required": ["path"],
-            "additionalProperties": False,
-        },
+        "inputSchema": _object_schema({"path": _PATH_PROP}, ["path"]),
         "handler": _h_explain,
     },
     {
         "name": "resolve_references",
         "description": "List $ref/ref pointers in a document for cross-spec traversal.",
         "class": "safe",
-        "inputSchema": {
-            "type": "object",
-            "properties": {"path": _PATH_PROP, "limit": _LIMIT_PROP},
-            "required": ["path"],
-            "additionalProperties": False,
-        },
+        "inputSchema": _object_schema(
+            {"path": _PATH_PROP, "limit": _LIMIT_PROP}, ["path"]
+        ),
         "handler": _h_resolve_refs,
     },
     {
         "name": "list_resources",
         "description": "Enumerate bundled SDK resources (schemas, vocabularies, JSONL indexes).",
         "class": "safe",
-        "inputSchema": {
-            "type": "object",
-            "properties": {},
-            "additionalProperties": False,
-        },
+        "inputSchema": _object_schema({}),
         "handler": _h_list_resources,
     },
     {
         "name": "get_resource",
         "description": "Fetch metadata for one bundled SDK resource by id.",
         "class": "safe",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
+        "inputSchema": _object_schema(
+            {
                 "id": {
                     "type": "string",
                     "description": "Resource id from list_resources (e.g. odpv.terms).",
                 }
             },
-            "required": ["id"],
-            "additionalProperties": False,
-        },
+            ["id"],
+        ),
         "handler": _h_get_resource,
     },
     {
         "name": "load_summary",
         "description": "Return lightweight metadata (size, hash, spec) for a document; never the body.",
         "class": "safe",
-        "inputSchema": {
-            "type": "object",
-            "properties": {"path": _PATH_PROP},
-            "required": ["path"],
-            "additionalProperties": False,
-        },
+        "inputSchema": _object_schema({"path": _PATH_PROP}, ["path"]),
         "handler": _h_load_summary,
     },
     {
         "name": "search_terms",
         "description": "Search the bundled ODPV vocabulary terms by keyword.",
         "class": "safe",
-        "inputSchema": {
-            "type": "object",
-            "properties": {"query": _QUERY_PROP, "limit": _LIMIT_PROP},
-            "required": ["query"],
-            "additionalProperties": False,
-        },
+        "inputSchema": _object_schema(
+            {"query": _QUERY_PROP, "limit": _LIMIT_PROP}, ["query"]
+        ),
         "handler": _h_search_terms,
     },
     {
         "name": "search_objects",
         "description": "Search the bundled ODPC catalog object guidance records by keyword.",
         "class": "safe",
-        "inputSchema": {
-            "type": "object",
-            "properties": {"query": _QUERY_PROP, "limit": _LIMIT_PROP},
-            "required": ["query"],
-            "additionalProperties": False,
-        },
+        "inputSchema": _object_schema(
+            {"query": _QUERY_PROP, "limit": _LIMIT_PROP}, ["query"]
+        ),
         "handler": _h_search_objects,
     },
     {
         "name": "search_graph_objects",
         "description": "Search bundled ODPG graph guidance records by keyword.",
         "class": "safe",
-        "inputSchema": {
-            "type": "object",
-            "properties": {"query": _QUERY_PROP, "limit": _LIMIT_PROP},
-            "required": ["query"],
-            "additionalProperties": False,
-        },
+        "inputSchema": _object_schema(
+            {"query": _QUERY_PROP, "limit": _LIMIT_PROP}, ["query"]
+        ),
         "handler": _h_search_graph_objects,
     },
     {
         "name": "summarize_graph",
         "description": "Summarize ODPG graph metadata, nodes, edges, types, and confidence values.",
         "class": "safe",
-        "inputSchema": {
-            "type": "object",
-            "properties": {"path": _PATH_PROP},
-            "required": ["path"],
-            "additionalProperties": False,
-        },
+        "inputSchema": _object_schema({"path": _PATH_PROP}, ["path"]),
         "handler": _h_summarize_graph,
     },
     {
         "name": "traverse_graph",
         "description": "Discover ODPG relationship paths from a focus node.",
         "class": "safe",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
+        "inputSchema": _object_schema(
+            {
                 "path": _PATH_PROP,
                 "start": _NODE_PROP,
                 "depth": _DEPTH_PROP,
@@ -324,37 +304,29 @@ TOOLS: List[Dict[str, Any]] = [
                     "default": False,
                 },
             },
-            "required": ["path", "start"],
-            "additionalProperties": False,
-        },
+            ["path", "start"],
+        ),
         "handler": _h_traverse_graph,
     },
     {
         "name": "analyze_graph",
         "description": "Run ODPG strategic and governance analysis checks.",
         "class": "safe",
-        "inputSchema": {
-            "type": "object",
-            "properties": {"path": _PATH_PROP},
-            "required": ["path"],
-            "additionalProperties": False,
-        },
+        "inputSchema": _object_schema({"path": _PATH_PROP}, ["path"]),
         "handler": _h_analyze_graph,
     },
     {
         "name": "agent_context",
         "description": "Extract trusted ODPG context around a focus node.",
         "class": "safe",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
+        "inputSchema": _object_schema(
+            {
                 "path": _PATH_PROP,
                 "node": _NODE_PROP,
                 "depth": _DEPTH_PROP,
             },
-            "required": ["path", "node"],
-            "additionalProperties": False,
-        },
+            ["path", "node"],
+        ),
         "handler": _h_agent_context,
     },
 ]
