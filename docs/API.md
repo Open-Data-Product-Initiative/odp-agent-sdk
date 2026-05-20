@@ -1,4 +1,77 @@
-# ODPS Python Library API Reference
+# Open Data Products Python SDK API Reference
+
+## Agent API
+
+Use the top-level `open_data_products` API when an agent, pipeline, or tool
+needs one surface across ODPS, ODPC, ODPG, and ODPV documents:
+
+```python
+from open_data_products import (
+    detect_document,
+    explain_document,
+    get_resource,
+    list_resources,
+    load_document,
+    load_summary,
+    resolve_references,
+    validate_document,
+)
+
+document = load_document("product.yaml")
+result = validate_document(document)
+summary = explain_document(document)
+references = resolve_references(document)
+resources = list_resources()
+metadata = load_summary("product.yaml")
+```
+
+### Core Functions
+
+- `load_document(path)`: load an ODPS, ODPC, ODPG, or ODPV YAML/JSON document.
+- `detect_document(document)`: return `(spec, kind)` for a loaded document.
+- `validate_document(document_or_path, path=None)`: return a shared
+  `ValidationResult` with `valid`, `spec`, `kind`, `errors`, `warnings`,
+  `hints`, and `path`.
+- `explain_document(document_or_path, path=None)`: return a compact
+  human-and-agent-readable summary.
+- `resolve_references(document_or_path, path=None)`: return discovered `$ref`,
+  `ref`, and `schema` references as `Reference` objects.
+- `load_summary(path)`: return lightweight metadata (`path`, `byte_size`,
+  `line_count`, `sha256`, `spec`, `kind`, and `id`) without returning the
+  document body.
+- `list_resources()` and `get_resource(id)`: discover bundled schemas,
+  vocabularies, examples, and JSONL retrieval records.
+
+### Shared Result Types
+
+```python
+from open_data_products import Reference, Resource, ValidationResult
+
+result_dict = validate_document("product.yaml").to_dict()
+resource_dict = get_resource("odpv.terms").to_dict()
+reference_dicts = [ref.to_dict() for ref in resolve_references("graph.yaml")]
+```
+
+`ValidationResult`, `Resource`, and `Reference` are dataclasses with `to_dict()`
+helpers for JSON/MCP responses.
+
+### Unified CLI and Agent Surfaces
+
+The same cross-spec workflow is available through the unified CLI:
+
+```bash
+open-data-products validate product.yaml --json
+open-data-products explain product.yaml --json
+open-data-products refs graph.yaml --json
+open-data-products resources --json
+open-data-products summary product.yaml
+open-data-products manifest --json
+open-data-products serve
+```
+
+`open-data-products serve` runs the local stdio MCP server. The MCP tool
+registry and ARWS manifest expose the safe read-only tools documented in
+`README.md` and `llms.txt`.
 
 ## Package Namespace
 
@@ -16,19 +89,58 @@ from open_data_products.odps import OpenDataProduct
 from open_data_products.odps.models import ProductDetails
 ```
 
+### Spec Helper Namespaces
+
+Use the spec namespaces when the target standard is already known:
+
+```python
+from open_data_products.odpc import (
+    explain_catalog,
+    load_catalog,
+    search_objects,
+    validate_catalog,
+)
+from open_data_products.odpg import (
+    agent_context,
+    analyze_graph,
+    load_graph,
+    search_graph_objects,
+    summarize_graph,
+    traverse_graph,
+    validate_graph,
+)
+from open_data_products.odpv import (
+    build_artifacts,
+    load_vocabulary,
+    search_vocabulary,
+    validate_vocabulary,
+    write_artifacts,
+)
+```
+
+- `open_data_products.odpc`: catalog loading, schema validation, compact
+  explanations, and bundled catalog object guidance search.
+- `open_data_products.odpg`: graph loading, validation, summaries,
+  relationship traversal, strategic/governance analysis, focus-node agent
+  context, object search, and standalone graph explorer generation.
+- `open_data_products.odpv`: vocabulary loading, validation, search, generated
+  JSON/JSONL/YAML artifacts, and artifact drift checks.
+
 ## Table of Contents
 
-1. [Core Classes](#core-classes)
-2. [Data Models](#data-models)
+1. [Agent API](#agent-api)
+2. [Package Namespace](#package-namespace)
+3. [Core Classes](#core-classes)
+4. [Data Models](#data-models)
    - [ProductStrategy (v4.1)](#productstrategy-v41)
    - [KPI (v4.1)](#kpi-v41)
-3. [Validation Framework](#validation-framework)
-4. [Exception Hierarchy](#exception-hierarchy)
-5. [Type Protocols](#type-protocols)
-6. [Enumerations](#enumerations)
+5. [Validation Framework](#validation-framework)
+6. [Exception Hierarchy](#exception-hierarchy)
+7. [Type Protocols](#type-protocols)
+8. [Enumerations](#enumerations)
    - [KPI Enums (v4.1)](#kpi-enums-v41)
-7. [Utility Functions](#utility-functions)
-8. [v4.1 Features](#v41-features)
+9. [Utility Functions](#utility-functions)
+10. [v4.1 Features](#v41-features)
 
 ---
 

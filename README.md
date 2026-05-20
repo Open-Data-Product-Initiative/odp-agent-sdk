@@ -166,7 +166,7 @@ pip install "open-data-products[dev]"
 This README is intentionally a short landing page. Use the focused references
 below for implementation details:
 
-- [API reference](docs/API.md): ODPS models, validators, serialization, and examples.
+- [API reference](docs/API.md): Agent API, spec helper namespaces, ODPS models, validators, serialization, and examples.
 - [Tooling development model](docs/tooling-development-model.md): human-facing explanation of how spec-level scripts mature into consolidated SDK capabilities.
 - [Example scripts](examples/): runnable ODPS examples, including v4.1 strategy and MCP access examples.
 - [Sample apps](apps/README.md): independent CLIs built on top of the SDK.
@@ -257,9 +257,9 @@ sample apps built on top of the SDK. Each app lives in its own folder with a
 - [ODPS Pricing 402 Builder CLI](apps/pricing_402_builder/cli.py): build an HTTP 402 payment envelope from an ODPS product with pricing plans.
 
 ```bash
-python3 apps/document_inspector/cli.py apps/pricing_402_builder/priced_product.yaml
-python3 apps/vocabulary_finder/cli.py "governance policy risk" --limit 5 --json
-python3 apps/pricing_402_builder/cli.py apps/pricing_402_builder/priced_product.yaml --json
+python apps/document_inspector/cli.py apps/pricing_402_builder/priced_product.yaml
+python apps/vocabulary_finder/cli.py "governance policy risk" --limit 5 --json
+python apps/pricing_402_builder/cli.py apps/pricing_402_builder/priced_product.yaml --json
 ```
 
 ## Acknowledgments

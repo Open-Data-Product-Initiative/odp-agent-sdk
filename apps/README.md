@@ -9,8 +9,8 @@ points.
 Inspect any ODPS, ODPC, ODPG, or ODPV YAML/JSON document:
 
 ```bash
-python3 apps/document_inspector/cli.py examples/demo_product.yaml
-python3 apps/document_inspector/cli.py examples/demo_product.yaml --json
+python apps/document_inspector/cli.py examples/demo_product.yaml
+python apps/document_inspector/cli.py examples/demo_product.yaml --json
 ```
 
 The app reports detected spec and kind, validation status, a compact
@@ -21,8 +21,8 @@ explanation, discovered references, and bundled SDK resources.
 Search bundled ODPV vocabulary terms with natural-language queries:
 
 ```bash
-python3 apps/vocabulary_finder/cli.py "customer churn reusable data offering"
-python3 apps/vocabulary_finder/cli.py "governance policy risk" --limit 5 --json
+python apps/vocabulary_finder/cli.py "customer churn reusable data offering"
+python apps/vocabulary_finder/cli.py "governance policy risk" --limit 5 --json
 ```
 
 The app reports matching term IDs, sections, scores, URIs, definitions,
@@ -33,8 +33,8 @@ matched fields, and related terms.
 Build an HTTP 402 payment envelope from an ODPS product with pricing plans:
 
 ```bash
-python3 apps/pricing_402_builder/cli.py apps/pricing_402_builder/priced_product.yaml
-python3 apps/pricing_402_builder/cli.py apps/pricing_402_builder/priced_product.yaml --json
+python apps/pricing_402_builder/cli.py apps/pricing_402_builder/priced_product.yaml
+python apps/pricing_402_builder/cli.py apps/pricing_402_builder/priced_product.yaml --json
 ```
 
 The app reports the ODPS product ID, whether pricing is available, and the
