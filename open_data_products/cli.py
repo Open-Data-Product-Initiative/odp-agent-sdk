@@ -364,8 +364,8 @@ def main(argv: Optional[List[str]] = None) -> int:
                 print(json.dumps(alignment.to_dict(), indent=2))
             else:
                 print(alignment.summary)
-                for finding in alignment.findings:
-                    print(f"- {finding.code}: {finding.message}")
+                for alignment_finding in alignment.findings:
+                    print(f"- {alignment_finding.code}: {alignment_finding.message}")
             return 0 if alignment.passed else 1
 
         if args.command == "product" and args.product_command == "contract-schema":
@@ -386,18 +386,18 @@ def main(argv: Optional[List[str]] = None) -> int:
         if args.command == "product" and args.product_command == "export-contract":
             from .contracts import export_contract
 
-            result = export_contract(args.contract, args.format)
+            export_result = export_contract(args.contract, args.format)
             if args.json:
-                print(json.dumps(result.to_dict(), indent=2))
-            elif result.exported:
-                if isinstance(result.content, str):
-                    print(result.content)
+                print(json.dumps(export_result.to_dict(), indent=2))
+            elif export_result.exported:
+                if isinstance(export_result.content, str):
+                    print(export_result.content)
                 else:
-                    print(json.dumps(result.content, indent=2))
+                    print(json.dumps(export_result.content, indent=2))
             else:
-                for finding in result.findings:
-                    print(f"- {finding.code}: {finding.message}")
-            return 0 if result.exported else 1
+                for export_finding in export_result.findings:
+                    print(f"- {export_finding.code}: {export_finding.message}")
+            return 0 if export_result.exported else 1
 
         if args.command == "product" and args.product_command == "audit":
             from .contracts import generate_product_contract_report
@@ -406,18 +406,20 @@ def main(argv: Optional[List[str]] = None) -> int:
             payload = report.to_dict()
             payload["live_contract_tests_requested"] = args.run_contract_tests
             if args.run_contract_tests:
-                payload["findings"].append(
-                    {
-                        "code": "LIVE_TESTS_NOT_IMPLEMENTED",
-                        "message": (
-                            "Live Data Contract tests are not implemented in this "
-                            "SDK command yet."
-                        ),
-                        "severity": "warning",
-                        "path": None,
-                        "source": "open-data-products",
-                    }
-                )
+                findings = payload.get("findings")
+                if isinstance(findings, list):
+                    findings.append(
+                        {
+                            "code": "LIVE_TESTS_NOT_IMPLEMENTED",
+                            "message": (
+                                "Live Data Contract tests are not implemented in this "
+                                "SDK command yet."
+                            ),
+                            "severity": "warning",
+                            "path": None,
+                            "source": "open-data-products",
+                        }
+                    )
             if args.json:
                 print(json.dumps(payload, indent=2))
             else:

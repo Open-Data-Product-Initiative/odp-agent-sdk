@@ -145,6 +145,15 @@ def _validate_with_cli(
     output = "\n".join(
         part for part in [completed.stdout.strip(), completed.stderr.strip()] if part
     )
+    findings = _findings_from_output(output, completed.returncode)
+    return ContractValidationResult(
+        passed=completed.returncode == 0,
+        tool=TOOL_NAME,
+        tool_version=tool_version,
+        contract_format=_infer_contract_format(path_or_url),
+        findings=findings,
+        raw=output or None,
+    )
 
 
 def _export_with_python_api(
@@ -223,15 +232,6 @@ def _export_with_cli(
             raw=output or None,
         )
     return _contract_export_result(format, completed.stdout, tool_version)
-    findings = _findings_from_output(output, completed.returncode)
-    return ContractValidationResult(
-        passed=completed.returncode == 0,
-        tool=TOOL_NAME,
-        tool_version=tool_version,
-        contract_format=_infer_contract_format(path_or_url),
-        findings=findings,
-        raw=output or None,
-    )
 
 
 def _missing_dependency_result() -> ContractValidationResult:

@@ -132,7 +132,16 @@ models:
     assert _json_output(capsys)["field_count"] == 1
 
     assert main(["product", "contract-report", str(product), "--json"]) == 0
-    assert _json_output(capsys)["alignments"][0]["passed"] is True
+    report_payload = _json_output(capsys)
+    assert report_payload["summaries"][0]["name"] == "Orders"
+    assert report_payload["summaries"][0]["field_count"] == 1
+    assert report_payload["alignments"][0]["passed"] is True
+
+    assert main(["product", "check-contract", str(product), str(contract), "--json"]) == 1
+    check_payload = _json_output(capsys)
+    assert check_payload["product"]["valid"] is True
+    assert check_payload["contract"]["passed"] is False
+    assert check_payload["summary"].startswith("Product valid; Data Contract invalid")
 
     assert (
         main(["product", "align-contract", str(product), str(contract), "--json"])
@@ -141,3 +150,15 @@ models:
     alignment_payload = _json_output(capsys)
     assert alignment_payload["contract_valid"] is False
     assert alignment_payload["summary"].startswith("Product valid; Data Contract invalid")
+
+    assert (
+        main(["product", "audit", str(product), "--contract", str(contract), "--json"])
+        == 1
+    )
+    audit_payload = _json_output(capsys)
+    assert audit_payload["contract_count"] == 1
+    assert audit_payload["validations"][0]["passed"] is False
+    assert audit_payload["findings"][0]["severity"] == "error"
+    assert audit_payload["summary"].startswith(
+        "Product valid; 1 Data Contract reference"
+    )

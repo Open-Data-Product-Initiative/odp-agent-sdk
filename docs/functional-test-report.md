@@ -39,12 +39,12 @@ pytest -q
 | ODPG analysis | Not yet direct | Covered | Covered |
 | ODPG agent context | Not yet direct | Covered | Covered |
 | Resolve product contracts | Covered | Covered | Covered |
-| Validate Data Contracts | Covered missing optional adapter | Covered through report/alignment | Covered |
-| Summarize Data Contracts | Covered | Not yet direct | Covered |
+| Validate Data Contracts | Covered missing optional adapter | Covered through check-contract/report/alignment | Covered |
+| Summarize Data Contracts | Covered | Covered through contract-report | Covered |
 | Extract contract schema | Covered | Covered | Covered |
 | Product-contract alignment | Covered | Covered | Covered |
 | Product contract report | Covered | Covered | Covered |
-| Product contract risk summary | Not yet direct | Not yet direct | Covered |
+| Product contract risk summary | Not yet direct | Covered through audit findings | Covered |
 | MCP initialize/list tools | Not applicable | Not applicable | Covered |
 
 ## Fixture Strategy
