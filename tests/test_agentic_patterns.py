@@ -80,6 +80,14 @@ EXPECTED_TOOLS = {
     "traverse_graph",
     "analyze_graph",
     "agent_context",
+    "resolve_product_contracts",
+    "validate_product_contracts",
+    "check_product_contract_alignment",
+    "generate_product_contract_report",
+    "summarize_product_contract_risks",
+    "validate_data_contract",
+    "summarize_data_contract",
+    "extract_data_contract_schema",
 }
 
 

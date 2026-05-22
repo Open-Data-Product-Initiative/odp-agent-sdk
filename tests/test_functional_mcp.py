@@ -54,6 +54,14 @@ def test_mcp_initialize_and_list_tools() -> None:
         "traverse_graph",
         "analyze_graph",
         "agent_context",
+        "resolve_product_contracts",
+        "validate_product_contracts",
+        "check_product_contract_alignment",
+        "generate_product_contract_report",
+        "summarize_product_contract_risks",
+        "validate_data_contract",
+        "summarize_data_contract",
+        "extract_data_contract_schema",
     }
 
 
@@ -99,3 +107,63 @@ def test_mcp_unknown_tool_returns_json_rpc_error() -> None:
 
     assert response is not None
     assert response["error"]["code"] == -32601
+
+
+def test_mcp_contract_tools_work_functionally(tmp_path: Path) -> None:
+    product = tmp_path / "product.yaml"
+    contract = tmp_path / "orders.contract.yaml"
+    product.write_text(
+        """
+schema: https://opendataproducts.org/v4.0/schema/odps.json
+version: '4.0'
+product:
+  name: Orders
+  productID: orders
+  visibility: public
+  status: production
+  type: dataset
+  datasets:
+    orders:
+      fields:
+        order_id:
+          type: string
+  contract:
+    type: DCS
+    spec:
+      name: Orders
+      models:
+        orders:
+          fields:
+            order_id:
+              type: string
+              required: true
+""",
+        encoding="utf-8",
+    )
+    contract.write_text(
+        """
+name: Orders
+models:
+  orders:
+    fields:
+      order_id:
+        type: string
+        required: true
+""",
+        encoding="utf-8",
+    )
+
+    for tool_name, arguments in [
+        ("resolve_product_contracts", {"path": str(product)}),
+        ("validate_product_contracts", {"path": str(product)}),
+        (
+            "check_product_contract_alignment",
+            {"path": str(product), "contract": str(contract)},
+        ),
+        ("generate_product_contract_report", {"path": str(product)}),
+        ("summarize_product_contract_risks", {"path": str(product)}),
+        ("validate_data_contract", {"contract": str(contract)}),
+        ("summarize_data_contract", {"contract": str(contract)}),
+        ("extract_data_contract_schema", {"contract": str(contract)}),
+    ]:
+        _call_tool(tool_name, arguments)

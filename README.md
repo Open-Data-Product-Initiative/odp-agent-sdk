@@ -13,7 +13,7 @@ An AI-agent-first Python SDK for the OpenDataProducts.org standards family. It g
 * [Open Data Product Graphs (ODPG)](https://opendataproducts.org/odpg-v1.0/), and
 * [Open Data Product Vocabulary (ODPV)](https://opendataproducts.org/odpv-v1.0/).
 
-The package still includes developer-facing Python helpers, but the primary contract is agent-ready: structured validation results, lightweight artifact summaries, reference discovery, bundled retrieval resources, a unified CLI, an MCP stdio server, and an ARWS agent manifest.
+The package still includes developer-facing Python helpers, but the primary contract is agent-ready: structured validation results, lightweight artifact summaries, reference discovery, Data Contract orchestration, bundled retrieval resources, a unified CLI, an MCP stdio server, and an ARWS agent manifest.
 
 ## AI Agent-First SDK
 
@@ -24,6 +24,7 @@ The package still includes developer-facing Python helpers, but the primary cont
 - **Small-context workflows**: `load_summary` returns metadata, size, hash, spec, kind, and id without returning full document bodies.
 - **Retrieval-ready resources**: Bundled schemas, vocabulary records, catalog object records, and graph object records are discoverable through `list_resources` and MCP tools.
 - **Graph reasoning for agents**: ODPG helpers support graph summaries, traversal, strategic analysis, and trusted focus-node context extraction.
+- **Data Contract orchestration**: Optional `datacontract-cli` integration validates external contracts while the SDK resolves ODPS contract references, extracts schemas, checks static product-contract alignment, and returns agent-ready reports.
 - **Host integration**: MCP-capable tools can launch `open-data-products serve`, while ARWS-compatible systems can read the generated manifest.
 
 ### Unified Agent API
@@ -62,6 +63,32 @@ open-data-products resources --json
 open-data-products summary product.yaml      # lightweight reference: size, hash, spec
 open-data-products manifest --json           # ARWS agent manifest
 open-data-products serve                     # MCP server over stdio
+```
+
+Data Contract support is optional and product-oriented. The SDK recognizes
+native ODPS `/product/contract` references (`$ref`, `contractURL`, and inline
+`spec`) as well as practical extension-style references such as
+`extensions.dataContract.href`. External contract lint/export uses
+`datacontract-cli` when installed; inline ODPS contract specs are used for
+static summaries and alignment without running live source tests.
+
+```python
+from open_data_products import (
+    check_product_contract_alignment,
+    extract_contract_schema,
+    generate_product_contract_report,
+    resolve_product_contracts,
+    summarize_contract,
+    validate_contract,
+)
+
+for reference in resolve_product_contracts("product.yaml"):
+    print(reference.pointer, reference.href)
+
+print(validate_contract("contract.yaml").passed)
+print(extract_contract_schema("contract.yaml").field_count)
+print(check_product_contract_alignment("product.yaml", "contract.yaml").summary)
+print(generate_product_contract_report("product.yaml").summary)
 ```
 
 ### Agent Surface (MCP + ARWS)
@@ -115,8 +142,12 @@ host to launch the server.
 The same tool set (`validate_document`, `explain_document`,
 `resolve_references`, `list_resources`, `get_resource`, `load_summary`,
 `search_terms`, `search_objects`, `search_graph_objects`, `summarize_graph`,
-`traverse_graph`, `analyze_graph`, `agent_context`) is also exposed as an
-[ARWS](https://agenticpatterns.veso.ai/arws) agent manifest:
+`traverse_graph`, `analyze_graph`, `agent_context`,
+`resolve_product_contracts`, `validate_product_contracts`,
+`check_product_contract_alignment`, `generate_product_contract_report`,
+`summarize_product_contract_risks`, `validate_data_contract`,
+`summarize_data_contract`, `extract_data_contract_schema`) is also exposed as
+an [ARWS](https://agenticpatterns.veso.ai/arws) agent manifest:
 
 ```bash
 open-data-products manifest --json
@@ -147,6 +178,7 @@ Use `open_data_products.<spec>` namespaces for every standard:
 | ODPC | Validate catalogs, explain catalog metadata, and search bundled catalog object guidance |
 | ODPG | Validate graphs, summarize nodes and edges, traverse relationships, analyze governance/strategy signals, and extract agent context |
 | ODPV | Load, validate, search, and generate vocabulary artifacts for shared ODP terminology |
+| Data Contracts | Resolve ODPS contract references, validate external contracts through optional `datacontract-cli`, extract schemas, check static alignment, and generate product-level reports |
 | Bundled resources | Discover schemas, examples, vocabulary records, catalog object records, and graph object records through the resource registry |
 
 ODPS field validation includes ISO language, country, currency, date/time,
@@ -156,6 +188,9 @@ phone, email, and URI formats where those standards apply.
 
 ```bash
 pip install open-data-products
+
+# Optional Data Contract validation adapter:
+pip install "open-data-products[contracts]"
 
 # For development:
 pip install "open-data-products[dev]"
@@ -192,6 +227,60 @@ open-data-products odpg-summary graph.yaml
 open-data-products odpg-traverse graph.yaml --start AGENT-001 --depth 2
 open-data-products odpg-analyze graph.yaml
 open-data-products odpg-agent-context graph.yaml --node AGENT-001 --depth 2
+
+# Product-level Data Contract validation
+open-data-products product check-contract product.yaml contract.yaml --json
+open-data-products product resolve-contracts product.yaml --json
+open-data-products product contract-report product.yaml contract.yaml --json
+open-data-products product align-contract product.yaml contract.yaml --json
+open-data-products product contract-schema contract.yaml --json
+open-data-products product export-contract contract.yaml --format jsonschema --json
+open-data-products product audit product.yaml --json
+```
+
+### Data Contract Workflows
+
+Data Contract capabilities are intentionally split between the ODP SDK and
+`datacontract-cli`:
+
+- The ODP SDK owns product context, ODPS reference resolution, static schema extraction, alignment checks, CLI orchestration, MCP tools, and compact agent-ready reports.
+- `datacontract-cli` remains the optional execution engine for external contract linting and export.
+- Live data tests are not run by default and are not exposed through MCP.
+
+Install the optional adapter when you need external contract linting or export:
+
+```bash
+pip install "open-data-products[contracts]"
+```
+
+Supported ODPS contract locations include:
+
+```yaml
+product:
+  contract:
+    type: DCS
+    $ref: ./contracts/orders.contract.yaml
+```
+
+```yaml
+product:
+  contract:
+    type: ODCS
+    contractURL: https://example.com/contracts/orders.yaml
+```
+
+```yaml
+product:
+  contract:
+    type: DCS
+    spec:
+      name: Orders
+      models:
+        orders:
+          fields:
+            order_id:
+              type: string
+              required: true
 ```
 
 ### Spec-Specific Entry Points

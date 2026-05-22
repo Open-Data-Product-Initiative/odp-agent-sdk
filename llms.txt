@@ -13,6 +13,7 @@ repository.
 - Unified CLI: `open-data-products`
 - MCP server command: `open-data-products serve`
 - ARWS manifest command: `open-data-products manifest --json`
+- Optional Data Contract adapter: `pip install "open-data-products[contracts]"`
 - Codex project MCP config: `.codex/config.toml`
 - Claude Code project MCP config: `.mcp.json`
 - Main human README: `README.md`
@@ -43,9 +44,20 @@ Use the top-level API when the input spec is unknown:
 - `load_summary(path)`
 - `list_resources()`
 - `get_resource(id)`
+- `resolve_product_contracts(product_path_or_document)`
+- `validate_contract(contract_path_or_url)`
+- `summarize_contract(contract_path_or_url)`
+- `extract_contract_schema(contract_path_or_url)`
+- `check_product_contract_alignment(product_path_or_document, contract_path_or_url)`
+- `generate_product_contract_report(product_path_or_document, contract_path=None)`
 
 These functions support ODPS, ODPC, ODPG, and ODPV documents through one
 consistent agent-facing surface.
+
+Data Contract functions are product-oriented. The SDK resolves native ODPS
+`/product/contract` entries (`$ref`, `contractURL`, inline `spec`) and
+extension-style `extensions.dataContract.href` entries. External lint/export
+uses optional `datacontract-cli`; inline specs are static-only.
 
 ## CLI Commands
 
@@ -59,6 +71,13 @@ Use these commands for machine-readable workflows:
 - `open-data-products summary <path>`
 - `open-data-products manifest --json`
 - `open-data-products serve`
+- `open-data-products product resolve-contracts <product.yaml> --json`
+- `open-data-products product check-contract <product.yaml> <contract.yaml> --json`
+- `open-data-products product contract-report <product.yaml> [contract.yaml] --json`
+- `open-data-products product align-contract <product.yaml> <contract.yaml> --json`
+- `open-data-products product contract-schema <contract.yaml> --json`
+- `open-data-products product export-contract <contract.yaml> --format jsonschema --json`
+- `open-data-products product audit <product.yaml> --json`
 
 ODPG graph reasoning commands:
 
@@ -84,10 +103,22 @@ The MCP server exposes safe, read-only tools:
 - `traverse_graph`
 - `analyze_graph`
 - `agent_context`
+- `resolve_product_contracts`
+- `validate_product_contracts`
+- `check_product_contract_alignment`
+- `generate_product_contract_report`
+- `summarize_product_contract_risks`
+- `validate_data_contract`
+- `summarize_data_contract`
+- `extract_data_contract_schema`
 
 Tool responses should stay compact and structured. Do not return full document
 bodies from MCP handlers; use `load_summary` for lightweight artifact
 references.
+
+Contract MCP tools are safe/read-only and do not run live source tests. Use
+`check_product_contract_alignment` or `generate_product_contract_report` for
+agent-facing product-contract assessment.
 
 ## Bundled Resources
 
@@ -111,10 +142,14 @@ Agents can discover bundled resources with `list_resources()` or the
 - `open_data_products.odpc`: ODPC catalog helpers and object retrieval records
 - `open_data_products.odpg`: ODPG graph validation, traversal, analysis, and context
 - `open_data_products.odpv`: ODPV vocabulary loading, validation, search, and artifacts
+- `open_data_products.contracts`: optional Data Contract validation adapter,
+  ODPS contract reference resolution, schema extraction, alignment checks, and
+  product-level reports
 
 ## Safety
 
 - The MCP surface is safe/read-only.
+- Live Data Contract tests are not exposed through MCP.
 - Do not include local absolute paths in project MCP configs.
 - Do not include secrets in config, examples, tests, or fixtures.
 - Use logical resource ids where possible and let the resource registry resolve

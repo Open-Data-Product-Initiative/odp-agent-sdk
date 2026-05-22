@@ -23,12 +23,18 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
 from .. import (
+    check_product_contract_alignment,
+    extract_contract_schema,
     explain_document,
+    generate_product_contract_report,
     get_resource,
     list_resources,
     load_document,
     load_summary,
+    resolve_product_contracts,
     resolve_references,
+    summarize_contract,
+    validate_contract,
     validate_document,
 )
 from ..odpc import search_objects as _search_objects, load_object_records
@@ -175,6 +181,79 @@ def _h_agent_context(args: Dict[str, Any]) -> Dict[str, Any]:
     return _json_envelope(payload)
 
 
+def _h_resolve_product_contracts(args: Dict[str, Any]) -> Dict[str, Any]:
+    refs = resolve_product_contracts(args["path"])
+    return _json_envelope({"count": len(refs), "contracts": [r.to_dict() for r in refs]})
+
+
+def _h_validate_product_contracts(args: Dict[str, Any]) -> Dict[str, Any]:
+    report = generate_product_contract_report(args["path"], args.get("contract"))
+    return _json_envelope(
+        {
+            "passed": report.passed,
+            "product_valid": report.product_valid,
+            "contract_count": report.contract_count,
+            "contract_valid": report.contract_valid,
+            "contract_tests_run": report.contract_tests_run,
+            "validations": [result.to_dict() for result in report.validations],
+            "findings": [finding.to_dict() for finding in report.findings],
+            "summary": report.summary,
+        }
+    )
+
+
+def _h_check_product_contract_alignment(args: Dict[str, Any]) -> Dict[str, Any]:
+    result = check_product_contract_alignment(args["path"], args["contract"])
+    return _json_envelope(result.to_dict())
+
+
+def _h_generate_product_contract_report(args: Dict[str, Any]) -> Dict[str, Any]:
+    report = generate_product_contract_report(args["path"], args.get("contract"))
+    return _json_envelope(report.to_dict())
+
+
+def _h_summarize_product_contract_risks(args: Dict[str, Any]) -> Dict[str, Any]:
+    report = generate_product_contract_report(args["path"], args.get("contract"))
+    product_findings = [finding.to_dict() for finding in report.findings]
+    alignment_findings = [
+        {
+            "code": finding.code,
+            "message": finding.message,
+            "severity": finding.severity,
+            "path": finding.odps_path or finding.contract_path,
+            "source": "open-data-products",
+        }
+        for alignment in report.alignments
+        for finding in alignment.findings
+    ]
+    findings = product_findings + alignment_findings
+    counts = {"critical": 0, "error": 0, "warning": 0, "info": 0}
+    for finding in findings:
+        severity = str(finding.get("severity", "info"))
+        if severity in counts:
+            counts[severity] += 1
+    return _json_envelope(
+        {
+            "passed": report.passed,
+            "risk_counts": counts,
+            "findings": findings,
+            "summary": report.summary,
+        }
+    )
+
+
+def _h_validate_data_contract(args: Dict[str, Any]) -> Dict[str, Any]:
+    return _json_envelope(validate_contract(args["contract"]).to_dict())
+
+
+def _h_summarize_data_contract(args: Dict[str, Any]) -> Dict[str, Any]:
+    return _json_envelope(summarize_contract(args["contract"]).to_dict())
+
+
+def _h_extract_data_contract_schema(args: Dict[str, Any]) -> Dict[str, Any]:
+    return _json_envelope(extract_contract_schema(args["contract"]).to_dict())
+
+
 # --- registry ---------------------------------------------------------------
 
 _PATH_PROP = {
@@ -196,6 +275,10 @@ _LIMIT_PROP = {
     "minimum": 1,
     "maximum": 200,
     "default": 10,
+}
+_CONTRACT_PROP = {
+    "type": "string",
+    "description": "Filesystem path or URL to a Data Contract file.",
 }
 
 TOOLS: List[Dict[str, Any]] = [
@@ -328,6 +411,70 @@ TOOLS: List[Dict[str, Any]] = [
             ["path", "node"],
         ),
         "handler": _h_agent_context,
+    },
+    {
+        "name": "resolve_product_contracts",
+        "description": "Resolve native and extension Data Contract references from an ODPS product.",
+        "class": "safe",
+        "inputSchema": _object_schema({"path": _PATH_PROP}, ["path"]),
+        "handler": _h_resolve_product_contracts,
+    },
+    {
+        "name": "validate_product_contracts",
+        "description": "Validate an ODPS product and its referenced or explicit Data Contract.",
+        "class": "safe",
+        "inputSchema": _object_schema(
+            {"path": _PATH_PROP, "contract": _CONTRACT_PROP}, ["path"]
+        ),
+        "handler": _h_validate_product_contracts,
+    },
+    {
+        "name": "check_product_contract_alignment",
+        "description": "Check static ODPS-to-Data Contract alignment without live source tests.",
+        "class": "safe",
+        "inputSchema": _object_schema(
+            {"path": _PATH_PROP, "contract": _CONTRACT_PROP}, ["path", "contract"]
+        ),
+        "handler": _h_check_product_contract_alignment,
+    },
+    {
+        "name": "generate_product_contract_report",
+        "description": "Generate a static product-level Data Contract report.",
+        "class": "safe",
+        "inputSchema": _object_schema(
+            {"path": _PATH_PROP, "contract": _CONTRACT_PROP}, ["path"]
+        ),
+        "handler": _h_generate_product_contract_report,
+    },
+    {
+        "name": "summarize_product_contract_risks",
+        "description": "Summarize product-contract findings by severity for agent triage.",
+        "class": "safe",
+        "inputSchema": _object_schema(
+            {"path": _PATH_PROP, "contract": _CONTRACT_PROP}, ["path"]
+        ),
+        "handler": _h_summarize_product_contract_risks,
+    },
+    {
+        "name": "validate_data_contract",
+        "description": "Validate one Data Contract through the optional datacontract-cli adapter.",
+        "class": "safe",
+        "inputSchema": _object_schema({"contract": _CONTRACT_PROP}, ["contract"]),
+        "handler": _h_validate_data_contract,
+    },
+    {
+        "name": "summarize_data_contract",
+        "description": "Summarize a local Data Contract without returning the full body.",
+        "class": "safe",
+        "inputSchema": _object_schema({"contract": _CONTRACT_PROP}, ["contract"]),
+        "handler": _h_summarize_data_contract,
+    },
+    {
+        "name": "extract_data_contract_schema",
+        "description": "Extract normalized schema models and fields from a local Data Contract.",
+        "class": "safe",
+        "inputSchema": _object_schema({"contract": _CONTRACT_PROP}, ["contract"]),
+        "handler": _h_extract_data_contract_schema,
     },
 ]
 
