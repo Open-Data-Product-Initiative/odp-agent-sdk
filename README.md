@@ -362,6 +362,8 @@ We extend our gratitude to the following:
 
 **[devlouie](https://github.com/devlouie)** - Special thanks to devlouie for contributing the MCP layer and Agent Surface on top of the SDK, helping make the Open Data Products standards family easier to use from agentic tools and workflows.
 
+**[Data Contract CLI](https://github.com/datacontract/datacontract-cli)** - Special thanks to Stefan Negele, Jochen Christ, and Simon Harrer for creating Data Contract CLI, the open source execution engine this SDK can optionally use for external Data Contract validation, export, and ecosystem interoperability.
+
 **Python Community** - For the exceptional ecosystem of libraries and tools that power this implementation, including PyYAML, jsonschema, and the countless other packages that make Python development a joy.
 
 **Data Community** - For embracing open standards and driving the need for better data product specifications and tooling that benefits everyone in the data ecosystem.
