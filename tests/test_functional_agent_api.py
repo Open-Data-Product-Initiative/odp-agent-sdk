@@ -7,12 +7,18 @@ import pytest
 import yaml
 
 from open_data_products import (
+    check_product_contract_alignment,
     detect_document,
     explain_document,
+    extract_contract_schema,
+    generate_product_contract_report,
     list_resources,
     load_document,
     load_summary,
     resolve_references,
+    resolve_product_contracts,
+    summarize_contract,
+    validate_contract,
     validate_document,
 )
 
@@ -86,3 +92,67 @@ def test_resource_registry_functional_paths_exist() -> None:
     assert resources
     assert all(Path(resource.path).is_file() for resource in resources)
     assert {resource.spec for resource in resources} == {"odps", "odpc", "odpg", "odpv"}
+
+
+def test_contract_api_workflow_with_native_odps_contract(tmp_path: Path) -> None:
+    product = tmp_path / "product.yaml"
+    contract = tmp_path / "orders.contract.yaml"
+    product.write_text(
+        """
+schema: https://opendataproducts.org/v4.0/schema/odps.json
+version: '4.0'
+product:
+  name: Orders
+  productID: orders
+  visibility: public
+  status: production
+  type: dataset
+  datasets:
+    orders:
+      fields:
+        order_id:
+          type: string
+  contract:
+    type: DCS
+    spec:
+      name: Orders
+      models:
+        orders:
+          fields:
+            order_id:
+              type: string
+              required: true
+""",
+        encoding="utf-8",
+    )
+    contract.write_text(
+        """
+name: Orders
+models:
+  orders:
+    fields:
+      order_id:
+        type: string
+        required: true
+""",
+        encoding="utf-8",
+    )
+
+    references = resolve_product_contracts(product)
+    validation = validate_contract(str(contract))
+    summary = summarize_contract(str(contract))
+    schema = extract_contract_schema(str(contract))
+    alignment = check_product_contract_alignment(product, str(contract))
+    report = generate_product_contract_report(product)
+
+    assert references[0].inline_spec is not None
+    assert validation.passed is False
+    assert validation.findings[0].code == "DATACONTRACT_CLI_NOT_INSTALLED"
+    assert summary.name == "Orders"
+    assert schema.model_count == 1
+    assert schema.field_count == 1
+    assert alignment.passed is False
+    assert alignment.contract_valid is False
+    assert report.passed is True
+    assert report.contract_count == 1
+    assert report.alignments[0].passed is True

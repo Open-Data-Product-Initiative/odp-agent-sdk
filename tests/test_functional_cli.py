@@ -76,3 +76,68 @@ def test_unified_cli_odpg_reasoning_commands(
         == 0
     )
     assert _json_output(capsys)["focusNode"]["id"] == "AGENT-AVIATION-001"
+
+
+def test_unified_cli_contract_workflow(
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+) -> None:
+    product = tmp_path / "product.yaml"
+    contract = tmp_path / "orders.contract.yaml"
+    product.write_text(
+        """
+schema: https://opendataproducts.org/v4.0/schema/odps.json
+version: '4.0'
+product:
+  name: Orders
+  productID: orders
+  visibility: public
+  status: production
+  type: dataset
+  datasets:
+    orders:
+      fields:
+        order_id:
+          type: string
+  contract:
+    type: DCS
+    spec:
+      name: Orders
+      models:
+        orders:
+          fields:
+            order_id:
+              type: string
+              required: true
+""",
+        encoding="utf-8",
+    )
+    contract.write_text(
+        """
+name: Orders
+models:
+  orders:
+    fields:
+      order_id:
+        type: string
+        required: true
+""",
+        encoding="utf-8",
+    )
+
+    assert main(["product", "resolve-contracts", str(product), "--json"]) == 0
+    assert _json_output(capsys)["references"][0]["inline_spec"] is not None
+
+    assert main(["product", "contract-schema", str(contract), "--json"]) == 0
+    assert _json_output(capsys)["field_count"] == 1
+
+    assert main(["product", "contract-report", str(product), "--json"]) == 0
+    assert _json_output(capsys)["alignments"][0]["passed"] is True
+
+    assert (
+        main(["product", "align-contract", str(product), str(contract), "--json"])
+        == 1
+    )
+    alignment_payload = _json_output(capsys)
+    assert alignment_payload["contract_valid"] is False
+    assert alignment_payload["summary"].startswith("Product valid; Data Contract invalid")

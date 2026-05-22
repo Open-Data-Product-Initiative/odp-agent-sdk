@@ -20,6 +20,9 @@ def test_functional_report_lists_public_functional_suites() -> None:
         "Public Python API",
         "Unified CLI",
         "MCP JSON-RPC",
+        "Data Contract orchestration",
+        "resolve_product_contracts",
+        "check_product_contract_alignment",
         "pytest -q -m functional",
     ):
         assert expected in content
