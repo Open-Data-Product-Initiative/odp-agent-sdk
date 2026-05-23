@@ -30,8 +30,31 @@ def test_unified_cli_help_uses_compact_command_metavar(
     help_text = capsys.readouterr().out
     assert "usage: open-data-products [-h] COMMAND ..." in help_text
     assert "{validate,explain,refs" not in help_text
+    assert "Core document commands:" in help_text
+    assert "Discovery and agent commands:" in help_text
+    assert "ODPG graph commands:" in help_text
+    assert "Product/Data Contract commands:" in help_text
+    assert "Examples:" in help_text
+    assert "open-data-products validate product.yaml --json" in help_text
+    assert "open-data-products product contract-report product.yaml contract.yaml --json" in help_text
     assert "validate" in help_text
     assert "product" in help_text
+
+
+def test_product_cli_help_uses_compact_command_metavar_and_examples(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    with pytest.raises(SystemExit) as exc_info:
+        main(["product", "--help"])
+
+    assert exc_info.value.code == 0
+    help_text = capsys.readouterr().out
+    assert "usage: open-data-products product [-h] PRODUCT_COMMAND ..." in help_text
+    assert "{check-contract,resolve-contracts" not in help_text
+    assert "Data Contract workflow commands:" in help_text
+    assert "Examples:" in help_text
+    assert "open-data-products product resolve-contracts product.yaml --json" in help_text
+    assert "open-data-products product audit product.yaml --contract contract.yaml --json" in help_text
 
 
 def test_unified_cli_document_workflow(capsys: pytest.CaptureFixture[str]) -> None:

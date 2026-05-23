@@ -21,11 +21,68 @@ if TYPE_CHECKING:
     from .contracts import ProductContractReport
 
 
+TOP_LEVEL_HELP = """\
+Core document commands:
+  validate     Validate ODPS, ODPC, ODPG, or ODPV documents
+  explain      Print an agent-readable document summary
+  refs         List document references
+  summary      Return lightweight file metadata
+
+Discovery and agent commands:
+  resources    List bundled schemas, vocabularies, and indexes
+  manifest     Emit the MCP/agent manifest
+  serve        Run the MCP server over stdio
+
+ODPG graph commands:
+  odpg-summary         Summarize graph metadata and relationship counts
+  odpg-traverse        Discover relationship paths from a focus node
+  odpg-analyze         Run governance and strategic graph checks
+  odpg-agent-context   Extract graph context around a node for agents
+
+Product/Data Contract commands:
+  product resolve-contracts   Resolve Data Contract references
+  product contract-report     Generate a product-contract report
+  product audit               Run static product and contract checks
+  product check-contract      Validate a product plus an external contract
+  product align-contract      Check static ODPS/Data Contract alignment
+  product contract-schema     Summarize a Data Contract schema
+  product export-contract     Export through datacontract-cli
+
+Examples:
+  open-data-products validate product.yaml --json
+  open-data-products explain catalog.yaml
+  open-data-products resources --json
+  open-data-products odpg-agent-context graph.yaml --node DATA-PRODUCT-001
+  open-data-products product contract-report product.yaml contract.yaml --json
+  open-data-products serve
+"""
+
+PRODUCT_HELP = """\
+Data Contract workflow commands:
+  resolve-contracts   Find Data Contract references in an ODPS product
+  contract-report     Generate a static product-contract report
+  audit               Run product checks, including referenced contracts
+  check-contract      Validate a product and an external Data Contract
+  align-contract      Check static ODPS-to-Data Contract alignment
+  contract-schema     Extract models and fields from a Data Contract
+  export-contract     Export a Data Contract through datacontract-cli
+
+Examples:
+  open-data-products product resolve-contracts product.yaml --json
+  open-data-products product contract-report product.yaml contract.yaml --json
+  open-data-products product audit product.yaml --contract contract.yaml --json
+"""
+
+
 def main(argv: Optional[List[str]] = None) -> int:
     """Run the top-level Open Data Products CLI."""
     parser = argparse.ArgumentParser(
         prog="open-data-products",
-        description="Agent-oriented tools for the Open Data Products SDK.",
+        description=(
+            "Validate, inspect, and expose Open Data Product family artifacts."
+        ),
+        epilog=TOP_LEVEL_HELP,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     subparsers = parser.add_subparsers(
         dest="command",
@@ -95,10 +152,15 @@ def main(argv: Optional[List[str]] = None) -> int:
     subparsers.add_parser("serve", help="Run the MCP server over stdio")
 
     product_parser = subparsers.add_parser(
-        "product", help="Product-level orchestration workflows"
+        "product",
+        help="Product-level orchestration workflows",
+        epilog=PRODUCT_HELP,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     product_subparsers = product_parser.add_subparsers(
-        dest="product_command", required=True
+        dest="product_command",
+        metavar="PRODUCT_COMMAND",
+        required=True,
     )
     check_contract_parser = product_subparsers.add_parser(
         "check-contract",
