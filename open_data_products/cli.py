@@ -28,6 +28,18 @@ Core document commands:
   refs         List document references
   summary      Return lightweight file metadata
 
+ODPC catalog commands:
+  odpc-summary         Summarize catalog metadata and item counts
+  odpc-search          Search bundled catalog object guidance
+  resources --id odpc.objects   Return catalog object guidance records
+  MCP search_objects            Search ODPC guidance from agents
+
+ODPV vocabulary commands:
+  odpv-summary         Summarize vocabulary sections and term counts
+  odpv-search          Search bundled vocabulary terms
+  resources --id odpv.terms     Return vocabulary term records
+  MCP search_terms              Search ODPV terms from agents
+
 Discovery and agent commands:
   resources    List bundled schemas, vocabularies, and indexes
   manifest     Emit the MCP/agent manifest
@@ -51,6 +63,12 @@ Product/Data Contract commands:
 Examples:
   open-data-products validate product.yaml --json
   open-data-products explain catalog.yaml
+  open-data-products odpc-summary catalog.yaml --json
+  open-data-products odpc-search "catalog data" --limit 3 --json
+  open-data-products odpv-summary --json
+  open-data-products odpv-search "governance policy risk" --limit 3 --json
+  open-data-products resources --id odpc.objects --json
+  open-data-products resources --id odpv.terms --json
   open-data-products resources --json
   open-data-products odpg-agent-context graph.yaml --node DATA-PRODUCT-001
   open-data-products product contract-report product.yaml contract.yaml --json
@@ -110,6 +128,45 @@ def main(argv: Optional[List[str]] = None) -> int:
         "summary", help="Lightweight artifact reference for a document"
     )
     summary_parser.add_argument("document", help="Path to an ODP document")
+
+    odpc_summary_parser = subparsers.add_parser(
+        "odpc-summary", help="Summarize an ODPC catalog"
+    )
+    odpc_summary_parser.add_argument("catalog", help="Path to an ODPC catalog file")
+    odpc_summary_parser.add_argument("--json", action="store_true", help="Emit JSON")
+
+    odpc_search_parser = subparsers.add_parser(
+        "odpc-search", help="Search ODPC catalog object guidance"
+    )
+    odpc_search_parser.add_argument(
+        "query",
+        nargs="?",
+        help="Keyword query for bundled ODPC object guidance",
+    )
+    odpc_search_parser.add_argument("--id", help="Return one ODPC object by id")
+    odpc_search_parser.add_argument(
+        "--limit", type=int, default=5, help="Maximum number of matches"
+    )
+    odpc_search_parser.add_argument("--json", action="store_true", help="Emit JSON")
+
+    odpv_summary_parser = subparsers.add_parser(
+        "odpv-summary", help="Summarize an ODPV vocabulary"
+    )
+    odpv_summary_parser.add_argument(
+        "vocabulary",
+        nargs="?",
+        help="Optional path to an ODPV vocabulary file; defaults to bundled ODPV",
+    )
+    odpv_summary_parser.add_argument("--json", action="store_true", help="Emit JSON")
+
+    odpv_search_parser = subparsers.add_parser(
+        "odpv-search", help="Search ODPV vocabulary terms"
+    )
+    odpv_search_parser.add_argument("query", help="Keyword query for ODPV terms")
+    odpv_search_parser.add_argument(
+        "--limit", type=int, default=5, help="Maximum number of matches"
+    )
+    odpv_search_parser.add_argument("--json", action="store_true", help="Emit JSON")
 
     odpg_summary_parser = subparsers.add_parser(
         "odpg-summary", help="Summarize an ODPG graph"
@@ -299,6 +356,105 @@ def main(argv: Optional[List[str]] = None) -> int:
         if args.command == "summary":
             print(json.dumps(load_summary(args.document), indent=2))
             return 0
+
+        if args.command == "odpc-summary":
+            from .odpc import collect_ids, count_items, explain_catalog
+            from .odpc import load_catalog, validate_catalog
+
+            document = load_catalog(args.catalog)
+            result = validate_catalog(document)
+            catalog = document.get("catalog", {})
+            metadata = catalog.get("metadata", {}) if isinstance(catalog, dict) else {}
+            name = metadata.get("name")
+            catalog_name = (
+                name.get("en", "(unnamed)") if isinstance(name, dict) else name
+            )
+            payload = {
+                "spec": "odpc",
+                "kind": "Catalog",
+                "path": args.catalog,
+                "valid": result.valid,
+                "errors": result.errors,
+                "catalogId": metadata.get("id", "(missing)"),
+                "catalogName": catalog_name or "(unnamed)",
+                "productReferenceCount": count_items(catalog, "productReferences"),
+                "useCaseCount": count_items(catalog, "useCases"),
+                "businessObjectiveCount": count_items(catalog, "businessObjectives"),
+                "signalCount": count_items(catalog, "signals"),
+                "productReferenceIds": collect_ids(
+                    catalog.get("productReferences", [])
+                ),
+            }
+            if args.json:
+                print(json.dumps(payload, indent=2))
+            else:
+                print(explain_catalog(document, path=Path(args.catalog)), end="")
+            return 0 if result.valid else 1
+
+        if args.command == "odpc-search":
+            from .odpc import render_object_records, search_objects
+
+            matches = search_objects(
+                args.query,
+                object_id=args.id,
+                limit=args.limit,
+            )
+            if args.json:
+                print(
+                    json.dumps(
+                        {
+                            "spec": "odpc",
+                            "kind": "CatalogObjectGuidance",
+                            "matches": matches,
+                        },
+                        indent=2,
+                    )
+                )
+            else:
+                print(render_object_records(matches), end="")
+            return 0 if matches else 1
+
+        if args.command == "odpv-summary":
+            from .odpv import load_vocabulary, validate_vocabulary
+
+            vocabulary = (
+                load_vocabulary(args.vocabulary) if args.vocabulary else None
+            )
+            result = validate_vocabulary(vocabulary)
+            payload = result.to_dict()
+            if args.vocabulary:
+                payload["path"] = args.vocabulary
+            if args.json:
+                print(json.dumps(payload, indent=2))
+            else:
+                print(
+                    "ODPV Vocabulary: "
+                    f"{result.term_count} terms, "
+                    f"{result.relationship_count} relationships, "
+                    f"{result.section_count} sections"
+                )
+                for error in result.errors:
+                    print(f"- {error}")
+            return 0 if result.valid else 1
+
+        if args.command == "odpv-search":
+            from .odpv import render_search_results, search_vocabulary
+
+            matches = search_vocabulary(args.query, limit=args.limit)
+            if args.json:
+                print(
+                    json.dumps(
+                        {
+                            "spec": "odpv",
+                            "kind": "VocabularyTermSearch",
+                            "matches": matches,
+                        },
+                        indent=2,
+                    )
+                )
+            else:
+                print(render_search_results(matches), end="")
+            return 0 if matches else 1
 
         if args.command == "odpg-summary":
             from .odpg import load_graph, summarize_graph

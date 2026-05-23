@@ -31,12 +31,26 @@ def test_unified_cli_help_uses_compact_command_metavar(
     assert "usage: open-data-products [-h] COMMAND ..." in help_text
     assert "{validate,explain,refs" not in help_text
     assert "Core document commands:" in help_text
+    assert "ODPC catalog commands:" in help_text
+    assert "resources --id odpc.objects" in help_text
+    assert "MCP search_objects" in help_text
+    assert "ODPV vocabulary commands:" in help_text
+    assert "resources --id odpv.terms" in help_text
+    assert "MCP search_terms" in help_text
     assert "Discovery and agent commands:" in help_text
+    assert "ODPC catalog commands:" in help_text
+    assert "odpc-summary" in help_text
+    assert "odpc-search" in help_text
+    assert "ODPV vocabulary commands:" in help_text
+    assert "odpv-summary" in help_text
+    assert "odpv-search" in help_text
     assert "ODPG graph commands:" in help_text
     assert "Product/Data Contract commands:" in help_text
     assert "Examples:" in help_text
     assert "open-data-products validate product.yaml --json" in help_text
     assert "open-data-products product contract-report product.yaml contract.yaml --json" in help_text
+    assert "open-data-products resources --id odpc.objects --json" in help_text
+    assert "open-data-products resources --id odpv.terms --json" in help_text
     assert "validate" in help_text
     assert "product" in help_text
 
@@ -87,6 +101,65 @@ def test_unified_cli_resources_and_manifest(capsys: pytest.CaptureFixture[str]) 
         "search_terms",
         "agent_context",
     }
+
+
+def test_unified_cli_odpc_commands(
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+) -> None:
+    catalog = tmp_path / "catalog.yaml"
+    catalog.write_text(
+        """
+schema: https://opendataproducts.org/odpc-v1.0/schema/odpc.yaml
+version: '1.0'
+kind: Catalog
+catalog:
+  metadata:
+    id: CAT-001
+    name:
+      en: Customer Data Product Catalog
+    description:
+      en: Catalog for customer-facing data products.
+  productReferences:
+    - id: PRODUCT-001
+      productID: PRODUCT-001
+      productVersion: '1.0'
+      name:
+        en: Customer Product
+      description:
+        en: Customer product reference.
+      productModel:
+        standard: ODPS
+        version: '4.0'
+        format: yaml
+        $ref: ./product.yaml
+""",
+        encoding="utf-8",
+    )
+
+    assert main(["odpc-summary", str(catalog), "--json"]) == 0
+    summary_payload = _json_output(capsys)
+    assert summary_payload["spec"] == "odpc"
+    assert summary_payload["catalogId"] == "CAT-001"
+    assert summary_payload["productReferenceCount"] == 1
+
+    assert main(["odpc-search", "catalog data", "--limit", "1", "--json"]) == 0
+    search_payload = _json_output(capsys)
+    assert search_payload["spec"] == "odpc"
+    assert len(search_payload["matches"]) == 1
+
+
+def test_unified_cli_odpv_commands(capsys: pytest.CaptureFixture[str]) -> None:
+    assert main(["odpv-summary", "--json"]) == 0
+    summary_payload = _json_output(capsys)
+    assert summary_payload["spec"] == "odpv"
+    assert summary_payload["kind"] == "Vocabulary"
+    assert summary_payload["term_count"] == 59
+
+    assert main(["odpv-search", "governance policy risk", "--limit", "2", "--json"]) == 0
+    search_payload = _json_output(capsys)
+    assert search_payload["spec"] == "odpv"
+    assert len(search_payload["matches"]) == 2
 
 
 def test_unified_cli_odpg_reasoning_commands(
