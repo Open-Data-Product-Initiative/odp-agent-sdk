@@ -9,7 +9,7 @@ family. Each standard lives in its own namespace:
 - :mod:`open_data_products.odpv`
 """
 
-__version__ = "0.2.1"
+__version__ = "0.1.0"
 version = __version__
 
 from . import odpc
