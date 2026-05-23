@@ -9,7 +9,7 @@ description = "Python SDK for the OpenDataProducts.org standards family, includi
 readme = "README.md"
 license = {text = "Apache-2.0"}
 authors = [
-    {name = "Chris Howard", email = "chris.howard@accenture.com"}
+    {name = "Jarkko Moilanen", email = "jarkko@vimo.fi"}
 ]
 keywords = [
     "open-data",
