@@ -1,0 +1,48 @@
+name: Capability Drift
+
+on:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.x"
+
+    - name: Install Python dependencies
+      run: python -m pip install -e .
+
+    - name: Generate capability drift report
+      run: PYTHONDONTWRITEBYTECODE=1 python scripts/check_capability_drift.py
+
+    - name: Validate generated report and SDK agent surface
+      run: |
+        PYTHONDONTWRITEBYTECODE=1 python scripts/check_capability_drift.py --check
+        PYTHONDONTWRITEBYTECODE=1 python -c "import open_data_products"
+        PYTHONDONTWRITEBYTECODE=1 python -m open_data_products.cli manifest --json | python -m json.tool
+
+    - name: Commit drift report folder when changed
+      run: |
+        if [ -z "$(git status --porcelain -- capability-drift)" ]; then
+          echo "No drift report changes to commit."
+          exit 0
+        fi
+
+        git config user.name "github-actions[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        git add capability-drift
+        git commit -m "chore: update weekly capability drift report"
+        git push
