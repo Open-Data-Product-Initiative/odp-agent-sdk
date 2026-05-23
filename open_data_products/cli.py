@@ -27,7 +27,11 @@ def main(argv: Optional[List[str]] = None) -> int:
         prog="open-data-products",
         description="Agent-oriented tools for the Open Data Products SDK.",
     )
-    subparsers = parser.add_subparsers(dest="command", required=True)
+    subparsers = parser.add_subparsers(
+        dest="command",
+        metavar="COMMAND",
+        required=True,
+    )
 
     validate_parser = subparsers.add_parser("validate", help="Validate a document")
     validate_parser.add_argument("document", help="Path to an ODPS, ODPC, or ODPG file")

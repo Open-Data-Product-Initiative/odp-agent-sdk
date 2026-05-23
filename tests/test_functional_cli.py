@@ -20,6 +20,20 @@ def _json_output(capsys: pytest.CaptureFixture[str]) -> Dict[str, Any]:
     return json.loads(capsys.readouterr().out)
 
 
+def test_unified_cli_help_uses_compact_command_metavar(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    with pytest.raises(SystemExit) as exc_info:
+        main(["--help"])
+
+    assert exc_info.value.code == 0
+    help_text = capsys.readouterr().out
+    assert "usage: open-data-products [-h] COMMAND ..." in help_text
+    assert "{validate,explain,refs" not in help_text
+    assert "validate" in help_text
+    assert "product" in help_text
+
+
 def test_unified_cli_document_workflow(capsys: pytest.CaptureFixture[str]) -> None:
     assert main(["validate", str(ODPS_PRODUCT), "--json"]) == 0
     validate_payload = _json_output(capsys)
