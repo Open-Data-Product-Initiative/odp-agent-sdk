@@ -87,6 +87,7 @@ Repository = "https://github.com/Open-Data-Product-Initiative/odps-python"
 packages = [
     "open_data_products",
     "open_data_products.contracts",
+    "open_data_products.mcp",
     "open_data_products.odpc",
     "open_data_products.odpc.data",
     "open_data_products.odpc.data.catalog",

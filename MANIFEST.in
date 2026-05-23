@@ -1,0 +1,7 @@
+prune .codex
+prune .github
+prune .worktrees
+prune capability-drift
+prune scripts
+prune tests
+global-exclude __pycache__ *.py[cod] .DS_Store
