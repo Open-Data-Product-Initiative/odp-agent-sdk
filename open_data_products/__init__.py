@@ -10,6 +10,7 @@ family. Each standard lives in its own namespace:
 """
 
 __version__ = "0.2.0"
+version = __version__
 
 from . import odpc
 from . import odpg
@@ -58,6 +59,7 @@ from .summary import load_summary
 
 __all__ = [
     "__version__",
+    "version",
     "odpc",
     "odpg",
     "odps",

@@ -12,6 +12,13 @@ def test_public_spec_namespaces_are_importable():
     assert odpv.SPEC_ID == "odpv"
 
 
+def test_top_level_package_exposes_version_alias():
+    import open_data_products
+
+    assert open_data_products.__version__ == "0.2.0"
+    assert open_data_products.version == open_data_products.__version__
+
+
 def test_odps_namespace_exports_existing_api():
     from open_data_products.odps import OpenDataProduct
     from open_data_products.odps.core import OpenDataProduct as CoreOpenDataProduct
