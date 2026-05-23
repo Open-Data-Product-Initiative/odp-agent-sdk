@@ -15,7 +15,7 @@ def test_public_spec_namespaces_are_importable():
 def test_top_level_package_exposes_version_alias():
     import open_data_products
 
-    assert open_data_products.__version__ == "0.2.0"
+    assert open_data_products.__version__ == "2.1"
     assert open_data_products.version == open_data_products.__version__
 
 
