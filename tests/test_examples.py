@@ -3,8 +3,13 @@
 import pytest
 import json
 
+from pathlib import Path
+
+from open_data_products.odpc import build_catalog, render_catalog_html, validate_catalog
 from open_data_products.odps import OpenDataProduct
 from open_data_products.odps.models import ProductDetails
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
 class TestDemoFiles:
@@ -154,6 +159,22 @@ class TestDemoFiles:
         # Should have some optional components for a complete demo
         # (This is informational - not all demos need all components)
         print(f"Demo product includes components: {present_components}")
+
+
+class TestODPCExamples:
+    """Test cases using ODPC catalog build examples."""
+
+    def test_odpc_catalog_html_example_matches_generated_output(self):
+        """Test that the committed ODPC HTML sample matches the build helper."""
+        fragments = REPO_ROOT / "examples" / "odpc_catalog_fragments"
+        sample_html = REPO_ROOT / "examples" / "odpc_catalog.html"
+
+        document = build_catalog(fragments)
+        result = validate_catalog(document)
+
+        assert result.valid is True
+        assert sample_html.read_text(encoding="utf-8") == render_catalog_html(document)
+        assert "Example ODPC Catalog" in sample_html.read_text(encoding="utf-8")
 
 
 class TestExampleUsage:

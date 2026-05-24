@@ -3,6 +3,7 @@
 from pathlib import Path
 
 from open_data_products.odpc import (
+    DEFAULT_CATALOG_HTML_TEMPLATE,
     build_catalog,
     build_catalog_artifacts,
     explain_catalog,
@@ -139,8 +140,12 @@ useCase:
 def test_render_and_write_catalog_html(tmp_path):
     html = render_catalog_html(VALID_CATALOG)
 
-    assert html.startswith("<!DOCTYPE html>")
+    assert DEFAULT_CATALOG_HTML_TEMPLATE.name == "catalog.html"
+    assert DEFAULT_CATALOG_HTML_TEMPLATE.exists()
+    assert html.startswith("<!doctype html>")
     assert "Urban Mobility Data Product Catalog" in html
+    assert '<section class="odp-summary">' in html
+    assert '<span class="odp-count">0</span><span>Product References</span>' in html
     assert "Product References" in html
 
     output = tmp_path / "catalog.html"

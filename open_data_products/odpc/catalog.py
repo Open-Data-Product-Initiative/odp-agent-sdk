@@ -43,6 +43,15 @@ OBJECT_COLLECTIONS = {
 }
 CATALOG_COLLECTIONS = tuple(OBJECT_COLLECTIONS.values())
 METADATA_KEYS = ("metadata", "catalogMetadata")
+HTML_PLACEHOLDERS = (
+    "title",
+    "catalog_header",
+    "summary",
+    "product_references",
+    "use_cases",
+    "business_objectives",
+    "signals",
+)
 HTML_FIELDS = {
     "productReferences": (
         ("Product ID", "productID"),
@@ -77,6 +86,9 @@ HTML_SECTION_TITLES = {
 
 def _data_file(*parts: str) -> Path:
     return Path(__file__).resolve().parent.joinpath("data", *parts)
+
+
+DEFAULT_CATALOG_HTML_TEMPLATE = _data_file("templates", "catalog.html")
 
 
 def load_catalog(path: Union[str, Path]) -> Dict[str, Any]:
@@ -338,6 +350,44 @@ def render_html_link(value: Any) -> str:
     return f'<a href="{escaped}">{escaped}</a>'
 
 
+def render_catalog_header(document: Dict[str, Any]) -> str:
+    """Render the catalog HTML header fragment."""
+    catalog = document.get("catalog", {})
+    metadata = catalog.get("metadata", {}) if isinstance(catalog, dict) else {}
+    graph = metadata.get("graph") if isinstance(metadata, dict) else None
+    lines = [
+        '<header class="odp-header">',
+        f"<h1>{escaped_text(metadata.get('name'), 'ODPC Catalog')}</h1>",
+        f'<p class="odp-id">{escaped_text(metadata.get("id"))}</p>',
+        f'<p class="odp-description">{escaped_text(metadata.get("description"))}</p>',
+    ]
+    if isinstance(graph, dict):
+        lines.append(
+            '<p class="odp-graph">'
+            f"Graph: {escaped_text(graph.get('standard'))} "
+            f"{escaped_text(graph.get('version'))} "
+            f"{render_html_link(graph.get('$ref'))}</p>"
+        )
+    lines.append("</header>")
+    return "\n".join(lines)
+
+
+def render_catalog_summary(document: Dict[str, Any]) -> str:
+    """Render the catalog count summary fragment."""
+    catalog = document.get("catalog", {})
+    counts = {
+        "Product References": count_items(catalog, "productReferences"),
+        "Use Cases": count_items(catalog, "useCases"),
+        "Business Objectives": count_items(catalog, "businessObjectives"),
+        "Signals": count_items(catalog, "signals"),
+    }
+    items = "".join(
+        f'<li><span class="odp-count">{count}</span><span>{html.escape(label)}</span></li>'
+        for label, count in counts.items()
+    )
+    return f'<section class="odp-summary"><h2>Summary</h2><ul>{items}</ul></section>'
+
+
 def render_catalog_card(
     item: Any,
     fields: Tuple[Tuple[str, str], ...],
@@ -401,47 +451,35 @@ def render_catalog_html(document: Dict[str, Any]) -> str:
     """Render a standalone browser-viewable ODPC catalog HTML document."""
     catalog = document.get("catalog", {})
     metadata = catalog.get("metadata", {}) if isinstance(catalog, dict) else {}
-    title = escaped_text(metadata.get("name"), "ODPC Catalog")
-    description = escaped_text(metadata.get("description"))
-    sections = "\n".join(
-        render_catalog_section(
-            HTML_SECTION_TITLES[collection],
-            catalog.get(collection, []) if isinstance(catalog, dict) else [],
-            HTML_FIELDS[collection],
-        )
-        for collection in CATALOG_COLLECTIONS
-    )
-    return "\n".join(
-        [
-            "<!DOCTYPE html>",
-            '<html lang="en">',
-            "<head>",
-            '<meta charset="utf-8">',
-            '<meta name="viewport" content="width=device-width, initial-scale=1">',
-            f"<title>{title}</title>",
-            "<style>",
-            "body{font-family:Arial,sans-serif;margin:2rem;line-height:1.5;color:#1f2933}",
-            ".odp-header,.odp-section{max-width:960px;margin:0 auto 2rem}",
-            ".odp-card{border:1px solid #d9e2ec;border-radius:8px;padding:1rem;margin:1rem 0}",
-            ".odp-id{color:#52606d;font-family:monospace}",
-            ".odp-facts{display:grid;grid-template-columns:max-content 1fr;gap:.25rem 1rem}",
-            ".odp-facts dt{font-weight:700}",
-            ".odp-tags{display:flex;flex-wrap:wrap;gap:.5rem;padding:0;list-style:none}",
-            ".odp-tags li{border:1px solid #bcccdc;border-radius:999px;padding:.125rem .5rem}",
-            "</style>",
-            "</head>",
-            "<body>",
-            '<header class="odp-header">',
-            f"<h1>{title}</h1>",
-            f'<p class="odp-id">{escaped_text(metadata.get("id"))}</p>',
-            f"<p>{description}</p>" if description else "",
-            "</header>",
-            sections,
-            "</body>",
-            "</html>",
-            "",
-        ]
-    )
+    fragments = {
+        "title": escaped_text(metadata.get("name"), "ODPC Catalog"),
+        "catalog_header": render_catalog_header(document),
+        "summary": render_catalog_summary(document),
+        "product_references": render_catalog_section(
+            "Product References",
+            catalog.get("productReferences", []) if isinstance(catalog, dict) else [],
+            HTML_FIELDS["productReferences"],
+        ),
+        "use_cases": render_catalog_section(
+            "Use Cases",
+            catalog.get("useCases", []) if isinstance(catalog, dict) else [],
+            HTML_FIELDS["useCases"],
+        ),
+        "business_objectives": render_catalog_section(
+            "Business Objectives",
+            catalog.get("businessObjectives", []) if isinstance(catalog, dict) else [],
+            HTML_FIELDS["businessObjectives"],
+        ),
+        "signals": render_catalog_section(
+            "Signals",
+            catalog.get("signals", []) if isinstance(catalog, dict) else [],
+            HTML_FIELDS["signals"],
+        ),
+    }
+    rendered = DEFAULT_CATALOG_HTML_TEMPLATE.read_text(encoding="utf-8")
+    for placeholder in HTML_PLACEHOLDERS:
+        rendered = rendered.replace("{{ " + placeholder + " }}", fragments[placeholder])
+    return rendered
 
 
 def write_catalog_html(

@@ -224,7 +224,7 @@ product:
         "schema: https://opendataproducts.org/odpc-v1.0/schema/odpc.yaml\n"
     )
     html = html_output.read_text(encoding="utf-8")
-    assert html.startswith("<!DOCTYPE html>")
+    assert html.startswith("<!doctype html>")
     assert "Agent Ready Product" in html
 
 

@@ -1,0 +1,11 @@
+schema: https://opendataproducts.org/v4.1/schema/odps.json
+version: "4.1"
+product:
+  details:
+    en:
+      name: Customer Analytics Product
+      productID: customer-analytics-product
+      description: Customer analytics product referenced by the sample catalog.
+      visibility: internal
+      status: production
+      type: dataset

@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Example ODPC Catalog</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f7f8f5;
+      --text: #18201a;
+      --muted: #5e6b60;
+      --line: #d9dfd6;
+      --panel: #ffffff;
+      --accent: #006d1d;
+    }
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    main {
+      width: min(1180px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 32px 0 48px;
+    }
+    a {
+      color: var(--accent);
+    }
+    .odp-header {
+      padding: 24px 0;
+      border-bottom: 1px solid var(--line);
+    }
+    .odp-header h1 {
+      margin: 0 0 8px;
+      font-size: clamp(2rem, 5vw, 4rem);
+      line-height: 1;
+      letter-spacing: 0;
+    }
+    .odp-id,
+    .odp-description,
+    .odp-graph {
+      margin: 6px 0;
+      color: var(--muted);
+    }
+    .odp-summary {
+      padding: 24px 0;
+    }
+    .odp-summary ul {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+      padding: 0;
+      margin: 0;
+      list-style: none;
+    }
+    .odp-summary li,
+    .odp-card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 16px;
+    }
+    .odp-count {
+      display: block;
+      font-size: 2rem;
+      font-weight: 700;
+      line-height: 1;
+    }
+    .odp-section {
+      padding: 8px 0 24px;
+    }
+    .odp-section h2 {
+      margin: 0 0 12px;
+      font-size: 1.35rem;
+    }
+    .odp-card {
+      margin: 12px 0;
+    }
+    .odp-card h3 {
+      margin: 0;
+      font-size: 1.1rem;
+    }
+    .odp-facts {
+      display: grid;
+      grid-template-columns: max-content 1fr;
+      gap: 6px 12px;
+      margin: 12px 0 0;
+    }
+    .odp-facts dt {
+      color: var(--muted);
+      font-weight: 700;
+    }
+    .odp-facts dd {
+      margin: 0;
+    }
+    .odp-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      padding: 0;
+      margin: 12px 0 0;
+      list-style: none;
+    }
+    .odp-tags li {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 2px 8px;
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header class="odp-header">
+<h1>Example ODPC Catalog</h1>
+<p class="odp-id">CAT-EXAMPLE</p>
+<p class="odp-description">Sample catalog built from ODPC fragments and an ODPS product file.</p>
+</header>
+    <section class="odp-summary"><h2>Summary</h2><ul><li><span class="odp-count">1</span><span>Product References</span></li><li><span class="odp-count">1</span><span>Use Cases</span></li><li><span class="odp-count">0</span><span>Business Objectives</span></li><li><span class="odp-count">0</span><span>Signals</span></li></ul></section>
+    <section class="odp-section"><h2>Product References</h2><article class="odp-card">
+<h3>Customer Analytics Product</h3>
+<p class="odp-id">customer-analytics-product</p>
+<p>Customer analytics product referenced by the sample catalog.</p>
+<dl class="odp-facts"><dt>Product ID</dt><dd>customer-analytics-product</dd><dt>Version</dt><dd>4.1</dd><dt>Status</dt><dd>production</dd><dt>Visibility</dt><dd>internal</dd><dt>Product model</dt><dd>ODPS 4.1 <a href="customer_product.yaml">customer_product.yaml</a></dd></dl>
+</article></section>
+    <section class="odp-section"><h2>Use Cases</h2><article class="odp-card">
+<h3>Customer Retention</h3>
+<p class="odp-id">UC-CUSTOMER-RETENTION</p>
+<p>Improve retention decisions with trusted customer analytics.</p>
+<dl class="odp-facts"><dt>Status</dt><dd>active</dd><dt>Priority</dt><dd>high</dd></dl>
+</article></section>
+    <section class="odp-section"><h2>Business Objectives</h2><p>No entries.</p></section>
+    <section class="odp-section"><h2>Signals</h2><p>No entries.</p></section>
+  </main>
+</body>
+</html>

@@ -1,0 +1,6 @@
+catalogMetadata:
+  id: CAT-EXAMPLE
+  name:
+    en: Example ODPC Catalog
+  description:
+    en: Sample catalog built from ODPC fragments and an ODPS product file.

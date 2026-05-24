@@ -363,6 +363,9 @@ python examples/odps_v41_example.py
 - [Basic ODPS Creation](examples/basic_usage.py)
 - [Comprehensive ODPS Document](examples/comprehensive_example.py)
 - [Advanced Features](examples/advanced_features.py)
+- [ODPC catalog fragments](examples/odpc_catalog_fragments/) plus generated
+  [catalog YAML](examples/odpc_catalog.yaml) and
+  [standalone HTML](examples/odpc_catalog.html)
 
 ### Sample Apps
 The [apps/](apps/README.md) folder contains independent, runnable Python

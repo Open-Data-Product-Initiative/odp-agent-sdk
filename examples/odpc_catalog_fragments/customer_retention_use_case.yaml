@@ -1,0 +1,8 @@
+useCase:
+  id: UC-CUSTOMER-RETENTION
+  name:
+    en: Customer Retention
+  description:
+    en: Improve retention decisions with trusted customer analytics.
+  status: active
+  priority: high

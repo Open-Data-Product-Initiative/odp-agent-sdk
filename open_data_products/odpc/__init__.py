@@ -2,6 +2,7 @@
 
 from .catalog import (
     CatalogValidationResult,
+    DEFAULT_CATALOG_HTML_TEMPLATE,
     build_catalog,
     build_catalog_artifacts,
     collect_ids,
@@ -27,6 +28,7 @@ __all__ = [
     "SPEC_ID",
     "SPEC_NAME",
     "CatalogValidationResult",
+    "DEFAULT_CATALOG_HTML_TEMPLATE",
     "build_catalog",
     "build_catalog_artifacts",
     "collect_ids",

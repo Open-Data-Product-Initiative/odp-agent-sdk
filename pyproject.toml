@@ -92,6 +92,7 @@ packages = [
     "open_data_products.odpc.data",
     "open_data_products.odpc.data.catalog",
     "open_data_products.odpc.data.schema",
+    "open_data_products.odpc.data.templates",
     "open_data_products.odpg",
     "open_data_products.odpg.data",
     "open_data_products.odpg.data.graph",
@@ -109,6 +110,7 @@ packages = [
     "data/catalog/*.jsonl",
     "data/schema/*.json",
     "data/schema/*.yaml",
+    "data/templates/*.html",
 ]
 "open_data_products.odpg" = [
     "data/graph/*.jsonl",
