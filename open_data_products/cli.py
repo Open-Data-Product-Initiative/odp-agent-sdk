@@ -29,6 +29,7 @@ Core document commands:
   summary      Return lightweight file metadata
 
 ODPC catalog commands:
+  odpc-build           Build one ODPC catalog from YAML/JSON fragments
   odpc-summary         Summarize catalog metadata and item counts
   odpc-search          Search bundled catalog object guidance
   odpc-artifacts       Generate or check derived catalog schema artifacts
@@ -69,6 +70,8 @@ Product/Data Contract commands:
 Examples:
   open-data-products validate product.yaml --json
   open-data-products explain catalog.yaml
+  open-data-products odpc-build fragments/ --output catalog.yaml --json
+  open-data-products odpc-build fragments/ --output catalog.yaml --html catalog.html --json
   open-data-products odpc-summary catalog.yaml --json
   open-data-products odpc-search "catalog data" --limit 3 --json
   open-data-products odpc-artifacts generated/ --check --json
@@ -144,6 +147,45 @@ def main(argv: Optional[List[str]] = None) -> int:
     odpc_summary_parser.add_argument("catalog", help="Path to an ODPC catalog file")
     odpc_summary_parser.add_argument("--json", action="store_true", help="Emit JSON")
 
+    odpc_build_parser = subparsers.add_parser(
+        "odpc-build", help="Build an ODPC catalog from fragments"
+    )
+    odpc_build_parser.add_argument(
+        "input_dir",
+        help="Folder containing ODPC objects, ODPC catalogs, or ODPS product files",
+    )
+    odpc_build_parser.add_argument(
+        "--output",
+        "-o",
+        required=True,
+        help="Output catalog YAML path",
+    )
+    odpc_build_parser.add_argument(
+        "--html",
+        help="Optional output path for a standalone browser-viewable HTML catalog",
+    )
+    odpc_build_parser.add_argument(
+        "--id", help="Catalog metadata id to use or override"
+    )
+    odpc_build_parser.add_argument(
+        "--name", help="Catalog metadata name.en to use or override"
+    )
+    odpc_build_parser.add_argument(
+        "--description",
+        help="Catalog metadata description.en to use or override",
+    )
+    odpc_build_parser.add_argument(
+        "--no-recursive",
+        action="store_true",
+        help="Only read files directly inside input_dir.",
+    )
+    odpc_build_parser.add_argument(
+        "--no-validate",
+        action="store_true",
+        help="Write the catalog without validating it against the ODPC schema.",
+    )
+    odpc_build_parser.add_argument("--json", action="store_true", help="Emit JSON")
+
     odpc_search_parser = subparsers.add_parser(
         "odpc-search", help="Search ODPC catalog object guidance"
     )
@@ -209,7 +251,9 @@ def main(argv: Optional[List[str]] = None) -> int:
         "odpv-relationship", help="Check ODPV relationship domain/range compatibility"
     )
     odpv_relationship_parser.add_argument("source", help="Source ODPV object type")
-    odpv_relationship_parser.add_argument("verb", help="Relationship id, alias, or text")
+    odpv_relationship_parser.add_argument(
+        "verb", help="Relationship id, alias, or text"
+    )
     odpv_relationship_parser.add_argument("target", help="Target ODPV object type")
     odpv_relationship_parser.add_argument(
         "--json", action="store_true", help="Emit JSON"
@@ -301,7 +345,9 @@ def main(argv: Optional[List[str]] = None) -> int:
         "resolve-contracts",
         help="Resolve Data Contract references from an ODPS product",
     )
-    resolve_contracts_parser.add_argument("product", help="Path to an ODPS product file")
+    resolve_contracts_parser.add_argument(
+        "product", help="Path to an ODPS product file"
+    )
     resolve_contracts_parser.add_argument(
         "--json", action="store_true", help="Emit JSON"
     )
@@ -460,6 +506,74 @@ def main(argv: Optional[List[str]] = None) -> int:
                 print(explain_catalog(document, path=Path(args.catalog)), end="")
             return 0 if result.valid else 1
 
+        if args.command == "odpc-build":
+            from .odpc import (
+                build_catalog,
+                count_items,
+                validate_catalog,
+                write_catalog,
+                write_catalog_html,
+            )
+
+            output = Path(args.output)
+            html_output = Path(args.html) if args.html else None
+            document = build_catalog(
+                args.input_dir,
+                recursive=not args.no_recursive,
+                output_path=output,
+                catalog_id=args.id,
+                name=args.name,
+                description=args.description,
+            )
+            result = validate_catalog(document) if not args.no_validate else None
+            if result is not None and not result.valid:
+                if args.json:
+                    print(
+                        json.dumps(
+                            {
+                                "spec": "odpc",
+                                "kind": "Catalog",
+                                "output": str(output),
+                                "valid": False,
+                                "errors": result.errors,
+                            },
+                            indent=2,
+                        )
+                    )
+                else:
+                    print("Generated catalog is invalid:", file=sys.stderr)
+                    for error in result.errors:
+                        print(f"- {error}", file=sys.stderr)
+                return 1
+
+            write_catalog(output, document)
+            if html_output:
+                write_catalog_html(html_output, document)
+            catalog = document.get("catalog", {})
+            payload = {
+                "spec": "odpc",
+                "kind": "Catalog",
+                "output": str(output),
+                "html": str(html_output) if html_output else None,
+                "valid": True if result is not None else None,
+                "productReferenceCount": count_items(catalog, "productReferences"),
+                "useCaseCount": count_items(catalog, "useCases"),
+                "businessObjectiveCount": count_items(catalog, "businessObjectives"),
+                "signalCount": count_items(catalog, "signals"),
+            }
+            if args.json:
+                print(json.dumps(payload, indent=2))
+            else:
+                print(
+                    "Generated "
+                    f"{output} "
+                    f"(productReferences={payload['productReferenceCount']}, "
+                    f"useCases={payload['useCaseCount']}, "
+                    f"businessObjectives={payload['businessObjectiveCount']}, "
+                    f"signals={payload['signalCount']})"
+                )
+            return 0
+
         if args.command == "odpc-search":
             from .odpc import render_object_records, search_objects
 
@@ -508,9 +622,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         if args.command == "odpv-summary":
             from .odpv import load_vocabulary, validate_vocabulary
 
-            vocabulary = (
-                load_vocabulary(args.vocabulary) if args.vocabulary else None
-            )
+            vocabulary = load_vocabulary(args.vocabulary) if args.vocabulary else None
             result = validate_vocabulary(vocabulary)
             payload = result.to_dict()
             if args.vocabulary:

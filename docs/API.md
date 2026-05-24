@@ -95,10 +95,13 @@ Use the spec namespaces when the target standard is already known:
 
 ```python
 from open_data_products.odpc import (
+    build_catalog,
     explain_catalog,
     load_catalog,
+    render_catalog_html,
     search_objects,
     validate_catalog,
+    write_catalog_html,
 )
 from open_data_products.odpg import (
     agent_context,
@@ -118,8 +121,9 @@ from open_data_products.odpv import (
 )
 ```
 
-- `open_data_products.odpc`: catalog loading, schema validation, compact
-  explanations, and bundled catalog object guidance search.
+- `open_data_products.odpc`: catalog building from ODPC fragments or ODPS
+  product files, standalone catalog HTML rendering, loading, schema validation,
+  compact explanations, and bundled catalog object guidance search.
 - `open_data_products.odpg`: graph loading, validation, summaries,
   relationship traversal, strategic/governance analysis, focus-node agent
   context, object search, and standalone graph explorer generation.

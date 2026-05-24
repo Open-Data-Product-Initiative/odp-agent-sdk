@@ -78,7 +78,7 @@ The MCP and agent surface should live inside the SDK as well. The SDK should inc
 The spec-specific namespaces should preserve domain logic.
 
 - The ODPS namespace should handle ODPS models, validation, codecs, protocols, exceptions, and schema data.
-- The ODPC namespace should handle catalog loading, validation, explanation, object search, and bundled catalog resources.
+- The ODPC namespace should handle catalog building, loading, validation, explanation, object search, and bundled catalog resources.
 - The ODPG namespace should handle graph loading, validation, traversal, analysis, agent context, graph explorer generation, and bundled graph objects.
 - The ODPV namespace should handle vocabulary loading, validation, search, artifact generation, and bundled vocabulary files.
 

@@ -53,8 +53,12 @@ from .contracts import (
     validate_contract,
 )
 from .odpc import (
+    build_catalog,
     build_catalog_artifacts,
+    render_catalog_html,
     render_catalog_schema_json,
+    write_catalog,
+    write_catalog_html,
     write_catalog_artifacts,
 )
 from .odpv import (
@@ -80,6 +84,7 @@ __all__ = [
     "ValidationResult",
     "AlignmentFinding",
     "agent_vocabulary_context",
+    "build_catalog",
     "build_catalog_artifacts",
     "check_vocabulary_relationship",
     "ContractToolAvailability",
@@ -112,6 +117,7 @@ __all__ = [
     "load_summary",
     "pricing_to_402",
     "generate_product_contract_report",
+    "render_catalog_html",
     "render_catalog_schema_json",
     "resolve_references",
     "resolve_vocabulary_term",
@@ -120,5 +126,7 @@ __all__ = [
     "summarize_contract_document",
     "validate_contract",
     "validate_document",
+    "write_catalog",
+    "write_catalog_html",
     "write_catalog_artifacts",
 ]

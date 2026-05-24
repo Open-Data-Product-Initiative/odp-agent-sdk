@@ -3,12 +3,15 @@
 from pathlib import Path
 
 from open_data_products.odpc import (
+    build_catalog,
     build_catalog_artifacts,
     explain_catalog,
     load_object_records,
+    render_catalog_html,
     render_catalog_schema_json,
     search_objects,
     validate_catalog,
+    write_catalog_html,
     write_catalog_artifacts,
 )
 
@@ -77,6 +80,73 @@ def test_write_catalog_artifacts_can_check_and_generate_to_target_directory(tmp_
     assert written == changed
 
     assert write_catalog_artifacts(tmp_path, check=True) == []
+
+
+def test_build_catalog_collects_fragments_and_product_references(tmp_path):
+    fragments = tmp_path / "fragments"
+    fragments.mkdir()
+    (fragments / "metadata.yaml").write_text(
+        """
+catalogMetadata:
+  id: CAT-BUILT
+  name:
+    en: Built Catalog
+  description:
+    en: Built from fragments.
+""",
+        encoding="utf-8",
+    )
+    (fragments / "product.yaml").write_text(
+        """
+schema: https://opendataproducts.org/v4.1/schema/odps.json
+version: "4.1"
+product:
+  details:
+    en:
+      name: Customer Product
+      productID: customer-product
+      status: production
+      visibility: internal
+      type: dataset
+""",
+        encoding="utf-8",
+    )
+    (fragments / "use_case.yaml").write_text(
+        """
+useCase:
+  id: UC-001
+  name:
+    en: Customer Retention
+  description:
+    en: Improve retention analytics.
+""",
+        encoding="utf-8",
+    )
+
+    document = build_catalog(fragments)
+
+    assert document["kind"] == "Catalog"
+    assert document["catalog"]["metadata"]["id"] == "CAT-BUILT"
+    assert document["catalog"]["useCases"][0]["id"] == "UC-001"
+    reference = document["catalog"]["productReferences"][0]
+    assert reference["productID"] == "customer-product"
+    assert reference["name"] == {"en": "Customer Product"}
+    assert reference["status"] == "production"
+    assert reference["visibility"] == "internal"
+    assert reference["productModel"]["$ref"] == "product.yaml"
+
+
+def test_render_and_write_catalog_html(tmp_path):
+    html = render_catalog_html(VALID_CATALOG)
+
+    assert html.startswith("<!DOCTYPE html>")
+    assert "Urban Mobility Data Product Catalog" in html
+    assert "Product References" in html
+
+    output = tmp_path / "catalog.html"
+    write_catalog_html(output, VALID_CATALOG)
+
+    assert output.read_text(encoding="utf-8") == html
 
 
 def test_explain_catalog_renders_summary_for_catalog_document():

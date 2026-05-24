@@ -23,7 +23,7 @@ The package still includes developer-facing Python helpers, but the primary cont
 - **Structured outputs**: Validation, references, resources, summaries, and graph reasoning helpers return predictable objects that are easy for agents to inspect.
 - **Small-context workflows**: `load_summary` returns metadata, size, hash, spec, kind, and id without returning full document bodies.
 - **Retrieval-ready resources**: Bundled schemas, vocabulary records, catalog object records, and graph object records are discoverable through `list_resources` and MCP tools.
-- **Agent-ready ODPC and ODPV helpers**: Catalog artifact checks, vocabulary term resolution, canonical term packets, relationship compatibility checks, and term context packets are available through Python, CLI, and MCP surfaces.
+- **Agent-ready ODPC and ODPV helpers**: Catalog building, catalog artifact checks, vocabulary term resolution, canonical term packets, relationship compatibility checks, and term context packets are available through Python, CLI, and MCP surfaces where safe.
 - **Graph reasoning for agents**: ODPG helpers support graph summaries, traversal, strategic analysis, and trusted focus-node context extraction.
 - **Data Contract orchestration**: Optional `datacontract-cli` integration validates external contracts while the SDK resolves ODPS contract references, extracts schemas, checks static product-contract alignment, and returns agent-ready reports.
 - **Host integration**: MCP-capable tools can launch `open-data-products serve`, while ARWS-compatible systems can read the generated manifest.
@@ -178,7 +178,7 @@ Use `open_data_products.<spec>` namespaces for every standard:
 | Cross-spec API | Detect, load, validate, explain, summarize, and resolve references across ODPS, ODPC, ODPG, and ODPV |
 | MCP + ARWS | Run a local stdio MCP server, expose safe tools, and generate an ARWS agent manifest |
 | ODPS | Create, load, validate, serialize, and inspect ODPS v4.1 data product documents |
-| ODPC | Validate catalogs, explain catalog metadata, search bundled catalog object guidance, and generate/check derived catalog schema artifacts |
+| ODPC | Build catalogs from fragments, validate catalogs, explain catalog metadata, search bundled catalog object guidance, and generate/check derived catalog schema artifacts |
 | ODPG | Validate graphs, summarize nodes and edges, traverse relationships, analyze governance/strategy signals, and extract agent context |
 | ODPV | Load, validate, search, generate vocabulary artifacts, resolve terms and aliases, explain canonical term packets, check relationships, and produce agent context for shared ODP terminology |
 | Data Contracts | Resolve ODPS contract references, validate external contracts through optional `datacontract-cli`, extract schemas, check static alignment, and generate product-level reports |
@@ -230,6 +230,12 @@ open-data-products resources --id odpv.terms --json
 open-data-products resources --id odpg.objects --json
 
 # ODPC catalog helpers
+# Build YAML only
+open-data-products odpc-build fragments/ --output catalog.yaml --json
+
+# Build YAML and standalone HTML
+open-data-products odpc-build fragments/ --output catalog.yaml --html catalog.html --json
+
 open-data-products odpc-summary catalog.yaml --json
 open-data-products odpc-search "catalog data" --limit 3 --json
 open-data-products odpc-artifacts generated/ --check --json
@@ -307,7 +313,7 @@ product:
 ### Spec-Specific Entry Points
 
 - `open_data_products.odps`: ODPS v4.1 models, standards-aware validation, YAML/JSON I/O, compliance helpers, and `pricing_to_402`.
-- `open_data_products.odpc`: ODPC catalog loading, validation, explanation, and object guidance search.
+- `open_data_products.odpc`: ODPC catalog building, loading, validation, explanation, and object guidance search.
 - `open_data_products.odpg`: ODPG graph validation, summary, traversal, analysis, agent context, object search, and graph explorer generation.
 - `open_data_products.odpv`: ODPV vocabulary loading, validation, search, and generated vocabulary artifacts.
 

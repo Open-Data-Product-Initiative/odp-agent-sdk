@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+import html
+import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import yaml
-import json
 
 from open_data_products._io import load_jsonl_records, load_mapping
 from open_data_products._search import search_records, searchable_record_text
@@ -33,6 +34,47 @@ class CatalogValidationResult:
     errors: List[str]
 
 
+SCHEMA_URI = "https://opendataproducts.org/odpc-v1.0/schema/odpc.yaml"
+OBJECT_COLLECTIONS = {
+    "productReference": "productReferences",
+    "useCase": "useCases",
+    "businessObjective": "businessObjectives",
+    "signal": "signals",
+}
+CATALOG_COLLECTIONS = tuple(OBJECT_COLLECTIONS.values())
+METADATA_KEYS = ("metadata", "catalogMetadata")
+HTML_FIELDS = {
+    "productReferences": (
+        ("Product ID", "productID"),
+        ("Version", "productVersion"),
+        ("Status", "status"),
+        ("Visibility", "visibility"),
+    ),
+    "useCases": (
+        ("Status", "status"),
+        ("Priority", "priority"),
+        ("Decision", "decision"),
+        ("Expected outcome", "expectedOutcome"),
+    ),
+    "businessObjectives": (
+        ("Status", "status"),
+        ("Priority", "priority"),
+    ),
+    "signals": (
+        ("Type", "type"),
+        ("Strength", "strength"),
+        ("Confidence", "confidence"),
+        ("Status", "status"),
+    ),
+}
+HTML_SECTION_TITLES = {
+    "productReferences": "Product References",
+    "useCases": "Use Cases",
+    "businessObjectives": "Business Objectives",
+    "signals": "Signals",
+}
+
+
 def _data_file(*parts: str) -> Path:
     return Path(__file__).resolve().parent.joinpath("data", *parts)
 
@@ -44,6 +86,372 @@ def load_catalog(path: Union[str, Path]) -> Dict[str, Any]:
         yaml_loader=NoDatesSafeLoader,
         root_name="ODPC catalog",
     )
+
+
+def iter_catalog_input_files(
+    input_dir: Union[str, Path],
+    *,
+    recursive: bool = True,
+) -> List[Path]:
+    """Return YAML and JSON catalog fragment files under ``input_dir``."""
+    root = Path(input_dir)
+    patterns = ("*.yaml", "*.yml", "*.json")
+    paths = []
+    for pattern in patterns:
+        paths.extend(root.rglob(pattern) if recursive else root.glob(pattern))
+    return sorted(path for path in paths if path.is_file())
+
+
+def lang_string(value: Any) -> Dict[str, Any]:
+    """Return a language string mapping for scalar input."""
+    if isinstance(value, dict):
+        return value
+    return {"en": value}
+
+
+def default_catalog_metadata(
+    *,
+    catalog_id: Optional[str] = None,
+    name: Optional[str] = None,
+    description: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Return default metadata for a generated ODPC catalog."""
+    return {
+        "id": catalog_id or "CAT-GENERATED",
+        "name": lang_string(name or "Generated ODPC Catalog"),
+        "description": lang_string(
+            description or "Generated from ODPC YAML fragments."
+        ),
+    }
+
+
+def append_catalog_items(
+    target: Dict[str, List[Any]],
+    collection: str,
+    items: Any,
+) -> None:
+    """Append list items into a catalog collection."""
+    if isinstance(items, list):
+        target[collection].extend(item for item in items if item is not None)
+
+
+def as_lang_string(value: Any, fallback: str) -> Dict[str, Any]:
+    """Return a language string, falling back when input is blank."""
+    if isinstance(value, dict):
+        return value
+    if isinstance(value, str) and value.strip():
+        return {"en": value}
+    return {"en": fallback}
+
+
+def product_details(product: Dict[str, Any]) -> Dict[str, Any]:
+    """Return the most useful ODPS product details mapping."""
+    details = product.get("details")
+    if isinstance(details, dict):
+        english = details.get("en")
+        if isinstance(english, dict):
+            return english
+    return product
+
+
+def product_reference_from_product(
+    document: Dict[str, Any],
+    source_path: Union[str, Path],
+    input_dir: Union[str, Path],
+) -> Optional[Dict[str, Any]]:
+    """Build an ODPC ProductReference from an ODPS product document."""
+    product = document.get("product")
+    if not isinstance(product, dict):
+        return None
+
+    path = Path(source_path)
+    details = product_details(product)
+    product_id = (
+        details.get("productID")
+        or product.get("productID")
+        or details.get("id")
+        or product.get("id")
+        or path.stem
+    )
+    product_version = (
+        details.get("productVersion")
+        or product.get("productVersion")
+        or details.get("version")
+        or product.get("version")
+        or document.get("version")
+        or "1.0.0"
+    )
+    reference_path = path.relative_to(Path(input_dir)).as_posix()
+    product_format = "json" if path.suffix.lower() == ".json" else "yaml"
+    reference = {
+        "id": str(details.get("id") or product.get("id") or product_id),
+        "productID": str(product_id),
+        "productVersion": str(product_version),
+        "name": as_lang_string(
+            details.get("name") or product.get("name"), str(product_id)
+        ),
+        "description": as_lang_string(
+            details.get("description") or product.get("description"),
+            f"Reference to {product_id}.",
+        ),
+        "productModel": {
+            "standard": "ODPS",
+            "version": str(document.get("version") or "4.1"),
+            "format": product_format,
+            "$ref": reference_path,
+        },
+    }
+    for key in ("visibility", "status", "type"):
+        value = details.get(key) or product.get(key)
+        if value:
+            reference[key] = value
+    return reference
+
+
+def collect_catalog_document(
+    document: Dict[str, Any],
+    source_path: Union[str, Path],
+    input_dir: Union[str, Path],
+    catalog: Dict[str, List[Any]],
+    metadata_candidates: List[Dict[str, Any]],
+    embedded_metadata_candidates: List[Dict[str, Any]],
+) -> None:
+    """Collect ODPC catalog parts from a document."""
+    if not isinstance(document, dict):
+        raise ValueError(
+            f"{source_path}: expected a YAML or JSON object at the document root"
+        )
+
+    nested_catalog = document.get("catalog")
+    if isinstance(nested_catalog, dict):
+        metadata = nested_catalog.get("metadata")
+        if isinstance(metadata, dict):
+            embedded_metadata_candidates.append(metadata)
+        for collection in CATALOG_COLLECTIONS:
+            append_catalog_items(catalog, collection, nested_catalog.get(collection))
+        return
+
+    for metadata_key in METADATA_KEYS:
+        metadata = document.get(metadata_key)
+        if isinstance(metadata, dict):
+            metadata_candidates.append(metadata)
+
+    for object_key, collection in OBJECT_COLLECTIONS.items():
+        item = document.get(object_key)
+        if item is not None:
+            catalog[collection].append(item)
+
+    product_reference = product_reference_from_product(document, source_path, input_dir)
+    if product_reference:
+        catalog["productReferences"].append(product_reference)
+
+    for collection in CATALOG_COLLECTIONS:
+        append_catalog_items(catalog, collection, document.get(collection))
+
+
+def build_catalog(
+    input_dir: Union[str, Path],
+    *,
+    recursive: bool = True,
+    output_path: Optional[Union[str, Path]] = None,
+    catalog_id: Optional[str] = None,
+    name: Optional[str] = None,
+    description: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Build one ODPC catalog from catalog fragments in a folder."""
+    root = Path(input_dir)
+    output = Path(output_path).resolve() if output_path is not None else None
+    catalog = {collection: [] for collection in CATALOG_COLLECTIONS}
+    metadata_candidates: List[Dict[str, Any]] = []
+    embedded_metadata_candidates: List[Dict[str, Any]] = []
+
+    for path in iter_catalog_input_files(root, recursive=recursive):
+        if output is not None and path.resolve() == output:
+            continue
+        collect_catalog_document(
+            load_catalog(path),
+            path,
+            root,
+            catalog,
+            metadata_candidates,
+            embedded_metadata_candidates,
+        )
+
+    if metadata_candidates:
+        metadata = dict(metadata_candidates[0])
+    elif embedded_metadata_candidates:
+        metadata = dict(embedded_metadata_candidates[0])
+    else:
+        metadata = default_catalog_metadata(
+            catalog_id=catalog_id,
+            name=name,
+            description=description,
+        )
+    if catalog_id:
+        metadata["id"] = catalog_id
+    if name:
+        metadata["name"] = lang_string(name)
+    if description:
+        metadata["description"] = lang_string(description)
+
+    populated_catalog = {key: value for key, value in catalog.items() if value}
+    return {
+        "schema": SCHEMA_URI,
+        "version": "1.0",
+        "kind": "Catalog",
+        "catalog": {"metadata": metadata, **populated_catalog},
+    }
+
+
+def write_catalog(
+    path: Union[str, Path],
+    document: Dict[str, Any],
+) -> None:
+    """Write an ODPC catalog document as YAML."""
+    output = Path(path)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(
+        yaml.safe_dump(document, sort_keys=False, allow_unicode=False),
+        encoding="utf-8",
+    )
+
+
+def text_value(value: Any, fallback: str = "") -> str:
+    """Return text from a scalar or English language string."""
+    if isinstance(value, dict):
+        return str(value.get("en") or fallback)
+    if value is None:
+        return fallback
+    return str(value)
+
+
+def escaped_text(value: Any, fallback: str = "") -> str:
+    """Return HTML-escaped text."""
+    return html.escape(text_value(value, fallback))
+
+
+def render_html_link(value: Any) -> str:
+    """Render an escaped link when a value is present."""
+    if not value:
+        return ""
+    escaped = html.escape(str(value), quote=True)
+    return f'<a href="{escaped}">{escaped}</a>'
+
+
+def render_catalog_card(
+    item: Any,
+    fields: Tuple[Tuple[str, str], ...],
+) -> str:
+    """Render one catalog item card."""
+    if not isinstance(item, dict):
+        return ""
+
+    lines = [
+        '<article class="odp-card">',
+        f"<h3>{escaped_text(item.get('name'), item.get('id', '(unnamed)'))}</h3>",
+        f'<p class="odp-id">{escaped_text(item.get("id"))}</p>',
+    ]
+    description = escaped_text(item.get("description"))
+    if description:
+        lines.append(f"<p>{description}</p>")
+
+    facts = []
+    for label, key in fields:
+        value = item.get(key)
+        if value:
+            facts.append(f"<dt>{html.escape(label)}</dt><dd>{escaped_text(value)}</dd>")
+    product_model = item.get("productModel")
+    if isinstance(product_model, dict):
+        facts.append(
+            "<dt>Product model</dt>"
+            f"<dd>{escaped_text(product_model.get('standard'))} "
+            f"{escaped_text(product_model.get('version'))} "
+            f"{render_html_link(product_model.get('$ref'))}</dd>"
+        )
+    if facts:
+        lines.append(f'<dl class="odp-facts">{"".join(facts)}</dl>')
+
+    tags = item.get("tags")
+    if isinstance(tags, list) and tags:
+        tag_items = "".join(f"<li>{html.escape(str(tag))}</li>" for tag in tags)
+        lines.append(f'<ul class="odp-tags">{tag_items}</ul>')
+
+    lines.append("</article>")
+    return "\n".join(lines)
+
+
+def render_catalog_section(
+    title: str,
+    items: Any,
+    fields: Tuple[Tuple[str, str], ...],
+) -> str:
+    """Render one HTML catalog section."""
+    if not isinstance(items, list) or not items:
+        return (
+            f'<section class="odp-section"><h2>{html.escape(title)}</h2>'
+            "<p>No entries.</p></section>"
+        )
+    cards = "\n".join(render_catalog_card(item, fields) for item in items)
+    return (
+        f'<section class="odp-section"><h2>{html.escape(title)}</h2>{cards}</section>'
+    )
+
+
+def render_catalog_html(document: Dict[str, Any]) -> str:
+    """Render a standalone browser-viewable ODPC catalog HTML document."""
+    catalog = document.get("catalog", {})
+    metadata = catalog.get("metadata", {}) if isinstance(catalog, dict) else {}
+    title = escaped_text(metadata.get("name"), "ODPC Catalog")
+    description = escaped_text(metadata.get("description"))
+    sections = "\n".join(
+        render_catalog_section(
+            HTML_SECTION_TITLES[collection],
+            catalog.get(collection, []) if isinstance(catalog, dict) else [],
+            HTML_FIELDS[collection],
+        )
+        for collection in CATALOG_COLLECTIONS
+    )
+    return "\n".join(
+        [
+            "<!DOCTYPE html>",
+            '<html lang="en">',
+            "<head>",
+            '<meta charset="utf-8">',
+            '<meta name="viewport" content="width=device-width, initial-scale=1">',
+            f"<title>{title}</title>",
+            "<style>",
+            "body{font-family:Arial,sans-serif;margin:2rem;line-height:1.5;color:#1f2933}",
+            ".odp-header,.odp-section{max-width:960px;margin:0 auto 2rem}",
+            ".odp-card{border:1px solid #d9e2ec;border-radius:8px;padding:1rem;margin:1rem 0}",
+            ".odp-id{color:#52606d;font-family:monospace}",
+            ".odp-facts{display:grid;grid-template-columns:max-content 1fr;gap:.25rem 1rem}",
+            ".odp-facts dt{font-weight:700}",
+            ".odp-tags{display:flex;flex-wrap:wrap;gap:.5rem;padding:0;list-style:none}",
+            ".odp-tags li{border:1px solid #bcccdc;border-radius:999px;padding:.125rem .5rem}",
+            "</style>",
+            "</head>",
+            "<body>",
+            '<header class="odp-header">',
+            f"<h1>{title}</h1>",
+            f'<p class="odp-id">{escaped_text(metadata.get("id"))}</p>',
+            f"<p>{description}</p>" if description else "",
+            "</header>",
+            sections,
+            "</body>",
+            "</html>",
+            "",
+        ]
+    )
+
+
+def write_catalog_html(
+    path: Union[str, Path],
+    document: Dict[str, Any],
+) -> None:
+    """Write an ODPC catalog as standalone HTML."""
+    output = Path(path)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(render_catalog_html(document), encoding="utf-8")
 
 
 def load_schema(path: Optional[Union[str, Path]] = None) -> Dict[str, Any]:

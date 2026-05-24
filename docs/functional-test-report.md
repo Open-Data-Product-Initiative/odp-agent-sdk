@@ -31,6 +31,7 @@ pytest -q
 | Resolve references | Covered | Not yet direct | Covered |
 | Lightweight summaries | Covered | Covered | Covered |
 | Resource registry | Covered | Covered | Covered |
+| ODPC catalog build | Covered | Covered | Not mapped; MCP avoids full generated catalog bodies |
 | ODPV search | Not yet direct | Not yet direct | Covered |
 | ODPC object search | Not yet direct | Not yet direct | Covered |
 | ODPG object search | Not yet direct | Not yet direct | Covered |

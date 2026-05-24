@@ -2,6 +2,7 @@
 
 from .catalog import (
     CatalogValidationResult,
+    build_catalog,
     build_catalog_artifacts,
     collect_ids,
     count_items,
@@ -9,10 +10,13 @@ from .catalog import (
     load_catalog,
     load_object_records,
     load_schema,
+    render_catalog_html,
     render_catalog_schema_json,
     render_object_records,
     search_objects,
     validate_catalog,
+    write_catalog,
+    write_catalog_html,
     write_catalog_artifacts,
 )
 
@@ -23,6 +27,7 @@ __all__ = [
     "SPEC_ID",
     "SPEC_NAME",
     "CatalogValidationResult",
+    "build_catalog",
     "build_catalog_artifacts",
     "collect_ids",
     "count_items",
@@ -30,9 +35,12 @@ __all__ = [
     "load_catalog",
     "load_object_records",
     "load_schema",
+    "render_catalog_html",
     "render_catalog_schema_json",
     "render_object_records",
     "search_objects",
     "validate_catalog",
+    "write_catalog",
+    "write_catalog_html",
     "write_catalog_artifacts",
 ]

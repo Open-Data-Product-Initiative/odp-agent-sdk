@@ -2,12 +2,12 @@
 
 This report compares upstream Open Data Product specification helper scripts against the SDK surfaces exposed for humans and AI agents.
 
-Last drift detection run: `2026-05-24T06:25:21Z`
+Last drift detection run: `2026-05-24T07:48:17Z`
 
 - Upstream sources: ODPC, ODPG, and ODPV specification repositories
 - SDK surfaces: public Python API, unified/spec CLI helpers, and MCP tools
-- Checked capabilities: 16
-- Partial capabilities: 3
+- Checked capabilities: 17
+- Partial capabilities: 4
 - Unresolved capabilities: 2
 
 Possible capability drift detected. Review rows marked `Review` or `Possible drift`.
@@ -21,7 +21,7 @@ Possible capability drift detected. Review rows marked `Review` or `Possible dri
 
 ## ODPC Capability Coverage
 
-- Checked capabilities: 5
+- Checked capabilities: 6
 - Unresolved capabilities: 1
 
 Unresolved capabilities need review before they can be treated as covered.
@@ -32,6 +32,7 @@ Unresolved capabilities need review before they can be treated as covered.
 | ODPC | `odpc-v1.0/scripts/validate_catalog.py` | Validate ODPC catalog documents | Covered | Covered | Covered | Covered |  |
 | ODPC | `odpc-v1.0/scripts/explain_catalog.py` | Explain ODPC catalogs for humans and AI agents | Covered | Covered | Covered | Covered |  |
 | ODPC | `odpc-v1.0/scripts/generate_catalog_artifacts.py` | Generate derived ODPC catalog schema artifacts | Covered | Covered | Covered | Covered | SDK can generate/check artifacts through API and CLI; MCP exposes read-only generated artifact metadata/content. |
+| ODPC | `odpc-v1.0/scripts/build_catalog.py` | Build one ODPC catalog from ODPC fragments and ODPS product files | Covered | Covered | Not mapped | Partial | Catalog building writes through the CLI/API workflow; MCP does not return full generated catalog bodies. |
 | **ODPC** | **`odpc-v1.0/scripts/check_agent_artifacts.py`** | **Check ODPC schema, examples, JSONL, and llms.txt agent artifacts** | **Not mapped** | **Not mapped** | **Not mapped** | **Review** | **Upstream docs consistency check; likely outside the SDK runtime surface.** |
 
 ## ODPG Capability Coverage

@@ -12,11 +12,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable, List, Optional, Sequence, Set
 
-
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_REPORT_DIR = ROOT / "capability-drift"
 DEFAULT_REPORT_NAME = "sdk-capability-drift.md"
-RUN_TIMESTAMP_RE = re.compile(r"^(?:- )?Last drift detection run: `([^`]+)`$", re.MULTILINE)
+RUN_TIMESTAMP_RE = re.compile(
+    r"^(?:- )?Last drift detection run: `([^`]+)`$", re.MULTILINE
+)
 
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
@@ -172,6 +173,14 @@ DEFAULT_CAPABILITIES: Sequence[Capability] = (
     ),
     Capability(
         spec="ODPC",
+        upstream_source="odpc-v1.0/scripts/build_catalog.py",
+        capability="Build one ODPC catalog from ODPC fragments and ODPS product files",
+        api_symbol="open_data_products.odpc:build_catalog",
+        cli_marker="odpc-build",
+        notes="Catalog building writes through the CLI/API workflow; MCP does not return full generated catalog bodies.",
+    ),
+    Capability(
+        spec="ODPC",
         upstream_source="odpc-v1.0/scripts/check_agent_artifacts.py",
         capability="Check ODPC schema, examples, JSONL, and llms.txt agent artifacts",
         notes="Upstream docs consistency check; likely outside the SDK runtime surface.",
@@ -181,8 +190,11 @@ DEFAULT_CAPABILITIES: Sequence[Capability] = (
 
 def current_run_timestamp() -> str:
     """Return the current UTC report timestamp."""
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace(
-        "+00:00", "Z"
+    return (
+        datetime.now(timezone.utc)
+        .replace(microsecond=0)
+        .isoformat()
+        .replace("+00:00", "Z")
     )
 
 
@@ -412,7 +424,9 @@ def check_report(report_path: Path, rows: Sequence[CapabilityRow]) -> int:
     """Validate an existing report without changing its timestamp."""
     run_timestamp = existing_run_timestamp(report_path)
     if not run_timestamp:
-        print(f"Missing capability drift report timestamp: {report_path}", file=sys.stderr)
+        print(
+            f"Missing capability drift report timestamp: {report_path}", file=sys.stderr
+        )
         return 1
     expected = render_report(rows, run_timestamp)
     if not report_path.exists():

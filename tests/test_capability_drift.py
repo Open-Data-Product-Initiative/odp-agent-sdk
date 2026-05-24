@@ -7,7 +7,6 @@ import sys
 from types import ModuleType
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = REPO_ROOT / "scripts" / "check_capability_drift.py"
 
@@ -95,6 +94,12 @@ def test_targeted_capability_drifts_are_mapped_to_sdk_surfaces() -> None:
     assert odpc.cli_status == "Covered"
     assert odpc.mcp_status == "Covered"
     assert odpc.status == "Covered"
+
+    odpc_build = by_source["odpc-v1.0/scripts/build_catalog.py"]
+    assert odpc_build.api_status == "Covered"
+    assert odpc_build.cli_status == "Covered"
+    assert odpc_build.mcp_status == "Not mapped"
+    assert odpc_build.status == "Partial"
 
 
 def test_check_mode_reuses_existing_timestamp(tmp_path: Path) -> None:

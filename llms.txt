@@ -50,6 +50,9 @@ Use the top-level API when the input spec is unknown:
 - `extract_contract_schema(contract_path_or_url)`
 - `check_product_contract_alignment(product_path_or_document, contract_path_or_url)`
 - `generate_product_contract_report(product_path_or_document, contract_path=None)`
+- `build_catalog(input_dir, output_path=None, catalog_id=None, name=None, description=None)`
+- `render_catalog_html(document)`
+- `write_catalog_html(path, document)`
 - `render_catalog_schema_json()`
 - `build_catalog_artifacts()`
 - `write_catalog_artifacts(output_dir, check=False)`
@@ -78,6 +81,8 @@ Use these commands for machine-readable workflows:
 - `open-data-products summary <path>`
 - `open-data-products manifest --json`
 - `open-data-products serve`
+- `open-data-products odpc-build <fragments-dir> --output <catalog.yaml> --json`
+- `open-data-products odpc-build <fragments-dir> --output <catalog.yaml> --html <catalog.html> --json`
 - `open-data-products odpc-summary <catalog.yaml> --json`
 - `open-data-products odpc-search "catalog data" --limit 3 --json`
 - `open-data-products odpc-artifacts <output-dir> --check --json`
@@ -160,8 +165,8 @@ Agents can discover bundled resources with `list_resources()` or the
 ## Spec Namespaces
 
 - `open_data_products.odps`: ODPS data product models and validation helpers
-- `open_data_products.odpc`: ODPC catalog helpers, object retrieval records,
-  and derived catalog schema artifact generation/checking
+- `open_data_products.odpc`: ODPC catalog building, catalog helpers, object
+  retrieval records, and derived catalog schema artifact generation/checking
 - `open_data_products.odpg`: ODPG graph validation, traversal, analysis, and context
 - `open_data_products.odpv`: ODPV vocabulary loading, validation, search,
   artifacts, term resolution, relationship compatibility, and term context

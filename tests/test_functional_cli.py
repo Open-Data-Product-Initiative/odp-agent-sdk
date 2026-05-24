@@ -49,10 +49,16 @@ def test_unified_cli_help_uses_compact_command_metavar(
     assert "Product/Data Contract commands:" in help_text
     assert "Examples:" in help_text
     assert "open-data-products validate product.yaml --json" in help_text
-    assert "open-data-products product contract-report product.yaml contract.yaml --json" in help_text
+    assert (
+        "open-data-products product contract-report product.yaml contract.yaml --json"
+        in help_text
+    )
     assert "open-data-products resources --id odpc.objects --json" in help_text
     assert "open-data-products resources --id odpv.terms --json" in help_text
-    assert "open-data-products odpg-generate graph.yaml --output graph-explorer.html --json" in help_text
+    assert (
+        "open-data-products odpg-generate graph.yaml --output graph-explorer.html --json"
+        in help_text
+    )
     assert "validate" in help_text
     assert "product" in help_text
 
@@ -69,8 +75,13 @@ def test_product_cli_help_uses_compact_command_metavar_and_examples(
     assert "{check-contract,resolve-contracts" not in help_text
     assert "Data Contract workflow commands:" in help_text
     assert "Examples:" in help_text
-    assert "open-data-products product resolve-contracts product.yaml --json" in help_text
-    assert "open-data-products product audit product.yaml --contract contract.yaml --json" in help_text
+    assert (
+        "open-data-products product resolve-contracts product.yaml --json" in help_text
+    )
+    assert (
+        "open-data-products product audit product.yaml --contract contract.yaml --json"
+        in help_text
+    )
 
 
 def test_unified_cli_document_workflow(capsys: pytest.CaptureFixture[str]) -> None:
@@ -164,6 +175,59 @@ catalog:
     assert _json_output(capsys)["in_sync"] is True
 
 
+def test_unified_cli_builds_odpc_catalog_from_fragments(
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+) -> None:
+    fragments = tmp_path / "fragments"
+    fragments.mkdir()
+    output = tmp_path / "catalog.yaml"
+    html_output = tmp_path / "catalog.html"
+    (fragments / "product.yaml").write_text(
+        """
+schema: https://opendataproducts.org/v4.1/schema/odps.json
+version: "4.1"
+product:
+  details:
+    en:
+      name: Agent Ready Product
+      productID: agent-ready-product
+      visibility: public
+""",
+        encoding="utf-8",
+    )
+
+    assert (
+        main(
+            [
+                "odpc-build",
+                str(fragments),
+                "--output",
+                str(output),
+                "--html",
+                str(html_output),
+                "--id",
+                "CAT-CLI",
+                "--json",
+            ]
+        )
+        == 0
+    )
+    payload = _json_output(capsys)
+    assert payload["spec"] == "odpc"
+    assert payload["kind"] == "Catalog"
+    assert payload["output"] == str(output)
+    assert payload["html"] == str(html_output)
+    assert payload["productReferenceCount"] == 1
+
+    assert output.read_text(encoding="utf-8").startswith(
+        "schema: https://opendataproducts.org/odpc-v1.0/schema/odpc.yaml\n"
+    )
+    html = html_output.read_text(encoding="utf-8")
+    assert html.startswith("<!DOCTYPE html>")
+    assert "Agent Ready Product" in html
+
+
 def test_unified_cli_odpv_commands(capsys: pytest.CaptureFixture[str]) -> None:
     assert main(["odpv-summary", "--json"]) == 0
     summary_payload = _json_output(capsys)
@@ -171,7 +235,9 @@ def test_unified_cli_odpv_commands(capsys: pytest.CaptureFixture[str]) -> None:
     assert summary_payload["kind"] == "Vocabulary"
     assert summary_payload["term_count"] == 59
 
-    assert main(["odpv-search", "governance policy risk", "--limit", "2", "--json"]) == 0
+    assert (
+        main(["odpv-search", "governance policy risk", "--limit", "2", "--json"]) == 0
+    )
     search_payload = _json_output(capsys)
     assert search_payload["spec"] == "odpv"
     assert len(search_payload["matches"]) == 2
@@ -209,7 +275,9 @@ def test_unified_cli_odpg_reasoning_commands(
     assert main(["odpg-summary", str(ODPG_GRAPH)]) == 0
     assert _json_output(capsys)["nodeCount"] == 9
 
-    assert main(["odpg-traverse", str(ODPG_GRAPH), "--start", "AGENT-AVIATION-001"]) == 0
+    assert (
+        main(["odpg-traverse", str(ODPG_GRAPH), "--start", "AGENT-AVIATION-001"]) == 0
+    )
     assert _json_output(capsys)["start"] == "AGENT-AVIATION-001"
 
     assert main(["odpg-analyze", str(ODPG_GRAPH)]) == 0
@@ -306,19 +374,22 @@ models:
     assert report_payload["summaries"][0]["field_count"] == 1
     assert report_payload["alignments"][0]["passed"] is True
 
-    assert main(["product", "check-contract", str(product), str(contract), "--json"]) == 1
+    assert (
+        main(["product", "check-contract", str(product), str(contract), "--json"]) == 1
+    )
     check_payload = _json_output(capsys)
     assert check_payload["product"]["valid"] is True
     assert check_payload["contract"]["passed"] is False
     assert check_payload["summary"].startswith("Product valid; Data Contract invalid")
 
     assert (
-        main(["product", "align-contract", str(product), str(contract), "--json"])
-        == 1
+        main(["product", "align-contract", str(product), str(contract), "--json"]) == 1
     )
     alignment_payload = _json_output(capsys)
     assert alignment_payload["contract_valid"] is False
-    assert alignment_payload["summary"].startswith("Product valid; Data Contract invalid")
+    assert alignment_payload["summary"].startswith(
+        "Product valid; Data Contract invalid"
+    )
 
     assert (
         main(["product", "audit", str(product), "--contract", str(contract), "--json"])
