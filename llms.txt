@@ -50,6 +50,13 @@ Use the top-level API when the input spec is unknown:
 - `extract_contract_schema(contract_path_or_url)`
 - `check_product_contract_alignment(product_path_or_document, contract_path_or_url)`
 - `generate_product_contract_report(product_path_or_document, contract_path=None)`
+- `render_catalog_schema_json()`
+- `build_catalog_artifacts()`
+- `write_catalog_artifacts(output_dir, check=False)`
+- `resolve_vocabulary_term(query)`
+- `explain_vocabulary_term(term_id)`
+- `check_vocabulary_relationship(source, verb, target)`
+- `agent_vocabulary_context(term_id)`
 
 These functions support ODPS, ODPC, ODPG, and ODPV documents through one
 consistent agent-facing surface.
@@ -71,6 +78,15 @@ Use these commands for machine-readable workflows:
 - `open-data-products summary <path>`
 - `open-data-products manifest --json`
 - `open-data-products serve`
+- `open-data-products odpc-summary <catalog.yaml> --json`
+- `open-data-products odpc-search "catalog data" --limit 3 --json`
+- `open-data-products odpc-artifacts <output-dir> --check --json`
+- `open-data-products odpv-summary --json`
+- `open-data-products odpv-search "governance policy risk" --limit 3 --json`
+- `open-data-products odpv-resolve "reusable data asset" --json`
+- `open-data-products odpv-explain DataProduct --json`
+- `open-data-products odpv-relationship DataProduct supports UseCase --json`
+- `open-data-products odpv-context DataProduct --json`
 - `open-data-products product resolve-contracts <product.yaml> --json`
 - `open-data-products product check-contract <product.yaml> <contract.yaml> --json`
 - `open-data-products product contract-report <product.yaml> [contract.yaml] --json`
@@ -96,7 +112,12 @@ The MCP server exposes safe, read-only tools:
 - `list_resources`
 - `get_resource`
 - `load_summary`
+- `catalog_artifacts`
 - `search_terms`
+- `resolve_vocabulary_term`
+- `explain_vocabulary_term`
+- `check_vocabulary_relationship`
+- `vocabulary_term_context`
 - `search_objects`
 - `search_graph_objects`
 - `summarize_graph`
@@ -139,9 +160,11 @@ Agents can discover bundled resources with `list_resources()` or the
 ## Spec Namespaces
 
 - `open_data_products.odps`: ODPS data product models and validation helpers
-- `open_data_products.odpc`: ODPC catalog helpers and object retrieval records
+- `open_data_products.odpc`: ODPC catalog helpers, object retrieval records,
+  and derived catalog schema artifact generation/checking
 - `open_data_products.odpg`: ODPG graph validation, traversal, analysis, and context
-- `open_data_products.odpv`: ODPV vocabulary loading, validation, search, and artifacts
+- `open_data_products.odpv`: ODPV vocabulary loading, validation, search,
+  artifacts, term resolution, relationship compatibility, and term context
 - `open_data_products.contracts`: optional Data Contract validation adapter,
   ODPS contract reference resolution, schema extraction, alignment checks, and
   product-level reports
