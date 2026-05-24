@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Package version to publish, for example 0.1.0"
+        description: "Package version to publish"
         required: true
         default: "0.1.0"
   release:
