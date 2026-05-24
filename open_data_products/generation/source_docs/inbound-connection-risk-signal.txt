@@ -1,0 +1,20 @@
+Signal name: Inbound Connection Risk Signal
+
+On 2026-05-22, Airport Operations Control identified 42 connecting passengers on
+inbound flight AY417 who had less than 22 estimated transfer minutes to outbound
+flights from Terminal 2.
+
+The signal source is the Flight Connection Reliability Data Product enriched
+with inbound flight estimates and outbound boarding close times. The signal
+strength is high because three outbound flights had boarding close times inside
+the minimum connection time rule. The confidence level is medium because the
+inbound aircraft had not reached the arrival stand at the time of calculation.
+
+The signal is relevant to Passenger Connection Protection and should be linked
+to the Flight Connection Reliability Data Product. It may also influence Flight
+Delay Risk Monitoring if operations decides to hold an outbound flight.
+
+Recommended action: connection desk coordinators should meet the inbound flight,
+prioritize security fast track for affected passengers, and ask airline station
+managers whether any outbound flight can hold boarding for up to seven minutes.
+

@@ -1,7 +1,7 @@
 """Functional tests for the unified command line interface."""
 
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, List, Optional, Union
 
 import pytest
 
@@ -12,6 +12,12 @@ pytestmark = pytest.mark.functional
 REPO_ROOT = Path(__file__).resolve().parents[1]
 ODPS_PRODUCT = REPO_ROOT / "apps" / "pricing_402_builder" / "priced_product.yaml"
 ODPG_GRAPH = REPO_ROOT / "open_data_products" / "odpg" / "data" / "graph" / "graph.yaml"
+GENERATION_SOURCE_DOCS = (
+    REPO_ROOT
+    / "open_data_products"
+    / "generation"
+    / "source_docs"
+)
 
 
 def _json_output(capsys: pytest.CaptureFixture[str]) -> Dict[str, Any]:
@@ -47,6 +53,7 @@ def test_unified_cli_help_uses_compact_command_metavar(
     assert "ODPG graph commands:" in help_text
     assert "odpg-generate" in help_text
     assert "Product/Data Contract commands:" in help_text
+    assert "Local generation commands:" in help_text
     assert "Examples:" in help_text
     assert "open-data-products validate product.yaml --json" in help_text
     assert (
@@ -57,6 +64,10 @@ def test_unified_cli_help_uses_compact_command_metavar(
     assert "open-data-products resources --id odpv.terms --json" in help_text
     assert (
         "open-data-products odpg-generate graph.yaml --output graph-explorer.html --json"
+        in help_text
+    )
+    assert (
+        "open-data-products generate open_data_products/generation/source_docs/ --output open_data_products/generation/fragments/ --json"
         in help_text
     )
     assert "validate" in help_text
@@ -114,6 +125,134 @@ def test_unified_cli_resources_and_manifest(capsys: pytest.CaptureFixture[str]) 
         "search_terms",
         "agent_context",
     }
+
+
+def test_unified_cli_local_generation(
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    from open_data_products import generation
+
+    def fake_generate_local_artifacts(
+        source_dir: Union[str, Path],
+        output_dir: Union[str, Path],
+        model: str = "qwen2.5",
+        ollama_url: str = "http://localhost:11434",
+        client: Optional[object] = None,
+    ) -> List[generation.GeneratedArtifact]:
+        output = Path(output_dir) / "odpc_signals.yaml"
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text("signals: []\n", encoding="utf-8")
+        return [
+            generation.GeneratedArtifact(
+                name="odpc_signals",
+                prompt_name="odpc_signal_fragment.md",
+                output_path=output,
+                valid_yaml=True,
+            )
+        ]
+
+    monkeypatch.setattr(
+        generation,
+        "generate_local_artifacts",
+        fake_generate_local_artifacts,
+    )
+
+    assert (
+        main(
+            [
+                "generate",
+                str(GENERATION_SOURCE_DOCS),
+                "--output",
+                str(tmp_path),
+                "--model",
+                "qwen2.5",
+                "--json",
+            ]
+        )
+        == 0
+    )
+    payload = _json_output(capsys)
+
+    assert payload["kind"] == "LocalGeneration"
+    assert payload["model"] == "qwen2.5"
+    assert payload["valid_yaml"] is True
+    assert payload["artifact_count"] == 1
+    assert payload["artifacts"][0]["name"] == "odpc_signals"
+
+
+def test_unified_cli_local_generation_can_select_one_kind(
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    from open_data_products import generation
+
+    def fake_generate_local_artifact(
+        artifact_kind: str,
+        source: Union[str, Path],
+        output_dir: Union[str, Path],
+        model: str = "qwen2.5",
+        ollama_url: str = "http://localhost:11434",
+        client: Optional[object] = None,
+    ) -> generation.GeneratedArtifact:
+        output = Path(output_dir) / "odpc_use_cases.yaml"
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text("useCases: []\n", encoding="utf-8")
+        return generation.GeneratedArtifact(
+            name="odpc_use_cases",
+            prompt_name="odpc_use_case_fragment.md",
+            output_path=output,
+            valid_yaml=True,
+        )
+
+    monkeypatch.setattr(
+        generation,
+        "generate_local_artifact",
+        fake_generate_local_artifact,
+    )
+
+    assert (
+        main(
+            [
+                "generate",
+                str(GENERATION_SOURCE_DOCS / "flight-delay-use-case.md"),
+                "--kind",
+                "use-case",
+                "--output",
+                str(tmp_path),
+                "--json",
+            ]
+        )
+        == 0
+    )
+    payload = _json_output(capsys)
+
+    assert payload["kind"] == "LocalGeneration"
+    assert payload["artifact_kind"] == "use-case"
+    assert payload["artifact_count"] == 1
+    assert payload["artifacts"][0]["name"] == "odpc_use_cases"
+
+
+def test_unified_cli_generation_requires_qwen_model(
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+) -> None:
+    with pytest.raises(SystemExit) as exc_info:
+        main(
+            [
+                "generate",
+                str(GENERATION_SOURCE_DOCS),
+                "--output",
+                str(tmp_path),
+                "--model",
+                "llama3.2",
+            ]
+        )
+
+    assert exc_info.value.code == 2
+    assert "invalid choice: 'llama3.2'" in capsys.readouterr().err
 
 
 def test_unified_cli_odpc_commands(

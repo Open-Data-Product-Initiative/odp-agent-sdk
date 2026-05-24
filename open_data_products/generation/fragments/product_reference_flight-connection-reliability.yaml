@@ -1,0 +1,21 @@
+productReference:
+  id: flight-connection-reliability
+  productID: flight-connection-reliability
+  productVersion: 1.0.0
+  name:
+    en: Flight Connection Reliability Data Product
+  description:
+    en: Monitoring transfer passenger risk across terminals.
+  visibility: restricted
+  status: production
+  type: dataset
+  domains:
+  - airport operations
+  portfolioPriority: high
+  owner:
+    team: Airline Partnership Data Team
+  productModel:
+    standard: ODPS
+    version: '4.1'
+    format: yaml
+    $ref: products/flight-connection-reliability.yaml

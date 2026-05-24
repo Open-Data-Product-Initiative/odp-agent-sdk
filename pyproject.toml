@@ -87,6 +87,7 @@ Repository = "https://github.com/Open-Data-Product-Initiative/odps-python"
 packages = [
     "open_data_products",
     "open_data_products.contracts",
+    "open_data_products.generation",
     "open_data_products.mcp",
     "open_data_products.odpc",
     "open_data_products.odpc.data",
@@ -106,6 +107,15 @@ packages = [
 ]
 
 [tool.setuptools.package-data]
+"open_data_products.generation" = [
+    "data/prompts/*.md",
+    "fragments/*.html",
+    "fragments/*.yaml",
+    "source_docs/*.md",
+    "source_docs/*.txt",
+    "source_docs/*/*.md",
+    "source_docs/*/*.txt",
+]
 "open_data_products.odpc" = [
     "data/catalog/*.jsonl",
     "data/schema/*.json",

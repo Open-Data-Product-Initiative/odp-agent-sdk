@@ -91,7 +91,13 @@ def test_resource_registry_functional_paths_exist() -> None:
 
     assert resources
     assert all(Path(resource.path).is_file() for resource in resources)
-    assert {resource.spec for resource in resources} == {"odps", "odpc", "odpg", "odpv"}
+    assert {resource.spec for resource in resources} == {
+        "generation",
+        "odps",
+        "odpc",
+        "odpg",
+        "odpv",
+    }
 
 
 def test_contract_api_workflow_with_native_odps_contract(tmp_path: Path) -> None:

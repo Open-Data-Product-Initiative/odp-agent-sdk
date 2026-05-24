@@ -1,0 +1,21 @@
+productReference:
+  id: airport-operations-performance
+  productID: airport-operations-performance
+  productVersion: 1.0.0
+  name:
+    en: Airport Operations Performance Data Product
+  description:
+    en: Internal operational analytics for flight, gate, baggage, and turnaround events.
+  visibility: internal
+  status: production
+  type: dataset
+  domains:
+  - airport operations
+  portfolioPriority: high
+  owner:
+    team: Airport Data Platform Team
+  productModel:
+    standard: ODPS
+    version: '4.1'
+    format: yaml
+    $ref: products/airport-operations-performance.yaml

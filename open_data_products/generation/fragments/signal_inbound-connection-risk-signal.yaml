@@ -1,0 +1,31 @@
+signal:
+  id: inbound-connection-risk-signal
+  name:
+    en: Inbound Connection Risk Signal
+  description:
+    en: Airport Operations Control identified 42 connecting passengers on inbound
+      flight AY417 with less than 22 estimated transfer minutes to outbound flights
+      from Terminal 2.
+  type: operational
+  source:
+    origin: internal
+    method: Flight Connection Reliability Data Product enriched with inbound and outbound
+      flight estimates
+    system: airport operations control center
+  observedAt: 2026-05-22T00:00:00Z
+  strength: high
+  confidence: medium
+  impact:
+    valuePotential: high
+    urgency: high
+    affectedDomains:
+    - Passenger Connection Protection
+    - Flight Delay Risk Monitoring
+  evidence:
+    summary:
+      en: 42 connecting passengers on inbound flight AY417 had less than 22 estimated
+        transfer minutes to outbound flights from Terminal 2.
+  recommendedAction:
+    en: Meet the inbound flight, prioritize security fast track for affected passengers,
+      and ask airline station managers whether any outbound flight can hold boarding
+      for up to seven minutes.

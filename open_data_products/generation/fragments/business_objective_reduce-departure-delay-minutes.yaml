@@ -1,0 +1,25 @@
+businessObjective:
+  id: reduce-departure-delay-minutes
+  name:
+    en: Reduce Departure Delay Minutes
+  description:
+    en: Reduce average departure delay minutes by 12 percent during the 2026 Q3 summer
+      peak period.
+  owner:
+    role: Head of Airport Operations
+  expectedOutcomes:
+  - en: Improve passenger satisfaction, stand availability, airline partner service
+      levels, and downstream arrival punctuality.
+  kpis:
+  - id: average-departure-delay-minutes
+    name:
+      en: Average Departure Delay Minutes
+    unit: minutes
+    target:
+      value: 12
+      date: 2026-09-30
+  timeframe:
+    startDate: 2026-07-01
+    endDate: 2026-09-30
+  status: active
+  priority: high

@@ -61,6 +61,9 @@ def test_generate_graph_explorer_writes_html(tmp_path):
     assert "ODPG Graph Explorer" in html
     assert "Aviation Data Product Value Graph" in html
     assert "vis-network" in html
+    assert 'id="filter-node-types"' in html
+    assert 'id="filter-edge-types"' in html
+    assert 'id="filter-confidence"' in html
 
 
 def test_build_graph_explorer_html_returns_document():
@@ -68,6 +71,10 @@ def test_build_graph_explorer_html_returns_document():
 
     assert html.startswith("\n<!DOCTYPE html>")
     assert "GRAPH-AVIATION-001" in html
+    assert "const NODE_TYPES =" in html
+    assert "const CONFIDENCE_LEVELS =" in html
+    assert '"id": "edge-0"' in html
+    assert "produces: \"#059669\"" in html
 
 
 def test_cli_entry_points(tmp_path):

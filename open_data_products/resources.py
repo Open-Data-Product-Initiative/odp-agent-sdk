@@ -94,6 +94,48 @@ _RESOURCE_DEFINITIONS: Tuple[ResourceDefinition, ...] = (
         "odpv/data/vocab/terms.jsonl",
         "Bundled ODPV term records for retrieval and search.",
     ),
+    (
+        "generation.prompt.system",
+        "generation",
+        "prompt",
+        "generation/data/prompts/system.md",
+        "System prompt for local LLM generation of ODP standards artifacts.",
+    ),
+    (
+        "generation.prompt.odps_data_product_fragment",
+        "generation",
+        "prompt",
+        "generation/data/prompts/odps_data_product_fragment.md",
+        "Prompt for generating ODPS data product fragments from source docs.",
+    ),
+    (
+        "generation.prompt.odpc_use_case_fragment",
+        "generation",
+        "prompt",
+        "generation/data/prompts/odpc_use_case_fragment.md",
+        "Prompt for generating ODPC use case fragments from source docs.",
+    ),
+    (
+        "generation.prompt.odpc_objective_fragment",
+        "generation",
+        "prompt",
+        "generation/data/prompts/odpc_objective_fragment.md",
+        "Prompt for generating ODPC objective fragments from source docs.",
+    ),
+    (
+        "generation.prompt.odpc_signal_fragment",
+        "generation",
+        "prompt",
+        "generation/data/prompts/odpc_signal_fragment.md",
+        "Prompt for generating ODPC signal fragments from source docs.",
+    ),
+    (
+        "generation.prompt.odpg_graph_yaml",
+        "generation",
+        "prompt",
+        "generation/data/prompts/odpg_graph_yaml.md",
+        "Prompt for generating ODPG graph YAML from generated fragments.",
+    ),
 )
 
 _RESOURCES = [_resource(definition) for definition in _RESOURCE_DEFINITIONS]

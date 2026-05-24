@@ -22,7 +22,7 @@ The package still includes developer-facing Python helpers, but the primary cont
 - **One cross-spec entry point**: Agents can call `load_document`, `validate_document`, `explain_document`, and `resolve_references` across ODPS, ODPC, ODPG, and ODPV files.
 - **Structured outputs**: Validation, references, resources, summaries, and graph reasoning helpers return predictable objects that are easy for agents to inspect.
 - **Small-context workflows**: `load_summary` returns metadata, size, hash, spec, kind, and id without returning full document bodies.
-- **Retrieval-ready resources**: Bundled schemas, vocabulary records, catalog object records, and graph object records are discoverable through `list_resources` and MCP tools.
+- **Retrieval-ready resources**: Bundled schemas, prompt templates, vocabulary records, catalog object records, and graph object records are discoverable through `list_resources` and MCP tools.
 - **Agent-ready ODPC and ODPV helpers**: Catalog building, catalog artifact checks, vocabulary term resolution, canonical term packets, relationship compatibility checks, and term context packets are available through Python, CLI, and MCP surfaces where safe.
 - **Graph reasoning for agents**: ODPG helpers support graph summaries, traversal, strategic analysis, and trusted focus-node context extraction.
 - **Data Contract orchestration**: Optional `datacontract-cli` integration validates external contracts while the SDK resolves ODPS contract references, extracts schemas, checks static product-contract alignment, and returns agent-ready reports.
@@ -35,6 +35,9 @@ Use the top-level API when building AI agents, automation, validation pipelines,
 ```python
 from open_data_products import (
     explain_document,
+    generate_local_artifact,
+    generate_local_artifacts,
+    load_generation_prompt,
     list_resources,
     load_document,
     resolve_references,
@@ -52,6 +55,17 @@ for reference in resolve_references(document):
 
 for resource in list_resources():
     print(resource.id, resource.spec, resource.type)
+
+prompt = load_generation_prompt("odps_data_product_fragment.md")
+signal = generate_local_artifact(
+    "signal",
+    "open_data_products/generation/source_docs/turnaround-delay-signal.txt",
+    "open_data_products/generation/fragments",
+)
+all_artifacts = generate_local_artifacts(
+    "open_data_products/generation/source_docs",
+    "open_data_products/generation/fragments",
+)
 ```
 
 The top-level CLI exposes the same workflow with machine-readable output:
@@ -225,20 +239,42 @@ open-data-products summary product.yaml
 
 # Bundled agent resources
 open-data-products resources --json
+open-data-products resources --id generation.prompt.system --json
 open-data-products resources --id odpc.objects --json
 open-data-products resources --id odpv.terms --json
 open-data-products resources --id odpg.objects --json
 
+# Local LLM generation, stopping at fragments and graph YAML
+# Requires Ollama running locally and qwen2.5 pulled:
+#   ollama pull qwen2.5
+
+# Generate one selected artifact kind from one source file
+open-data-products generate open_data_products/generation/source_docs/turnaround-delay-signal.txt \
+  --kind signal \
+  --output open_data_products/generation/fragments/ \
+  --model qwen2.5 \
+  --json
+
+# Or generate all supported artifacts from a source folder
+open-data-products generate open_data_products/generation/source_docs/ \
+  --output open_data_products/generation/fragments/ \
+  --model qwen2.5 \
+  --json
+
+# The output folder contains separate ODPC fragment files such as
+# productReference:, useCase:, businessObjective:, and signal:,
+# plus a standalone ODPG graph YAML file.
+
 # ODPC catalog helpers
 # Build YAML only
-open-data-products odpc-build fragments/ --output catalog.yaml --json
+open-data-products odpc-build open_data_products/generation/fragments/ --output catalog.yaml --json
 
 # Build YAML and standalone HTML
-open-data-products odpc-build fragments/ --output catalog.yaml --html catalog.html --json
+open-data-products odpc-build open_data_products/generation/fragments/ --output catalog.yaml --html catalog.html --json
 
 open-data-products odpc-summary catalog.yaml --json
 open-data-products odpc-search "catalog data" --limit 3 --json
-open-data-products odpc-artifacts generated/ --check --json
+open-data-products odpc-artifacts open_data_products/generation/fragments/ --check --json
 
 # ODPV vocabulary helpers
 open-data-products odpv-summary --json
@@ -312,6 +348,8 @@ product:
 
 ### Spec-Specific Entry Points
 
+- `open_data_products.generation`: editable prompt templates and required local
+  Ollama/Qwen 2.5 generation helpers for ODPS, ODPC, and ODPG YAML artifacts.
 - `open_data_products.odps`: ODPS v4.1 models, standards-aware validation, YAML/JSON I/O, compliance helpers, and `pricing_to_402`.
 - `open_data_products.odpc`: ODPC catalog building, loading, validation, explanation, and object guidance search.
 - `open_data_products.odpg`: ODPG graph validation, summary, traversal, analysis, agent context, object search, and graph explorer generation.
@@ -366,6 +404,15 @@ python examples/odps_v41_example.py
 - [ODPC catalog fragments](examples/odpc_catalog_fragments/) plus generated
   [catalog YAML](examples/odpc_catalog.yaml) and
   [standalone HTML](examples/odpc_catalog.html)
+
+### Generation Inputs And Outputs
+- [Source documents](open_data_products/generation/source_docs/)
+  are mixed Markdown/text inputs for local LLM generation. Replace them with
+  source documents for any domain.
+- [Generated fragment files](open_data_products/generation/fragments/)
+  are generated outputs: separate ODPC `productReference`, `useCase`,
+  `businessObjective`, and `signal` fragment files plus ODPG graph YAML and
+  generated graph explorer HTML.
 
 ### Sample Apps
 The [apps/](apps/README.md) folder contains independent, runnable Python

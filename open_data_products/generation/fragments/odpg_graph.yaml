@@ -1,0 +1,91 @@
+schema: https://opendataproducts.org/odpg-v1.0/schema/odpg.yaml
+version: '1.0'
+kind: Graph
+graph:
+  metadata:
+    id: airport-operations-generation-graph
+    name:
+      en: Airport Operations Data Products and Use Cases Generation Graph
+    description:
+      en: Relationships between generated airport data products, use cases, business
+        objectives, and signals.
+  nodes:
+  - id: airport-operations-performance
+    type: DataProduct
+    $ref: product_reference_airport-operations-performance.yaml
+  - id: flight-connection-reliability
+    type: DataProduct
+    $ref: product_reference_flight-connection-reliability.yaml
+  - id: passenger-flow-queue
+    type: DataProduct
+    $ref: product_reference_passenger-flow-queue.yaml
+  - id: flight-delay-risk-monitoring
+    type: UseCase
+    $ref: use_case_flight-delay-risk-monitoring.yaml
+  - id: passenger-connection-protection
+    type: UseCase
+    $ref: use_case_passenger-connection-protection.yaml
+  - id: reduce-departure-delay-minutes
+    type: BusinessObjective
+    $ref: business_objective_reduce-departure-delay-minutes.yaml
+  - id: baggage-belt-congestion-signal
+    type: Signal
+    $ref: signal_baggage-belt-congestion-signal.yaml
+  - id: inbound-connection-risk-signal
+    type: Signal
+    $ref: signal_inbound-connection-risk-signal.yaml
+  - id: security-queue-surge-signal
+    type: Signal
+    $ref: signal_security-queue-surge-signal.yaml
+  - id: turnaround-delay-spike-signal
+    type: Signal
+    $ref: signal_turnaround-delay-spike-signal.yaml
+  edges:
+  - from: flight-delay-risk-monitoring
+    to: airport-operations-performance
+    type: dependsOn
+    confidence: high
+  - from: passenger-connection-protection
+    to: flight-connection-reliability
+    type: uses
+    confidence: medium
+  - from: passenger-connection-protection
+    to: passenger-flow-queue
+    type: uses
+    confidence: medium
+  - from: reduce-departure-delay-minutes
+    to: airport-operations-performance
+    type: contributesTo
+    confidence: high
+  - from: baggage-belt-congestion-signal
+    to: flight-delay-risk-monitoring
+    type: impacts
+    confidence: medium
+  - from: baggage-belt-congestion-signal
+    to: passenger-connection-protection
+    type: impacts
+    confidence: medium
+  - from: inbound-connection-risk-signal
+    to: passenger-connection-protection
+    type: relatedTo
+    confidence: high
+  - from: inbound-connection-risk-signal
+    to: flight-delay-risk-monitoring
+    type: relatedTo
+    confidence: high
+  - from: security-queue-surge-signal
+    to: passenger-connection-protection
+    type: impacts
+    confidence: medium
+  - from: security-queue-surge-signal
+    to: reduce-departure-delay-minutes
+    type: impacts
+    confidence: medium
+  - from: turnaround-delay-spike-signal
+    to: flight-delay-risk-monitoring
+    type: impacts
+    confidence: high
+  - from: turnaround-delay-spike-signal
+    to: reduce-departure-delay-minutes
+    type: impacts
+    confidence: high

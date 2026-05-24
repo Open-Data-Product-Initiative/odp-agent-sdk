@@ -51,6 +51,9 @@ Discovery and agent commands:
   manifest     Emit the MCP/agent manifest
   serve        Run the MCP server over stdio
 
+Local generation commands:
+  generate     Use local Ollama/Qwen prompts to create fragments and graph YAML
+
 ODPG graph commands:
   odpg-summary         Summarize graph metadata and relationship counts
   odpg-traverse        Discover relationship paths from a focus node
@@ -74,13 +77,15 @@ Examples:
   open-data-products odpc-build fragments/ --output catalog.yaml --html catalog.html --json
   open-data-products odpc-summary catalog.yaml --json
   open-data-products odpc-search "catalog data" --limit 3 --json
-  open-data-products odpc-artifacts generated/ --check --json
+  open-data-products odpc-artifacts open_data_products/generation/fragments/ --check --json
   open-data-products odpv-summary --json
   open-data-products odpv-search "governance policy risk" --limit 3 --json
   open-data-products odpv-context DataProduct --json
   open-data-products resources --id odpc.objects --json
   open-data-products resources --id odpv.terms --json
   open-data-products resources --json
+  open-data-products generate open_data_products/generation/source_docs/ --output open_data_products/generation/fragments/ --json
+  open-data-products generate use-case.md --kind use-case --output open_data_products/generation/fragments/ --json
   open-data-products odpg-agent-context graph.yaml --node DATA-PRODUCT-001
   open-data-products odpg-generate graph.yaml --output graph-explorer.html --json
   open-data-products product contract-report product.yaml contract.yaml --json
@@ -140,6 +145,46 @@ def main(argv: Optional[List[str]] = None) -> int:
         "summary", help="Lightweight artifact reference for a document"
     )
     summary_parser.add_argument("document", help="Path to an ODP document")
+
+    generate_parser = subparsers.add_parser(
+        "generate",
+        help="Generate fragments and graph YAML with a local LLM",
+    )
+    generate_parser.add_argument(
+        "source_dir",
+        help="Markdown/text source file or folder",
+    )
+    generate_parser.add_argument(
+        "--kind",
+        choices=[
+            "all",
+            "product",
+            "use-case",
+            "objective",
+            "signal",
+            "graph",
+        ],
+        default="all",
+        help="Artifact kind to generate. Defaults to all.",
+    )
+    generate_parser.add_argument(
+        "--output",
+        "-o",
+        required=True,
+        help="Output folder for generated YAML artifacts",
+    )
+    generate_parser.add_argument(
+        "--model",
+        default="qwen2.5",
+        choices=["qwen2.5"],
+        help="Required local Ollama model. Currently only qwen2.5 is supported.",
+    )
+    generate_parser.add_argument(
+        "--ollama-url",
+        default="http://localhost:11434",
+        help="Local Ollama base URL. Defaults to http://localhost:11434.",
+    )
+    generate_parser.add_argument("--json", action="store_true", help="Emit JSON")
 
     odpc_summary_parser = subparsers.add_parser(
         "odpc-summary", help="Summarize an ODPC catalog"
@@ -471,6 +516,52 @@ def main(argv: Optional[List[str]] = None) -> int:
         if args.command == "summary":
             print(json.dumps(load_summary(args.document), indent=2))
             return 0
+
+        if args.command == "generate":
+            from . import generation
+
+            if args.kind == "all":
+                artifacts = generation.generate_local_artifacts(
+                    args.source_dir,
+                    args.output,
+                    model=args.model,
+                    ollama_url=args.ollama_url,
+                )
+            else:
+                artifacts = [
+                    generation.generate_local_artifact(
+                        args.kind,
+                        args.source_dir,
+                        args.output,
+                        model=args.model,
+                        ollama_url=args.ollama_url,
+                    )
+                ]
+            valid_yaml = all(artifact.valid_yaml for artifact in artifacts)
+            payload = {
+                "spec": "generation",
+                "kind": "LocalGeneration",
+                "source": args.source_dir,
+                "artifact_kind": args.kind,
+                "output": args.output,
+                "model": args.model,
+                "valid_yaml": valid_yaml,
+                "artifact_count": len(artifacts),
+                "artifacts": [artifact.to_dict() for artifact in artifacts],
+            }
+            if args.json:
+                print(json.dumps(payload, indent=2))
+            else:
+                state = "valid YAML" if valid_yaml else "invalid YAML"
+                print(
+                    f"Generated {len(artifacts)} artifact(s) in {args.output} "
+                    f"({state})"
+                )
+                for artifact in artifacts:
+                    print(f"- {artifact.name}: {artifact.output_path}")
+                    for error in artifact.errors:
+                        print(f"  - {error}")
+            return 0 if valid_yaml else 1
 
         if args.command == "odpc-summary":
             from .odpc import collect_ids, count_items, explain_catalog

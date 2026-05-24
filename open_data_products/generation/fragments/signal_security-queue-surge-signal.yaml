@@ -1,0 +1,30 @@
+signal:
+  id: security-queue-surge-signal
+  name:
+    en: Security Queue Surge Signal
+  description:
+    en: Terminal operations observed estimated security wait minutes above 28 minutes
+      in the central security queue of Terminal 1 from 07:10 to 08:05.
+  type: operational
+  source:
+    origin: internal
+    method: Passenger Flow and Queue Data Product using passenger counting sensors
+      and security checkpoint measurements
+    system: terminal operations control center
+  observedAt: 2026-05-21T00:00:00Z
+  strength: medium
+  confidence: high
+  impact:
+    valuePotential: medium
+    urgency: medium
+    affectedDomains:
+    - Passenger Connection Protection
+    - Reduce Departure Delay Minutes
+  evidence:
+    summary:
+      en: Estimated security wait minutes exceeded 28 minutes in Terminal 1 central
+        security from 07:10 to 08:05.
+  recommendedAction:
+    en: Open one additional security lane if staffing allows, notify connection desk
+      coordinators, and flag outbound flights with less than 35 minutes until boarding
+      close.

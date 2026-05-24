@@ -1,0 +1,20 @@
+Signal name: Turnaround Delay Spike Signal
+
+On 2026-05-20, the airport operations control center observed an 18 percent
+increase in turnaround delays for flights departing between 16:00 and 20:00
+from Terminal 2.
+
+The signal source is the ground operations event log enriched with aircraft
+stand events and baggage loading milestones. The signal strength is high because
+the increase appeared across three handling agents and multiple gate zones. The
+confidence level is medium because two baggage belt event streams were delayed
+for part of the observation window.
+
+The signal is relevant to Flight Delay Risk Monitoring and the Reduce Departure
+Delay Minutes objective. It should trigger investigation of staffing levels,
+baggage loading bottlenecks, late inbound aircraft, and aircraft stand conflicts.
+
+Recommended action: operations control should review high-risk departures in
+Terminal 2 before the evening peak, coordinate with handling agents, and prepare
+gate reassignment options for flights with limited turnaround buffer.
+

@@ -1,0 +1,26 @@
+useCase:
+  id: flight-delay-risk-monitoring
+  name:
+    en: Flight Delay Risk Monitoring
+  description:
+    en: Detect departures likely to miss target off-block time.
+  stakeholders:
+  - duty managers
+  - gate coordinators
+  - airline station managers
+  - turnaround supervisors
+  decision:
+    en: Gate swaps, stand reassignment, additional ground handling staff, baggage
+      belt priority, proactive passenger communication.
+  expectedOutcome:
+    en: Reduce reaction time by 20 percent during the summer peak period.
+  dataNeeds:
+    summary:
+      en: Airport Operations Performance Data Product, gate events, aircraft stand
+        events, baggage loading milestones, updated estimated departure times.
+    items:
+    - airport-operations-performance
+  status: active
+  priority: high
+  tags:
+  - departure-delay

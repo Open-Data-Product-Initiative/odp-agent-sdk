@@ -52,6 +52,15 @@ from .contracts import (
     summarize_contract_document,
     validate_contract,
 )
+from .generation import (
+    ensure_ollama_model,
+    generate_local_artifact,
+    generate_local_artifacts,
+    list_ollama_models,
+    list_generation_prompts,
+    load_generation_prompt,
+    render_generation_prompt,
+)
 from .odpc import (
     build_catalog,
     build_catalog_artifacts,
@@ -115,10 +124,17 @@ __all__ = [
     "load_document",
     "load_contract",
     "load_summary",
+    "list_generation_prompts",
+    "load_generation_prompt",
     "pricing_to_402",
     "generate_product_contract_report",
+    "ensure_ollama_model",
+    "generate_local_artifact",
+    "generate_local_artifacts",
+    "list_ollama_models",
     "render_catalog_html",
     "render_catalog_schema_json",
+    "render_generation_prompt",
     "resolve_references",
     "resolve_vocabulary_term",
     "resolve_product_contracts",

@@ -1,0 +1,690 @@
+"""Local LLM generation prompt helpers."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+import json
+from pathlib import Path
+import re
+from typing import Callable, List, Optional, Sequence, Union
+from urllib import error, request
+
+import yaml
+
+_PROMPT_DIR = Path(__file__).resolve().parent / "data" / "prompts"
+DEFAULT_OLLAMA_URL = "http://localhost:11434"
+DEFAULT_GENERATION_MODEL = "qwen2.5"
+DEFAULT_OLLAMA_GENERATE_TIMEOUT = 300
+
+ModelClient = Callable[[str, str], str]
+
+
+@dataclass(frozen=True)
+class GenerationTask:
+    """Prompt and output mapping for one local generation artifact."""
+
+    name: str
+    prompt_name: str
+    output_name: str
+    expected_root: str
+    fragment_root: Optional[str] = None
+    filename_prefix: Optional[str] = None
+    graph_node_type: Optional[str] = None
+
+
+@dataclass(frozen=True)
+class GeneratedArtifact:
+    """Generated YAML artifact metadata."""
+
+    name: str
+    prompt_name: str
+    output_path: Path
+    valid_yaml: bool
+    errors: List[str] = field(default_factory=list)
+
+    def to_dict(self) -> dict:
+        """Return a JSON-ready artifact summary."""
+        return {
+            "name": self.name,
+            "prompt": self.prompt_name,
+            "output": str(self.output_path),
+            "valid_yaml": self.valid_yaml,
+            "errors": list(self.errors),
+        }
+
+
+GENERATION_TASKS: Sequence[GenerationTask] = (
+    GenerationTask(
+        name="odps_data_products",
+        prompt_name="odps_data_product_fragment.md",
+        output_name="odps_data_products.yaml",
+        expected_root="productReferences",
+        fragment_root="productReference",
+        filename_prefix="product_reference",
+        graph_node_type="DataProduct",
+    ),
+    GenerationTask(
+        name="odpc_use_cases",
+        prompt_name="odpc_use_case_fragment.md",
+        output_name="odpc_use_cases.yaml",
+        expected_root="useCases",
+        fragment_root="useCase",
+        filename_prefix="use_case",
+        graph_node_type="UseCase",
+    ),
+    GenerationTask(
+        name="odpc_objectives",
+        prompt_name="odpc_objective_fragment.md",
+        output_name="odpc_objectives.yaml",
+        expected_root="businessObjectives",
+        fragment_root="businessObjective",
+        filename_prefix="business_objective",
+        graph_node_type="BusinessObjective",
+    ),
+    GenerationTask(
+        name="odpc_signals",
+        prompt_name="odpc_signal_fragment.md",
+        output_name="odpc_signals.yaml",
+        expected_root="signals",
+        fragment_root="signal",
+        filename_prefix="signal",
+        graph_node_type="Signal",
+    ),
+    GenerationTask(
+        name="odpg_graph",
+        prompt_name="odpg_graph_yaml.md",
+        output_name="odpg_graph.yaml",
+        expected_root="graph",
+    ),
+)
+
+GENERATION_TASK_ALIASES = {
+    "product": "odps_data_products",
+    "data-product": "odps_data_products",
+    "data-products": "odps_data_products",
+    "odps": "odps_data_products",
+    "use-case": "odpc_use_cases",
+    "usecase": "odpc_use_cases",
+    "use-cases": "odpc_use_cases",
+    "objective": "odpc_objectives",
+    "objectives": "odpc_objectives",
+    "business-objective": "odpc_objectives",
+    "signal": "odpc_signals",
+    "signals": "odpc_signals",
+    "graph": "odpg_graph",
+    "odpg": "odpg_graph",
+}
+
+
+def list_generation_prompts() -> List[str]:
+    """List bundled local generation prompt filenames."""
+    return sorted(path.name for path in _PROMPT_DIR.glob("*.md"))
+
+
+def load_generation_prompt(name: str) -> str:
+    """Load a bundled local generation prompt by filename."""
+    if "/" in name or "\\" in name:
+        raise KeyError(f"Unknown generation prompt: {name}")
+
+    prompt_path = _PROMPT_DIR / name
+    if not prompt_path.is_file():
+        raise KeyError(f"Unknown generation prompt: {name}")
+    return prompt_path.read_text(encoding="utf-8")
+
+
+PathLike = Union[str, Path]
+
+
+def load_source_documents(source_dir: PathLike) -> str:
+    """Load Markdown and text source documents as one prompt context."""
+    root = Path(source_dir)
+    if root.is_file():
+        paths = [root]
+    elif root.is_dir():
+        paths = sorted(
+            path
+            for path in root.iterdir()
+            if path.is_file() and path.suffix.lower() in {".md", ".txt"}
+        )
+    else:
+        raise FileNotFoundError(f"Source document path not found: {root}")
+
+    if not paths:
+        raise ValueError(f"No Markdown or text source documents found at {root}")
+
+    sections = []
+    for path in paths:
+        sections.append(
+            "\n".join(
+                [
+                    f"--- Source file: {path.name} ---",
+                    path.read_text(encoding="utf-8").strip(),
+                ]
+            )
+        )
+    return "\n\n".join(sections)
+
+
+def render_generation_prompt(prompt_name: str, source_dir: PathLike) -> str:
+    """Render a generation prompt with source documents inlined."""
+    return load_generation_prompt(prompt_name).replace(
+        "{source_documents}",
+        load_source_documents(source_dir),
+    )
+
+
+def ollama_generate(
+    prompt: str,
+    model: str = DEFAULT_GENERATION_MODEL,
+    base_url: str = DEFAULT_OLLAMA_URL,
+) -> str:
+    """Generate text with a local Ollama model."""
+    payload = json.dumps(
+        {
+            "model": model,
+            "prompt": prompt,
+            "stream": False,
+        }
+    ).encode("utf-8")
+    req = request.Request(
+        f"{base_url.rstrip('/')}/api/generate",
+        data=payload,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    with request.urlopen(req, timeout=DEFAULT_OLLAMA_GENERATE_TIMEOUT) as response:
+        data = json.loads(response.read().decode("utf-8"))
+    generated = data.get("response")
+    if not isinstance(generated, str):
+        raise RuntimeError("Ollama response did not contain generated text.")
+    return generated
+
+
+def list_ollama_models(base_url: str = DEFAULT_OLLAMA_URL) -> List[str]:
+    """List models available from the local Ollama server."""
+    req = request.Request(
+        f"{base_url.rstrip('/')}/api/tags",
+        headers={"Accept": "application/json"},
+        method="GET",
+    )
+    try:
+        with request.urlopen(req, timeout=10) as response:
+            data = json.loads(response.read().decode("utf-8"))
+    except (OSError, error.URLError) as exc:
+        raise RuntimeError(
+            "Ollama is required for local generation but is not reachable at "
+            f"{base_url}. Start Ollama before running generation."
+        ) from exc
+
+    models = data.get("models", [])
+    if not isinstance(models, list):
+        return []
+
+    names = []
+    for item in models:
+        if not isinstance(item, dict):
+            continue
+        name = item.get("name") or item.get("model")
+        if isinstance(name, str):
+            names.append(name)
+    return names
+
+
+def ensure_ollama_model(
+    model: str = DEFAULT_GENERATION_MODEL,
+    base_url: str = DEFAULT_OLLAMA_URL,
+) -> None:
+    """Require the configured local Ollama model before generation."""
+    available = list_ollama_models(base_url)
+    matches = {model, f"{model}:latest"}
+    if not any(name in matches or name.startswith(f"{model}:") for name in available):
+        raise RuntimeError(
+            f"Required Ollama model {model} is not available. "
+            f"Run `ollama pull {model}` before local generation."
+        )
+
+
+def generate_local_artifacts(
+    source_dir: PathLike,
+    output_dir: PathLike,
+    model: str = DEFAULT_GENERATION_MODEL,
+    ollama_url: str = DEFAULT_OLLAMA_URL,
+    client: Optional[ModelClient] = None,
+) -> List[GeneratedArtifact]:
+    """Generate YAML fragments and graph YAML from source documents."""
+    destination = Path(output_dir)
+    destination.mkdir(parents=True, exist_ok=True)
+    if client is None:
+        ensure_ollama_model(model, ollama_url)
+    model_client = client or (
+        lambda prompt, model_name: ollama_generate(prompt, model_name, ollama_url)
+    )
+
+    artifacts = []
+    for task in GENERATION_TASKS:
+        prompt_context = (
+            _generated_artifact_context(artifacts)
+            if task.name == "odpg_graph" and artifacts
+            else None
+        )
+        expected_graph_nodes = (
+            _generated_graph_nodes(artifacts)
+            if task.name == "odpg_graph" and artifacts
+            else None
+        )
+        artifacts.extend(
+            _run_generation_task(
+                task,
+                source_dir,
+                destination,
+                model,
+                model_client,
+                prompt_context=prompt_context,
+                expected_graph_nodes=expected_graph_nodes,
+            )
+        )
+    return artifacts
+
+
+def generate_local_artifact(
+    artifact_kind: str,
+    source: PathLike,
+    output_dir: PathLike,
+    model: str = DEFAULT_GENERATION_MODEL,
+    ollama_url: str = DEFAULT_OLLAMA_URL,
+    client: Optional[ModelClient] = None,
+) -> GeneratedArtifact:
+    """Generate one selected YAML artifact from source documents."""
+    destination = Path(output_dir)
+    destination.mkdir(parents=True, exist_ok=True)
+    if client is None:
+        ensure_ollama_model(model, ollama_url)
+    model_client = client or (
+        lambda prompt, model_name: ollama_generate(prompt, model_name, ollama_url)
+    )
+    artifacts = _run_generation_task(
+        _generation_task_for(artifact_kind),
+        source,
+        destination,
+        model,
+        model_client,
+    )
+    if not artifacts:
+        raise RuntimeError(f"No artifacts generated for kind: {artifact_kind}")
+    return artifacts[0]
+
+
+def _generation_task_for(artifact_kind: str) -> GenerationTask:
+    task_name = GENERATION_TASK_ALIASES.get(artifact_kind)
+    for task in GENERATION_TASKS:
+        if artifact_kind == task.name or task_name == task.name:
+            return task
+    raise KeyError(f"Unknown generation artifact kind: {artifact_kind}")
+
+
+def _run_generation_task(
+    task: GenerationTask,
+    source: PathLike,
+    destination: Path,
+    model: str,
+    model_client: ModelClient,
+    prompt_context: Optional[str] = None,
+    expected_graph_nodes: Optional[Sequence[dict]] = None,
+) -> List[GeneratedArtifact]:
+    prompt = (
+        _render_generation_prompt_context(task.prompt_name, prompt_context)
+        if prompt_context is not None
+        else render_generation_prompt(task.prompt_name, source)
+    )
+    raw_output = model_client(prompt, model)
+    yaml_output = _normalize_generated_output(
+        task,
+        _strip_markdown_fence(raw_output).strip(),
+        expected_graph_nodes=expected_graph_nodes,
+    ) + "\n"
+    expected_graph_node_ids = (
+        [str(node["id"]) for node in expected_graph_nodes]
+        if expected_graph_nodes
+        else None
+    )
+    errors = _artifact_errors(task, yaml_output, expected_graph_node_ids)
+    if errors:
+        output_path = destination / task.output_name
+        output_path.write_text(yaml_output, encoding="utf-8")
+        return [
+            GeneratedArtifact(
+                name=task.name,
+                prompt_name=task.prompt_name,
+                output_path=output_path,
+                valid_yaml=False,
+                errors=errors,
+            )
+        ]
+
+    return _write_generated_artifacts(task, yaml_output, destination)
+
+
+def _write_generated_artifacts(
+    task: GenerationTask,
+    yaml_output: str,
+    destination: Path,
+) -> List[GeneratedArtifact]:
+    if task.expected_root == "graph":
+        output_path = destination / task.output_name
+        output_path.write_text(yaml_output, encoding="utf-8")
+        return [
+            GeneratedArtifact(
+                name=task.name,
+                prompt_name=task.prompt_name,
+                output_path=output_path,
+                valid_yaml=True,
+            )
+        ]
+
+    document = yaml.safe_load(yaml_output)
+    if not isinstance(document, dict):
+        return []
+    items = document.get(task.expected_root)
+    if not isinstance(items, list) or not task.fragment_root or not task.filename_prefix:
+        return []
+
+    artifacts = []
+    for index, item in enumerate(items):
+        if not isinstance(item, dict):
+            continue
+        item_id = str(item.get("id") or f"{task.filename_prefix}-{index + 1}")
+        output_path = destination / _fragment_file_name(task.filename_prefix, item_id)
+        output_path.write_text(
+            yaml.safe_dump(
+                {task.fragment_root: item},
+                sort_keys=False,
+                allow_unicode=True,
+            ),
+            encoding="utf-8",
+        )
+        artifacts.append(
+            GeneratedArtifact(
+                name=f"{task.fragment_root}:{item_id}",
+                prompt_name=task.prompt_name,
+                output_path=output_path,
+                valid_yaml=True,
+            )
+        )
+    return artifacts
+
+
+def _fragment_file_name(prefix: str, item_id: str) -> str:
+    return f"{prefix}_{_slugify_identifier(item_id)}.yaml"
+
+
+def _render_generation_prompt_context(prompt_name: str, context: str) -> str:
+    return load_generation_prompt(prompt_name).replace("{source_documents}", context)
+
+
+def _generated_artifact_context(artifacts: Sequence[GeneratedArtifact]) -> str:
+    sections = []
+    for artifact in artifacts:
+        sections.append(
+            "\n".join(
+                [
+                    f"--- Source file: {artifact.output_path.name} ---",
+                    artifact.output_path.read_text(encoding="utf-8").strip(),
+                ]
+            )
+        )
+    return "\n\n".join(sections)
+
+
+def _generated_graph_nodes(artifacts: Sequence[GeneratedArtifact]) -> List[dict]:
+    root_types = {
+        "productReference": "DataProduct",
+        "useCase": "UseCase",
+        "businessObjective": "BusinessObjective",
+        "signal": "Signal",
+    }
+    nodes = []
+    for artifact in artifacts:
+        try:
+            document = yaml.safe_load(artifact.output_path.read_text(encoding="utf-8"))
+        except yaml.YAMLError:
+            continue
+        if not isinstance(document, dict):
+            continue
+        for root_key, value in document.items():
+            if not isinstance(value, dict):
+                continue
+            node_type = root_types.get(root_key)
+            if node_type is None:
+                continue
+            if isinstance(value.get("id"), str):
+                nodes.append(
+                    {
+                        "id": value["id"],
+                        "type": node_type,
+                        "$ref": artifact.output_path.name,
+                    }
+                )
+    return nodes
+
+
+def _strip_markdown_fence(text: str) -> str:
+    stripped = text.strip()
+    if not stripped.startswith("```"):
+        return stripped
+
+    lines = stripped.splitlines()
+    if len(lines) >= 2 and lines[-1].strip() == "```":
+        return "\n".join(lines[1:-1])
+    return stripped
+
+
+def _normalize_generated_output(
+    task: GenerationTask,
+    text: str,
+    expected_graph_nodes: Optional[Sequence[dict]] = None,
+) -> str:
+    try:
+        document = yaml.safe_load(text)
+    except yaml.YAMLError:
+        return text
+    if not isinstance(document, dict):
+        return text
+
+    if task.name == "odpc_signals":
+        _normalize_signal_fragments(document)
+        return yaml.safe_dump(document, sort_keys=False, allow_unicode=True).strip()
+    if task.name == "odpc_objectives":
+        _normalize_objective_fragments(document)
+        return yaml.safe_dump(document, sort_keys=False, allow_unicode=True).strip()
+    if task.name == "odpg_graph" and expected_graph_nodes:
+        _normalize_graph_nodes(document, expected_graph_nodes)
+        return yaml.safe_dump(document, sort_keys=False, allow_unicode=True).strip()
+    return text
+
+
+def _normalize_objective_fragments(document: dict) -> None:
+    for objective in document.get("businessObjectives", []):
+        if not isinstance(objective, dict):
+            continue
+        objective.pop("linkedUseCases", None)
+        objective.pop("dataProducts", None)
+
+
+def _normalize_graph_nodes(document: dict, expected_graph_nodes: Sequence[dict]) -> None:
+    graph = document.get("graph")
+    if not isinstance(graph, dict):
+        return
+    nodes = graph.setdefault("nodes", [])
+    if not isinstance(nodes, list):
+        return
+    expected_by_id = {expected["id"]: expected for expected in expected_graph_nodes}
+    existing = {
+        node.get("id")
+        for node in nodes
+        if isinstance(node, dict) and isinstance(node.get("id"), str)
+    }
+    for node in nodes:
+        if not isinstance(node, dict):
+            continue
+        node_id = node.get("id")
+        expected = expected_by_id.get(node_id)
+        if expected:
+            node["type"] = expected["type"]
+            node["$ref"] = expected["$ref"]
+    for expected in expected_graph_nodes:
+        if expected["id"] not in existing:
+            nodes.append(dict(expected))
+            existing.add(expected["id"])
+
+
+def _normalize_signal_fragments(document: dict) -> None:
+    for signal in document.get("signals", []):
+        if not isinstance(signal, dict):
+            continue
+        name = signal.get("name")
+        english_name = name.get("en") if isinstance(name, dict) else None
+        if isinstance(english_name, str):
+            signal["id"] = _slugify_identifier(english_name)
+
+        for field in ("strength", "confidence"):
+            if field in signal:
+                signal[field] = _normalize_signal_enum(signal.get(field))
+
+        impact = signal.get("impact")
+        if isinstance(impact, dict):
+            for field in ("valuePotential", "urgency"):
+                if field in impact:
+                    impact[field] = _normalize_signal_enum(impact.get(field))
+
+
+def _normalize_signal_enum(value: object) -> object:
+    if isinstance(value, str) and value.lower() == "moderate":
+        return "medium"
+    return value
+
+
+def _artifact_errors(
+    task: GenerationTask,
+    text: str,
+    expected_graph_node_ids: Optional[Sequence[str]] = None,
+) -> List[str]:
+    try:
+        document = yaml.safe_load(text)
+    except yaml.YAMLError as exc:
+        return [str(exc)]
+    if not isinstance(document, dict):
+        return ["Generated YAML must be a mapping at the document root."]
+    if task.expected_root not in document:
+        return [
+            "Generated YAML must contain expected root key "
+            f"`{task.expected_root}` for {task.name}."
+        ]
+    if task.expected_root != "graph" and not isinstance(
+        document.get(task.expected_root), list
+    ):
+        return [f"`{task.expected_root}` must be a list."]
+    if task.expected_root == "graph" and document.get("kind") != "Graph":
+        return ["ODPG graph output must include `kind: Graph`."]
+    if task.expected_root == "graph":
+        from open_data_products.odpg import validate_graph
+
+        graph_result = validate_graph(document)
+        if not graph_result.valid:
+            return graph_result.errors
+        coverage_errors = _graph_coverage_errors(document, expected_graph_node_ids)
+        if coverage_errors:
+            return coverage_errors
+    if task.expected_root != "graph":
+        from open_data_products.odpc import validate_catalog
+
+        catalog_result = validate_catalog(
+            {
+                "schema": "https://opendataproducts.org/odpc-v1.0/schema/odpc.yaml",
+                "version": "1.0",
+                "kind": "Catalog",
+                "catalog": {
+                    "metadata": {
+                        "id": "CAT-GENERATED-CHECK",
+                        "name": {"en": "Generated Check"},
+                        "description": {"en": "Generated fragment validation."},
+                    },
+                    task.expected_root: document[task.expected_root],
+                },
+            }
+        )
+        if not catalog_result.valid:
+            return catalog_result.errors
+        quality_errors = _fragment_quality_errors(task, document)
+        if quality_errors:
+            return quality_errors
+    return []
+
+
+def _graph_coverage_errors(
+    document: dict,
+    expected_graph_node_ids: Optional[Sequence[str]],
+) -> List[str]:
+    if not expected_graph_node_ids:
+        return []
+    graph = document.get("graph")
+    if not isinstance(graph, dict):
+        return []
+    nodes = graph.get("nodes")
+    if not isinstance(nodes, list):
+        return []
+    actual_ids = {
+        node.get("id")
+        for node in nodes
+        if isinstance(node, dict) and isinstance(node.get("id"), str)
+    }
+    missing = sorted(set(expected_graph_node_ids) - actual_ids)
+    if not missing:
+        return []
+    return ["ODPG graph is missing generated fragment node ids: " + ", ".join(missing)]
+
+
+def _fragment_quality_errors(task: GenerationTask, document: dict) -> List[str]:
+    if task.name != "odpc_signals":
+        return []
+
+    errors = []
+    for index, signal in enumerate(document.get("signals", [])):
+        if not isinstance(signal, dict):
+            continue
+        signal_id = str(signal.get("id") or "")
+        name = signal.get("name")
+        english_name = name.get("en") if isinstance(name, dict) else None
+        if not isinstance(english_name, str):
+            continue
+        expected_id = _slugify_identifier(english_name)
+        if signal_id != expected_id:
+            errors.append(
+                f"signals.{index}.id `{signal_id}` does not match signal name "
+                f"slug `{expected_id}`."
+            )
+    return errors
+
+
+def _slugify_identifier(value: str) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
+    return re.sub(r"-+", "-", slug)
+
+
+__all__ = [
+    "DEFAULT_GENERATION_MODEL",
+    "DEFAULT_OLLAMA_GENERATE_TIMEOUT",
+    "DEFAULT_OLLAMA_URL",
+    "GENERATION_TASKS",
+    "GENERATION_TASK_ALIASES",
+    "GeneratedArtifact",
+    "GenerationTask",
+    "ensure_ollama_model",
+    "generate_local_artifact",
+    "generate_local_artifacts",
+    "list_generation_prompts",
+    "list_ollama_models",
+    "load_generation_prompt",
+    "load_source_documents",
+    "ollama_generate",
+    "render_generation_prompt",
+]

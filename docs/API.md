@@ -9,8 +9,11 @@ needs one surface across ODPS, ODPC, ODPG, and ODPV documents:
 from open_data_products import (
     detect_document,
     explain_document,
+    generate_local_artifact,
+    generate_local_artifacts,
     get_resource,
     list_resources,
+    load_generation_prompt,
     load_document,
     load_summary,
     resolve_references,
@@ -23,6 +26,9 @@ summary = explain_document(document)
 references = resolve_references(document)
 resources = list_resources()
 metadata = load_summary("product.yaml")
+prompt = load_generation_prompt("odps_data_product_fragment.md")
+signal = generate_local_artifact("signal", "signal.txt", "open_data_products/generation/fragments")
+artifacts = generate_local_artifacts("open_data_products/generation/source_docs", "open_data_products/generation/fragments")
 ```
 
 ### Core Functions
@@ -40,7 +46,19 @@ metadata = load_summary("product.yaml")
   `line_count`, `sha256`, `spec`, `kind`, and `id`) without returning the
   document body.
 - `list_resources()` and `get_resource(id)`: discover bundled schemas,
-  vocabularies, examples, and JSONL retrieval records.
+  prompt templates, vocabularies, examples, and JSONL retrieval records.
+- `list_generation_prompts()` and `load_generation_prompt(name)`: discover and
+  load editable local LLM prompts for generating standards-ready YAML artifacts.
+- `generate_local_artifact(kind, source, output_dir, model="qwen2.5")`: generate
+  one selected artifact kind (`product`, `use-case`, `objective`, `signal`, or
+  `graph`) from one Markdown/text source file or a source folder.
+- `generate_local_artifacts(source_dir, output_dir, model="qwen2.5")`: use the
+  editable prompts and required local Ollama/Qwen 2.5 model to generate
+  separate ODPC `productReference`, `useCase`, `businessObjective`, and
+  `signal` fragment files from Markdown/text source documents, then generate
+  ODPG graph YAML from those fragment files.
+- `ensure_ollama_model(model="qwen2.5")`: check that Ollama is reachable and
+  that the required local model is available before generation.
 
 ### Shared Result Types
 
@@ -64,6 +82,9 @@ open-data-products validate product.yaml --json
 open-data-products explain product.yaml --json
 open-data-products refs graph.yaml --json
 open-data-products resources --json
+# Requires Ollama running locally and `ollama pull qwen2.5`.
+open-data-products generate signal.txt --kind signal --output open_data_products/generation/fragments --model qwen2.5 --json
+open-data-products generate open_data_products/generation/source_docs --output open_data_products/generation/fragments --model qwen2.5 --json
 open-data-products summary product.yaml
 open-data-products manifest --json
 open-data-products serve
@@ -81,6 +102,7 @@ The SDK uses one namespace per Open Data Products standard:
 - `open_data_products.odpc` for Open Data Product Catalog
 - `open_data_products.odpg` for Open Data Product Graph
 - `open_data_products.odpv` for Open Data Product Vocabulary
+- `open_data_products.generation` for local LLM generation prompts
 
 Import ODPS APIs from `open_data_products.odps`:
 
@@ -119,6 +141,10 @@ from open_data_products.odpv import (
     validate_vocabulary,
     write_artifacts,
 )
+from open_data_products.generation import (
+    list_generation_prompts,
+    load_generation_prompt,
+)
 ```
 
 - `open_data_products.odpc`: catalog building from ODPC fragments or ODPS
@@ -129,6 +155,9 @@ from open_data_products.odpv import (
   context, object search, and standalone graph explorer generation.
 - `open_data_products.odpv`: vocabulary loading, validation, search, generated
   JSON/JSONL/YAML artifacts, and artifact drift checks.
+- `open_data_products.generation`: editable prompt files for guiding local LLMs
+  to produce ODPS, ODPC, and ODPG YAML that can be validated by the SDK, plus
+  local Ollama generation helpers.
 
 ## Table of Contents
 

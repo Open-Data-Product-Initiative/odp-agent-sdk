@@ -1,0 +1,27 @@
+useCase:
+  id: passenger-connection-protection
+  name:
+    en: Passenger Connection Protection
+  description:
+    en: Identify transfer passengers at risk of missing outbound flights.
+  stakeholders:
+  - connection desk coordinators
+  - duty managers
+  - airline station managers
+  - passenger service supervisors
+  decision:
+    en: Hold boarding for a short interval, assign connection desk staff, prioritize
+      security fast track, send passenger service notifications, coordinate gate teams.
+  expectedOutcome:
+    en: Reduce missed connections by 8 percent during the 2026 Q3 summer peak period.
+  dataNeeds:
+    summary:
+      en: Flight Connection Reliability Data Product, Passenger Flow and Queue Data
+        Product, selected fields from Airport Operations Performance Data Product.
+    items:
+    - flight-connection-reliability
+    - passenger-flow-queue
+  status: active
+  priority: high
+  tags:
+  - connection-risk

@@ -1,0 +1,20 @@
+Business objective: Reduce Departure Delay Minutes
+
+The airport operations leadership team wants to reduce average departure delay
+minutes by 12 percent during the 2026 Q3 summer peak period.
+
+The objective applies to scheduled passenger departures from Terminal 1 and
+Terminal 2. The most important metric is average departure delay minutes, with a
+secondary metric for the percentage of flights leaving within 15 minutes of the
+scheduled departure time.
+
+Priority is high because delay minutes affect passenger satisfaction, stand
+availability, airline partner service levels, and downstream arrival punctuality.
+
+The objective owner is the Head of Airport Operations. Progress should be
+reviewed weekly by operations control, terminal planning, and airline partner
+representatives.
+
+The objective is linked to Flight Delay Risk Monitoring and should use the
+Airport Operations Performance Data Product as the main measurement source.
+

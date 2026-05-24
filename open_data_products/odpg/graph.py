@@ -374,6 +374,16 @@ def build_html(graph: dict) -> str:
     payload = graph_payload(graph)
     metadata = graph_metadata(graph)
     relationship_types = collect_relationship_types(graph)
+    node_types = sorted(
+        {str(node.get("type", "")) for node in payload["nodes"] if node.get("type")}
+    )
+    confidence_levels = sorted(
+        {
+            str(edge.get("confidence", ""))
+            for edge in payload["edges"]
+            if edge.get("confidence")
+        }
+    )
     odpg_supported_ordered_json = json.dumps(
         list(ODPG_CORE_EDGE_TYPES_ORDERED), ensure_ascii=False
     )
@@ -404,15 +414,17 @@ def build_html(graph: dict) -> str:
         )
 
     vis_edges = []
-    for edge in payload["edges"]:
+    for idx, edge in enumerate(payload["edges"]):
         display = _edge_relationship_label(edge)
         conf = str(edge["confidence"]).lower()
         ec = _edge_legend_color(display)
         vis_edges.append(
             {
+                "id": f"edge-{idx}",
                 "from": edge["from"],
                 "to": edge["to"],
                 "label": f"{display}\n({conf})",
+                "type": display,
                 "title": _edge_vis_tooltip(edge, display),
                 "arrows": "to",
                 "confidence": edge["confidence"],
@@ -432,6 +444,8 @@ def build_html(graph: dict) -> str:
         graph_title=graph_title,
         graph_meta=graph_meta,
         relationship_types=relationship_types,
+        node_types=node_types,
+        confidence_levels=confidence_levels,
         vis_nodes=vis_nodes,
         vis_edges=vis_edges,
         legend_edges_html=legend_edges_html,

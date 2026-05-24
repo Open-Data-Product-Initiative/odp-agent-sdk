@@ -1,0 +1,20 @@
+Signal name: Security Queue Surge Signal
+
+On 2026-05-21, terminal operations observed estimated security wait minutes
+above 28 minutes for Terminal 1 central security between 07:10 and 08:05.
+
+The signal source is the Passenger Flow and Queue Data Product, using passenger
+counting sensors and security checkpoint queue measurements. The signal strength
+is medium because the queue exceeded the normal morning peak threshold for 45
+minutes. The confidence level is high because sensor confidence scores stayed
+above 0.92 throughout the observation window.
+
+The signal is relevant to Passenger Connection Protection because transfer
+passengers using Terminal 1 security fast track may miss boarding close times.
+It is also relevant to the Reduce Departure Delay Minutes objective when late
+passengers delay aircraft door closure.
+
+Recommended action: terminal operations should open one additional security lane
+where staffing allows, notify connection desk coordinators, and flag outbound
+flights with less than 35 minutes until boarding close.
+

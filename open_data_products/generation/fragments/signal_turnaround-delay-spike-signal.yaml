@@ -1,0 +1,30 @@
+signal:
+  id: turnaround-delay-spike-signal
+  name:
+    en: Turnaround Delay Spike Signal
+  description:
+    en: The airport operations control center observed an 18 percent increase in turnaround
+      delays for Terminal 2 departures between 16:00 and 20:00.
+  type: operational
+  source:
+    origin: internal
+    method: ground operations event log enriched with aircraft stand events and baggage
+      loading milestones
+    system: airport operations control center, ground operations event log
+  observedAt: 2026-05-20T00:00:00Z
+  strength: high
+  confidence: medium
+  impact:
+    valuePotential: high
+    urgency: high
+    affectedDomains:
+    - Flight Delay Risk Monitoring
+    - Reduce Departure Delay Minutes
+  evidence:
+    summary:
+      en: Turnaround delays increased by 18 percent for Terminal 2 departures between
+        16:00 and 20:00.
+  recommendedAction:
+    en: Review high-risk departures in Terminal 2 before the evening peak, coordinate
+      with handling agents, and prepare gate reassignment options for flights with
+      limited turnaround buffer.

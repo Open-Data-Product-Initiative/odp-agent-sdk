@@ -1,0 +1,21 @@
+productReference:
+  id: passenger-flow-queue
+  productID: passenger-flow-queue
+  productVersion: 1.0.0
+  name:
+    en: Passenger Flow and Queue Data Product
+  description:
+    en: Internal airport operations analytics for terminal performance.
+  visibility: restricted
+  status: production
+  type: dataset
+  domains:
+  - airport operations
+  portfolioPriority: high
+  owner:
+    team: Terminal Planning Analytics Team
+  productModel:
+    standard: ODPS
+    version: '4.1'
+    format: yaml
+    $ref: products/passenger-flow-queue.yaml

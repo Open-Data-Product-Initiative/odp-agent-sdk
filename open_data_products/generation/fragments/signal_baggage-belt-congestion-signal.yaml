@@ -1,0 +1,28 @@
+signal:
+  id: baggage-belt-congestion-signal
+  name:
+    en: Baggage Belt Congestion Signal
+  description:
+    en: Baggage operations observed belt occupancy above planned capacity on Terminal
+      2 belts B14 and B15 between 18:20 and 19:05.
+  type: operational
+  source:
+    origin: internal
+    method: baggage belt event data from Airport Operations Performance Data Product
+    system: airport operations control center, ground operations event log
+  observedAt: 2026-05-23T00:00:00Z
+  strength: medium
+  confidence: medium
+  impact:
+    valuePotential: high
+    urgency: medium
+    affectedDomains:
+    - Flight Delay Risk Monitoring
+    - Passenger Connection Protection
+  evidence:
+    summary:
+      en: Baggage belt occupancy exceeded planned capacity on Terminal 2 belts B14
+        and B15 between 18:20 and 19:05.
+  recommendedAction:
+    en: Assign one additional ramp team to Terminal 2 belts B14 and B15, review transfer
+      bag cutoff risk, and notify turnaround supervisors for affected flights.

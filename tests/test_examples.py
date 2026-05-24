@@ -2,6 +2,7 @@
 
 import pytest
 import json
+import yaml
 
 from pathlib import Path
 
@@ -175,6 +176,70 @@ class TestODPCExamples:
         assert result.valid is True
         assert sample_html.read_text(encoding="utf-8") == render_catalog_html(document)
         assert "Example ODPC Catalog" in sample_html.read_text(encoding="utf-8")
+
+
+class TestGenerationSourceExamples:
+    """Test cases using source documents for local generation."""
+
+    def test_generation_source_docs_are_available(self):
+        """Test that mixed source docs exist for local LLM generation."""
+        source_dir = (
+            REPO_ROOT
+            / "open_data_products"
+            / "generation"
+            / "source_docs"
+        )
+
+        markdown_files = sorted(source_dir.glob("*.md"))
+        text_files = sorted(source_dir.glob("*.txt"))
+        combined_text = "\n".join(
+            path.read_text(encoding="utf-8")
+            for path in [*markdown_files, *text_files]
+        )
+
+        assert source_dir.is_dir()
+        assert len(markdown_files) >= 5
+        assert len(text_files) >= 4
+        assert "Airport Operations Performance Data Product" in combined_text
+        assert "Passenger Flow and Queue Data Product" in combined_text
+        assert "Flight Connection Reliability Data Product" in combined_text
+        assert "Flight Delay Risk Monitoring" in combined_text
+        assert "Passenger Connection Protection" in combined_text
+        assert "Reduce Departure Delay Minutes" in combined_text
+        assert "Turnaround Delay Spike Signal" in combined_text
+        assert "Security Queue Surge Signal" in combined_text
+        assert "Inbound Connection Risk Signal" in combined_text
+        assert "Baggage Belt Congestion Signal" in combined_text
+
+    def test_generated_fragments_are_generic_odpc_files(self):
+        """Test that generated outputs are generic fragment files."""
+        from open_data_products.odpc import build_catalog, validate_catalog
+        from open_data_products.odpg import validate_graph
+
+        fragments_dir = REPO_ROOT / "open_data_products" / "generation" / "fragments"
+        graph_path = fragments_dir / "odpg_graph.yaml"
+
+        fragment_roots = {
+            path.name: yaml.safe_load(path.read_text(encoding="utf-8"))
+            for path in fragments_dir.glob("*.yaml")
+            if path.name != "odpg_graph.yaml"
+        }
+
+        assert fragments_dir.is_dir()
+        assert not any(path.is_dir() for path in fragments_dir.iterdir())
+        assert {next(iter(document)) for document in fragment_roots.values()} == {
+            "productReference",
+            "useCase",
+            "businessObjective",
+            "signal",
+        }
+
+        catalog = build_catalog(fragments_dir)
+        assert validate_catalog(catalog).valid is True
+
+        graph = yaml.safe_load(graph_path.read_text(encoding="utf-8"))
+        assert validate_graph(graph).valid is True
+        assert all("#/" not in node["$ref"] for node in graph["graph"]["nodes"])
 
 
 class TestExampleUsage:

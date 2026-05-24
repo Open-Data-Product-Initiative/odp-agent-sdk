@@ -1,0 +1,20 @@
+Signal name: Baggage Belt Congestion Signal
+
+On 2026-05-23, baggage operations observed baggage belt occupancy above planned
+capacity for Terminal 2 belts B14 and B15 between 18:20 and 19:05.
+
+The signal source is baggage belt event data from the Airport Operations
+Performance Data Product, cross-checked with passenger arrival load bands. The
+signal strength is medium because two high-load inbound flights arrived within
+12 minutes of each other. The confidence level is medium because one belt sensor
+reported intermittent status updates.
+
+The signal is relevant to Flight Delay Risk Monitoring when delayed baggage
+unloading affects aircraft turnaround. It also provides context for Passenger
+Connection Protection when transfer bags are at risk of missing outbound loading
+cutoff times.
+
+Recommended action: baggage operations should assign one additional ramp team to
+Terminal 2 belts B14 and B15, review transfer bag cutoff risk, and notify
+turnaround supervisors for flights sharing the affected handling agent.
+
