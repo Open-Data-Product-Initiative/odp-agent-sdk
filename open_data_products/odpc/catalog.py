@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
 import yaml
+import json
 
 from open_data_products._io import load_jsonl_records, load_mapping
 from open_data_products._search import search_records, searchable_record_text
@@ -49,6 +50,41 @@ def load_schema(path: Optional[Union[str, Path]] = None) -> Dict[str, Any]:
     """Load ODPC schema YAML from ``path`` or bundled package data."""
     schema_path = Path(path) if path is not None else _data_file("schema", "odpc.yaml")
     return load_mapping(schema_path, root_name="ODPC schema")
+
+
+def render_catalog_schema_json(
+    schema: Optional[Dict[str, Any]] = None,
+) -> str:
+    """Render the canonical ODPC schema as derived formatted JSON."""
+    return json.dumps(schema or load_schema(), indent=2) + "\n"
+
+
+def build_catalog_artifacts(
+    schema: Optional[Dict[str, Any]] = None,
+) -> Dict[str, str]:
+    """Build derived ODPC catalog artifact contents."""
+    return {"odpc.json": render_catalog_schema_json(schema)}
+
+
+def write_catalog_artifacts(
+    output_dir: Union[str, Path],
+    *,
+    schema: Optional[Dict[str, Any]] = None,
+    check: bool = False,
+) -> List[Path]:
+    """Write or check derived ODPC catalog artifacts under ``output_dir``."""
+    root = Path(output_dir)
+    changed = []
+    for relative_name, content in build_catalog_artifacts(schema).items():
+        relative_path = Path(relative_name)
+        path = root / relative_path
+        if path.exists() and path.read_text(encoding="utf-8") == content:
+            continue
+        changed.append(relative_path)
+        if not check:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(content, encoding="utf-8")
+    return changed
 
 
 def load_object_records(

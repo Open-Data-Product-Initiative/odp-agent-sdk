@@ -64,6 +64,25 @@ def test_report_renders_history_friendly_capability_statuses() -> None:
     assert "Review" in report
 
 
+def test_targeted_capability_drifts_are_mapped_to_sdk_surfaces() -> None:
+    drift = load_script_module()
+
+    rows = drift.evaluate_capabilities()
+    by_source = {row.upstream_source: row for row in rows}
+
+    odpv = by_source["odpv-v1.0/scripts/agent_vocab_helper.py"]
+    assert odpv.api_status == "Covered"
+    assert odpv.cli_status == "Covered"
+    assert odpv.mcp_status == "Covered"
+    assert odpv.status == "Covered"
+
+    odpc = by_source["odpc-v1.0/scripts/generate_catalog_artifacts.py"]
+    assert odpc.api_status == "Covered"
+    assert odpc.cli_status == "Covered"
+    assert odpc.mcp_status == "Covered"
+    assert odpc.status == "Covered"
+
+
 def test_check_mode_reuses_existing_timestamp(tmp_path: Path) -> None:
     drift = load_script_module()
     report_path = tmp_path / "2026-05-23-sdk-capability-drift.md"

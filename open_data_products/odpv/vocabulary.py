@@ -316,6 +316,230 @@ def search_vocabulary(
     return sorted(results, key=lambda item: (-item["score"], item["id"]))[:limit]
 
 
+def term_packet(section: Dict[str, Any], term: Dict[str, Any]) -> Dict[str, Any]:
+    """Return an agent-ready canonical ODPV term packet."""
+    packet = {
+        "section": section["id"],
+        "id": term["id"],
+        "uri": term["uri"],
+        "type": term["type"],
+        "status": term["status"],
+        "introducedIn": term.get("introducedIn"),
+        "preferredLabel": term["preferredLabel"],
+        "definition": term["definition"],
+        "alsoKnownAs": term.get("alsoKnownAs", {}),
+        "relatedTerms": term.get("relatedTerms", []),
+        "usedIn": term.get("usedIn", []),
+        "examples": term.get("examples", {}),
+    }
+    for optional in ("mappings", "domain", "range"):
+        if term.get(optional):
+            packet[optional] = term[optional]
+    return packet
+
+
+def vocabulary_index(
+    data: Optional[Dict[str, Any]] = None,
+) -> Tuple[
+    Dict[str, Any],
+    Dict[str, Tuple[Dict[str, Any], Dict[str, Any]]],
+    Dict[str, Tuple[str, Dict[str, Any], Dict[str, Any]]],
+]:
+    """Return vocabulary data plus term and alias indexes."""
+    vocabulary = data or load_vocabulary()
+    terms_by_id: Dict[str, Tuple[Dict[str, Any], Dict[str, Any]]] = {}
+    aliases: Dict[str, Tuple[str, Dict[str, Any], Dict[str, Any]]] = {}
+    for section, term in iter_terms(vocabulary):
+        terms_by_id[term["id"]] = (section, term)
+        for alias in term.get("alsoKnownAs", {}).get("en", []):
+            aliases.setdefault(alias.casefold(), (alias, section, term))
+    return vocabulary, terms_by_id, aliases
+
+
+def resolve_vocabulary_term(
+    query: str,
+    *,
+    data: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Resolve user text to a canonical ODPV term packet."""
+    vocabulary, terms_by_id, aliases = vocabulary_index(data)
+    if query in terms_by_id:
+        section, term = terms_by_id[query]
+        return {
+            "query": query,
+            "vocabularyVersion": vocabulary["version"],
+            "match": {
+                **term_packet(section, term),
+                "matchType": "id",
+                "matchedAliases": [],
+                "score": 100,
+            },
+            "candidates": [],
+        }
+
+    alias_match = aliases.get(query.casefold())
+    if alias_match:
+        alias, section, term = alias_match
+        return {
+            "query": query,
+            "vocabularyVersion": vocabulary["version"],
+            "match": {
+                **term_packet(section, term),
+                "matchType": "alias",
+                "matchedAliases": [alias],
+                "score": 95,
+            },
+            "candidates": [],
+        }
+
+    candidates = search_vocabulary(query, limit=5, data=vocabulary)
+    if not candidates:
+        return {
+            "query": query,
+            "vocabularyVersion": vocabulary["version"],
+            "match": None,
+            "candidates": [],
+        }
+
+    best = candidates[0]
+    section, term = terms_by_id[best["id"]]
+    return {
+        "query": query,
+        "vocabularyVersion": vocabulary["version"],
+        "match": {
+            **term_packet(section, term),
+            "matchType": "search",
+            "matchedAliases": [],
+            "score": best["score"],
+            "matchedFields": best["matchedFields"],
+        },
+        "candidates": candidates[1:],
+    }
+
+
+def explain_vocabulary_term(
+    term_id: str,
+    *,
+    data: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Return the canonical ODPV packet for one term id."""
+    vocabulary, terms_by_id, _aliases = vocabulary_index(data)
+    if term_id not in terms_by_id:
+        raise KeyError(f"Unknown ODPV term: {term_id}")
+    section, term = terms_by_id[term_id]
+    return {"vocabularyVersion": vocabulary["version"], **term_packet(section, term)}
+
+
+def check_vocabulary_relationship(
+    source: str,
+    verb: str,
+    target: str,
+    *,
+    data: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Check whether a relationship verb supports a source and target type."""
+    vocabulary, terms_by_id, aliases = vocabulary_index(data)
+    resolved = resolve_vocabulary_term(verb, data=vocabulary)
+    match = resolved.get("match")
+    if not match or match.get("type") != "relationship":
+        alias_match = aliases.get(verb.casefold())
+        if alias_match:
+            _alias, section, term = alias_match
+        else:
+            return {
+                "vocabularyVersion": vocabulary["version"],
+                "source": source,
+                "verb": verb,
+                "target": target,
+                "relationship": None,
+                "compatible": False,
+                "sourceCompatible": False,
+                "targetCompatible": False,
+                "notes": ["No official ODPV relationship matched the verb."],
+            }
+    else:
+        section, term = terms_by_id[match["id"]]
+
+    domain = term.get("domain", [])
+    range_ = term.get("range", [])
+    source_compatible = source in domain
+    target_compatible = target in range_
+    notes = []
+    if not source_compatible:
+        notes.append(f"{source} is not listed in domain for {term['id']}.")
+    if not target_compatible:
+        notes.append(f"{target} is not listed in range for {term['id']}.")
+
+    return {
+        "vocabularyVersion": vocabulary["version"],
+        "source": source,
+        "verb": verb,
+        "target": target,
+        "relationship": term_packet(section, term),
+        "compatible": source_compatible and target_compatible,
+        "sourceCompatible": source_compatible,
+        "targetCompatible": target_compatible,
+        "notes": notes,
+    }
+
+
+def agent_vocabulary_context(
+    term_id: str,
+    *,
+    data: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Return an agent-ready ODPV term context packet."""
+    vocabulary, terms_by_id, _aliases = vocabulary_index(data)
+    if term_id not in terms_by_id:
+        raise KeyError(f"Unknown ODPV term: {term_id}")
+    section, term = terms_by_id[term_id]
+
+    incoming = []
+    outgoing = []
+    for _rel_section, rel in terms_by_id.values():
+        if rel.get("type") != "relationship":
+            continue
+        if term_id in rel.get("domain", []):
+            outgoing.append(rel["id"])
+        if term_id in rel.get("range", []):
+            incoming.append(rel["id"])
+
+    related_packets = []
+    for related_id in term.get("relatedTerms", []):
+        related = terms_by_id.get(related_id)
+        if not related:
+            continue
+        related_section, related_term = related
+        related_packets.append(
+            {
+                "id": related_term["id"],
+                "uri": related_term["uri"],
+                "section": related_section["id"],
+                "preferredLabel": related_term["preferredLabel"],
+                "definition": related_term["definition"],
+            }
+        )
+
+    return {
+        "contextType": "odpv.term",
+        "vocabularyVersion": vocabulary["version"],
+        "term": term_packet(section, term),
+        "neighbors": {
+            "relatedTerms": term.get("relatedTerms", []),
+            "relatedTermPackets": related_packets,
+        },
+        "relationshipHints": {
+            "incoming": sorted(incoming),
+            "outgoing": sorted(outgoing),
+        },
+        "usageGuidance": [
+            "Use the stable id and uri in generated outputs.",
+            "Prefer aliases only for matching user or source language; emit the canonical id.",
+            "Use related terms for retrieval expansion, not as exact synonyms.",
+        ],
+    }
+
+
 def render_search_results(results: List[Dict[str, Any]]) -> str:
     """Render ODPV search results in the source script text format."""
     lines = []

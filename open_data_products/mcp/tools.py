@@ -37,7 +37,11 @@ from .. import (
     validate_contract,
     validate_document,
 )
-from ..odpc import search_objects as _search_objects, load_object_records
+from ..odpc import (
+    build_catalog_artifacts,
+    load_object_records,
+    search_objects as _search_objects,
+)
 from ..odpg import (
     agent_context as _agent_context,
     analyze_graph as _analyze_graph,
@@ -47,7 +51,14 @@ from ..odpg import (
     traverse_graph as _traverse_graph,
     validate_graph as _validate_graph,
 )
-from ..odpv import search_vocabulary, load_vocabulary
+from ..odpv import (
+    agent_vocabulary_context as _agent_vocabulary_context,
+    check_vocabulary_relationship as _check_vocabulary_relationship,
+    explain_vocabulary_term as _explain_vocabulary_term,
+    load_vocabulary,
+    resolve_vocabulary_term as _resolve_vocabulary_term,
+    search_vocabulary,
+)
 
 Handler = Callable[[Dict[str, Any]], Dict[str, Any]]
 
@@ -114,6 +125,25 @@ def _h_load_summary(args: Dict[str, Any]) -> Dict[str, Any]:
     return _json_envelope(load_summary(args["path"]))
 
 
+def _h_catalog_artifacts(args: Dict[str, Any]) -> Dict[str, Any]:
+    artifacts = build_catalog_artifacts()
+    include_content = bool(args.get("include_content", False))
+    payload: Dict[str, Any] = {
+        "spec": "odpc",
+        "kind": "CatalogArtifacts",
+        "artifact_count": len(artifacts),
+        "artifacts": [
+            {
+                "path": path,
+                "byte_size": len(content.encode("utf-8")),
+                **({"content": content} if include_content else {}),
+            }
+            for path, content in artifacts.items()
+        ],
+    }
+    return _json_envelope(payload)
+
+
 def _h_search_terms(args: Dict[str, Any]) -> Dict[str, Any]:
     vocab = load_vocabulary()
     results = search_vocabulary(
@@ -122,6 +152,28 @@ def _h_search_terms(args: Dict[str, Any]) -> Dict[str, Any]:
         data=vocab,
     )
     return _json_envelope(results)
+
+
+def _h_resolve_vocabulary_term(args: Dict[str, Any]) -> Dict[str, Any]:
+    return _json_envelope(_resolve_vocabulary_term(args["query"]))
+
+
+def _h_explain_vocabulary_term(args: Dict[str, Any]) -> Dict[str, Any]:
+    return _json_envelope(_explain_vocabulary_term(args["term"]))
+
+
+def _h_check_vocabulary_relationship(args: Dict[str, Any]) -> Dict[str, Any]:
+    return _json_envelope(
+        _check_vocabulary_relationship(
+            args["source"],
+            args["verb"],
+            args["target"],
+        )
+    )
+
+
+def _h_vocabulary_term_context(args: Dict[str, Any]) -> Dict[str, Any]:
+    return _json_envelope(_agent_vocabulary_context(args["term"]))
 
 
 def _h_search_objects(args: Dict[str, Any]) -> Dict[str, Any]:
@@ -280,6 +332,7 @@ _CONTRACT_PROP = {
     "type": "string",
     "description": "Filesystem path or URL to a Data Contract file.",
 }
+_TERM_PROP = {"type": "string", "description": "ODPV term id."}
 
 TOOLS: List[Dict[str, Any]] = [
     {
@@ -335,6 +388,21 @@ TOOLS: List[Dict[str, Any]] = [
         "handler": _h_load_summary,
     },
     {
+        "name": "catalog_artifacts",
+        "description": "Return derived ODPC catalog schema artifact metadata and optional content.",
+        "class": "safe",
+        "inputSchema": _object_schema(
+            {
+                "include_content": {
+                    "type": "boolean",
+                    "description": "Include generated artifact content in the response.",
+                    "default": False,
+                }
+            }
+        ),
+        "handler": _h_catalog_artifacts,
+    },
+    {
         "name": "search_terms",
         "description": "Search the bundled ODPV vocabulary terms by keyword.",
         "class": "safe",
@@ -342,6 +410,50 @@ TOOLS: List[Dict[str, Any]] = [
             {"query": _QUERY_PROP, "limit": _LIMIT_PROP}, ["query"]
         ),
         "handler": _h_search_terms,
+    },
+    {
+        "name": "resolve_vocabulary_term",
+        "description": "Resolve text, aliases, or ids to a canonical ODPV term packet.",
+        "class": "safe",
+        "inputSchema": _object_schema({"query": _QUERY_PROP}, ["query"]),
+        "handler": _h_resolve_vocabulary_term,
+    },
+    {
+        "name": "explain_vocabulary_term",
+        "description": "Return one canonical ODPV term packet by id.",
+        "class": "safe",
+        "inputSchema": _object_schema({"term": _TERM_PROP}, ["term"]),
+        "handler": _h_explain_vocabulary_term,
+    },
+    {
+        "name": "check_vocabulary_relationship",
+        "description": "Check ODPV relationship domain/range compatibility.",
+        "class": "safe",
+        "inputSchema": _object_schema(
+            {
+                "source": {
+                    "type": "string",
+                    "description": "Source ODPV object type.",
+                },
+                "verb": {
+                    "type": "string",
+                    "description": "Relationship id, alias, or search text.",
+                },
+                "target": {
+                    "type": "string",
+                    "description": "Target ODPV object type.",
+                },
+            },
+            ["source", "verb", "target"],
+        ),
+        "handler": _h_check_vocabulary_relationship,
+    },
+    {
+        "name": "vocabulary_term_context",
+        "description": "Return an agent-ready ODPV term context packet.",
+        "class": "safe",
+        "inputSchema": _object_schema({"term": _TERM_PROP}, ["term"]),
+        "handler": _h_vocabulary_term_context,
     },
     {
         "name": "search_objects",

@@ -52,6 +52,17 @@ from .contracts import (
     summarize_contract_document,
     validate_contract,
 )
+from .odpc import (
+    build_catalog_artifacts,
+    render_catalog_schema_json,
+    write_catalog_artifacts,
+)
+from .odpv import (
+    agent_vocabulary_context,
+    check_vocabulary_relationship,
+    explain_vocabulary_term,
+    resolve_vocabulary_term,
+)
 from .pricing import pricing_to_402
 from .resources import get_resource, list_resources
 from .results import Reference, Resource, ValidationResult
@@ -68,6 +79,9 @@ __all__ = [
     "Resource",
     "ValidationResult",
     "AlignmentFinding",
+    "agent_vocabulary_context",
+    "build_catalog_artifacts",
+    "check_vocabulary_relationship",
     "ContractToolAvailability",
     "ContractValidationResult",
     "ContractDocument",
@@ -89,6 +103,7 @@ __all__ = [
     "extract_contract_schema_from_document",
     "explain_document",
     "explain_product",
+    "explain_vocabulary_term",
     "explain_vocabulary",
     "get_resource",
     "list_resources",
@@ -97,10 +112,13 @@ __all__ = [
     "load_summary",
     "pricing_to_402",
     "generate_product_contract_report",
+    "render_catalog_schema_json",
     "resolve_references",
+    "resolve_vocabulary_term",
     "resolve_product_contracts",
     "summarize_contract",
     "summarize_contract_document",
     "validate_contract",
     "validate_document",
+    "write_catalog_artifacts",
 ]

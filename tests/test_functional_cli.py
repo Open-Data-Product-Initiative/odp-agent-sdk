@@ -148,6 +148,19 @@ catalog:
     assert search_payload["spec"] == "odpc"
     assert len(search_payload["matches"]) == 1
 
+    assert main(["odpc-artifacts", str(tmp_path), "--check", "--json"]) == 1
+    artifact_check_payload = _json_output(capsys)
+    assert artifact_check_payload["spec"] == "odpc"
+    assert artifact_check_payload["in_sync"] is False
+    assert artifact_check_payload["changed"] == ["odpc.json"]
+
+    assert main(["odpc-artifacts", str(tmp_path), "--json"]) == 0
+    artifact_payload = _json_output(capsys)
+    assert artifact_payload["artifact_count"] == 1
+
+    assert main(["odpc-artifacts", str(tmp_path), "--check", "--json"]) == 0
+    assert _json_output(capsys)["in_sync"] is True
+
 
 def test_unified_cli_odpv_commands(capsys: pytest.CaptureFixture[str]) -> None:
     assert main(["odpv-summary", "--json"]) == 0
@@ -160,6 +173,31 @@ def test_unified_cli_odpv_commands(capsys: pytest.CaptureFixture[str]) -> None:
     search_payload = _json_output(capsys)
     assert search_payload["spec"] == "odpv"
     assert len(search_payload["matches"]) == 2
+
+    assert main(["odpv-resolve", "reusable data asset", "--json"]) == 0
+    resolve_payload = _json_output(capsys)
+    assert resolve_payload["match"]["id"] == "DataProduct"
+    assert resolve_payload["match"]["matchType"] == "alias"
+
+    assert main(["odpv-explain", "DataProduct", "--json"]) == 0
+    assert _json_output(capsys)["id"] == "DataProduct"
+
+    assert (
+        main(
+            [
+                "odpv-relationship",
+                "DataProduct",
+                "supports",
+                "UseCase",
+                "--json",
+            ]
+        )
+        == 0
+    )
+    assert _json_output(capsys)["compatible"] is True
+
+    assert main(["odpv-context", "DataProduct", "--json"]) == 0
+    assert _json_output(capsys)["contextType"] == "odpv.term"
 
 
 def test_unified_cli_odpg_reasoning_commands(

@@ -3,10 +3,13 @@
 from pathlib import Path
 
 from open_data_products.odpc import (
+    build_catalog_artifacts,
     explain_catalog,
     load_object_records,
+    render_catalog_schema_json,
     search_objects,
     validate_catalog,
+    write_catalog_artifacts,
 )
 
 VALID_CATALOG = {
@@ -48,6 +51,32 @@ def test_load_object_records_reads_bundled_records():
 
     assert len(records) == 6
     assert {record["id"] for record in records} >= {"Catalog", "Signal"}
+
+
+def test_render_catalog_schema_json_matches_bundled_schema():
+    rendered = render_catalog_schema_json()
+
+    assert rendered.endswith("\n")
+    assert '"$schema": "https://json-schema.org/draft/2020-12/schema"' in rendered
+    assert '"Catalog"' in rendered
+
+
+def test_build_catalog_artifacts_returns_derived_schema_artifact():
+    artifacts = build_catalog_artifacts()
+
+    assert sorted(artifacts) == ["odpc.json"]
+    assert artifacts["odpc.json"] == render_catalog_schema_json()
+
+
+def test_write_catalog_artifacts_can_check_and_generate_to_target_directory(tmp_path):
+    changed = write_catalog_artifacts(tmp_path, check=True)
+
+    assert changed == [Path("odpc.json")]
+
+    written = write_catalog_artifacts(tmp_path)
+    assert written == changed
+
+    assert write_catalog_artifacts(tmp_path, check=True) == []
 
 
 def test_explain_catalog_renders_summary_for_catalog_document():

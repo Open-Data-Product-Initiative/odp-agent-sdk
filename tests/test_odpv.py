@@ -4,7 +4,11 @@ import json
 from pathlib import Path
 
 from open_data_products.odpv import (
+    agent_vocabulary_context,
     build_artifacts,
+    check_vocabulary_relationship,
+    explain_vocabulary_term,
+    resolve_vocabulary_term,
     search_vocabulary,
     validate_vocabulary,
     write_artifacts,
@@ -59,6 +63,49 @@ def test_search_vocabulary_returns_alias_and_example_matches():
     assert "uri" in matches[0]
     assert "score" in matches[0]
     assert "matchedFields" in matches[0]
+
+
+def test_resolve_vocabulary_term_matches_id_alias_and_search():
+    by_id = resolve_vocabulary_term("DataProduct")
+    by_alias = resolve_vocabulary_term("reusable data asset")
+    by_search = resolve_vocabulary_term("customer churn reusable data offering")
+
+    assert by_id["match"]["id"] == "DataProduct"
+    assert by_id["match"]["matchType"] == "id"
+    assert by_alias["match"]["id"] == "DataProduct"
+    assert by_alias["match"]["matchType"] == "alias"
+    assert by_search["match"]["id"] == "DataProduct"
+    assert by_search["match"]["matchType"] == "search"
+    assert by_search["candidates"]
+
+
+def test_explain_vocabulary_term_returns_agent_packet():
+    packet = explain_vocabulary_term("DataProduct")
+
+    assert packet["id"] == "DataProduct"
+    assert packet["vocabularyVersion"]
+    assert packet["section"] == "core"
+    assert packet["preferredLabel"]["en"] == "Data Product"
+
+
+def test_check_vocabulary_relationship_reports_domain_range_compatibility():
+    result = check_vocabulary_relationship("DataProduct", "supports", "UseCase")
+
+    assert result["relationship"]["id"] == "supports"
+    assert result["compatible"] is True
+    assert result["sourceCompatible"] is True
+    assert result["targetCompatible"] is True
+    assert result["notes"] == []
+
+
+def test_agent_vocabulary_context_packages_neighbors_and_usage_guidance():
+    context = agent_vocabulary_context("DataProduct")
+
+    assert context["contextType"] == "odpv.term"
+    assert context["term"]["id"] == "DataProduct"
+    assert "relatedTermPackets" in context["neighbors"]
+    assert "outgoing" in context["relationshipHints"]
+    assert context["usageGuidance"]
 
 
 def test_build_artifacts_returns_package_artifact_contents():

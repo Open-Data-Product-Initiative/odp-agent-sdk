@@ -126,7 +126,10 @@ DEFAULT_CAPABILITIES: Sequence[Capability] = (
         spec="ODPV",
         upstream_source="odpv-v1.0/scripts/agent_vocab_helper.py",
         capability="Resolve, explain, and package agent-ready vocabulary term context",
-        notes="Review whether resolve/explain/context should become first-class SDK and MCP capabilities.",
+        api_symbol="open_data_products.odpv:agent_vocabulary_context",
+        cli_marker="odpv-context",
+        mcp_tool="vocabulary_term_context",
+        notes="Ported as ODPV resolve/explain/relationship/context API, CLI, and safe MCP term-context tools.",
     ),
     Capability(
         spec="ODPV",
@@ -162,7 +165,10 @@ DEFAULT_CAPABILITIES: Sequence[Capability] = (
         spec="ODPC",
         upstream_source="odpc-v1.0/scripts/generate_catalog_artifacts.py",
         capability="Generate derived ODPC catalog schema artifacts",
-        notes="Upstream maintenance capability; review whether SDK should expose a read-only drift indicator only.",
+        api_symbol="open_data_products.odpc:write_catalog_artifacts",
+        cli_marker="odpc-artifacts",
+        mcp_tool="catalog_artifacts",
+        notes="SDK can generate/check artifacts through API and CLI; MCP exposes read-only generated artifact metadata/content.",
     ),
     Capability(
         spec="ODPC",

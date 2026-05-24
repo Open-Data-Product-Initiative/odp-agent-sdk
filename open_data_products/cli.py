@@ -31,12 +31,17 @@ Core document commands:
 ODPC catalog commands:
   odpc-summary         Summarize catalog metadata and item counts
   odpc-search          Search bundled catalog object guidance
+  odpc-artifacts       Generate or check derived catalog schema artifacts
   resources --id odpc.objects   Return catalog object guidance records
   MCP search_objects            Search ODPC guidance from agents
 
 ODPV vocabulary commands:
   odpv-summary         Summarize vocabulary sections and term counts
   odpv-search          Search bundled vocabulary terms
+  odpv-resolve         Resolve text or aliases to a canonical term
+  odpv-explain         Return one canonical term packet
+  odpv-relationship    Check relationship domain/range compatibility
+  odpv-context         Return an agent-ready term context packet
   resources --id odpv.terms     Return vocabulary term records
   MCP search_terms              Search ODPV terms from agents
 
@@ -65,8 +70,10 @@ Examples:
   open-data-products explain catalog.yaml
   open-data-products odpc-summary catalog.yaml --json
   open-data-products odpc-search "catalog data" --limit 3 --json
+  open-data-products odpc-artifacts generated/ --check --json
   open-data-products odpv-summary --json
   open-data-products odpv-search "governance policy risk" --limit 3 --json
+  open-data-products odpv-context DataProduct --json
   open-data-products resources --id odpc.objects --json
   open-data-products resources --id odpv.terms --json
   open-data-products resources --json
@@ -149,6 +156,22 @@ def main(argv: Optional[List[str]] = None) -> int:
     )
     odpc_search_parser.add_argument("--json", action="store_true", help="Emit JSON")
 
+    odpc_artifacts_parser = subparsers.add_parser(
+        "odpc-artifacts", help="Generate or check derived ODPC catalog artifacts"
+    )
+    odpc_artifacts_parser.add_argument(
+        "output_dir",
+        nargs="?",
+        default=".",
+        help="Directory for generated artifacts. Defaults to the current directory.",
+    )
+    odpc_artifacts_parser.add_argument(
+        "--check",
+        action="store_true",
+        help="Fail if generated artifacts under output_dir are not in sync.",
+    )
+    odpc_artifacts_parser.add_argument("--json", action="store_true", help="Emit JSON")
+
     odpv_summary_parser = subparsers.add_parser(
         "odpv-summary", help="Summarize an ODPV vocabulary"
     )
@@ -167,6 +190,34 @@ def main(argv: Optional[List[str]] = None) -> int:
         "--limit", type=int, default=5, help="Maximum number of matches"
     )
     odpv_search_parser.add_argument("--json", action="store_true", help="Emit JSON")
+
+    odpv_resolve_parser = subparsers.add_parser(
+        "odpv-resolve", help="Resolve text or aliases to a canonical ODPV term"
+    )
+    odpv_resolve_parser.add_argument("query", help="Term id, alias, or keyword query")
+    odpv_resolve_parser.add_argument("--json", action="store_true", help="Emit JSON")
+
+    odpv_explain_parser = subparsers.add_parser(
+        "odpv-explain", help="Return one canonical ODPV term packet"
+    )
+    odpv_explain_parser.add_argument("term", help="ODPV term id")
+    odpv_explain_parser.add_argument("--json", action="store_true", help="Emit JSON")
+
+    odpv_relationship_parser = subparsers.add_parser(
+        "odpv-relationship", help="Check ODPV relationship domain/range compatibility"
+    )
+    odpv_relationship_parser.add_argument("source", help="Source ODPV object type")
+    odpv_relationship_parser.add_argument("verb", help="Relationship id, alias, or text")
+    odpv_relationship_parser.add_argument("target", help="Target ODPV object type")
+    odpv_relationship_parser.add_argument(
+        "--json", action="store_true", help="Emit JSON"
+    )
+
+    odpv_context_parser = subparsers.add_parser(
+        "odpv-context", help="Return an agent-ready ODPV term context packet"
+    )
+    odpv_context_parser.add_argument("term", help="ODPV term id")
+    odpv_context_parser.add_argument("--json", action="store_true", help="Emit JSON")
 
     odpg_summary_parser = subparsers.add_parser(
         "odpg-summary", help="Summarize an ODPG graph"
@@ -414,6 +465,28 @@ def main(argv: Optional[List[str]] = None) -> int:
                 print(render_object_records(matches), end="")
             return 0 if matches else 1
 
+        if args.command == "odpc-artifacts":
+            from .odpc import build_catalog_artifacts, write_catalog_artifacts
+
+            changed = write_catalog_artifacts(args.output_dir, check=args.check)
+            payload = {
+                "spec": "odpc",
+                "kind": "CatalogArtifacts",
+                "in_sync": not changed,
+                "changed": [str(path) for path in changed],
+                "artifact_count": len(build_catalog_artifacts()),
+            }
+            if args.json:
+                print(json.dumps(payload, indent=2))
+            elif args.check and changed:
+                for path in changed:
+                    print(f"Out of sync: {path}")
+            elif args.check:
+                print("Catalog artifacts are in sync")
+            else:
+                print(f"Generated {payload['artifact_count']} catalog artifacts")
+            return 1 if args.check and changed else 0
+
         if args.command == "odpv-summary":
             from .odpv import load_vocabulary, validate_vocabulary
 
@@ -455,6 +528,55 @@ def main(argv: Optional[List[str]] = None) -> int:
             else:
                 print(render_search_results(matches), end="")
             return 0 if matches else 1
+
+        if args.command == "odpv-resolve":
+            from .odpv import resolve_vocabulary_term
+
+            payload = resolve_vocabulary_term(args.query)
+            if args.json:
+                print(json.dumps(payload, indent=2))
+            else:
+                match = payload.get("match")
+                print(match["id"] if match else "No matching ODPV term found.")
+            return 0 if payload.get("match") else 1
+
+        if args.command == "odpv-explain":
+            from .odpv import explain_vocabulary_term
+
+            payload = explain_vocabulary_term(args.term)
+            if args.json:
+                print(json.dumps(payload, indent=2))
+            else:
+                print(f"{payload['id']}: {payload['definition'].get('en', '')}")
+            return 0
+
+        if args.command == "odpv-relationship":
+            from .odpv import check_vocabulary_relationship
+
+            payload = check_vocabulary_relationship(
+                args.source,
+                args.verb,
+                args.target,
+            )
+            if args.json:
+                print(json.dumps(payload, indent=2))
+            else:
+                state = "compatible" if payload["compatible"] else "not compatible"
+                print(f"{args.source} {args.verb} {args.target}: {state}")
+                for note in payload["notes"]:
+                    print(f"- {note}")
+            return 0 if payload["compatible"] else 1
+
+        if args.command == "odpv-context":
+            from .odpv import agent_vocabulary_context
+
+            payload = agent_vocabulary_context(args.term)
+            if args.json:
+                print(json.dumps(payload, indent=2))
+            else:
+                term = payload["term"]
+                print(f"{term['id']}: {term['definition'].get('en', '')}")
+            return 0
 
         if args.command == "odpg-summary":
             from .odpg import load_graph, summarize_graph
