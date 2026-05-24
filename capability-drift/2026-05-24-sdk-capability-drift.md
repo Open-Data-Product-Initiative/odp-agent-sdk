@@ -2,7 +2,7 @@
 
 This report compares upstream Open Data Product specification helper scripts against the SDK surfaces exposed for humans and AI agents.
 
-Last drift detection run: `2026-05-24T06:06:04Z`
+Last drift detection run: `2026-05-24T06:25:21Z`
 
 - Upstream sources: ODPC, ODPG, and ODPV specification repositories
 - SDK surfaces: public Python API, unified/spec CLI helpers, and MCP tools

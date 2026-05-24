@@ -64,6 +64,20 @@ def test_report_renders_history_friendly_capability_statuses() -> None:
     assert "Review" in report
 
 
+def test_graph_explorer_capability_uses_unified_cli_marker() -> None:
+    drift = load_script_module()
+
+    marker_by_source = {
+        capability.upstream_source: capability.cli_marker
+        for capability in drift.DEFAULT_CAPABILITIES
+    }
+
+    assert (
+        marker_by_source["odpg-v1.0/source/scripts/generate_graph_explorer.py"]
+        == "odpg-generate"
+    )
+
+
 def test_targeted_capability_drifts_are_mapped_to_sdk_surfaces() -> None:
     drift = load_script_module()
 

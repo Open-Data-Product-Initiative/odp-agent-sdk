@@ -55,6 +55,7 @@ ODPG graph commands:
   odpg-traverse        Discover relationship paths from a focus node
   odpg-analyze         Run governance and strategic graph checks
   odpg-agent-context   Extract graph context around a node for agents
+  odpg-generate        Generate a standalone graph explorer HTML file
 
 Product/Data Contract commands:
   product resolve-contracts   Resolve Data Contract references
@@ -78,6 +79,7 @@ Examples:
   open-data-products resources --id odpv.terms --json
   open-data-products resources --json
   open-data-products odpg-agent-context graph.yaml --node DATA-PRODUCT-001
+  open-data-products odpg-generate graph.yaml --output graph-explorer.html --json
   open-data-products product contract-report product.yaml contract.yaml --json
   open-data-products serve
 """
@@ -252,6 +254,22 @@ def main(argv: Optional[List[str]] = None) -> int:
     odpg_context_parser.add_argument(
         "--depth", type=int, default=2, help="Context traversal depth"
     )
+
+    odpg_generate_parser = subparsers.add_parser(
+        "odpg-generate", help="Generate a standalone ODPG graph explorer"
+    )
+    odpg_generate_parser.add_argument(
+        "graph",
+        nargs="?",
+        help="Path to an ODPG graph file. Defaults to the bundled graph.",
+    )
+    odpg_generate_parser.add_argument(
+        "--output",
+        type=Path,
+        default=Path("graph-explorer.html"),
+        help="Output HTML file path",
+    )
+    odpg_generate_parser.add_argument("--json", action="store_true", help="Emit JSON")
 
     subparsers.add_parser("manifest", help="Emit the ARWS agent manifest").add_argument(
         "--json", action="store_true", help="Emit JSON"
@@ -629,6 +647,22 @@ def main(argv: Optional[List[str]] = None) -> int:
             payload = agent_context(graph, args.node, args.depth)
             payload["warnings"] = result.warnings
             print(json.dumps(payload, indent=2))
+            return 0
+
+        if args.command == "odpg-generate":
+            from .odpg import generate_graph_explorer
+
+            output = generate_graph_explorer(args.graph, args.output)
+            payload = {
+                "spec": "odpg",
+                "kind": "Graph",
+                "output": str(output),
+                "generated": True,
+            }
+            if args.json:
+                print(json.dumps(payload, indent=2))
+            else:
+                print(f"Graph Explorer generated successfully: {output}")
             return 0
 
         if args.command == "manifest":

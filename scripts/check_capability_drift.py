@@ -95,7 +95,7 @@ DEFAULT_CAPABILITIES: Sequence[Capability] = (
         upstream_source="odpg-v1.0/source/scripts/generate_graph_explorer.py",
         capability="Generate a standalone ODPG graph explorer",
         api_symbol="open_data_products.odpg:generate_graph_explorer",
-        cli_marker="open-data-products-odpg-generate",
+        cli_marker="odpg-generate",
         notes="MCP remains read-only; graph explorer generation is not exposed as an MCP tool.",
     ),
     Capability(

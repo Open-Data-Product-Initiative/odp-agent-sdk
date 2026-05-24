@@ -45,12 +45,14 @@ def test_unified_cli_help_uses_compact_command_metavar(
     assert "odpv-summary" in help_text
     assert "odpv-search" in help_text
     assert "ODPG graph commands:" in help_text
+    assert "odpg-generate" in help_text
     assert "Product/Data Contract commands:" in help_text
     assert "Examples:" in help_text
     assert "open-data-products validate product.yaml --json" in help_text
     assert "open-data-products product contract-report product.yaml contract.yaml --json" in help_text
     assert "open-data-products resources --id odpc.objects --json" in help_text
     assert "open-data-products resources --id odpv.terms --json" in help_text
+    assert "open-data-products odpg-generate graph.yaml --output graph-explorer.html --json" in help_text
     assert "validate" in help_text
     assert "product" in help_text
 
@@ -202,6 +204,7 @@ def test_unified_cli_odpv_commands(capsys: pytest.CaptureFixture[str]) -> None:
 
 def test_unified_cli_odpg_reasoning_commands(
     capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
 ) -> None:
     assert main(["odpg-summary", str(ODPG_GRAPH)]) == 0
     assert _json_output(capsys)["nodeCount"] == 9
@@ -224,6 +227,24 @@ def test_unified_cli_odpg_reasoning_commands(
         == 0
     )
     assert _json_output(capsys)["focusNode"]["id"] == "AGENT-AVIATION-001"
+
+    output = tmp_path / "graph-explorer.html"
+    assert (
+        main(
+            [
+                "odpg-generate",
+                str(ODPG_GRAPH),
+                "--output",
+                str(output),
+                "--json",
+            ]
+        )
+        == 0
+    )
+    payload = _json_output(capsys)
+    assert payload["spec"] == "odpg"
+    assert payload["generated"] is True
+    assert output.exists()
 
 
 def test_unified_cli_contract_workflow(

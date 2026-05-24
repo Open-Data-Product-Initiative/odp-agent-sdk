@@ -213,6 +213,9 @@ below for implementation details:
 
 ### Common Workflows
 
+Most commands print human-readable output by default; add `--json` when agents,
+CI jobs, or scripts need a stable machine-readable response.
+
 ```bash
 # Cross-spec validation and summaries
 open-data-products validate product.yaml --json
@@ -244,6 +247,7 @@ open-data-products odpg-summary graph.yaml
 open-data-products odpg-traverse graph.yaml --start AGENT-001 --depth 2
 open-data-products odpg-analyze graph.yaml
 open-data-products odpg-agent-context graph.yaml --node AGENT-001 --depth 2
+open-data-products odpg-generate graph.yaml --output graph-explorer.html --json
 
 # Product-level Data Contract validation
 open-data-products product check-contract product.yaml contract.yaml --json
