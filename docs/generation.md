@@ -7,7 +7,7 @@ config. This workflow stops before catalog publishing: it produces
 source-backed fragment files and a graph file that can be validated, inspected,
 and used by the existing ODPC/ODPG helpers.
 
-## Requirements
+## LLM Setup
 
 Default local generation requires Ollama running locally and Qwen 2.5
 available:

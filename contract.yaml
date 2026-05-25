@@ -1,0 +1,23 @@
+id: urbanpulse-events-contract
+name: UrbanPulse Events
+version: "1.0.0"
+models:
+  events:
+    description: Public event records prepared for city analytics.
+    fields:
+      event_id:
+        type: string
+        required: true
+        description: Stable event identifier.
+      event_name:
+        type: string
+        required: true
+        description: Public event name.
+      event_start_time:
+        type: timestamp
+        required: false
+        description: Scheduled event start time.
+      venue_name:
+        type: string
+        required: false
+        description: Venue or place where the event is hosted.

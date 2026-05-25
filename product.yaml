@@ -41,7 +41,7 @@ product:
     id: 02323M123
     type: ODCS
     contractVersion: 2.2.2
-    contractURL: 'https://datamesh-manager.com/urbanltd/dataproducts/9bd530'
+    $ref: contract.yaml
   details:
     en:
       name: UrbanPulse Events

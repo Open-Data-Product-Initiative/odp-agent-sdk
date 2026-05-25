@@ -179,8 +179,8 @@ CI jobs, or scripts need a stable machine-readable response.
 ```bash
 # Cross-spec validation and summaries
 open-data-products validate product.yaml --json
-open-data-products explain catalog.yaml --json
-open-data-products refs graph.yaml --json
+open-data-products explain examples/odpc_catalog.yaml --json
+open-data-products refs open_data_products/odpg/data/graph/graph.yaml --json
 open-data-products summary product.yaml
 
 # Bundled agent resources
@@ -189,20 +189,29 @@ open-data-products resources --id generation.prompt.system --json
 open-data-products resources --id odpc.objects --json
 open-data-products resources --id odpv.terms --json
 open-data-products resources --id odpg.objects --json
+```
 
+The LLM generation commands
+[require Ollama or configured provider credentials](docs/generation.md#llm-setup).
+
+```bash
 # LLM generation
 open-data-products generate --json
-open-data-products generate --config generation.config.yaml --json
-open-data-products generate --config generation.config.yaml --provider groq --json
-open-data-products generate --config generation.config.yaml --provider claude --json
-open-data-products generate --config generation.config.yaml --kind signal --json
-open-data-products validate fragments/odpg_graph.yaml --json
-open-data-products odpg-generate fragments/odpg_graph.yaml --output fragments/graph_explorer.html --json
+open-data-products generate --config open_data_products/generation/generation.config.example.yaml --json
+open-data-products generate --config open_data_products/generation/generation.config.example.yaml --provider groq --json
+open-data-products generate --config open_data_products/generation/generation.config.example.yaml --provider claude --json
+open-data-products generate --config open_data_products/generation/generation.config.example.yaml --kind signal --json
+```
+
+```bash
+# Generated fragment artifacts
+open-data-products validate open_data_products/generation/fragments/odpg_graph.yaml --json
+open-data-products odpg-generate open_data_products/generation/fragments/odpg_graph.yaml --output /tmp/odp-generation-graph.html --json
 
 # ODPC catalog helpers
-open-data-products odpc-build fragments/ --output catalog.yaml --json
-open-data-products odpc-build fragments/ --output catalog.yaml --html catalog.html --json
-open-data-products odpc-summary catalog.yaml --json
+open-data-products odpc-build examples/odpc_catalog_fragments/ --output /tmp/odp-catalog.yaml --json
+open-data-products odpc-build examples/odpc_catalog_fragments/ --output /tmp/odp-catalog.yaml --html /tmp/odp-catalog.html --json
+open-data-products odpc-summary /tmp/odp-catalog.yaml --json
 open-data-products odpc-search "catalog data" --limit 3 --json
 
 # ODPV vocabulary helpers
@@ -214,25 +223,22 @@ open-data-products odpv-relationship DataProduct supports UseCase --json
 open-data-products odpv-context DataProduct --json
 
 # ODPG graph reasoning
-open-data-products odpg-summary graph.yaml
-open-data-products odpg-traverse graph.yaml --start AGENT-001 --depth 2
-open-data-products odpg-analyze graph.yaml
-open-data-products odpg-agent-context graph.yaml --node AGENT-001 --depth 2
-open-data-products odpg-generate graph.yaml --output graph-explorer.html --json
+open-data-products odpg-summary open_data_products/odpg/data/graph/graph.yaml
+open-data-products odpg-traverse open_data_products/odpg/data/graph/graph.yaml --start AGENT-AVIATION-001 --depth 2
+open-data-products odpg-analyze open_data_products/odpg/data/graph/graph.yaml
+open-data-products odpg-agent-context open_data_products/odpg/data/graph/graph.yaml --node AGENT-AVIATION-001 --depth 2
+open-data-products odpg-generate open_data_products/odpg/data/graph/graph.yaml --output /tmp/odp-graph-explorer.html --json
 
-# Product-level Data Contract validation
-open-data-products product check-contract product.yaml contract.yaml --json
+# Product-level Data Contract inspection
 open-data-products product resolve-contracts product.yaml --json
-open-data-products product contract-report product.yaml contract.yaml --json
-open-data-products product align-contract product.yaml contract.yaml --json
 open-data-products product contract-schema contract.yaml --json
-open-data-products product export-contract contract.yaml --format jsonschema --json
-open-data-products product audit product.yaml --json
 ```
 
 See [Data Contract workflows](docs/data-contracts.md) for product contract
 resolution, optional `datacontract-cli` integration, alignment checks, reports,
 and supported ODPS contract reference shapes.
+Live LLM generation requires Ollama or a configured provider API key; see
+[LLM generation](docs/generation.md) for runnable provider examples.
 
 ### Spec-Specific Entry Points
 
