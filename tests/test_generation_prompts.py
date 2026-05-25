@@ -1,17 +1,24 @@
 """Tests for local generation prompt assets and helpers."""
 
+import io
 from pathlib import Path
+from urllib import error
 
 import yaml
 
 from open_data_products.generation import (
+    DEFAULT_GENERATION_CONFIG,
+    create_generation_client,
     ensure_ollama_model,
     generate_local_artifact,
     generate_local_artifacts,
+    load_generation_config,
     list_generation_prompts,
     load_generation_prompt,
     list_ollama_models,
+    openai_generate,
     render_generation_prompt,
+    resolve_generation_settings,
 )
 from open_data_products import (
     ensure_ollama_model as ensure_public_ollama_model,
@@ -166,6 +173,237 @@ def test_ensure_ollama_model_rejects_missing_qwen(monkeypatch):
         assert "Required Ollama model qwen2.5 is not available" in str(exc)
     else:
         raise AssertionError("missing qwen2.5 did not raise RuntimeError")
+
+
+def test_load_generation_config_and_resolve_openai_settings(tmp_path):
+    """Test provider config resolves paths, model, and secret env references."""
+    config = tmp_path / "generation.config.yaml"
+    config.write_text(
+        """
+provider: openai
+input: source_docs
+output: fragments
+providers:
+  openai:
+    type: openai
+    model: gpt-test
+    baseUrl: https://api.openai.example/v1
+    apiKeyEnv: TEST_OPENAI_API_KEY
+""",
+        encoding="utf-8",
+    )
+
+    raw = load_generation_config(config)
+    settings = resolve_generation_settings(config)
+
+    assert raw["provider"] == "openai"
+    assert settings.provider == "openai"
+    assert settings.provider_type == "openai"
+    assert settings.model == "gpt-test"
+    assert settings.input_path == "source_docs"
+    assert settings.output_path == "fragments"
+    assert settings.base_url == "https://api.openai.example/v1"
+    assert settings.api_key_env == "TEST_OPENAI_API_KEY"
+
+
+def test_resolve_generation_settings_allows_overrides(tmp_path):
+    """Test CLI-style overrides take precedence over config values."""
+    config = tmp_path / "generation.config.yaml"
+    config.write_text(
+        """
+provider: openai
+input: configured-input
+output: configured-output
+providers:
+  openai:
+    type: openai
+    model: configured-model
+    apiKeyEnv: TEST_OPENAI_API_KEY
+""",
+        encoding="utf-8",
+    )
+
+    settings = resolve_generation_settings(
+        config,
+        input_path="override-input",
+        output_path="override-output",
+        provider="ollama",
+        model="override-model",
+        ollama_url="http://ollama.example",
+    )
+
+    assert settings.provider == "ollama"
+    assert settings.provider_type == "ollama"
+    assert settings.model == "override-model"
+    assert settings.input_path == "override-input"
+    assert settings.output_path == "override-output"
+    assert settings.base_url == "http://ollama.example"
+    assert settings.api_key_env is None
+
+
+def test_bundled_generation_config_includes_common_compatible_providers():
+    """Test bundled config resolves common OpenAI-compatible provider profiles."""
+    config = load_generation_config(DEFAULT_GENERATION_CONFIG)
+
+    assert "openrouter" in config["providers"]
+    assert "groq" in config["providers"]
+
+    openrouter = resolve_generation_settings(
+        DEFAULT_GENERATION_CONFIG,
+        provider="openrouter",
+    )
+    groq = resolve_generation_settings(
+        DEFAULT_GENERATION_CONFIG,
+        provider="groq",
+    )
+
+    assert openrouter.provider_type == "openai"
+    assert openrouter.base_url == "https://openrouter.ai/api/v1"
+    assert openrouter.api_key_env == "OPENROUTER_API_KEY"
+    assert groq.provider_type == "openai"
+    assert groq.base_url == "https://api.groq.com/openai/v1"
+    assert groq.api_key_env == "GROQ_API_KEY"
+
+
+def test_openai_generate_requires_env(monkeypatch):
+    """Test OpenAI generation fails before HTTP without the API key env var."""
+    monkeypatch.delenv("TEST_OPENAI_API_KEY", raising=False)
+
+    try:
+        openai_generate("prompt", "gpt-test", api_key_env="TEST_OPENAI_API_KEY")
+    except RuntimeError as exc:
+        assert "TEST_OPENAI_API_KEY" in str(exc)
+    else:
+        raise AssertionError("missing OpenAI API key did not raise RuntimeError")
+
+
+def test_openai_generate_rejects_non_ascii_api_key(monkeypatch):
+    """Test copied smart quotes in API key env vars fail with a useful message."""
+    monkeypatch.setenv("TEST_OPENAI_API_KEY", "sk-test\u2018")
+
+    try:
+        openai_generate("prompt", "gpt-test", api_key_env="TEST_OPENAI_API_KEY")
+    except RuntimeError as exc:
+        message = str(exc)
+        assert "TEST_OPENAI_API_KEY" in message
+        assert "plain quotes" in message
+        assert "sk-test" not in message
+    else:
+        raise AssertionError("non-ASCII API key did not raise RuntimeError")
+
+
+def test_openai_generate_reads_responses_output_text(monkeypatch):
+    """Test OpenAI Responses API output_text parsing and secret header use."""
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return None
+
+        def read(self) -> bytes:
+            return b'{"output_text":"generated yaml"}'
+
+    def fake_urlopen(req, timeout, context=None):
+        body = req.data.decode("utf-8")
+        assert req.full_url == "https://api.openai.example/v1/responses"
+        assert req.headers["Authorization"] == "Bearer sk-test"
+        assert req.headers["Accept"] == "application/json"
+        assert req.headers["User-agent"] == "open-data-products-python/0.2"
+        assert '"model": "gpt-test"' in body
+        assert '"input": "prompt"' in body
+        assert timeout == 300
+        assert context is not None
+        return FakeResponse()
+
+    monkeypatch.setenv("TEST_OPENAI_API_KEY", "sk-test")
+    monkeypatch.setattr("open_data_products.generation.request.urlopen", fake_urlopen)
+
+    assert (
+        openai_generate(
+            "prompt",
+            "gpt-test",
+            api_key_env="TEST_OPENAI_API_KEY",
+            base_url="https://api.openai.example/v1",
+        )
+        == "generated yaml"
+    )
+
+
+def test_openai_generate_reports_transport_reason(monkeypatch):
+    """Test OpenAI transport failures include a non-secret diagnostic reason."""
+
+    def fake_urlopen(req, timeout, context=None):
+        assert context is not None
+        raise OSError("network unavailable")
+
+    monkeypatch.setenv("TEST_OPENAI_API_KEY", "sk-test")
+    monkeypatch.setattr("open_data_products.generation.request.urlopen", fake_urlopen)
+
+    try:
+        openai_generate("prompt", "gpt-test", api_key_env="TEST_OPENAI_API_KEY")
+    except RuntimeError as exc:
+        message = str(exc)
+        assert "OpenAI generation request failed: network unavailable" == message
+        assert "sk-test" not in message
+    else:
+        raise AssertionError("transport failure did not raise RuntimeError")
+
+
+def test_openai_generate_reports_http_error_message(monkeypatch):
+    """Test provider HTTP errors include useful non-secret response details."""
+
+    def fake_urlopen(req, timeout, context=None):
+        assert context is not None
+        raise error.HTTPError(
+            req.full_url,
+            403,
+            "Forbidden",
+            {},
+            io.BytesIO(
+                b'{"error":{"message":"The model is blocked at the organization level."}}'
+            ),
+        )
+
+    monkeypatch.setenv("TEST_OPENAI_API_KEY", "sk-test")
+    monkeypatch.setattr("open_data_products.generation.request.urlopen", fake_urlopen)
+
+    try:
+        openai_generate("prompt", "gpt-test", api_key_env="TEST_OPENAI_API_KEY")
+    except RuntimeError as exc:
+        message = str(exc)
+        assert "HTTP 403" in message
+        assert "blocked at the organization level" in message
+        assert "sk-test" not in message
+    else:
+        raise AssertionError("HTTP error did not raise RuntimeError")
+
+
+def test_create_generation_client_checks_ollama(monkeypatch):
+    """Test provider client creation keeps Ollama model validation."""
+    observed = {}
+
+    def fake_ensure(model, base_url):
+        observed["model"] = model
+        observed["base_url"] = base_url
+
+    monkeypatch.setattr("open_data_products.generation.ensure_ollama_model", fake_ensure)
+    monkeypatch.setattr(
+        "open_data_products.generation.ollama_generate",
+        lambda prompt, model, base_url: f"{model}@{base_url}:{prompt}",
+    )
+
+    settings = resolve_generation_settings(
+        input_path="source_docs",
+        output_path="fragments",
+        model="qwen2.5",
+        ollama_url="http://ollama.example",
+    )
+    client = create_generation_client(settings)
+
+    assert observed == {"model": "qwen2.5", "base_url": "http://ollama.example"}
+    assert client("prompt", "qwen2.5") == "qwen2.5@http://ollama.example:prompt"
 
 
 def test_generate_local_artifacts_writes_yaml_outputs(tmp_path):
@@ -331,6 +569,32 @@ def test_generate_local_artifact_writes_one_selected_yaml_output(tmp_path):
             "observedAt": "2026-05-20T00:00:00Z",
         }
     }
+
+
+def test_generate_local_artifact_extracts_yaml_after_model_prose(tmp_path):
+    """Test models that prepend reasoning can still yield valid fragments."""
+    artifact = generate_local_artifact(
+        "signal",
+        GENERATION_SOURCE_DOCS / "turnaround-delay-signal.txt",
+        tmp_path,
+        client=lambda prompt, model: """We must include fields: id, name, description, type, source, and observedAt.
+
+signals:
+- id: turnaround-delay-spike-signal
+  name:
+    en: Turnaround Delay Spike Signal
+  description:
+    en: Turnaround delay increased at Terminal 2.
+  type: operational
+  source:
+    origin: internal
+    method: ground operations event log
+  observedAt: "2026-05-20T00:00:00Z"
+""",
+    )
+
+    assert artifact.valid_yaml is True
+    assert artifact.output_path == tmp_path / "signal_turnaround-delay-spike-signal.yaml"
 
 
 def test_generate_local_artifact_rejects_wrong_fragment_shape(tmp_path):

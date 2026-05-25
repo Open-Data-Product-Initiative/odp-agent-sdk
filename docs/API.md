@@ -48,17 +48,21 @@ artifacts = generate_local_artifacts("open_data_products/generation/source_docs"
 - `list_resources()` and `get_resource(id)`: discover bundled schemas,
   prompt templates, vocabularies, examples, and JSONL retrieval records.
 - `list_generation_prompts()` and `load_generation_prompt(name)`: discover and
-  load editable local LLM prompts for generating standards-ready YAML artifacts.
+  load editable LLM prompts for generating standards-ready YAML artifacts.
 - `generate_local_artifact(kind, source, output_dir, model="qwen2.5")`: generate
   one selected artifact kind (`product`, `use-case`, `objective`, `signal`, or
   `graph`) from one Markdown/text source file or a source folder.
 - `generate_local_artifacts(source_dir, output_dir, model="qwen2.5")`: use the
-  editable prompts and required local Ollama/Qwen 2.5 model to generate
-  separate ODPC `productReference`, `useCase`, `businessObjective`, and
-  `signal` fragment files from Markdown/text source documents, then generate
-  ODPG graph YAML from those fragment files.
+  editable prompts and configured generation client to generate separate ODPC
+  `productReference`, `useCase`, `businessObjective`, and `signal` fragment
+  files from Markdown/text source documents, then generate ODPG graph YAML from
+  those fragment files.
+- `load_generation_config(path)`, `resolve_generation_settings(...)`, and
+  `create_generation_client(settings)`: load provider config and create the
+  configured Ollama or OpenAI generation client without storing API keys in
+  source files.
 - `ensure_ollama_model(model="qwen2.5")`: check that Ollama is reachable and
-  that the required local model is available before generation.
+  that the requested local model is available before Ollama-backed generation.
 
 ### Shared Result Types
 
@@ -82,9 +86,10 @@ open-data-products validate product.yaml --json
 open-data-products explain product.yaml --json
 open-data-products refs graph.yaml --json
 open-data-products resources --json
-# Requires Ollama running locally and `ollama pull qwen2.5`.
+# Requires Ollama running locally and `ollama pull qwen2.5` for the default provider.
 open-data-products generate --input signal.txt --kind signal --output open_data_products/generation/fragments --model qwen2.5 --json
 open-data-products generate --input open_data_products/generation/source_docs --output open_data_products/generation/fragments --model qwen2.5 --json
+open-data-products generate --config generation.config.yaml --provider openai --json
 open-data-products summary product.yaml
 open-data-products manifest --json
 open-data-products serve
@@ -102,7 +107,7 @@ The SDK uses one namespace per Open Data Products standard:
 - `open_data_products.odpc` for Open Data Product Catalog
 - `open_data_products.odpg` for Open Data Product Graph
 - `open_data_products.odpv` for Open Data Product Vocabulary
-- `open_data_products.generation` for local LLM generation prompts
+- `open_data_products.generation` for LLM generation prompts and provider config
 
 Import ODPS APIs from `open_data_products.odps`:
 
@@ -155,9 +160,9 @@ from open_data_products.generation import (
   context, object search, and standalone graph explorer generation.
 - `open_data_products.odpv`: vocabulary loading, validation, search, generated
   JSON/JSONL/YAML artifacts, and artifact drift checks.
-- `open_data_products.generation`: editable prompt files for guiding local LLMs
-  to produce ODPS, ODPC, and ODPG YAML that can be validated by the SDK, plus
-  local Ollama generation helpers.
+- `open_data_products.generation`: editable prompt files for guiding configured
+  LLM providers to produce ODPS, ODPC, and ODPG YAML that can be validated by
+  the SDK, plus local Ollama and OpenAI generation helpers.
 
 ## Table of Contents
 

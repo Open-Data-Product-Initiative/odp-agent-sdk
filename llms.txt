@@ -47,6 +47,9 @@ Use the top-level API when the input spec is unknown:
 - `list_generation_prompts()`
 - `load_generation_prompt(name)`
 - `ensure_ollama_model(model="qwen2.5")`
+- `load_generation_config(path)`
+- `resolve_generation_settings(...)`
+- `create_generation_client(settings)`
 - `generate_local_artifact(kind, source, output_dir, model="qwen2.5")`
 - `generate_local_artifacts(source_dir, output_dir, model="qwen2.5")`
 - `resolve_product_contracts(product_path_or_document)`
@@ -175,17 +178,25 @@ Agents can discover bundled resources with `list_resources()` or the
 - `generation.prompt.odpc_signal_fragment`
 - `generation.prompt.odpg_graph_yaml`
 
-## Local Generation Prompts
+## Generation Prompts
 
-Prompt templates for local LLM fragment generation are stored as editable
+Prompt templates for LLM fragment generation are stored as editable
 Markdown files under `open_data_products/generation/data/prompts/`.
 
-Local generation requires Ollama running on `http://localhost:11434` and the
-Qwen 2.5 model installed with:
+The default provider is local Ollama on `http://localhost:11434` with the Qwen
+2.5 model installed:
 
 ```bash
 ollama pull qwen2.5
 ```
+
+External providers are configured with a YAML file. Store provider names,
+models, endpoints, input/output folders, and secret environment variable names
+in config. Do not store API key values in config. For OpenAI, use
+`apiKeyEnv: OPENAI_API_KEY` and set `OPENAI_API_KEY` in the environment before
+running generation. The OpenAI-compatible provider path has been smoke-tested
+with OpenAI `gpt-4.1-mini` and Groq `openai/gpt-oss-120b` for ODPC signal
+fragment generation.
 
 Use `list_generation_prompts()` and `load_generation_prompt(name)` from Python,
 or discover prompt resources with `open-data-products resources --json`.
@@ -195,13 +206,13 @@ to generate one selected artifact from one source file or folder. Supported
 kinds are `product`, `use-case`, `objective`, `signal`, and `graph`.
 
 Use `generate_local_artifacts()` or `open-data-products generate` without
-`--kind` to call local Ollama and write the holistic artifact set. ODPC outputs
-are separate fragment files with singular roots: `productReference`, `useCase`,
-`businessObjective`, and `signal`. In the holistic flow, ODPG graph generation
-receives those generated fragment YAML files as context so graph node ids can
-match the fragments.
+`--kind` to call the configured provider and write the holistic artifact set.
+ODPC outputs are separate fragment files with singular roots:
+`productReference`, `useCase`, `businessObjective`, and `signal`. In the
+holistic flow, ODPG graph generation receives those generated fragment YAML
+files as context so graph node ids can match the fragments.
 
-The prompt set is intended to guide a local model from source documents to
+The prompt set is intended to guide a configured model from source documents to
 standards-ready YAML fragments:
 
 - ODPC productReference fragment for an ODPS data product
@@ -218,9 +229,9 @@ standards-ready YAML fragments:
 - `open_data_products.odpg`: ODPG graph validation, traversal, analysis, and context
 - `open_data_products.odpv`: ODPV vocabulary loading, validation, search,
   artifacts, term resolution, relationship compatibility, and term context
-- `open_data_products.generation`: editable local LLM prompt templates for
-  generating standards-ready ODPS, ODPC, and ODPG YAML artifacts, plus local
-  Ollama generation helpers
+- `open_data_products.generation`: editable LLM prompt templates for generating
+  standards-ready ODPS, ODPC, and ODPG YAML artifacts, plus configured Ollama
+  and OpenAI generation helpers
 - `open_data_products.contracts`: optional Data Contract validation adapter,
   ODPS contract reference resolution, schema extraction, alignment checks, and
   product-level reports

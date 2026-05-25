@@ -4,17 +4,26 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 import json
+import os
 from pathlib import Path
 import re
-from typing import Callable, List, Optional, Sequence, Union
+import ssl
+from typing import Any, Callable, Dict, List, Optional, Sequence, Union
 from urllib import error, request
 
+import certifi
 import yaml
 
 _PROMPT_DIR = Path(__file__).resolve().parent / "data" / "prompts"
 DEFAULT_OLLAMA_URL = "http://localhost:11434"
+DEFAULT_OPENAI_URL = "https://api.openai.com/v1"
 DEFAULT_GENERATION_MODEL = "qwen2.5"
 DEFAULT_OLLAMA_GENERATE_TIMEOUT = 300
+DEFAULT_OPENAI_GENERATE_TIMEOUT = 300
+DEFAULT_OPENAI_USER_AGENT = "open-data-products-python/0.2"
+DEFAULT_GENERATION_CONFIG = (
+    Path(__file__).resolve().parent / "generation.config.example.yaml"
+)
 
 ModelClient = Callable[[str, str], str]
 
@@ -30,6 +39,19 @@ class GenerationTask:
     fragment_root: Optional[str] = None
     filename_prefix: Optional[str] = None
     graph_node_type: Optional[str] = None
+
+
+@dataclass(frozen=True)
+class GenerationSettings:
+    """Resolved LLM generation provider and path settings."""
+
+    provider: str
+    model: str
+    input_path: str
+    output_path: str
+    provider_type: str = "ollama"
+    base_url: Optional[str] = None
+    api_key_env: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -244,6 +266,188 @@ def ensure_ollama_model(
         )
 
 
+def openai_generate(
+    prompt: str,
+    model: str,
+    api_key_env: str = "OPENAI_API_KEY",
+    base_url: str = DEFAULT_OPENAI_URL,
+) -> str:
+    """Generate text with the OpenAI Responses API."""
+    api_key = os.environ.get(api_key_env)
+    if not api_key:
+        raise RuntimeError(
+            f"OpenAI generation requires environment variable {api_key_env}. "
+            "Set it before running generation."
+        )
+    try:
+        api_key.encode("ascii")
+    except UnicodeEncodeError as exc:
+        raise RuntimeError(
+            f"OpenAI-compatible generation requires {api_key_env} to contain "
+            "only ASCII characters. Re-export the API key using plain quotes."
+        ) from exc
+
+    payload = json.dumps({"model": model, "input": prompt}).encode("utf-8")
+    req = request.Request(
+        f"{base_url.rstrip('/')}/responses",
+        data=payload,
+        headers={
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {api_key}",
+            "User-Agent": DEFAULT_OPENAI_USER_AGENT,
+        },
+        method="POST",
+    )
+    try:
+        context = ssl.create_default_context(cafile=certifi.where())
+        with request.urlopen(
+            req, timeout=DEFAULT_OPENAI_GENERATE_TIMEOUT, context=context
+        ) as response:
+            data = json.loads(response.read().decode("utf-8"))
+    except error.HTTPError as exc:
+        detail = _http_error_detail(exc)
+        message = f"OpenAI generation request failed with HTTP {exc.code}."
+        if detail:
+            message = f"{message} {detail}"
+        raise RuntimeError(
+            message
+        ) from exc
+    except (OSError, error.URLError) as exc:
+        reason = getattr(exc, "reason", exc)
+        raise RuntimeError(f"OpenAI generation request failed: {reason}") from exc
+
+    output_text = data.get("output_text")
+    if isinstance(output_text, str):
+        return output_text
+
+    output = data.get("output")
+    if isinstance(output, list):
+        parts = []
+        for item in output:
+            if not isinstance(item, dict):
+                continue
+            content = item.get("content")
+            if not isinstance(content, list):
+                continue
+            for content_item in content:
+                if not isinstance(content_item, dict):
+                    continue
+                text = content_item.get("text")
+                if isinstance(text, str):
+                    parts.append(text)
+        if parts:
+            return "\n".join(parts)
+
+    raise RuntimeError("OpenAI response did not contain generated text.")
+
+
+def _http_error_detail(exc: error.HTTPError) -> str:
+    """Return a short, non-secret provider error detail when available."""
+    try:
+        raw = exc.read().decode("utf-8", errors="replace")
+    except OSError:
+        return ""
+    if not raw:
+        return ""
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError:
+        return raw[:500]
+    error_value = parsed.get("error") if isinstance(parsed, dict) else None
+    if isinstance(error_value, dict):
+        message = error_value.get("message")
+        if isinstance(message, str):
+            return message[:500]
+    if isinstance(error_value, str):
+        return error_value[:500]
+    return raw[:500]
+
+
+def load_generation_config(path: PathLike) -> Dict[str, Any]:
+    """Load a generation config YAML file."""
+    config_path = Path(path)
+    if not config_path.is_file():
+        raise FileNotFoundError(f"Generation config not found: {config_path}")
+    data = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    if not isinstance(data, dict):
+        raise ValueError("Generation config must be a YAML mapping.")
+    return data
+
+
+def resolve_generation_settings(
+    config_path: Optional[PathLike] = None,
+    input_path: Optional[PathLike] = None,
+    output_path: Optional[PathLike] = None,
+    provider: Optional[str] = None,
+    model: Optional[str] = None,
+    ollama_url: Optional[str] = None,
+) -> GenerationSettings:
+    """Resolve generation settings from config plus CLI-style overrides."""
+    config: Dict[str, Any] = load_generation_config(config_path) if config_path else {}
+    providers = config.get("providers")
+    providers = providers if isinstance(providers, dict) else {}
+
+    provider_name = str(provider or config.get("provider") or "ollama")
+    provider_config = providers.get(provider_name)
+    provider_config = provider_config if isinstance(provider_config, dict) else {}
+    provider_type = str(provider_config.get("type") or provider_name)
+
+    resolved_model = str(
+        model
+        or provider_config.get("model")
+        or config.get("model")
+        or DEFAULT_GENERATION_MODEL
+    )
+    resolved_input = str(input_path or config.get("input") or "")
+    resolved_output = str(output_path or config.get("output") or "")
+
+    if provider_type == "ollama":
+        base_url = str(
+            ollama_url
+            or provider_config.get("baseUrl")
+            or config.get("baseUrl")
+            or DEFAULT_OLLAMA_URL
+        )
+        api_key_env = None
+    elif provider_type == "openai":
+        base_url = str(
+            provider_config.get("baseUrl")
+            or config.get("baseUrl")
+            or DEFAULT_OPENAI_URL
+        )
+        api_key_env = str(provider_config.get("apiKeyEnv") or "OPENAI_API_KEY")
+    else:
+        raise ValueError(f"Unsupported generation provider type: {provider_type}")
+
+    return GenerationSettings(
+        provider=provider_name,
+        model=resolved_model,
+        input_path=resolved_input,
+        output_path=resolved_output,
+        provider_type=provider_type,
+        base_url=base_url,
+        api_key_env=api_key_env,
+    )
+
+
+def create_generation_client(settings: GenerationSettings) -> ModelClient:
+    """Create a model client for resolved generation settings."""
+    if settings.provider_type == "ollama":
+        base_url = settings.base_url or DEFAULT_OLLAMA_URL
+        ensure_ollama_model(settings.model, base_url)
+        return lambda prompt, model_name: ollama_generate(prompt, model_name, base_url)
+
+    if settings.provider_type == "openai":
+        api_key_env = settings.api_key_env or "OPENAI_API_KEY"
+        base_url = settings.base_url or DEFAULT_OPENAI_URL
+        return lambda prompt, model_name: openai_generate(
+            prompt, model_name, api_key_env=api_key_env, base_url=base_url
+        )
+
+    raise ValueError(f"Unsupported generation provider type: {settings.provider_type}")
+
+
 def generate_local_artifacts(
     source_dir: PathLike,
     output_dir: PathLike,
@@ -339,7 +543,7 @@ def _run_generation_task(
     raw_output = model_client(prompt, model)
     yaml_output = _normalize_generated_output(
         task,
-        _strip_markdown_fence(raw_output).strip(),
+        _extract_yaml_document(task, _strip_markdown_fence(raw_output).strip()),
         expected_graph_nodes=expected_graph_nodes,
     ) + "\n"
     expected_graph_node_ids = (
@@ -476,6 +680,31 @@ def _strip_markdown_fence(text: str) -> str:
     if len(lines) >= 2 and lines[-1].strip() == "```":
         return "\n".join(lines[1:-1])
     return stripped
+
+
+def _extract_yaml_document(task: GenerationTask, text: str) -> str:
+    """Extract a YAML document when a model prepends prose or reasoning."""
+    if _loads_as_mapping(text):
+        return text
+
+    roots = ["graph"] if task.expected_root == "graph" else [task.expected_root]
+    lines = text.splitlines()
+    for index, line in enumerate(lines):
+        stripped = line.lstrip()
+        if line[: len(line) - len(stripped)]:
+            continue
+        if any(stripped.startswith(f"{root}:") for root in roots):
+            candidate = "\n".join(lines[index:]).strip()
+            if _loads_as_mapping(candidate):
+                return candidate
+    return text
+
+
+def _loads_as_mapping(text: str) -> bool:
+    try:
+        return isinstance(yaml.safe_load(text), dict)
+    except yaml.YAMLError:
+        return False
 
 
 def _normalize_generated_output(
@@ -671,20 +900,29 @@ def _slugify_identifier(value: str) -> str:
 
 
 __all__ = [
+    "DEFAULT_GENERATION_CONFIG",
     "DEFAULT_GENERATION_MODEL",
+    "DEFAULT_OPENAI_GENERATE_TIMEOUT",
+    "DEFAULT_OPENAI_USER_AGENT",
+    "DEFAULT_OPENAI_URL",
     "DEFAULT_OLLAMA_GENERATE_TIMEOUT",
     "DEFAULT_OLLAMA_URL",
     "GENERATION_TASKS",
     "GENERATION_TASK_ALIASES",
     "GeneratedArtifact",
+    "GenerationSettings",
     "GenerationTask",
+    "create_generation_client",
     "ensure_ollama_model",
     "generate_local_artifact",
     "generate_local_artifacts",
     "list_generation_prompts",
     "list_ollama_models",
+    "load_generation_config",
     "load_generation_prompt",
     "load_source_documents",
     "ollama_generate",
+    "openai_generate",
     "render_generation_prompt",
+    "resolve_generation_settings",
 ]

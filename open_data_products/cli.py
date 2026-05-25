@@ -88,6 +88,7 @@ Examples:
   open-data-products resources --id odpv.terms --json
   open-data-products resources --json
   open-data-products generate --json
+  open-data-products generate --config generation.config.yaml --json
   open-data-products generate --input source_docs/ --output fragments/ --json
   open-data-products generate --input use-case.md --kind use-case --output fragments/ --json
   open-data-products odpg-agent-context graph.yaml --node DATA-PRODUCT-001
@@ -169,6 +170,17 @@ def main(argv: Optional[List[str]] = None) -> int:
         ),
     )
     generate_parser.add_argument(
+        "--config",
+        help="Generation config YAML file with provider and path settings.",
+    )
+    generate_parser.add_argument(
+        "--provider",
+        help=(
+            "LLM provider override. Defaults to config provider or ollama. "
+            "Use a configured provider name such as openai, openrouter, or groq."
+        ),
+    )
+    generate_parser.add_argument(
         "--kind",
         choices=[
             "all",
@@ -184,7 +196,6 @@ def main(argv: Optional[List[str]] = None) -> int:
     generate_parser.add_argument(
         "--output",
         "-o",
-        default=DEFAULT_GENERATION_OUTPUT,
         help=(
             "Output folder for generated YAML artifacts. Defaults to "
             f"{DEFAULT_GENERATION_OUTPUT}."
@@ -192,13 +203,10 @@ def main(argv: Optional[List[str]] = None) -> int:
     )
     generate_parser.add_argument(
         "--model",
-        default="qwen2.5",
-        choices=["qwen2.5"],
-        help="Required local Ollama model. Currently only qwen2.5 is supported.",
+        help="Model override. Defaults to config model or qwen2.5.",
     )
     generate_parser.add_argument(
         "--ollama-url",
-        default="http://localhost:11434",
         help="Local Ollama base URL. Defaults to http://localhost:11434.",
     )
     generate_parser.add_argument("--json", action="store_true", help="Emit JSON")
@@ -544,23 +552,39 @@ def main(argv: Optional[List[str]] = None) -> int:
                     file=sys.stderr,
                 )
                 return 2
-            generation_input = args.input_dir or args.source_dir or DEFAULT_GENERATION_INPUT
+            try:
+                settings = generation.resolve_generation_settings(
+                    config_path=args.config,
+                    input_path=args.input_dir or args.source_dir,
+                    output_path=args.output,
+                    provider=args.provider,
+                    model=args.model,
+                    ollama_url=args.ollama_url,
+                )
+                generation_input = settings.input_path or DEFAULT_GENERATION_INPUT
+                generation_output = settings.output_path or DEFAULT_GENERATION_OUTPUT
+                model_client = generation.create_generation_client(settings)
+            except (FileNotFoundError, RuntimeError, ValueError) as exc:
+                print(str(exc), file=sys.stderr)
+                return 1
 
             if args.kind == "all":
                 artifacts = generation.generate_local_artifacts(
                     generation_input,
-                    args.output,
-                    model=args.model,
-                    ollama_url=args.ollama_url,
+                    generation_output,
+                    model=settings.model,
+                    ollama_url=settings.base_url or generation.DEFAULT_OLLAMA_URL,
+                    client=model_client,
                 )
             else:
                 artifacts = [
                     generation.generate_local_artifact(
                         args.kind,
                         generation_input,
-                        args.output,
-                        model=args.model,
-                        ollama_url=args.ollama_url,
+                        generation_output,
+                        model=settings.model,
+                        ollama_url=settings.base_url or generation.DEFAULT_OLLAMA_URL,
+                        client=model_client,
                     )
                 ]
             valid_yaml = all(artifact.valid_yaml for artifact in artifacts)
@@ -569,8 +593,10 @@ def main(argv: Optional[List[str]] = None) -> int:
                 "kind": "LocalGeneration",
                 "source": generation_input,
                 "artifact_kind": args.kind,
-                "output": args.output,
-                "model": args.model,
+                "output": generation_output,
+                "provider": settings.provider,
+                "provider_type": settings.provider_type,
+                "model": settings.model,
                 "valid_yaml": valid_yaml,
                 "artifact_count": len(artifacts),
                 "artifacts": [artifact.to_dict() for artifact in artifacts],
@@ -580,7 +606,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             else:
                 state = "valid YAML" if valid_yaml else "invalid YAML"
                 print(
-                    f"Generated {len(artifacts)} artifact(s) in {args.output} "
+                    f"Generated {len(artifacts)} artifact(s) in {generation_output} "
                     f"({state})"
                 )
                 for artifact in artifacts:

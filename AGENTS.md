@@ -12,7 +12,7 @@ Python SDK + MCP surface for the OpenDataProducts.org standards family
 ## Stack
 
 - Python ≥ 3.8 (tested through 3.12; CI runs on 3.14)
-- Runtime deps: `PyYAML`, `jsonschema`, `pycountry`, `phonenumbers`
+- Runtime deps: `PyYAML`, `certifi`, `jsonschema`, `pycountry`, `phonenumbers`
 - Dev deps: `pytest`, `pytest-cov`, `black`, `flake8`, `mypy`, `build`, `twine`
 - No web framework, no DB, no async runtime.
 

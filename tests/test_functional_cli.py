@@ -158,6 +158,11 @@ def test_unified_cli_local_generation(
         "generate_local_artifacts",
         fake_generate_local_artifacts,
     )
+    monkeypatch.setattr(
+        generation,
+        "create_generation_client",
+        lambda settings: (lambda prompt, model: ""),
+    )
 
     assert (
         main(
@@ -215,6 +220,11 @@ def test_unified_cli_local_generation_can_select_one_kind(
         "generate_local_artifact",
         fake_generate_local_artifact,
     )
+    monkeypatch.setattr(
+        generation,
+        "create_generation_client",
+        lambda settings: (lambda prompt, model: ""),
+    )
 
     assert (
         main(
@@ -270,6 +280,11 @@ def test_unified_cli_local_generation_uses_default_paths(
         "generate_local_artifacts",
         fake_generate_local_artifacts,
     )
+    monkeypatch.setattr(
+        generation,
+        "create_generation_client",
+        lambda settings: (lambda prompt, model: ""),
+    )
 
     assert main(["generate", "--json"]) == 0
     payload = _json_output(capsys)
@@ -303,11 +318,32 @@ def test_unified_cli_local_generation_rejects_positional_and_input(
     assert "either positional source_dir or --input" in capsys.readouterr().err
 
 
-def test_unified_cli_generation_requires_qwen_model(
+def test_unified_cli_generation_accepts_model_override(
     capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    with pytest.raises(SystemExit) as exc_info:
+    from open_data_products import generation
+
+    monkeypatch.setattr(
+        generation,
+        "create_generation_client",
+        lambda settings: (lambda prompt, model: ""),
+    )
+    monkeypatch.setattr(
+        generation,
+        "generate_local_artifacts",
+        lambda source_dir, output_dir, model="qwen2.5", ollama_url="http://localhost:11434", client=None: [
+            generation.GeneratedArtifact(
+                name="odpg_graph",
+                prompt_name="odpg_graph_yaml.md",
+                output_path=Path(output_dir) / "odpg_graph.yaml",
+                valid_yaml=True,
+            )
+        ],
+    )
+
+    assert (
         main(
             [
                 "generate",
@@ -316,11 +352,64 @@ def test_unified_cli_generation_requires_qwen_model(
                 str(tmp_path),
                 "--model",
                 "llama3.2",
+                "--json",
             ]
         )
+        == 0
+    )
+    payload = _json_output(capsys)
 
-    assert exc_info.value.code == 2
-    assert "invalid choice: 'llama3.2'" in capsys.readouterr().err
+    assert payload["model"] == "llama3.2"
+
+
+def test_unified_cli_generation_uses_config_provider(
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    from open_data_products import generation
+
+    config = tmp_path / "generation.config.yaml"
+    output_dir = tmp_path / "configured-output"
+    config.write_text(
+        f"""
+provider: openai
+input: {GENERATION_SOURCE_DOCS}
+output: {output_dir}
+providers:
+  openai:
+    type: openai
+    model: gpt-test
+    apiKeyEnv: TEST_OPENAI_API_KEY
+""",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        generation,
+        "create_generation_client",
+        lambda settings: (lambda prompt, model: ""),
+    )
+    monkeypatch.setattr(
+        generation,
+        "generate_local_artifacts",
+        lambda source_dir, output_dir, model="qwen2.5", ollama_url="http://localhost:11434", client=None: [
+            generation.GeneratedArtifact(
+                name="odpg_graph",
+                prompt_name="odpg_graph_yaml.md",
+                output_path=Path(output_dir) / "odpg_graph.yaml",
+                valid_yaml=True,
+            )
+        ],
+    )
+
+    assert main(["generate", "--config", str(config), "--json"]) == 0
+    payload = _json_output(capsys)
+
+    assert payload["source"] == str(GENERATION_SOURCE_DOCS)
+    assert payload["output"] == str(output_dir)
+    assert payload["provider"] == "openai"
+    assert payload["provider_type"] == "openai"
+    assert payload["model"] == "gpt-test"
 
 
 def test_unified_cli_odpc_commands(

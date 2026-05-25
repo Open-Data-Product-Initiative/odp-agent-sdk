@@ -1,0 +1,37 @@
+# Example generation config. Safe to commit: secrets are referenced by
+# environment variable name, never stored here.
+
+provider: ollama
+model: qwen2.5
+input: open_data_products/generation/source_docs/
+output: open_data_products/generation/fragments/
+
+providers:
+  ollama:
+    type: ollama
+    baseUrl: http://localhost:11434
+
+  openai:
+    type: openai
+    model: gpt-4.1-mini
+    baseUrl: https://api.openai.com/v1
+    apiKeyEnv: OPENAI_API_KEY
+
+  # OpenAI-compatible Responses API providers. Select one with
+  # `--provider openrouter` or `--provider groq`, and choose a model supported
+  # by that provider.
+  openrouter:
+    type: openai
+    model: openai/gpt-4.1-mini
+    baseUrl: https://openrouter.ai/api/v1
+    apiKeyEnv: OPENROUTER_API_KEY
+
+  groq:
+    type: openai
+    model: openai/gpt-oss-120b
+    baseUrl: https://api.groq.com/openai/v1
+    apiKeyEnv: GROQ_API_KEY
+
+  # Providers with different auth or request formats should get a dedicated
+  # SDK client before being enabled here, for example Azure OpenAI, Anthropic,
+  # Google Gemini, Mistral, Cohere, and Bedrock.

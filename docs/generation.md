@@ -1,21 +1,26 @@
-# Local Generation
+# LLM Generation
 
-The SDK can use a local LLM through Ollama to turn plain source documents into
-standards-ready ODPC fragments and ODPG graph YAML. This workflow stops before
-catalog publishing: it produces source-backed fragment files and a graph file
-that can be validated, inspected, and used by the existing ODPC/ODPG helpers.
+The SDK can use a configured LLM provider to turn plain source documents into
+standards-ready ODPC fragments and ODPG graph YAML. The default provider is
+local Ollama with Qwen 2.5, and OpenAI can be selected through the generation
+config. This workflow stops before catalog publishing: it produces
+source-backed fragment files and a graph file that can be validated, inspected,
+and used by the existing ODPC/ODPG helpers.
 
 ## Requirements
 
-Local generation requires Ollama running locally and Qwen 2.5 available:
+Default local generation requires Ollama running locally and Qwen 2.5
+available:
 
 ```bash
 ollama pull qwen2.5
 ollama list
 ```
 
-The default model is `qwen2.5`. Later provider-specific configuration can add
-online LLM backends, but the current SDK generation path is local-only.
+The default provider is `ollama` and the default model is `qwen2.5`. External
+providers can be selected with a generation config file. OpenAI generation
+requires `OPENAI_API_KEY` in the environment; the SDK stores only the
+environment variable name in config.
 
 ## Folder Layout
 
@@ -96,6 +101,106 @@ The output folder contains separate ODPC fragment files:
 - `signal:` files such as `signal_<id>.yaml`
 
 It also contains `odpg_graph.yaml`, which connects the generated fragment ids.
+
+## Provider Configuration
+
+Use a generation config file when you want to select a provider, model, input
+folder, and output folder together:
+
+```bash
+open-data-products generate \
+  --config open_data_products/generation/generation.config.example.yaml \
+  --json
+```
+
+You can override config values from the CLI:
+
+```bash
+open-data-products generate \
+  --config generation.config.yaml \
+  --provider openai \
+  --model gpt-4.1-mini \
+  --input source_docs/ \
+  --output fragments/ \
+  --json
+```
+
+Example config:
+
+```yaml
+provider: ollama
+model: qwen2.5
+input: open_data_products/generation/source_docs/
+output: open_data_products/generation/fragments/
+
+providers:
+  ollama:
+    type: ollama
+    baseUrl: http://localhost:11434
+
+  openai:
+    type: openai
+    model: gpt-4.1-mini
+    baseUrl: https://api.openai.com/v1
+    apiKeyEnv: OPENAI_API_KEY
+
+  # OpenAI-compatible Responses API providers. Select one with
+  # `--provider openrouter` or `--provider groq`, and choose a model supported
+  # by that provider.
+  openrouter:
+    type: openai
+    model: openai/gpt-4.1-mini
+    baseUrl: https://openrouter.ai/api/v1
+    apiKeyEnv: OPENROUTER_API_KEY
+
+  groq:
+    type: openai
+    model: openai/gpt-oss-120b
+    baseUrl: https://api.groq.com/openai/v1
+    apiKeyEnv: GROQ_API_KEY
+
+  # Providers with different auth or request formats should get a dedicated
+  # SDK client before being enabled here, for example Azure OpenAI, Anthropic,
+  # Google Gemini, Mistral, Cohere, and Bedrock.
+```
+
+The config file is safe to commit when it only references secret environment
+variable names. Do not store API keys in YAML. For OpenAI, set the key in the
+environment before running generation:
+
+```bash
+export OPENAI_API_KEY="..."
+open-data-products generate --config generation.config.yaml --provider openai --json
+```
+
+The SDK never prints API key values in JSON output or error messages. If a
+required secret env var is missing, generation fails before sending a request.
+OpenAI HTTPS requests use the package `certifi` CA bundle, which avoids local
+Python certificate-store issues without disabling TLS verification.
+
+Provider entries with `type: openai` use the OpenAI Responses request shape,
+Bearer token authentication, and `baseUrl + /responses`. That supports OpenAI
+and providers that expose a compatible Responses API endpoint, such as
+OpenRouter and Groq. Providers with different auth headers or request formats
+should be added as dedicated clients instead of forced into this profile.
+
+Smoke tests have produced valid ODPC signal fragments with OpenAI
+`gpt-4.1-mini` and Groq `openai/gpt-oss-120b`. Provider availability, model
+permissions, and output quality still depend on the account, model, and source
+documents used at runtime.
+
+To smoke-test OpenAI with one small source file:
+
+```bash
+export OPENAI_API_KEY="..."
+open-data-products generate \
+  --provider openai \
+  --model gpt-4.1-mini \
+  --input open_data_products/generation/source_docs/baggage-belt-congestion-signal.txt \
+  --kind signal \
+  --output /tmp/odp-openai-test \
+  --json
+```
 
 ## Validate And Build From Generated Fragments
 

@@ -159,7 +159,7 @@ below for implementation details:
 
 - [API reference](docs/API.md): Agent API, spec helper namespaces, ODPS models, validators, serialization, and examples.
 - [Agent surface](docs/agent-surface.md): MCP server, ARWS manifest, and bundled skills for agent hosts.
-- [Local generation](docs/generation.md): Ollama/Qwen source-doc to ODPC fragment and ODPG graph workflow.
+- [LLM generation](docs/generation.md): Ollama or configured external LLM source-doc to ODPC fragment and ODPG graph workflow.
 - [Data Contract workflows](docs/data-contracts.md): ODPS contract resolution, optional `datacontract-cli`, alignment, and reports.
 - [Tooling development model](docs/tooling-development-model.md): human-facing explanation of how spec-level scripts mature into consolidated SDK capabilities.
 - [Functional test report](docs/functional-test-report.md): public API, CLI, and MCP functional coverage matrix.
@@ -186,9 +186,11 @@ open-data-products resources --id odpc.objects --json
 open-data-products resources --id odpv.terms --json
 open-data-products resources --id odpg.objects --json
 
-# Local LLM generation
+# LLM generation
 open-data-products generate --json
 open-data-products generate --input source_docs/ --output fragments/ --json
+open-data-products generate --config generation.config.yaml --provider openai --json
+open-data-products generate --config open_data_products/generation/generation.config.example.yaml --provider groq --input open_data_products/generation/source_docs/baggage-belt-congestion-signal.txt --kind signal --output /tmp/odp-groq-test --json
 open-data-products generate --input signal.txt --kind signal --output fragments/ --json
 open-data-products validate fragments/odpg_graph.yaml --json
 open-data-products odpg-generate fragments/odpg_graph.yaml --output fragments/graph_explorer.html --json
@@ -230,8 +232,9 @@ and supported ODPS contract reference shapes.
 
 ### Spec-Specific Entry Points
 
-- `open_data_products.generation`: editable prompt templates and required local
-  Ollama/Qwen 2.5 generation helpers for ODPS, ODPC, and ODPG YAML artifacts.
+- `open_data_products.generation`: editable prompt templates and provider-backed
+  generation helpers for ODPS, ODPC, and ODPG YAML artifacts. Defaults to local
+  Ollama/Qwen 2.5 and can use configured external providers such as OpenAI.
 - `open_data_products.odps`: ODPS v4.1 models, standards-aware validation, YAML/JSON I/O, compliance helpers, and `pricing_to_402`.
 - `open_data_products.odpc`: ODPC catalog building, loading, validation, explanation, and object guidance search.
 - `open_data_products.odpg`: ODPG graph validation, summary, traversal, analysis, agent context, object search, and graph explorer generation.
@@ -288,8 +291,9 @@ python examples/odps_v41_example.py
   [standalone HTML](examples/odpc_catalog.html)
 
 ### Generation Inputs And Outputs
-See [Local generation](docs/generation.md) for source documents, prompts,
-generated fragments, ODPG graph YAML, and graph explorer output.
+See [LLM generation](docs/generation.md) for source documents, prompts,
+provider configuration, generated fragments, ODPG graph YAML, and graph explorer
+output.
 
 ### Sample Apps
 The [apps/](apps/README.md) folder contains independent, runnable Python

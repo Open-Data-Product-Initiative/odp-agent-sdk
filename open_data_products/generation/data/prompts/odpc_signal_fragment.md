@@ -5,6 +5,8 @@ Create ODPC signal YAML fragments from the source documents.
 Output rules:
 
 - Return valid YAML only.
+- Start the response with `signals:` as the first characters.
+- Do not include analysis, reasoning, notes, or sentences before the YAML.
 - Return exactly one YAML document with a top-level `signals` list.
 - Do not use YAML document separators such as `---`.
 - Allowed enum values are strict. Replace any source wording such as
