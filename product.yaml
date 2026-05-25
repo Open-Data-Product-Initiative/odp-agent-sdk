@@ -1,51 +1,146 @@
+schema: 'https://opendataproducts.org/v4.1/schema/odps.yaml'
+version: "4.1"
 product:
-  brand: null
-  brandSlogan: null
-  categories: []
-  contentSample: null
-  created: null
-  description: null
-  geography: null
-  homepage: null
-  issues: null
-  keywords: []
-  language: []
-  license:
-    auditTerms: null
-    confidentialityClauses: null
-    damages: null
-    exclusive: false
-    geographicalArea:
-    - US
-    governanceSpecifics: null
-    licenseGrant: null
-    licenseName: null
-    licenseURL: null
-    permanent: true
-    rightToModify: false
-    rightToSublicense: false
-    scopeDetails: null
-    scopeOfUse: commercial
-    terminationConditions: null
-    validFrom: null
-    validUntil: null
-    warranties: null
-  logoURL: null
-  name: Serialization Demo Dataset
-  outputFileFormats: []
-  productID: serial-demo-001
-  productSeries: null
-  productVersion: null
-  recommendedDataProducts: []
-  standards: []
-  status: production
-  tags: []
-  themes: []
-  type: dataset
-  updated: null
-  useCases: []
-  valueProposition: null
-  versionNotes: null
-  visibility: public
-schema: https://opendataproducts.org/v4.0/schema/odps.json
-version: '4.0'
+  productStrategy:
+    objectives:
+      - en: Reduce emergency response time
+    strategicAlignment:
+      - en: Smart City Vision 2030
+    contributesToKPI:
+      id: bizkpi-city-response-time
+      name: City Emergency Response Time
+      description: Average minutes from incident to first responder arrival
+      unit: minutes
+      target: 5
+      direction: at_most
+      timeframe: "by Q4"
+    relatedKPIs:
+      - id: bizkpi-traffic-congestion
+        name: Traffic Congestion Index
+        unit: percentage
+        target: -10
+        direction: decrease
+    productKPIs:
+      - id: kpi-detection-coverage
+        name: Event Detection Coverage
+        description: percentage of reported incidents captured in real time
+        unit: percentage
+        target: 95
+        direction: at_least
+        frequency: hourly
+        calculation: detected_events / reported_events
+
+      - id: kpi-time-to-insight
+        name: Average Time to Insight
+        description: Median time from event occurrence to product update
+        unit: seconds
+        target: 60
+        direction: at_most
+        calculation: p50(update_ts - event_ts)
+  contract:
+    id: 02323M123
+    type: ODCS
+    contractVersion: 2.2.2
+    contractURL: 'https://datamesh-manager.com/urbanltd/dataproducts/9bd530'
+  details:
+    en:
+      name: UrbanPulse Events
+      productID: urbanpulse-events-001
+      valueProposition: >-
+        Enable smarter city experiences by providing structured, real-time
+        public event data ready for integration into travel apps, tourism
+        platforms, and smart city services.
+      description: >-
+        UrbanPulse Events is a SmartCity data product that aggregates and
+        structures public event information — concerts, exhibitions, festivals,
+        sports events — making it accessible through APIs and dashboards for
+        internal and future external use.
+      productSeries: SmartCity Living Data Products
+      visibility: private
+      status: production
+      productVersion: 0.1.0
+      versionNotes: >-
+        Initial internal release with basic event metadata structure and shadow
+        pricing model implemented.
+      categories:
+        - city-events
+        - tourism
+        - smartcity
+      standards:
+        - ODPS 4.0
+      tags:
+        - smartcity
+        - events
+        - tourism
+        - public-data
+      brandSlogan: Turning City Buzz into Business Value
+      type: dataset
+  pricingPlans:
+    declarative:
+      en:
+        - name: Basic Reader
+          priceCurrency: USD
+          price: "0"
+          billingDuration: month
+          unit: Recurring
+          maxTransactionQuantity: 100
+          offering:
+            - Standard access to event metadata
+            - Up to 100 SQL queries per month
+            - Shared SLA (best-effort availability)
+            - No prioritization in case of peaks
+          notes: >-
+            Shadow pricing only for internal visibility. No actual billing
+            applied.
+          paymentGateway:
+            $ref: '#/product/paymentGateways/default'
+          dataQuality:
+            $ref: '#/product/dataQuality/default'
+          SLA:
+            $ref: '#/product/SLA/default'
+          access:
+            $ref: '#/product/dataAccess/API'
+        - name: Extended User
+          priceCurrency: USD
+          price: "300"
+          billingDuration: month
+          unit: Recurring
+          maxTransactionQuantity: 1000
+          offering:
+            - Prioritized SQL access during high-demand periods
+            - Up to 1000 SQL queries per month
+            - Faster response times
+            - Moderate rate limits
+          notes: >-
+            Shadow pricing estimate based on infrastructure and operational cost
+            models.
+          paymentGateway:
+            $ref: '#/product/paymentGateways/default'
+          dataQuality:
+            $ref: '#/product/dataQuality/default'
+          SLA:
+            $ref: '#/product/SLA/default'
+          access:
+            $ref: '#/product/dataAccess/API'
+        - name: High Volume Access
+          priceCurrency: USD
+          price: "2000"
+          billingDuration: month
+          unit: Recurring
+          maxTransactionQuantity: 500000
+          offering:
+            - Dedicated API channel for bulk usage
+            - 'Up to 500,000 SQL queries per month'
+            - Guaranteed SLA for availability and response time
+          notes: Shadow pricing for strategic high-usage internal consumers.
+          paymentGateway:
+            $ref: '#/product/paymentGateways/agent'
+          dataQuality:
+            $ref: '#/product/dataQuality/premium'
+          SLA:
+            $ref: '#/product/SLA/premium'
+          access:
+            $ref: '#/product/dataAccess/Agent'
+
+      
+  
