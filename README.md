@@ -108,71 +108,10 @@ print(generate_product_contract_report("product.yaml").summary)
 
 ### Agent Surface (MCP + ARWS)
 
-The SDK ships a local stdio MCP (Model Context Protocol) server. MCP-capable
-hosts such as Claude Code, Codex CLI, Cursor, and Gemini CLI can be configured
-to launch the server and call its tools over MCP, instead of invoking SDK CLI
-commands manually:
-
-```bash
-open-data-products serve
-```
-
-#### Codex and Claude Code
-
-Project-level MCP setup is included for **Codex** and **Claude Code** so the SDK can be
-used as an MCP tool surface directly from the repository:
-
-- **Codex**: `.codex/config.toml` registers the SDK server as
-  `open_data_products`.
-
-  ```toml
-  [mcp_servers.open_data_products]
-  command = "open-data-products"
-  args = ["serve"]
-  enabled = true
-  startup_timeout_sec = 10
-  tool_timeout_sec = 60
-  ```
-
-- **Claude Code**: `.mcp.json` registers the same server using Claude Code's
-  project-scoped MCP configuration.
-
-  ```json
-  {
-    "mcpServers": {
-      "open_data_products": {
-        "command": "open-data-products",
-        "args": ["serve"]
-      }
-    }
-  }
-  ```
-
-Both configs are intentionally portable: they use `open-data-products serve`,
-contain no local absolute paths, and assume `open-data-products` is available
-on `PATH`. Install the package in the active environment first with
-`pip install -e .` or install the published package before expecting an agent
-host to launch the server.
-
-The same tool set (`validate_document`, `explain_document`,
-`resolve_references`, `list_resources`, `get_resource`, `load_summary`,
-`catalog_artifacts`, `search_terms`, `resolve_vocabulary_term`,
-`explain_vocabulary_term`, `check_vocabulary_relationship`,
-`vocabulary_term_context`, `search_objects`, `search_graph_objects`,
-`summarize_graph`, `traverse_graph`, `analyze_graph`, `agent_context`,
-`resolve_product_contracts`, `validate_product_contracts`,
-`check_product_contract_alignment`, `generate_product_contract_report`,
-`summarize_product_contract_risks`, `validate_data_contract`,
-`summarize_data_contract`, `extract_data_contract_schema`) is also exposed as
-an [ARWS](https://agenticpatterns.veso.ai/arws) agent manifest:
-
-```bash
-open-data-products manifest --json
-```
-
-Three [agent skills](https://agenticpatterns.veso.ai/skills) under
-`skills/` (`odp-validate`, `odp-author`, `odp-explore-graph`) wrap the
-common workflows for hosts that auto-load `SKILL.md` bundles.
+Run `open-data-products serve` to expose the SDK as a local MCP server, or
+`open-data-products manifest --json` to render the ARWS manifest. See
+[Agent surface](docs/agent-surface.md) for Codex/Claude Code setup, MCP tools,
+and bundled skills.
 
 ## Package Structure
 
@@ -219,6 +158,9 @@ This README is intentionally a short landing page. Use the focused references
 below for implementation details:
 
 - [API reference](docs/API.md): Agent API, spec helper namespaces, ODPS models, validators, serialization, and examples.
+- [Agent surface](docs/agent-surface.md): MCP server, ARWS manifest, and bundled skills for agent hosts.
+- [Local generation](docs/generation.md): Ollama/Qwen source-doc to ODPC fragment and ODPG graph workflow.
+- [Data Contract workflows](docs/data-contracts.md): ODPS contract resolution, optional `datacontract-cli`, alignment, and reports.
 - [Tooling development model](docs/tooling-development-model.md): human-facing explanation of how spec-level scripts mature into consolidated SDK capabilities.
 - [Functional test report](docs/functional-test-report.md): public API, CLI, and MCP functional coverage matrix.
 - [Example scripts](examples/): runnable ODPS examples, including v4.1 strategy and MCP access examples.
@@ -244,37 +186,17 @@ open-data-products resources --id odpc.objects --json
 open-data-products resources --id odpv.terms --json
 open-data-products resources --id odpg.objects --json
 
-# Local LLM generation, stopping at fragments and graph YAML
-# Requires Ollama running locally and qwen2.5 pulled:
-#   ollama pull qwen2.5
-
-# Generate one selected artifact kind from one source file
-open-data-products generate open_data_products/generation/source_docs/turnaround-delay-signal.txt \
-  --kind signal \
-  --output open_data_products/generation/fragments/ \
-  --model qwen2.5 \
-  --json
-
-# Or generate all supported artifacts from a source folder
+# Local LLM generation
 open-data-products generate open_data_products/generation/source_docs/ \
   --output open_data_products/generation/fragments/ \
   --model qwen2.5 \
   --json
 
-# The output folder contains separate ODPC fragment files such as
-# productReference:, useCase:, businessObjective:, and signal:,
-# plus a standalone ODPG graph YAML file.
-
 # ODPC catalog helpers
-# Build YAML only
 open-data-products odpc-build open_data_products/generation/fragments/ --output catalog.yaml --json
-
-# Build YAML and standalone HTML
 open-data-products odpc-build open_data_products/generation/fragments/ --output catalog.yaml --html catalog.html --json
-
 open-data-products odpc-summary catalog.yaml --json
 open-data-products odpc-search "catalog data" --limit 3 --json
-open-data-products odpc-artifacts open_data_products/generation/fragments/ --check --json
 
 # ODPV vocabulary helpers
 open-data-products odpv-summary --json
@@ -301,50 +223,9 @@ open-data-products product export-contract contract.yaml --format jsonschema --j
 open-data-products product audit product.yaml --json
 ```
 
-### Data Contract Workflows
-
-Data Contract capabilities are intentionally split between the ODP SDK and
-`datacontract-cli`:
-
-- The ODP SDK owns product context, ODPS reference resolution, static schema extraction, alignment checks, CLI orchestration, MCP tools, and compact agent-ready reports.
-- `datacontract-cli` remains the optional execution engine for external contract linting and export.
-- Live data tests are not run by default and are not exposed through MCP.
-
-Install the optional adapter when you need external contract linting or export:
-
-```bash
-pip install "open-data-products[contracts]"
-```
-
-Supported ODPS contract locations include:
-
-```yaml
-product:
-  contract:
-    type: DCS
-    $ref: ./contracts/orders.contract.yaml
-```
-
-```yaml
-product:
-  contract:
-    type: ODCS
-    contractURL: https://example.com/contracts/orders.yaml
-```
-
-```yaml
-product:
-  contract:
-    type: DCS
-    spec:
-      name: Orders
-      models:
-        orders:
-          fields:
-            order_id:
-              type: string
-              required: true
-```
+See [Data Contract workflows](docs/data-contracts.md) for product contract
+resolution, optional `datacontract-cli` integration, alignment checks, reports,
+and supported ODPS contract reference shapes.
 
 ### Spec-Specific Entry Points
 
@@ -406,13 +287,8 @@ python examples/odps_v41_example.py
   [standalone HTML](examples/odpc_catalog.html)
 
 ### Generation Inputs And Outputs
-- [Source documents](open_data_products/generation/source_docs/)
-  are mixed Markdown/text inputs for local LLM generation. Replace them with
-  source documents for any domain.
-- [Generated fragment files](open_data_products/generation/fragments/)
-  are generated outputs: separate ODPC `productReference`, `useCase`,
-  `businessObjective`, and `signal` fragment files plus ODPG graph YAML and
-  generated graph explorer HTML.
+See [Local generation](docs/generation.md) for source documents, prompts,
+generated fragments, ODPG graph YAML, and graph explorer output.
 
 ### Sample Apps
 The [apps/](apps/README.md) folder contains independent, runnable Python
