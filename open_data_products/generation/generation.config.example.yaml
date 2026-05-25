@@ -13,6 +13,13 @@ model: qwen2.5
 input: open_data_products/generation/source_docs/
 output: open_data_products/generation/fragments/
 
+# To make Claude the default instead, set `provider: claude`. The selected
+# provider entry below supplies the Claude model and Anthropic API settings.
+#
+# provider: claude
+# input: open_data_products/generation/source_docs/
+# output: open_data_products/generation/fragments/
+
 providers:
   ollama:
     type: ollama
