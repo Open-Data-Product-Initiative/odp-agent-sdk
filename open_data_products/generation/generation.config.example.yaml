@@ -1,5 +1,12 @@
 # Example generation config. Safe to commit: secrets are referenced by
 # environment variable name, never stored here.
+#
+# The top-level keys below are generation defaults. `provider` selects the
+# default entry from the `providers` map, while `model`, `input`, and `output`
+# provide default runtime values. A provider-specific `model` overrides the
+# top-level model when that provider is selected. CLI flags such as
+# `--provider`, `--model`, `--input`, and `--output` override this file for one
+# run.
 
 provider: ollama
 model: qwen2.5
