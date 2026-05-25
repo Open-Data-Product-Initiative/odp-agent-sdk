@@ -87,9 +87,9 @@ open-data-products explain product.yaml --json
 open-data-products refs graph.yaml --json
 open-data-products resources --json
 # Requires Ollama running locally and `ollama pull qwen2.5` for the default provider.
-open-data-products generate --input signal.txt --kind signal --output open_data_products/generation/fragments --model qwen2.5 --json
-open-data-products generate --input open_data_products/generation/source_docs --output open_data_products/generation/fragments --model qwen2.5 --json
-open-data-products generate --config generation.config.yaml --provider openai --json
+open-data-products generate --json
+open-data-products generate --config generation.config.yaml --json
+open-data-products generate --config generation.config.yaml --provider groq --json
 open-data-products summary product.yaml
 open-data-products manifest --json
 open-data-products serve

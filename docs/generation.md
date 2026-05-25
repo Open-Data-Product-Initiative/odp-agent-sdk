@@ -105,7 +105,7 @@ It also contains `odpg_graph.yaml`, which connects the generated fragment ids.
 ## Provider Configuration
 
 Use a generation config file when you want to select a provider, model, input
-folder, and output folder together:
+folder, and output folder together. This is the normal path:
 
 ```bash
 open-data-products generate \
@@ -113,7 +113,18 @@ open-data-products generate \
   --json
 ```
 
-You can override config values from the CLI:
+To use another provider already defined in the config, override only the
+provider:
+
+```bash
+open-data-products generate \
+  --config generation.config.yaml \
+  --provider groq \
+  --json
+```
+
+CLI flags are for temporary overrides. Use them when testing a different model,
+input, or output without editing the config:
 
 ```bash
 open-data-products generate \
@@ -170,7 +181,7 @@ environment before running generation:
 
 ```bash
 export OPENAI_API_KEY="..."
-open-data-products generate --config generation.config.yaml --provider openai --json
+open-data-products generate --config generation.config.yaml --json
 ```
 
 The SDK never prints API key values in JSON output or error messages. If a
@@ -189,11 +200,12 @@ Smoke tests have produced valid ODPC signal fragments with OpenAI
 permissions, and output quality still depend on the account, model, and source
 documents used at runtime.
 
-To smoke-test OpenAI with one small source file:
+To smoke-test OpenAI with one small source file while overriding config paths:
 
 ```bash
 export OPENAI_API_KEY="..."
 open-data-products generate \
+  --config generation.config.yaml \
   --provider openai \
   --model gpt-4.1-mini \
   --input open_data_products/generation/source_docs/baggage-belt-congestion-signal.txt \

@@ -188,10 +188,9 @@ open-data-products resources --id odpg.objects --json
 
 # LLM generation
 open-data-products generate --json
-open-data-products generate --input source_docs/ --output fragments/ --json
-open-data-products generate --config generation.config.yaml --provider openai --json
-open-data-products generate --config open_data_products/generation/generation.config.example.yaml --provider groq --input open_data_products/generation/source_docs/baggage-belt-congestion-signal.txt --kind signal --output /tmp/odp-groq-test --json
-open-data-products generate --input signal.txt --kind signal --output fragments/ --json
+open-data-products generate --config generation.config.yaml --json
+open-data-products generate --config generation.config.yaml --provider groq --json
+open-data-products generate --config generation.config.yaml --kind signal --json
 open-data-products validate fragments/odpg_graph.yaml --json
 open-data-products odpg-generate fragments/odpg_graph.yaml --output fragments/graph_explorer.html --json
 

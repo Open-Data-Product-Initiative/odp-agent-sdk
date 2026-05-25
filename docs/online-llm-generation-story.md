@@ -59,10 +59,18 @@ The CLI now supports provider-driven generation:
 ```bash
 open-data-products generate \
   --config generation.config.yaml \
-  --provider openai \
-  --model gpt-4.1-mini \
-  --input source_docs/ \
-  --output fragments/ \
+  --json
+```
+
+The config is the source of truth for the normal workflow. It can select the
+provider, model, input folder, and output folder together. CLI flags remain
+available for temporary overrides, for example trying another provider already
+defined in the config:
+
+```bash
+open-data-products generate \
+  --config generation.config.yaml \
+  --provider groq \
   --json
 ```
 
@@ -73,9 +81,7 @@ export GROQ_API_KEY="..."
 open-data-products generate \
   --config open_data_products/generation/generation.config.example.yaml \
   --provider groq \
-  --input open_data_products/generation/source_docs/baggage-belt-congestion-signal.txt \
   --kind signal \
-  --output /tmp/odp-groq-test \
   --json
 ```
 
