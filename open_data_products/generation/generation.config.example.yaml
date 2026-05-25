@@ -39,6 +39,7 @@ providers:
     model: gpt-4.1-mini
     baseUrl: https://api.openai.com/v1
     # Export OPENAI_API_KEY before selecting this provider.
+    # Example: export OPENAI_API_KEY="..."
     apiKeyEnv: OPENAI_API_KEY
 
   # OpenAI-compatible Responses API providers. Select one with
@@ -49,6 +50,7 @@ providers:
     model: openai/gpt-4.1-mini
     baseUrl: https://openrouter.ai/api/v1
     # Export OPENROUTER_API_KEY before selecting this provider.
+    # Example: export OPENROUTER_API_KEY="..."
     apiKeyEnv: OPENROUTER_API_KEY
 
   groq:
@@ -56,6 +58,7 @@ providers:
     model: openai/gpt-oss-120b
     baseUrl: https://api.groq.com/openai/v1
     # Export GROQ_API_KEY before selecting this provider.
+    # Example: export GROQ_API_KEY="..."
     apiKeyEnv: GROQ_API_KEY
 
   # Anthropic Claude uses its own Messages API client.
@@ -64,6 +67,7 @@ providers:
     model: claude-sonnet-4-5
     baseUrl: https://api.anthropic.com/v1
     # Export ANTHROPIC_API_KEY before selecting this provider.
+    # Example: export ANTHROPIC_API_KEY="..."
     apiKeyEnv: ANTHROPIC_API_KEY
     version: "2023-06-01"
     maxTokens: 4096
