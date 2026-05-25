@@ -192,11 +192,12 @@ ollama pull qwen2.5
 
 External providers are configured with a YAML file. Store provider names,
 models, endpoints, input/output folders, and secret environment variable names
-in config. Do not store API key values in config. For OpenAI, use
-`apiKeyEnv: OPENAI_API_KEY` and set `OPENAI_API_KEY` in the environment before
-running generation. The OpenAI-compatible provider path has been smoke-tested
-with OpenAI `gpt-4.1-mini` and Groq `openai/gpt-oss-120b` for ODPC signal
-fragment generation.
+in config. Do not store API key values in config. For OpenAI-compatible
+providers, use env vars such as `OPENAI_API_KEY`, `OPENROUTER_API_KEY`, or
+`GROQ_API_KEY`. For Anthropic Claude, use `ANTHROPIC_API_KEY` with a provider
+entry of `type: anthropic`. The OpenAI-compatible provider path has been
+smoke-tested with OpenAI `gpt-4.1-mini` and Groq `openai/gpt-oss-120b` for ODPC
+signal fragment generation.
 
 Use `list_generation_prompts()` and `load_generation_prompt(name)` from Python,
 or discover prompt resources with `open-data-products resources --json`.

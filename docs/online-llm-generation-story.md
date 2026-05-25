@@ -44,15 +44,26 @@ providers:
     model: openai/gpt-oss-120b
     baseUrl: https://api.groq.com/openai/v1
     apiKeyEnv: GROQ_API_KEY
+
+  claude:
+    type: anthropic
+    model: claude-sonnet-4-5
+    baseUrl: https://api.anthropic.com/v1
+    apiKeyEnv: ANTHROPIC_API_KEY
+    version: "2023-06-01"
+    maxTokens: 4096
 ```
 
 The `type: openai` profile means the provider is called through an
 OpenAI-compatible Responses API shape: Bearer token authentication, JSON request
 body, and `baseUrl + /responses`. This makes the same SDK generation client
 usable with OpenAI itself and compatible providers such as Groq and OpenRouter.
-Providers with different authentication or request formats, such as Azure
-OpenAI, Anthropic, Gemini, Mistral, Cohere, or Bedrock, are intentionally not
-forced into this profile. They can be added later as dedicated provider clients.
+Claude is supported through a separate `type: anthropic` profile because the
+Anthropic Messages API has a different endpoint, authentication header, version
+header, request body, and response shape. Providers with other authentication
+or request formats, such as Azure OpenAI, Gemini, Mistral, Cohere, or Bedrock,
+are intentionally not forced into an existing profile. They can be added later
+as dedicated provider clients.
 
 The CLI now supports provider-driven generation:
 
@@ -71,6 +82,16 @@ defined in the config:
 open-data-products generate \
   --config generation.config.yaml \
   --provider groq \
+  --json
+```
+
+Claude can be selected the same way:
+
+```bash
+export ANTHROPIC_API_KEY="..."
+open-data-products generate \
+  --config generation.config.yaml \
+  --provider claude \
   --json
 ```
 
@@ -115,9 +136,9 @@ SDK does not print API key values in JSON output or error messages. It also
 validates that API key environment values contain only ASCII characters, which
 catches copy-paste issues such as smart quotes before they reach the HTTP layer.
 
-The OpenAI-compatible HTTPS client uses the `certifi` CA bundle for TLS
-verification. This avoids local Python certificate-store problems without
-disabling certificate validation.
+The online provider clients use the `certifi` CA bundle for TLS verification.
+This avoids local Python certificate-store problems without disabling
+certificate validation.
 
 The CLI error handling was also improved during testing. Instead of returning
 vague failures such as "request failed" or only `HTTP 403`, the SDK now surfaces

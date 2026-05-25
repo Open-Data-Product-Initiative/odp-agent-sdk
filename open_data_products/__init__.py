@@ -53,6 +53,7 @@ from .contracts import (
     validate_contract,
 )
 from .generation import (
+    anthropic_generate,
     create_generation_client,
     ensure_ollama_model,
     generate_local_artifact,
@@ -132,6 +133,7 @@ __all__ = [
     "load_generation_prompt",
     "pricing_to_402",
     "generate_product_contract_report",
+    "anthropic_generate",
     "create_generation_client",
     "ensure_ollama_model",
     "generate_local_artifact",

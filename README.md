@@ -190,6 +190,7 @@ open-data-products resources --id odpg.objects --json
 open-data-products generate --json
 open-data-products generate --config generation.config.yaml --json
 open-data-products generate --config generation.config.yaml --provider groq --json
+open-data-products generate --config generation.config.yaml --provider claude --json
 open-data-products generate --config generation.config.yaml --kind signal --json
 open-data-products validate fragments/odpg_graph.yaml --json
 open-data-products odpg-generate fragments/odpg_graph.yaml --output fragments/graph_explorer.html --json

@@ -1,6 +1,7 @@
 """Tests for local generation prompt assets and helpers."""
 
 import io
+import json
 from pathlib import Path
 from urllib import error
 
@@ -8,6 +9,8 @@ import yaml
 
 from open_data_products.generation import (
     DEFAULT_GENERATION_CONFIG,
+    GenerationSettings,
+    anthropic_generate,
     create_generation_client,
     ensure_ollama_model,
     generate_local_artifact,
@@ -21,6 +24,7 @@ from open_data_products.generation import (
     resolve_generation_settings,
 )
 from open_data_products import (
+    anthropic_generate as anthropic_public_generate,
     ensure_ollama_model as ensure_public_ollama_model,
     generate_local_artifact as generate_public_local_artifact,
     generate_local_artifacts as generate_public_local_artifacts,
@@ -105,6 +109,7 @@ def test_generation_prompt_helpers_are_public_api():
     assert ensure_public_ollama_model is ensure_ollama_model
     assert generate_public_local_artifact is generate_local_artifact
     assert generate_public_local_artifacts is generate_local_artifacts
+    assert anthropic_public_generate is anthropic_generate
 
 
 def test_render_generation_prompt_inlines_source_documents():
@@ -247,6 +252,7 @@ def test_bundled_generation_config_includes_common_compatible_providers():
 
     assert "openrouter" in config["providers"]
     assert "groq" in config["providers"]
+    assert "claude" in config["providers"]
 
     openrouter = resolve_generation_settings(
         DEFAULT_GENERATION_CONFIG,
@@ -263,6 +269,44 @@ def test_bundled_generation_config_includes_common_compatible_providers():
     assert groq.provider_type == "openai"
     assert groq.base_url == "https://api.groq.com/openai/v1"
     assert groq.api_key_env == "GROQ_API_KEY"
+    claude = resolve_generation_settings(
+        DEFAULT_GENERATION_CONFIG,
+        provider="claude",
+    )
+    assert claude.provider_type == "anthropic"
+    assert claude.base_url == "https://api.anthropic.com/v1"
+    assert claude.api_key_env == "ANTHROPIC_API_KEY"
+
+
+def test_resolve_generation_settings_reads_anthropic_provider(tmp_path):
+    """Test Anthropic provider config resolves Claude-specific fields."""
+    config = tmp_path / "generation.config.yaml"
+    config.write_text(
+        """
+provider: claude
+input: source_docs
+output: fragments
+providers:
+  claude:
+    type: anthropic
+    model: claude-test
+    baseUrl: https://api.anthropic.example/v1
+    apiKeyEnv: TEST_ANTHROPIC_API_KEY
+    version: "2023-06-01"
+    maxTokens: 4096
+""",
+        encoding="utf-8",
+    )
+
+    settings = resolve_generation_settings(config)
+
+    assert settings.provider == "claude"
+    assert settings.provider_type == "anthropic"
+    assert settings.model == "claude-test"
+    assert settings.base_url == "https://api.anthropic.example/v1"
+    assert settings.api_key_env == "TEST_ANTHROPIC_API_KEY"
+    assert settings.api_version == "2023-06-01"
+    assert settings.max_tokens == 4096
 
 
 def test_openai_generate_requires_env(monkeypatch):
@@ -378,6 +422,120 @@ def test_openai_generate_reports_http_error_message(monkeypatch):
         assert "sk-test" not in message
     else:
         raise AssertionError("HTTP error did not raise RuntimeError")
+
+
+def test_anthropic_generate_requires_env(monkeypatch):
+    """Test Anthropic generation fails before HTTP without the API key env var."""
+    monkeypatch.delenv("TEST_ANTHROPIC_API_KEY", raising=False)
+
+    try:
+        anthropic_generate(
+            "prompt",
+            "claude-test",
+            api_key_env="TEST_ANTHROPIC_API_KEY",
+        )
+    except RuntimeError as exc:
+        assert "TEST_ANTHROPIC_API_KEY" in str(exc)
+    else:
+        raise AssertionError("missing Anthropic API key did not raise RuntimeError")
+
+
+def test_anthropic_generate_reads_message_text(monkeypatch):
+    """Test Anthropic Messages API request shape and text response parsing."""
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return None
+
+        def read(self) -> bytes:
+            return b'{"content":[{"type":"text","text":"signals:\\n- id: test"}]}'
+
+    def fake_urlopen(req, timeout, context=None):
+        body = json.loads(req.data.decode("utf-8"))
+        assert req.full_url == "https://api.anthropic.example/v1/messages"
+        assert req.headers["X-api-key"] == "sk-ant-test"
+        assert req.headers["Anthropic-version"] == "2023-06-01"
+        assert req.headers["Accept"] == "application/json"
+        assert req.headers["User-agent"] == "open-data-products-python/0.2"
+        assert body == {
+            "model": "claude-test",
+            "max_tokens": 2048,
+            "messages": [{"role": "user", "content": "prompt"}],
+        }
+        assert timeout == 300
+        assert context is not None
+        return FakeResponse()
+
+    monkeypatch.setenv("TEST_ANTHROPIC_API_KEY", "sk-ant-test")
+    monkeypatch.setattr("open_data_products.generation.request.urlopen", fake_urlopen)
+
+    assert (
+        anthropic_generate(
+            "prompt",
+            "claude-test",
+            api_key_env="TEST_ANTHROPIC_API_KEY",
+            base_url="https://api.anthropic.example/v1",
+            version="2023-06-01",
+            max_tokens=2048,
+        )
+        == "signals:\n- id: test"
+    )
+
+
+def test_create_generation_client_uses_anthropic(monkeypatch):
+    """Test provider factory creates an Anthropic model client."""
+    observed = {}
+
+    def fake_anthropic_generate(
+        prompt,
+        model,
+        api_key_env="ANTHROPIC_API_KEY",
+        base_url="https://api.anthropic.com/v1",
+        version="2023-06-01",
+        max_tokens=4096,
+    ):
+        observed.update(
+            {
+                "prompt": prompt,
+                "model": model,
+                "api_key_env": api_key_env,
+                "base_url": base_url,
+                "version": version,
+                "max_tokens": max_tokens,
+            }
+        )
+        return "generated"
+
+    monkeypatch.setattr(
+        "open_data_products.generation.anthropic_generate",
+        fake_anthropic_generate,
+    )
+    settings = GenerationSettings(
+        provider="claude",
+        provider_type="anthropic",
+        model="claude-test",
+        input_path="source_docs",
+        output_path="fragments",
+        base_url="https://api.anthropic.example/v1",
+        api_key_env="TEST_ANTHROPIC_API_KEY",
+        api_version="2023-06-01",
+        max_tokens=2048,
+    )
+
+    client = create_generation_client(settings)
+
+    assert client("prompt", "claude-test") == "generated"
+    assert observed == {
+        "prompt": "prompt",
+        "model": "claude-test",
+        "api_key_env": "TEST_ANTHROPIC_API_KEY",
+        "base_url": "https://api.anthropic.example/v1",
+        "version": "2023-06-01",
+        "max_tokens": 2048,
+    }
 
 
 def test_create_generation_client_checks_ollama(monkeypatch):

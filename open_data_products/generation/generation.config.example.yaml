@@ -32,6 +32,15 @@ providers:
     baseUrl: https://api.groq.com/openai/v1
     apiKeyEnv: GROQ_API_KEY
 
+  # Anthropic Claude uses its own Messages API client.
+  claude:
+    type: anthropic
+    model: claude-sonnet-4-5
+    baseUrl: https://api.anthropic.com/v1
+    apiKeyEnv: ANTHROPIC_API_KEY
+    version: "2023-06-01"
+    maxTokens: 4096
+
   # Providers with different auth or request formats should get a dedicated
-  # SDK client before being enabled here, for example Azure OpenAI, Anthropic,
-  # Google Gemini, Mistral, Cohere, and Bedrock.
+  # SDK client before being enabled here, for example Azure OpenAI, Google
+  # Gemini, Mistral, Cohere, and Bedrock.

@@ -170,14 +170,23 @@ providers:
     baseUrl: https://api.groq.com/openai/v1
     apiKeyEnv: GROQ_API_KEY
 
+  # Anthropic Claude uses its own Messages API client.
+  claude:
+    type: anthropic
+    model: claude-sonnet-4-5
+    baseUrl: https://api.anthropic.com/v1
+    apiKeyEnv: ANTHROPIC_API_KEY
+    version: "2023-06-01"
+    maxTokens: 4096
+
   # Providers with different auth or request formats should get a dedicated
-  # SDK client before being enabled here, for example Azure OpenAI, Anthropic,
-  # Google Gemini, Mistral, Cohere, and Bedrock.
+  # SDK client before being enabled here, for example Azure OpenAI, Google
+  # Gemini, Mistral, Cohere, and Bedrock.
 ```
 
 The config file is safe to commit when it only references secret environment
-variable names. Do not store API keys in YAML. For OpenAI, set the key in the
-environment before running generation:
+variable names. Do not store API keys in YAML. Set the required provider key in
+the environment before running generation:
 
 ```bash
 export OPENAI_API_KEY="..."
@@ -192,8 +201,13 @@ Python certificate-store issues without disabling TLS verification.
 Provider entries with `type: openai` use the OpenAI Responses request shape,
 Bearer token authentication, and `baseUrl + /responses`. That supports OpenAI
 and providers that expose a compatible Responses API endpoint, such as
-OpenRouter and Groq. Providers with different auth headers or request formats
-should be added as dedicated clients instead of forced into this profile.
+OpenRouter and Groq.
+
+Provider entries with `type: anthropic` use the Anthropic Messages API request
+shape, `x-api-key` authentication, `anthropic-version`, and
+`baseUrl + /messages`. Use this profile for Claude models. Providers with
+different auth headers or request formats should be added as dedicated clients
+instead of forced into an existing profile.
 
 Smoke tests have produced valid ODPC signal fragments with OpenAI
 `gpt-4.1-mini` and Groq `openai/gpt-oss-120b`. Provider availability, model

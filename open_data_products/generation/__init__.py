@@ -1,4 +1,4 @@
-"""Local LLM generation prompt helpers."""
+"""LLM generation prompt and provider helpers."""
 
 from __future__ import annotations
 
@@ -17,6 +17,9 @@ import yaml
 _PROMPT_DIR = Path(__file__).resolve().parent / "data" / "prompts"
 DEFAULT_OLLAMA_URL = "http://localhost:11434"
 DEFAULT_OPENAI_URL = "https://api.openai.com/v1"
+DEFAULT_ANTHROPIC_URL = "https://api.anthropic.com/v1"
+DEFAULT_ANTHROPIC_VERSION = "2023-06-01"
+DEFAULT_ANTHROPIC_MAX_TOKENS = 4096
 DEFAULT_GENERATION_MODEL = "qwen2.5"
 DEFAULT_OLLAMA_GENERATE_TIMEOUT = 300
 DEFAULT_OPENAI_GENERATE_TIMEOUT = 300
@@ -52,6 +55,8 @@ class GenerationSettings:
     provider_type: str = "ollama"
     base_url: Optional[str] = None
     api_key_env: Optional[str] = None
+    api_version: Optional[str] = None
+    max_tokens: Optional[int] = None
 
 
 @dataclass(frozen=True)
@@ -279,13 +284,7 @@ def openai_generate(
             f"OpenAI generation requires environment variable {api_key_env}. "
             "Set it before running generation."
         )
-    try:
-        api_key.encode("ascii")
-    except UnicodeEncodeError as exc:
-        raise RuntimeError(
-            f"OpenAI-compatible generation requires {api_key_env} to contain "
-            "only ASCII characters. Re-export the API key using plain quotes."
-        ) from exc
+    _require_ascii_api_key(api_key, api_key_env, "OpenAI-compatible")
 
     payload = json.dumps({"model": model, "input": prompt}).encode("utf-8")
     req = request.Request(
@@ -340,6 +339,85 @@ def openai_generate(
             return "\n".join(parts)
 
     raise RuntimeError("OpenAI response did not contain generated text.")
+
+
+def anthropic_generate(
+    prompt: str,
+    model: str,
+    api_key_env: str = "ANTHROPIC_API_KEY",
+    base_url: str = DEFAULT_ANTHROPIC_URL,
+    version: str = DEFAULT_ANTHROPIC_VERSION,
+    max_tokens: int = DEFAULT_ANTHROPIC_MAX_TOKENS,
+) -> str:
+    """Generate text with the Anthropic Messages API."""
+    api_key = os.environ.get(api_key_env)
+    if not api_key:
+        raise RuntimeError(
+            f"Anthropic generation requires environment variable {api_key_env}. "
+            "Set it before running generation."
+        )
+    _require_ascii_api_key(api_key, api_key_env, "Anthropic")
+
+    payload = json.dumps(
+        {
+            "model": model,
+            "max_tokens": max_tokens,
+            "messages": [{"role": "user", "content": prompt}],
+        }
+    ).encode("utf-8")
+    req = request.Request(
+        f"{base_url.rstrip('/')}/messages",
+        data=payload,
+        headers={
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+            "x-api-key": api_key,
+            "anthropic-version": version,
+            "User-Agent": DEFAULT_OPENAI_USER_AGENT,
+        },
+        method="POST",
+    )
+    try:
+        context = ssl.create_default_context(cafile=certifi.where())
+        with request.urlopen(
+            req, timeout=DEFAULT_OPENAI_GENERATE_TIMEOUT, context=context
+        ) as response:
+            data = json.loads(response.read().decode("utf-8"))
+    except error.HTTPError as exc:
+        detail = _http_error_detail(exc)
+        message = f"Anthropic generation request failed with HTTP {exc.code}."
+        if detail:
+            message = f"{message} {detail}"
+        raise RuntimeError(message) from exc
+    except (OSError, error.URLError) as exc:
+        reason = getattr(exc, "reason", exc)
+        raise RuntimeError(f"Anthropic generation request failed: {reason}") from exc
+
+    content = data.get("content")
+    if isinstance(content, list):
+        parts = []
+        for item in content:
+            if not isinstance(item, dict):
+                continue
+            if item.get("type") != "text":
+                continue
+            text = item.get("text")
+            if isinstance(text, str):
+                parts.append(text)
+        if parts:
+            return "\n".join(parts)
+
+    raise RuntimeError("Anthropic response did not contain generated text.")
+
+
+def _require_ascii_api_key(api_key: str, api_key_env: str, provider: str) -> None:
+    try:
+        api_key.encode("ascii")
+    except UnicodeEncodeError as exc:
+        raise RuntimeError(
+            f"{provider} generation requires {api_key_env} to contain only ASCII "
+            "characters. Re-export the API key using plain quotes."
+        ) from exc
 
 
 def _http_error_detail(exc: error.HTTPError) -> str:
@@ -401,6 +479,8 @@ def resolve_generation_settings(
     )
     resolved_input = str(input_path or config.get("input") or "")
     resolved_output = str(output_path or config.get("output") or "")
+    api_version = None
+    max_tokens = None
 
     if provider_type == "ollama":
         base_url = str(
@@ -417,6 +497,25 @@ def resolve_generation_settings(
             or DEFAULT_OPENAI_URL
         )
         api_key_env = str(provider_config.get("apiKeyEnv") or "OPENAI_API_KEY")
+        api_version = None
+        max_tokens = None
+    elif provider_type == "anthropic":
+        base_url = str(
+            provider_config.get("baseUrl")
+            or config.get("baseUrl")
+            or DEFAULT_ANTHROPIC_URL
+        )
+        api_key_env = str(provider_config.get("apiKeyEnv") or "ANTHROPIC_API_KEY")
+        api_version = str(
+            provider_config.get("version")
+            or config.get("version")
+            or DEFAULT_ANTHROPIC_VERSION
+        )
+        max_tokens = int(
+            provider_config.get("maxTokens")
+            or config.get("maxTokens")
+            or DEFAULT_ANTHROPIC_MAX_TOKENS
+        )
     else:
         raise ValueError(f"Unsupported generation provider type: {provider_type}")
 
@@ -428,6 +527,8 @@ def resolve_generation_settings(
         provider_type=provider_type,
         base_url=base_url,
         api_key_env=api_key_env,
+        api_version=api_version,
+        max_tokens=max_tokens,
     )
 
 
@@ -443,6 +544,20 @@ def create_generation_client(settings: GenerationSettings) -> ModelClient:
         base_url = settings.base_url or DEFAULT_OPENAI_URL
         return lambda prompt, model_name: openai_generate(
             prompt, model_name, api_key_env=api_key_env, base_url=base_url
+        )
+
+    if settings.provider_type == "anthropic":
+        api_key_env = settings.api_key_env or "ANTHROPIC_API_KEY"
+        base_url = settings.base_url or DEFAULT_ANTHROPIC_URL
+        version = settings.api_version or DEFAULT_ANTHROPIC_VERSION
+        max_tokens = settings.max_tokens or DEFAULT_ANTHROPIC_MAX_TOKENS
+        return lambda prompt, model_name: anthropic_generate(
+            prompt,
+            model_name,
+            api_key_env=api_key_env,
+            base_url=base_url,
+            version=version,
+            max_tokens=max_tokens,
         )
 
     raise ValueError(f"Unsupported generation provider type: {settings.provider_type}")
@@ -900,6 +1015,9 @@ def _slugify_identifier(value: str) -> str:
 
 
 __all__ = [
+    "DEFAULT_ANTHROPIC_MAX_TOKENS",
+    "DEFAULT_ANTHROPIC_URL",
+    "DEFAULT_ANTHROPIC_VERSION",
     "DEFAULT_GENERATION_CONFIG",
     "DEFAULT_GENERATION_MODEL",
     "DEFAULT_OPENAI_GENERATE_TIMEOUT",
@@ -912,6 +1030,7 @@ __all__ = [
     "GeneratedArtifact",
     "GenerationSettings",
     "GenerationTask",
+    "anthropic_generate",
     "create_generation_client",
     "ensure_ollama_model",
     "generate_local_artifact",

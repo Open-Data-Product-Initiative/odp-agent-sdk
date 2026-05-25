@@ -59,8 +59,8 @@ artifacts = generate_local_artifacts("open_data_products/generation/source_docs"
   those fragment files.
 - `load_generation_config(path)`, `resolve_generation_settings(...)`, and
   `create_generation_client(settings)`: load provider config and create the
-  configured Ollama or OpenAI generation client without storing API keys in
-  source files.
+  configured Ollama, OpenAI-compatible, or Anthropic generation client without
+  storing API keys in source files.
 - `ensure_ollama_model(model="qwen2.5")`: check that Ollama is reachable and
   that the requested local model is available before Ollama-backed generation.
 
@@ -90,6 +90,7 @@ open-data-products resources --json
 open-data-products generate --json
 open-data-products generate --config generation.config.yaml --json
 open-data-products generate --config generation.config.yaml --provider groq --json
+open-data-products generate --config generation.config.yaml --provider claude --json
 open-data-products summary product.yaml
 open-data-products manifest --json
 open-data-products serve
