@@ -23,15 +23,15 @@ def load_app_module(name, relative_path):
 
 inspector = load_app_module(
     "document_inspector_cli",
-    Path("apps") / "document_inspector" / "cli.py",
+    Path("examples") / "apps" / "document_inspector" / "cli.py",
 )
 vocabulary_finder = load_app_module(
     "vocabulary_finder_cli",
-    Path("apps") / "vocabulary_finder" / "cli.py",
+    Path("examples") / "apps" / "vocabulary_finder" / "cli.py",
 )
 pricing_402_builder = load_app_module(
     "pricing_402_builder_cli",
-    Path("apps") / "pricing_402_builder" / "cli.py",
+    Path("examples") / "apps" / "pricing_402_builder" / "cli.py",
 )
 
 
@@ -110,7 +110,7 @@ def test_document_inspector_runs_as_script_from_repo_root():
     completed = subprocess.run(
         [
             sys.executable,
-            "apps/document_inspector/cli.py",
+            "examples/apps/document_inspector/cli.py",
             "examples/demo_product.yaml",
         ],
         check=False,
@@ -166,7 +166,7 @@ def test_vocabulary_finder_runs_as_script_from_repo_root():
     completed = subprocess.run(
         [
             sys.executable,
-            "apps/vocabulary_finder/cli.py",
+            "examples/apps/vocabulary_finder/cli.py",
             "customer churn reusable data offering",
             "--limit",
             "1",
@@ -244,8 +244,8 @@ def test_pricing_402_builder_runs_as_script_from_repo_root():
     completed = subprocess.run(
         [
             sys.executable,
-            "apps/pricing_402_builder/cli.py",
-            "apps/pricing_402_builder/priced_product.yaml",
+            "examples/apps/pricing_402_builder/cli.py",
+            "examples/apps/pricing_402_builder/priced_product.yaml",
         ],
         check=False,
         capture_output=True,

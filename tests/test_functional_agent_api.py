@@ -48,7 +48,7 @@ def functional_paths(tmp_path: Path) -> Dict[str, Tuple[Path, str]]:
     odpc_path.write_text(yaml.safe_dump(_odpc_catalog()), encoding="utf-8")
     return {
         "odps": (
-            REPO_ROOT / "apps" / "pricing_402_builder" / "priced_product.yaml",
+            REPO_ROOT / "examples" / "apps" / "pricing_402_builder" / "priced_product.yaml",
             "OpenDataProduct",
         ),
         "odpc": (odpc_path, "Catalog"),

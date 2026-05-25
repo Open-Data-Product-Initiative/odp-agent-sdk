@@ -1,6 +1,6 @@
 # Open Data Products Python SDK for AI Agents
 
-![Open Data Products Python SDK](./agent.png)
+![Open Data Products Python SDK](./images/agent.png)
 
 [![PyPI version](https://badge.fury.io/py/open-data-products.svg)](https://badge.fury.io/py/open-data-products)
 [![Python Support](https://img.shields.io/badge/python-3.8%2B-blue.svg)](https://github.com/Open-Data-Product-Initiative/odps-python)
@@ -163,18 +163,21 @@ below for implementation details:
 
 - [API reference](docs/API.md): Agent API, spec helper namespaces, ODPS models, validators, serialization, and examples.
 - [Agent surface](docs/agent-surface.md): MCP server, ARWS manifest, and bundled skills for agent hosts.
+- [Command guide](docs/commands.md): what each common CLI command does, what it reads, and what it writes.
 - [LLM generation](docs/generation.md): Ollama or configured external LLM source-doc to ODPC fragment and ODPG graph workflow.
 - [Data Contract workflows](docs/data-contracts.md): ODPS contract resolution, optional `datacontract-cli`, alignment, and reports.
 - [Tooling development model](docs/tooling-development-model.md): human-facing explanation of how spec-level scripts mature into consolidated SDK capabilities.
 - [Functional test report](docs/functional-test-report.md): public API, CLI, and MCP functional coverage matrix.
 - [Example scripts](examples/): runnable ODPS examples, including v4.1 strategy and MCP access examples.
-- [Sample apps](apps/README.md): independent CLIs built on top of the SDK.
+- [Sample apps](examples/apps/README.md): independent CLIs built on top of the SDK.
 - [Agent handoff](llms.txt): compact machine-readable routing for AI agents.
 
 ### Common Workflows
 
 Most commands print human-readable output by default; add `--json` when agents,
-CI jobs, or scripts need a stable machine-readable response.
+CI jobs, or scripts need a stable machine-readable response. See the
+[command guide](docs/commands.md) for what each command reads, checks, and
+produces.
 
 ```bash
 # Cross-spec validation and summaries
@@ -306,18 +309,18 @@ provider configuration, generated fragments, ODPG graph YAML, and graph explorer
 output.
 
 ### Sample Apps
-The [apps/](apps/README.md) folder contains independent, runnable Python
+The [examples/apps/](examples/apps/README.md) folder contains independent, runnable Python
 sample apps built on top of the SDK. Each app lives in its own folder with a
 `cli.py` entry point and can be run directly from the repository root.
 
-- [ODP Document Inspector CLI](apps/document_inspector/cli.py): inspect any ODPS, ODPC, ODPG, or ODPV YAML/JSON document and print validation, explanation, references, and bundled resource metadata.
-- [ODPV Vocabulary Finder CLI](apps/vocabulary_finder/cli.py): search bundled ODPV terms by natural-language query and print definitions, scores, matched fields, and related terms.
-- [ODPS Pricing 402 Builder CLI](apps/pricing_402_builder/cli.py): build an HTTP 402 payment envelope from an ODPS product with pricing plans.
+- [ODP Document Inspector CLI](examples/apps/document_inspector/cli.py): inspect any ODPS, ODPC, ODPG, or ODPV YAML/JSON document and print validation, explanation, references, and bundled resource metadata.
+- [ODPV Vocabulary Finder CLI](examples/apps/vocabulary_finder/cli.py): search bundled ODPV terms by natural-language query and print definitions, scores, matched fields, and related terms.
+- [ODPS Pricing 402 Builder CLI](examples/apps/pricing_402_builder/cli.py): build an HTTP 402 payment envelope from an ODPS product with pricing plans.
 
 ```bash
-python apps/document_inspector/cli.py apps/pricing_402_builder/priced_product.yaml
-python apps/vocabulary_finder/cli.py "governance policy risk" --limit 5 --json
-python apps/pricing_402_builder/cli.py apps/pricing_402_builder/priced_product.yaml --json
+python examples/apps/document_inspector/cli.py examples/apps/pricing_402_builder/priced_product.yaml
+python examples/apps/vocabulary_finder/cli.py "governance policy risk" --limit 5 --json
+python examples/apps/pricing_402_builder/cli.py examples/apps/pricing_402_builder/priced_product.yaml --json
 ```
 
 ## Acknowledgments

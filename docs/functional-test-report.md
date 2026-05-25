@@ -52,7 +52,7 @@ pytest -q
 
 The functional layer uses real package and example artifacts where practical:
 
-- ODPS: `apps/pricing_402_builder/priced_product.yaml`
+- ODPS: `examples/apps/pricing_402_builder/priced_product.yaml`
 - ODPC: a minimal temporary catalog fixture
 - ODPG: `open_data_products/odpg/data/graph/graph.yaml`
 - ODPV: `open_data_products/odpv/data/vocab/odpv.yaml`

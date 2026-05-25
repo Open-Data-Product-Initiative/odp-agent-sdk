@@ -41,7 +41,7 @@ def sample_odps_product():
 
 
 def test_unified_load_validate_and_explain_odps(tmp_path):
-    path = REPO_ROOT / "apps" / "pricing_402_builder" / "priced_product.yaml"
+    path = REPO_ROOT / "examples" / "apps" / "pricing_402_builder" / "priced_product.yaml"
 
     loaded = load_document(path)
     result = validate_document(path)
@@ -148,7 +148,7 @@ def test_unified_validate_and_explain_odpv():
 
 
 def test_top_level_cli_json_validate_and_explain(tmp_path, capsys):
-    path = REPO_ROOT / "apps" / "pricing_402_builder" / "priced_product.yaml"
+    path = REPO_ROOT / "examples" / "apps" / "pricing_402_builder" / "priced_product.yaml"
 
     assert main(["validate", str(path), "--json"]) == 0
     validate_payload = json.loads(capsys.readouterr().out)

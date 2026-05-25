@@ -15,7 +15,7 @@ from open_data_products.contracts.models import (
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-ODPS_PRODUCT = REPO_ROOT / "apps" / "pricing_402_builder" / "priced_product.yaml"
+ODPS_PRODUCT = REPO_ROOT / "examples" / "apps" / "pricing_402_builder" / "priced_product.yaml"
 
 
 def test_validate_contract_returns_install_hint_when_dependency_missing(

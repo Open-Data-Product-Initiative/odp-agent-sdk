@@ -10,7 +10,7 @@ from open_data_products.cli import main
 pytestmark = pytest.mark.functional
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-ODPS_PRODUCT = REPO_ROOT / "apps" / "pricing_402_builder" / "priced_product.yaml"
+ODPS_PRODUCT = REPO_ROOT / "examples" / "apps" / "pricing_402_builder" / "priced_product.yaml"
 ODPG_GRAPH = REPO_ROOT / "open_data_products" / "odpg" / "data" / "graph" / "graph.yaml"
 GENERATION_SOURCE_DOCS = (
     REPO_ROOT
