@@ -177,7 +177,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         "--provider",
         help=(
             "LLM provider override. Defaults to config provider or ollama. "
-            "Use a configured provider name such as openai, openrouter, or groq."
+            "Use a configured provider name such as openai, openrouter, groq, "
+            "or claude."
         ),
     )
     generate_parser.add_argument(
