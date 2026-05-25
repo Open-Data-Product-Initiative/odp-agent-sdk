@@ -109,7 +109,7 @@ folder, and output folder together. This is the normal path:
 
 ```bash
 open-data-products generate \
-  --config open_data_products/generation/generation.config.example.yaml \
+  --config open_data_products/generation/generation.config.yaml \
   --json
 ```
 

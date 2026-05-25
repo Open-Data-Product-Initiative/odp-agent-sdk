@@ -73,7 +73,7 @@ Runs the default generation workflow. By default, it reads source documents from
 and writes generated fragments to `open_data_products/generation/fragments/`.
 
 ```bash
-open-data-products generate --config open_data_products/generation/generation.config.example.yaml --json
+open-data-products generate --config open_data_products/generation/generation.config.yaml --json
 ```
 
 Runs generation using a config file. The config can define provider, model,
@@ -81,15 +81,15 @@ input folder, output folder, base URL, and the environment variable name that
 contains the API key.
 
 ```bash
-open-data-products generate --config open_data_products/generation/generation.config.example.yaml --provider groq --json
-open-data-products generate --config open_data_products/generation/generation.config.example.yaml --provider claude --json
+open-data-products generate --config open_data_products/generation/generation.config.yaml --provider groq --json
+open-data-products generate --config open_data_products/generation/generation.config.yaml --provider claude --json
 ```
 
 Overrides the provider selected by the config. This lets you test the same
 source documents with another configured backend without editing the file.
 
 ```bash
-open-data-products generate --config open_data_products/generation/generation.config.example.yaml --kind signal --json
+open-data-products generate --config open_data_products/generation/generation.config.yaml --kind signal --json
 ```
 
 Generates one artifact type instead of the full set. Supported kinds include

@@ -200,10 +200,10 @@ The LLM generation commands
 ```bash
 # LLM generation
 open-data-products generate --json
-open-data-products generate --config open_data_products/generation/generation.config.example.yaml --json
-open-data-products generate --config open_data_products/generation/generation.config.example.yaml --provider groq --json
-open-data-products generate --config open_data_products/generation/generation.config.example.yaml --provider claude --json
-open-data-products generate --config open_data_products/generation/generation.config.example.yaml --kind signal --json
+open-data-products generate --config open_data_products/generation/generation.config.yaml --json
+open-data-products generate --config open_data_products/generation/generation.config.yaml --provider groq --json
+open-data-products generate --config open_data_products/generation/generation.config.yaml --provider claude --json
+open-data-products generate --config open_data_products/generation/generation.config.yaml --kind signal --json
 ```
 
 ```bash

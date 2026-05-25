@@ -100,7 +100,7 @@ A Groq smoke test can be run with:
 ```bash
 export GROQ_API_KEY="..."
 open-data-products generate \
-  --config open_data_products/generation/generation.config.example.yaml \
+  --config open_data_products/generation/generation.config.yaml \
   --provider groq \
   --kind signal \
   --json
