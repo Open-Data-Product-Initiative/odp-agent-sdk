@@ -16,13 +16,13 @@ pip install "open-data-products[contracts]"
 ## Commands
 
 ```bash
-open-data-products product check-contract product.yaml contract.yaml --json
-open-data-products product resolve-contracts product.yaml --json
-open-data-products product contract-report product.yaml contract.yaml --json
-open-data-products product align-contract product.yaml contract.yaml --json
-open-data-products product contract-schema contract.yaml --json
-open-data-products product export-contract contract.yaml --format jsonschema --json
-open-data-products product audit product.yaml --json
+open-data-products product check-contract examples/product.yaml examples/contract.yaml --json
+open-data-products product resolve-contracts examples/product.yaml --json
+open-data-products product contract-report examples/product.yaml examples/contract.yaml --json
+open-data-products product align-contract examples/product.yaml examples/contract.yaml --json
+open-data-products product contract-schema examples/contract.yaml --json
+open-data-products product export-contract examples/contract.yaml --format jsonschema --json
+open-data-products product audit examples/product.yaml --json
 ```
 
 ## Supported Contract References

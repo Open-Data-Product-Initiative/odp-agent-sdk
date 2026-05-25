@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Iterable, List, Optional, Sequence, Set
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_REPORT_DIR = ROOT / "capability-drift"
+DEFAULT_REPORT_DIR = ROOT / "docs/capability-drift"
 DEFAULT_REPORT_NAME = "sdk-capability-drift.md"
 RUN_TIMESTAMP_RE = re.compile(
     r"^(?:- )?Last drift detection run: `([^`]+)`$", re.MULTILINE

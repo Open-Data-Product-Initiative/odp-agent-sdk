@@ -10,7 +10,7 @@ result is consumed by CI, scripts, MCP clients, or other agents.
 ## Cross-Spec Documents
 
 ```bash
-open-data-products validate product.yaml --json
+open-data-products validate examples/product.yaml --json
 ```
 
 Detects the document family, validates the file against the bundled schema and
@@ -33,7 +33,7 @@ Lists `$ref` and `ref` pointers found in a document. This is useful when an
 agent needs to discover linked artifacts without loading every target body.
 
 ```bash
-open-data-products summary product.yaml
+open-data-products summary examples/product.yaml
 ```
 
 Returns lightweight file metadata such as detected spec, size, and hash. This
@@ -214,14 +214,14 @@ graph.
 ## Product-Level Data Contract Inspection
 
 ```bash
-open-data-products product resolve-contracts product.yaml --json
+open-data-products product resolve-contracts examples/product.yaml --json
 ```
 
 Finds Data Contract references in an ODPS product and resolves local reference
 metadata.
 
 ```bash
-open-data-products product contract-schema contract.yaml --json
+open-data-products product contract-schema examples/contract.yaml --json
 ```
 
 Extracts normalized model and field information from a local Data Contract

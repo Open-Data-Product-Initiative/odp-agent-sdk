@@ -72,7 +72,7 @@ It runs every Monday at 06:00 UTC and can also be started manually with
 2. runs `scripts/check_capability_drift.py`,
 3. validates the generated report,
 4. runs the SDK import and manifest checks,
-5. commits changed files under `capability-drift/`.
+5. commits changed files under `docs/capability-drift/`.
 
 ## Local Commands
 

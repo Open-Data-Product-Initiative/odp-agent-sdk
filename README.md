@@ -44,7 +44,7 @@ from open_data_products import (
     validate_document,
 )
 
-document = load_document("product.yaml")
+document = load_document("examples/product.yaml")
 result = validate_document(document)
 
 print(result.valid, result.spec, result.kind)
@@ -71,11 +71,11 @@ all_artifacts = generate_local_artifacts(
 The top-level CLI exposes the same workflow with machine-readable output:
 
 ```bash
-open-data-products validate product.yaml --json
-open-data-products explain product.yaml --json
+open-data-products validate examples/product.yaml --json
+open-data-products explain examples/product.yaml --json
 open-data-products refs graph.yaml --json
 open-data-products resources --json
-open-data-products summary product.yaml      # lightweight reference: size, hash, spec
+open-data-products summary examples/product.yaml      # lightweight reference: size, hash, spec
 open-data-products manifest --json           # ARWS agent manifest
 open-data-products serve                     # MCP server over stdio
 ```
@@ -97,13 +97,13 @@ from open_data_products import (
     validate_contract,
 )
 
-for reference in resolve_product_contracts("product.yaml"):
+for reference in resolve_product_contracts("examples/product.yaml"):
     print(reference.pointer, reference.href)
 
-print(validate_contract("contract.yaml").passed)
-print(extract_contract_schema("contract.yaml").field_count)
-print(check_product_contract_alignment("product.yaml", "contract.yaml").summary)
-print(generate_product_contract_report("product.yaml").summary)
+print(validate_contract("examples/contract.yaml").passed)
+print(extract_contract_schema("examples/contract.yaml").field_count)
+print(check_product_contract_alignment("examples/product.yaml", "examples/contract.yaml").summary)
+print(generate_product_contract_report("examples/product.yaml").summary)
 ```
 
 ### Agent Surface (MCP + ARWS)
@@ -166,6 +166,7 @@ below for implementation details:
 - [Command guide](docs/commands.md): what each common CLI command does, what it reads, and what it writes.
 - [LLM generation](docs/generation.md): Ollama or configured external LLM source-doc to ODPC fragment and ODPG graph workflow.
 - [Data Contract workflows](docs/data-contracts.md): ODPS contract resolution, optional `datacontract-cli`, alignment, and reports.
+- [Capability drift reports](docs/capability-drift/README.md): dated SDK alignment reports against upstream specification tooling.
 - [Tooling development model](docs/tooling-development-model.md): human-facing explanation of how spec-level scripts mature into consolidated SDK capabilities.
 - [Functional test report](docs/functional-test-report.md): public API, CLI, and MCP functional coverage matrix.
 - [Example scripts](examples/): runnable ODPS examples, including v4.1 strategy and MCP access examples.
@@ -181,10 +182,10 @@ produces.
 
 ```bash
 # Cross-spec validation and summaries
-open-data-products validate product.yaml --json
+open-data-products validate examples/product.yaml --json
 open-data-products explain examples/odpc_catalog.yaml --json
 open-data-products refs open_data_products/odpg/data/graph/graph.yaml --json
-open-data-products summary product.yaml
+open-data-products summary examples/product.yaml
 
 # Bundled agent resources
 open-data-products resources --json
@@ -233,8 +234,8 @@ open-data-products odpg-agent-context open_data_products/odpg/data/graph/graph.y
 open-data-products odpg-generate open_data_products/odpg/data/graph/graph.yaml --output /tmp/odp-graph-explorer.html --json
 
 # Product-level Data Contract inspection
-open-data-products product resolve-contracts product.yaml --json
-open-data-products product contract-schema contract.yaml --json
+open-data-products product resolve-contracts examples/product.yaml --json
+open-data-products product contract-schema examples/contract.yaml --json
 ```
 
 See [Data Contract workflows](docs/data-contracts.md) for product contract

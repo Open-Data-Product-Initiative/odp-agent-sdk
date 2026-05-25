@@ -58,7 +58,7 @@ def test_source_distribution_prunes_repo_automation_files() -> None:
     for expected in (
         "prune .codex",
         "prune .github",
-        "prune capability-drift",
+        "prune docs/capability-drift",
         "prune scripts",
         "prune tests",
     ):

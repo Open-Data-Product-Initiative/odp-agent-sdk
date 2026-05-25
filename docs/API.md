@@ -20,12 +20,12 @@ from open_data_products import (
     validate_document,
 )
 
-document = load_document("product.yaml")
+document = load_document("examples/product.yaml")
 result = validate_document(document)
 summary = explain_document(document)
 references = resolve_references(document)
 resources = list_resources()
-metadata = load_summary("product.yaml")
+metadata = load_summary("examples/product.yaml")
 prompt = load_generation_prompt("odps_data_product_fragment.md")
 signal = generate_local_artifact("signal", "signal.txt", "open_data_products/generation/fragments")
 artifacts = generate_local_artifacts("open_data_products/generation/source_docs", "open_data_products/generation/fragments")
@@ -69,7 +69,7 @@ artifacts = generate_local_artifacts("open_data_products/generation/source_docs"
 ```python
 from open_data_products import Reference, Resource, ValidationResult
 
-result_dict = validate_document("product.yaml").to_dict()
+result_dict = validate_document("examples/product.yaml").to_dict()
 resource_dict = get_resource("odpv.terms").to_dict()
 reference_dicts = [ref.to_dict() for ref in resolve_references("graph.yaml")]
 ```
@@ -82,8 +82,8 @@ helpers for JSON/MCP responses.
 The same cross-spec workflow is available through the unified CLI:
 
 ```bash
-open-data-products validate product.yaml --json
-open-data-products explain product.yaml --json
+open-data-products validate examples/product.yaml --json
+open-data-products explain examples/product.yaml --json
 open-data-products refs graph.yaml --json
 open-data-products resources --json
 # Requires Ollama running locally and `ollama pull qwen2.5` for the default provider.
@@ -91,7 +91,7 @@ open-data-products generate --json
 open-data-products generate --config generation.config.yaml --json
 open-data-products generate --config generation.config.yaml --provider groq --json
 open-data-products generate --config generation.config.yaml --provider claude --json
-open-data-products summary product.yaml
+open-data-products summary examples/product.yaml
 open-data-products manifest --json
 open-data-products serve
 ```
