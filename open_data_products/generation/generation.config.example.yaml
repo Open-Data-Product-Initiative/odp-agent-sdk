@@ -1,5 +1,10 @@
-# Example generation config. Safe to commit: secrets are referenced by
-# environment variable name, never stored here.
+# Example config for `open-data-products generate` in the Open Data Product SDK.
+# Project: https://opendataproducts.org
+#
+# Copy this file to your own `generation.config.yaml` when you want to choose
+# the LLM provider, model, input folder, and output folder from a config file.
+# Safe to commit: secrets are referenced by environment variable name, never
+# stored here.
 #
 # The top-level keys below are generation defaults. `provider` selects the
 # default entry from the `providers` map, while `model`, `input`, and `output`
