@@ -100,6 +100,7 @@ def test_unified_cli_document_workflow(capsys: pytest.CaptureFixture[str]) -> No
     validate_payload = _json_output(capsys)
     assert validate_payload["valid"] is True
     assert validate_payload["spec"] == "odps"
+    assert validate_payload["version"] == "4.1"
 
     assert main(["explain", str(ODPS_PRODUCT), "--json"]) == 0
     explain_payload = _json_output(capsys)
@@ -110,6 +111,23 @@ def test_unified_cli_document_workflow(capsys: pytest.CaptureFixture[str]) -> No
     summary_payload = _json_output(capsys)
     assert summary_payload["spec"] == "odps"
     assert "sha256" in summary_payload
+
+
+def test_unified_cli_validate_human_output_is_step_report(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    assert main(["validate", str(ODPS_PRODUCT)]) == 0
+
+    output = capsys.readouterr().out
+
+    assert f"✓ Loaded ODPS document: {ODPS_PRODUCT}" in output
+    assert "✓ Detected kind: OpenDataProduct" in output
+    assert "✓ Detected version: 4.1" in output
+    assert "✓ Schema validation passed" in output
+    assert "✓ ODPS validation passed" in output
+    assert "Resources are valid" not in output
+    assert "Relationships are valid" not in output
+    assert "Validation successful!" in output
 
 
 def test_unified_cli_resources_and_manifest(capsys: pytest.CaptureFixture[str]) -> None:

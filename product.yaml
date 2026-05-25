@@ -1,0 +1,51 @@
+product:
+  brand: null
+  brandSlogan: null
+  categories: []
+  contentSample: null
+  created: null
+  description: null
+  geography: null
+  homepage: null
+  issues: null
+  keywords: []
+  language: []
+  license:
+    auditTerms: null
+    confidentialityClauses: null
+    damages: null
+    exclusive: false
+    geographicalArea:
+    - US
+    governanceSpecifics: null
+    licenseGrant: null
+    licenseName: null
+    licenseURL: null
+    permanent: true
+    rightToModify: false
+    rightToSublicense: false
+    scopeDetails: null
+    scopeOfUse: commercial
+    terminationConditions: null
+    validFrom: null
+    validUntil: null
+    warranties: null
+  logoURL: null
+  name: Serialization Demo Dataset
+  outputFileFormats: []
+  productID: serial-demo-001
+  productSeries: null
+  productVersion: null
+  recommendedDataProducts: []
+  standards: []
+  status: production
+  tags: []
+  themes: []
+  type: dataset
+  updated: null
+  useCases: []
+  valueProposition: null
+  versionNotes: null
+  visibility: public
+schema: https://opendataproducts.org/v4.0/schema/odps.json
+version: '4.0'

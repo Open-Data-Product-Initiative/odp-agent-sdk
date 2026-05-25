@@ -489,12 +489,8 @@ def main(argv: Optional[List[str]] = None) -> int:
             result = validate_document(args.document)
             if args.json:
                 print(json.dumps(result.to_dict(), indent=2))
-            elif result.valid:
-                print(f"{args.document}: valid {result.spec} {result.kind}")
             else:
-                print(f"{args.document}: invalid {result.spec} {result.kind}")
-                for error in result.errors:
-                    print(f"- {error}")
+                _print_validation_report(args.document, result)
             return 0 if result.valid else 1
 
         if args.command == "explain":
@@ -1066,6 +1062,38 @@ def main(argv: Optional[List[str]] = None) -> int:
         return 1
 
     return 1
+
+
+def _print_validation_report(document: str, result: "ValidationResult") -> None:
+    spec_label = result.spec.upper() if result.spec else "Document"
+    print(f"✓ Loaded {spec_label} document: {document}")
+    print(f"✓ Detected kind: {result.kind}")
+    if result.version:
+        print(f"✓ Detected version: {result.version}")
+    if result.valid:
+        print("✓ Schema validation passed")
+        print(f"✓ {spec_label} validation passed")
+        if result.warnings:
+            print()
+            for warning in result.warnings:
+                print(f"! {warning}")
+        if result.hints:
+            print()
+            for hint in result.hints:
+                print(f"i {hint}")
+        print()
+        print("Validation successful!")
+        return
+
+    print("✗ Schema validation failed")
+    print()
+    print("Validation failed.")
+    for error in result.errors:
+        print(f"✗ {error}")
+    for warning in result.warnings:
+        print(f"! {warning}")
+    for hint in result.hints:
+        print(f"i {hint}")
 
 
 def _contract_check_summary(product_valid: bool, contract_valid: bool) -> str:

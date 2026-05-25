@@ -64,17 +64,32 @@ def validate_document(
     """Validate an Open Data Products document using the matching spec helper."""
     loaded, source_path = _prepare_document(document, path)
     spec, kind = detect_document(loaded)
+    version = _document_version(loaded)
 
     if spec == "odps":
         raw_errors = _validate_raw_odps_document(document)
         if raw_errors:
-            return ValidationResult(False, spec, kind, raw_errors, path=source_path)
+            return ValidationResult(
+                False,
+                spec,
+                kind,
+                raw_errors,
+                path=source_path,
+                version=version,
+            )
         try:
             assert isinstance(loaded, OpenDataProduct)
             loaded.validate()
-            return ValidationResult(True, spec, kind, path=source_path)
+            return ValidationResult(True, spec, kind, path=source_path, version=version)
         except ODPSValidationError as exc:
-            return ValidationResult(False, spec, kind, [str(exc)], path=source_path)
+            return ValidationResult(
+                False,
+                spec,
+                kind,
+                [str(exc)],
+                path=source_path,
+                version=version,
+            )
 
     if spec == "odpc":
         assert isinstance(loaded, dict)
@@ -85,6 +100,7 @@ def validate_document(
             kind=kind,
             errors=catalog_result.errors,
             path=source_path,
+            version=version,
         )
 
     if spec == "odpg":
@@ -98,6 +114,7 @@ def validate_document(
             warnings=graph_result.warnings,
             hints=graph_result.hints,
             path=source_path,
+            version=version,
         )
 
     if spec == "odpv":
@@ -109,6 +126,7 @@ def validate_document(
             kind=kind,
             errors=vocabulary_result.errors,
             path=source_path,
+            version=version,
         )
 
     return ValidationResult(
@@ -117,6 +135,7 @@ def validate_document(
         kind,
         [f"Validation is not available for detected spec: {spec}"],
         path=source_path,
+        version=version,
     )
 
 
@@ -141,6 +160,16 @@ def explain_document(
         assert isinstance(loaded, dict)
         return explain_vocabulary(loaded, path=source_path)
     return f"Open Data Products document detected as {spec}.\n"
+
+
+def _document_version(document: Document) -> Optional[str]:
+    """Return the declared spec version when available."""
+    if isinstance(document, OpenDataProduct):
+        return str(document.version) if document.version is not None else None
+    if isinstance(document, dict):
+        version = document.get("version")
+        return str(version) if version is not None else None
+    return None
 
 
 def explain_product(

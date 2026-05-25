@@ -137,6 +137,10 @@ Use `open_data_products.<spec>` namespaces for every standard:
 | Data Contracts | Resolve ODPS contract references, validate external contracts through optional `datacontract-cli`, extract schemas, check static alignment, and generate product-level reports |
 | Bundled resources | Discover schemas, examples, vocabulary records, catalog object records, and graph object records through the resource registry |
 
+ODPS support is scoped to the 4.x generation of the specification. The SDK
+primarily targets ODPS v4.1 and keeps backward-compatible support for ODPS v4.0
+documents.
+
 ODPS field validation includes ISO language, country, currency, date/time,
 phone, email, and URI formats where those standards apply.
 

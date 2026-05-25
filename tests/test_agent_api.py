@@ -51,6 +51,7 @@ def test_unified_load_validate_and_explain_odps(tmp_path):
     assert result.valid is True
     assert result.spec == "odps"
     assert result.kind == "OpenDataProduct"
+    assert result.version == "4.1"
     assert "Agent Ready Product" in summary
 
 
@@ -74,6 +75,7 @@ def test_unified_validate_and_explain_odpc():
     assert result.valid is True
     assert result.spec == "odpc"
     assert result.kind == "Catalog"
+    assert result.version == "1.0"
     assert "Catalog id: CAT-001" in summary
 
 

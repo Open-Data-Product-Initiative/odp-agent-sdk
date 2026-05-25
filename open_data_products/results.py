@@ -17,6 +17,7 @@ class ValidationResult:
     warnings: List[str] = field(default_factory=list)
     hints: List[str] = field(default_factory=list)
     path: Optional[str] = None
+    version: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         """Return a JSON-serializable representation."""
