@@ -67,7 +67,7 @@ def test_unified_cli_help_uses_compact_command_metavar(
         in help_text
     )
     assert (
-        "open-data-products generate open_data_products/generation/source_docs/ --output open_data_products/generation/fragments/ --json"
+        "open-data-products generate --input source_docs/ --output fragments/ --json"
         in help_text
     )
     assert "validate" in help_text
@@ -163,6 +163,7 @@ def test_unified_cli_local_generation(
         main(
             [
                 "generate",
+                "--input",
                 str(GENERATION_SOURCE_DOCS),
                 "--output",
                 str(tmp_path),
@@ -176,6 +177,8 @@ def test_unified_cli_local_generation(
     payload = _json_output(capsys)
 
     assert payload["kind"] == "LocalGeneration"
+    assert payload["source"] == str(GENERATION_SOURCE_DOCS)
+    assert payload["output"] == str(tmp_path)
     assert payload["model"] == "qwen2.5"
     assert payload["valid_yaml"] is True
     assert payload["artifact_count"] == 1
@@ -233,6 +236,71 @@ def test_unified_cli_local_generation_can_select_one_kind(
     assert payload["artifact_kind"] == "use-case"
     assert payload["artifact_count"] == 1
     assert payload["artifacts"][0]["name"] == "odpc_use_cases"
+
+
+def test_unified_cli_local_generation_uses_default_paths(
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from open_data_products import generation
+    from open_data_products.cli import DEFAULT_GENERATION_INPUT, DEFAULT_GENERATION_OUTPUT
+
+    observed = {}
+
+    def fake_generate_local_artifacts(
+        source_dir: Union[str, Path],
+        output_dir: Union[str, Path],
+        model: str = "qwen2.5",
+        ollama_url: str = "http://localhost:11434",
+        client: Optional[object] = None,
+    ) -> List[generation.GeneratedArtifact]:
+        observed["source"] = source_dir
+        observed["output"] = output_dir
+        return [
+            generation.GeneratedArtifact(
+                name="odpg_graph",
+                prompt_name="odpg_graph_yaml.md",
+                output_path=Path(output_dir) / "odpg_graph.yaml",
+                valid_yaml=True,
+            )
+        ]
+
+    monkeypatch.setattr(
+        generation,
+        "generate_local_artifacts",
+        fake_generate_local_artifacts,
+    )
+
+    assert main(["generate", "--json"]) == 0
+    payload = _json_output(capsys)
+
+    assert observed == {
+        "source": DEFAULT_GENERATION_INPUT,
+        "output": DEFAULT_GENERATION_OUTPUT,
+    }
+    assert payload["source"] == DEFAULT_GENERATION_INPUT
+    assert payload["output"] == DEFAULT_GENERATION_OUTPUT
+
+
+def test_unified_cli_local_generation_rejects_positional_and_input(
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+) -> None:
+    assert (
+        main(
+            [
+                "generate",
+                str(GENERATION_SOURCE_DOCS),
+                "--input",
+                str(GENERATION_SOURCE_DOCS),
+                "--output",
+                str(tmp_path),
+            ]
+        )
+        == 2
+    )
+
+    assert "either positional source_dir or --input" in capsys.readouterr().err
 
 
 def test_unified_cli_generation_requires_qwen_model(

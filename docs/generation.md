@@ -48,7 +48,8 @@ prefer names like `*-product.md`, `*-signal.txt`, `*-use-case.md`, and
 Use `--kind` when one source file should produce one selected artifact type:
 
 ```bash
-open-data-products generate open_data_products/generation/source_docs/turnaround-delay-signal.txt \
+open-data-products generate \
+  --input open_data_products/generation/source_docs/turnaround-delay-signal.txt \
   --kind signal \
   --output open_data_products/generation/fragments/ \
   --model qwen2.5 \
@@ -69,10 +70,19 @@ the source filename.
 
 ## Generate The Full Set
 
-Run without `--kind` to generate all supported artifacts from a source folder:
+Run without `--kind` to generate all supported artifacts from a source folder.
+The default input is `open_data_products/generation/source_docs/` and the
+default output is `open_data_products/generation/fragments/`, so this works:
 
 ```bash
-open-data-products generate open_data_products/generation/source_docs/ \
+open-data-products generate --json
+```
+
+You can also set the folders explicitly:
+
+```bash
+open-data-products generate \
+  --input open_data_products/generation/source_docs/ \
   --output open_data_products/generation/fragments/ \
   --model qwen2.5 \
   --json

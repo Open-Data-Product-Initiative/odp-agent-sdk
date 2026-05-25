@@ -187,14 +187,15 @@ open-data-products resources --id odpv.terms --json
 open-data-products resources --id odpg.objects --json
 
 # Local LLM generation
-open-data-products generate open_data_products/generation/source_docs/ \
-  --output open_data_products/generation/fragments/ \
-  --model qwen2.5 \
-  --json
+open-data-products generate --json
+open-data-products generate --input source_docs/ --output fragments/ --json
+open-data-products generate --input signal.txt --kind signal --output fragments/ --json
+open-data-products validate fragments/odpg_graph.yaml --json
+open-data-products odpg-generate fragments/odpg_graph.yaml --output fragments/graph_explorer.html --json
 
 # ODPC catalog helpers
-open-data-products odpc-build open_data_products/generation/fragments/ --output catalog.yaml --json
-open-data-products odpc-build open_data_products/generation/fragments/ --output catalog.yaml --html catalog.html --json
+open-data-products odpc-build fragments/ --output catalog.yaml --json
+open-data-products odpc-build fragments/ --output catalog.yaml --html catalog.html --json
 open-data-products odpc-summary catalog.yaml --json
 open-data-products odpc-search "catalog data" --limit 3 --json
 

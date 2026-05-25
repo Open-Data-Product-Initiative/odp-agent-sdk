@@ -17,6 +17,9 @@ from .agent import (
 from .resources import get_resource, list_resources
 from .summary import load_summary
 
+DEFAULT_GENERATION_INPUT = "open_data_products/generation/source_docs/"
+DEFAULT_GENERATION_OUTPUT = "open_data_products/generation/fragments/"
+
 if TYPE_CHECKING:
     from .contracts import ProductContractReport
 
@@ -84,8 +87,9 @@ Examples:
   open-data-products resources --id odpc.objects --json
   open-data-products resources --id odpv.terms --json
   open-data-products resources --json
-  open-data-products generate open_data_products/generation/source_docs/ --output open_data_products/generation/fragments/ --json
-  open-data-products generate use-case.md --kind use-case --output open_data_products/generation/fragments/ --json
+  open-data-products generate --json
+  open-data-products generate --input source_docs/ --output fragments/ --json
+  open-data-products generate --input use-case.md --kind use-case --output fragments/ --json
   open-data-products odpg-agent-context graph.yaml --node DATA-PRODUCT-001
   open-data-products odpg-generate graph.yaml --output graph-explorer.html --json
   open-data-products product contract-report product.yaml contract.yaml --json
@@ -152,7 +156,17 @@ def main(argv: Optional[List[str]] = None) -> int:
     )
     generate_parser.add_argument(
         "source_dir",
+        nargs="?",
         help="Markdown/text source file or folder",
+    )
+    generate_parser.add_argument(
+        "--input",
+        "-i",
+        dest="input_dir",
+        help=(
+            "Markdown/text source file or folder. Defaults to "
+            f"{DEFAULT_GENERATION_INPUT}."
+        ),
     )
     generate_parser.add_argument(
         "--kind",
@@ -170,8 +184,11 @@ def main(argv: Optional[List[str]] = None) -> int:
     generate_parser.add_argument(
         "--output",
         "-o",
-        required=True,
-        help="Output folder for generated YAML artifacts",
+        default=DEFAULT_GENERATION_OUTPUT,
+        help=(
+            "Output folder for generated YAML artifacts. Defaults to "
+            f"{DEFAULT_GENERATION_OUTPUT}."
+        ),
     )
     generate_parser.add_argument(
         "--model",
@@ -520,9 +537,18 @@ def main(argv: Optional[List[str]] = None) -> int:
         if args.command == "generate":
             from . import generation
 
+            if args.source_dir and args.input_dir:
+                print(
+                    "Provide the generation input as either positional source_dir "
+                    "or --input, not both.",
+                    file=sys.stderr,
+                )
+                return 2
+            generation_input = args.input_dir or args.source_dir or DEFAULT_GENERATION_INPUT
+
             if args.kind == "all":
                 artifacts = generation.generate_local_artifacts(
-                    args.source_dir,
+                    generation_input,
                     args.output,
                     model=args.model,
                     ollama_url=args.ollama_url,
@@ -531,7 +557,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                 artifacts = [
                     generation.generate_local_artifact(
                         args.kind,
-                        args.source_dir,
+                        generation_input,
                         args.output,
                         model=args.model,
                         ollama_url=args.ollama_url,
@@ -541,7 +567,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             payload = {
                 "spec": "generation",
                 "kind": "LocalGeneration",
-                "source": args.source_dir,
+                "source": generation_input,
                 "artifact_kind": args.kind,
                 "output": args.output,
                 "model": args.model,
