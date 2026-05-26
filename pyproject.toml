@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "open-data-products"
 dynamic = ["version"]
-description = "Python SDK for the OpenDataProducts.org standards family, including ODPS, ODPC, ODPG, and ODPV support"
+description = "Python SDK and AI agent toolkit for the OpenDataProducts.org standards family, supporting ODPS, ODPC, ODPG, ODPV, MCP, CLI workflows, and LLM-assisted generation"
 readme = "README.md"
 license = {text = "Apache-2.0"}
 authors = [
