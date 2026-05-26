@@ -11,58 +11,62 @@ on:
 
 permissions:
   contents: read
-  id-token: write
 
 jobs:
   publish:
     runs-on: ubuntu-latest
-    environment: pypi
+    environment:
+      name: pypi
+      url: https://pypi.org/p/open-data-products
+    permissions:
+      contents: read
+      id-token: write
 
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: "3.x"
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
 
-    - name: Install packaging tools
-      run: python -m pip install --upgrade build twine
+      - name: Install packaging tools
+        run: python -m pip install --upgrade build twine
 
-    - name: Verify package version matches release
-      env:
-        DISPATCH_VERSION: ${{ github.event.inputs.version }}
-        RELEASE_TAG: ${{ github.event.release.tag_name }}
-      run: |
-        EXPECTED_VERSION="${DISPATCH_VERSION:-${RELEASE_TAG#v}}"
-        PACKAGE_VERSION="$(
-          python - <<'PY'
-        import re
-        from pathlib import Path
+      - name: Verify package version matches release
+        env:
+          DISPATCH_VERSION: ${{ github.event.inputs.version }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          EXPECTED_VERSION="${DISPATCH_VERSION:-${RELEASE_TAG#v}}"
+          PACKAGE_VERSION="$(
+            python - <<'PY'
+          import re
+          from pathlib import Path
 
-        source = Path("open_data_products/__init__.py").read_text(encoding="utf-8")
-        match = re.search(r'^__version__ = ["\']([^"\']+)["\']', source, re.MULTILINE)
-        if not match:
-            raise SystemExit("Could not find open_data_products.__version__")
-        print(match.group(1))
-        PY
-        )"
-        if [ "$PACKAGE_VERSION" != "$EXPECTED_VERSION" ]; then
-          echo "Package version $PACKAGE_VERSION does not match expected $EXPECTED_VERSION"
-          exit 1
-        fi
+          source = Path("open_data_products/__init__.py").read_text(encoding="utf-8")
+          match = re.search(r'^__version__ = ["\']([^"\']+)["\']', source, re.MULTILINE)
+          if not match:
+              raise SystemExit("Could not find open_data_products.__version__")
+          print(match.group(1))
+          PY
+          )"
+          if [ "$PACKAGE_VERSION" != "$EXPECTED_VERSION" ]; then
+            echo "Package version $PACKAGE_VERSION does not match expected $EXPECTED_VERSION"
+            exit 1
+          fi
 
-    - name: Build distribution
-      run: python -m build --quiet
+      - name: Build distribution
+        run: python -m build --quiet
 
-    - name: Check distribution metadata
-      run: python -m twine check dist/*
+      - name: Check distribution metadata
+        run: python -m twine check dist/*
 
-    - name: Upload distribution artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: dist
-        path: dist/*
+      - name: Upload distribution artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/*
 
-    - name: Publish distribution to PyPI
-      uses: pypa/gh-action-pypi-publish@release/v1
+      - name: Publish distribution to PyPI
+        uses: pypa/gh-action-pypi-publish@v1.13.0
