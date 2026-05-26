@@ -17,7 +17,7 @@ def test_testpypi_workflow_uses_manual_trusted_publishing() -> None:
         "name: Publish to TestPyPI",
         "workflow_dispatch:",
         "id-token: write",
-        "python -m build",
+        "python -m build --quiet",
         "actions/upload-artifact@v4",
         "pypa/gh-action-pypi-publish@release/v1",
         "repository-url: https://test.pypi.org/legacy/",
@@ -34,7 +34,7 @@ def test_pypi_workflow_uses_release_trusted_publishing_with_version_guard() -> N
         "release:",
         "types: [published]",
         "id-token: write",
-        "python -m build",
+        "python -m build --quiet",
         "actions/upload-artifact@v4",
         "pypa/gh-action-pypi-publish@release/v1",
         "Verify package version matches release",
@@ -52,14 +52,20 @@ def test_package_metadata_includes_mcp_package() -> None:
     assert '"open_data_products.mcp",' in content
 
 
-def test_source_distribution_prunes_repo_automation_files() -> None:
+def test_source_distribution_uses_positive_artifact_includes() -> None:
     content = MANIFEST.read_text(encoding="utf-8")
 
     for expected in (
-        "prune .codex",
-        "prune .github",
-        "prune docs/capability-drift",
-        "prune scripts",
-        "prune tests",
+        "include README.md",
+        "include pyproject.toml",
+        "include llms.txt",
+        "include docs/*.md",
+        "recursive-include examples *.py *.json *.yaml *.html *.md",
+        "recursive-include images *.png",
+        "recursive-include skills */SKILL.md",
+        "recursive-exclude tests *",
     ):
         assert expected in content
+
+    for excluded in ("prune .github", "prune scripts", "prune tests"):
+        assert excluded not in content

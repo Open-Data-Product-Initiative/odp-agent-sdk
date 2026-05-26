@@ -1,0 +1,1 @@
+"""Bundled generation prompt data."""

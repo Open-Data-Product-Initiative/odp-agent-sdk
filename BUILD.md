@@ -8,8 +8,8 @@ This guide explains how to package the Open Data Products Python SDK as a wheel 
 # Install build tools
 pip install build
 
-# Build the package
-python -m build
+# Build the package with minimal output
+python -m build --quiet
 
 # Install locally for testing
 pip install dist/open_data_products-0.2.0-py3-none-any.whl
@@ -33,8 +33,8 @@ The modern way using `pyproject.toml`:
 # Install build dependencies
 pip install build
 
-# Build the package (creates both wheel and source distribution)
-python -m build
+# Build the package with minimal output (creates both wheel and source distribution)
+python -m build --quiet
 
 # This creates files in dist/:
 # - open_data_products-0.2.0-py3-none-any.whl (wheel file)
@@ -153,7 +153,7 @@ odps_python-0.2.0-py3-none-any.whl
    ```bash
    # Clean previous builds
    rm -rf build/ dist/ *.egg-info/
-   python -m build
+   python -m build --quiet
    ```
 
 3. **Missing files in wheel**:
@@ -201,7 +201,7 @@ jobs:
         pip install build twine
         pip install -e ".[dev]"
     - name: Build package
-      run: python -m build
+      run: python -m build --quiet
     - name: Check package
       run: python -m twine check dist/*
 ```

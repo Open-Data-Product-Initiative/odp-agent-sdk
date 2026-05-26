@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=45", "wheel", "setuptools-scm"]
+requires = ["setuptools>=77", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -7,7 +7,7 @@ name = "open-data-products"
 dynamic = ["version"]
 description = "Python SDK and AI agent toolkit for the OpenDataProducts.org standards family, supporting ODPS, ODPC, ODPG, ODPV, MCP, CLI workflows, and LLM-assisted generation"
 readme = "README.md"
-license = {text = "Apache-2.0"}
+license = "Apache-2.0"
 authors = [
     {name = "Jarkko Moilanen", email = "jarkko@vimo.fi"}
 ]
@@ -19,11 +19,19 @@ keywords = [
     "odpv",
     "odpc",
     "odpg",
+    "data-contracts",
     "specification",
     "validation",
     "vocabulary",
     "catalog",
     "graph",
+    "mcp",
+    "model-context-protocol",
+    "llm",
+    "ai-agent",
+    "cli",
+    "yaml",
+    "json-schema",
     "iso-standards",
     "rfc",
     "type-safety",
@@ -32,7 +40,6 @@ classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "Intended Audience :: Information Technology",
-    "License :: OSI Approved :: Apache Software License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.8",
@@ -40,6 +47,8 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Topic :: Internet :: WWW/HTTP",
     "Topic :: Scientific/Engineering :: Information Analysis",
@@ -53,18 +62,20 @@ dependencies = [
 ]
 
 [project.scripts]
-# Unified CLI. Subcommands: validate, explain, refs, resources, summary,
-# manifest, serve. The MCP server runs via `open-data-products serve`.
+# Unified CLI. Subcommands include validate, explain, refs, resources, summary,
+# generate, ODPC/ODPG/ODPV helpers, product workflows, manifest, and serve.
+# The MCP server runs via `open-data-products serve`.
 open-data-products = "open_data_products.cli:main"
-# Retained: emits a standalone HTML graph explorer; not yet a subcommand.
+# Backward-compatible graph explorer entry point. Prefer the unified
+# `open-data-products odpg-generate` subcommand for new workflows.
 open-data-products-odpg-generate = "open_data_products.odpg.cli:generate_main"
 
 [project.optional-dependencies]
 contracts = [
-    "datacontract-cli>=0.12.3",
+    "datacontract-cli>=0.12.3; python_version < '3.13'",
 ]
 contracts-all = [
-    "datacontract-cli[all]>=0.12.3",
+    "datacontract-cli[all]>=0.12.3; python_version < '3.13'",
 ]
 dev = [
     "pytest>=6.0",
@@ -89,6 +100,10 @@ packages = [
     "open_data_products",
     "open_data_products.contracts",
     "open_data_products.generation",
+    "open_data_products.generation.data",
+    "open_data_products.generation.data.prompts",
+    "open_data_products.generation.fragments",
+    "open_data_products.generation.source_docs",
     "open_data_products.mcp",
     "open_data_products.odpc",
     "open_data_products.odpc.data",
@@ -109,7 +124,7 @@ packages = [
 
 [tool.setuptools.package-data]
 "open_data_products.generation" = [
-    "generation.config*.yaml",
+    "generation.config.yaml",
     "data/prompts/*.md",
     "fragments/*.html",
     "fragments/*.yaml",

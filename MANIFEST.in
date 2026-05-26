@@ -1,7 +1,18 @@
-prune .codex
-prune .github
-prune .worktrees
-prune docs/capability-drift
-prune scripts
-prune tests
-global-exclude __pycache__ *.py[cod] .DS_Store
+include LICENSE
+include README.md
+include pyproject.toml
+include requirements.txt
+include BUILD.md
+include CONTRIBUTING.md
+include AGENTS.md
+include llms.txt
+include .mcp.json
+include .flake8
+include .gitignore
+
+include docs/*.md
+recursive-include examples *.py *.json *.yaml *.html *.md
+recursive-include images *.png
+recursive-include skills */SKILL.md
+
+recursive-exclude tests *
