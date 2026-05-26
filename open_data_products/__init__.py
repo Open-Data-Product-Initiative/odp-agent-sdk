@@ -9,6 +9,8 @@ family. Each standard lives in its own namespace:
 - :mod:`open_data_products.odpv`
 """
 
+# flake8: noqa: E402
+
 __version__ = "0.1.0"
 version = __version__
 

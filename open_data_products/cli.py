@@ -22,6 +22,7 @@ DEFAULT_GENERATION_OUTPUT = "open_data_products/generation/fragments/"
 
 if TYPE_CHECKING:
     from .contracts import ProductContractReport
+    from .results import ValidationResult
 
 
 TOP_LEVEL_HELP = """\
@@ -517,23 +518,23 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     try:
         if args.command == "validate":
-            result = validate_document(args.document)
+            document_result = validate_document(args.document)
             if args.json:
-                print(json.dumps(result.to_dict(), indent=2))
+                print(json.dumps(document_result.to_dict(), indent=2))
             else:
-                _print_validation_report(args.document, result)
-            return 0 if result.valid else 1
+                _print_validation_report(args.document, document_result)
+            return 0 if document_result.valid else 1
 
         if args.command == "explain":
             document = load_document(args.document)
             summary = explain_document(document, path=Path(args.document))
             if args.json:
-                result = validate_document(document, path=args.document)
+                explanation_result = validate_document(document, path=args.document)
                 print(
                     json.dumps(
                         {
-                            "spec": result.spec,
-                            "kind": result.kind,
+                            "spec": explanation_result.spec,
+                            "kind": explanation_result.kind,
                             "path": args.document,
                             "summary": summary,
                         },
@@ -648,7 +649,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             from .odpc import load_catalog, validate_catalog
 
             document = load_catalog(args.catalog)
-            result = validate_catalog(document)
+            catalog_result = validate_catalog(document)
             catalog = document.get("catalog", {})
             metadata = catalog.get("metadata", {}) if isinstance(catalog, dict) else {}
             name = metadata.get("name")
@@ -659,8 +660,8 @@ def main(argv: Optional[List[str]] = None) -> int:
                 "spec": "odpc",
                 "kind": "Catalog",
                 "path": args.catalog,
-                "valid": result.valid,
-                "errors": result.errors,
+                "valid": catalog_result.valid,
+                "errors": catalog_result.errors,
                 "catalogId": metadata.get("id", "(missing)"),
                 "catalogName": catalog_name or "(unnamed)",
                 "productReferenceCount": count_items(catalog, "productReferences"),
@@ -675,7 +676,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                 print(json.dumps(payload, indent=2))
             else:
                 print(explain_catalog(document, path=Path(args.catalog)), end="")
-            return 0 if result.valid else 1
+            return 0 if catalog_result.valid else 1
 
         if args.command == "odpc-build":
             from .odpc import (
@@ -696,8 +697,8 @@ def main(argv: Optional[List[str]] = None) -> int:
                 name=args.name,
                 description=args.description,
             )
-            result = validate_catalog(document) if not args.no_validate else None
-            if result is not None and not result.valid:
+            build_result = validate_catalog(document) if not args.no_validate else None
+            if build_result is not None and not build_result.valid:
                 if args.json:
                     print(
                         json.dumps(
@@ -706,14 +707,14 @@ def main(argv: Optional[List[str]] = None) -> int:
                                 "kind": "Catalog",
                                 "output": str(output),
                                 "valid": False,
-                                "errors": result.errors,
+                                "errors": build_result.errors,
                             },
                             indent=2,
                         )
                     )
                 else:
                     print("Generated catalog is invalid:", file=sys.stderr)
-                    for error in result.errors:
+                    for error in build_result.errors:
                         print(f"- {error}", file=sys.stderr)
                 return 1
 
@@ -726,7 +727,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                 "kind": "Catalog",
                 "output": str(output),
                 "html": str(html_output) if html_output else None,
-                "valid": True if result is not None else None,
+                "valid": True if build_result is not None else None,
                 "productReferenceCount": count_items(catalog, "productReferences"),
                 "useCaseCount": count_items(catalog, "useCases"),
                 "businessObjectiveCount": count_items(catalog, "businessObjectives"),
@@ -794,8 +795,8 @@ def main(argv: Optional[List[str]] = None) -> int:
             from .odpv import load_vocabulary, validate_vocabulary
 
             vocabulary = load_vocabulary(args.vocabulary) if args.vocabulary else None
-            result = validate_vocabulary(vocabulary)
-            payload = result.to_dict()
+            vocabulary_result = validate_vocabulary(vocabulary)
+            payload = vocabulary_result.to_dict()
             if args.vocabulary:
                 payload["path"] = args.vocabulary
             if args.json:
@@ -803,13 +804,13 @@ def main(argv: Optional[List[str]] = None) -> int:
             else:
                 print(
                     "ODPV Vocabulary: "
-                    f"{result.term_count} terms, "
-                    f"{result.relationship_count} relationships, "
-                    f"{result.section_count} sections"
+                    f"{vocabulary_result.term_count} terms, "
+                    f"{vocabulary_result.relationship_count} relationships, "
+                    f"{vocabulary_result.section_count} sections"
                 )
-                for error in result.errors:
+                for error in vocabulary_result.errors:
                     print(f"- {error}")
-            return 0 if result.valid else 1
+            return 0 if vocabulary_result.valid else 1
 
         if args.command == "odpv-search":
             from .odpv import render_search_results, search_vocabulary
@@ -889,9 +890,9 @@ def main(argv: Optional[List[str]] = None) -> int:
             from .odpg import load_graph, traverse_graph, validate_graph
 
             graph = load_graph(args.graph)
-            result = validate_graph(graph)
-            if not result.valid:
-                print(json.dumps(result.to_dict(), indent=2))
+            graph_result = validate_graph(graph)
+            if not graph_result.valid:
+                print(json.dumps(graph_result.to_dict(), indent=2))
                 return 1
             paths = traverse_graph(
                 graph,
@@ -907,13 +908,13 @@ def main(argv: Optional[List[str]] = None) -> int:
             from .odpg import analyze_graph, load_graph, validate_graph
 
             graph = load_graph(args.graph)
-            result = validate_graph(graph)
-            if not result.valid:
-                print(json.dumps(result.to_dict(), indent=2))
+            graph_result = validate_graph(graph)
+            if not graph_result.valid:
+                print(json.dumps(graph_result.to_dict(), indent=2))
                 return 1
             print(
                 json.dumps(
-                    {"warnings": result.warnings, "analysis": analyze_graph(graph)},
+                    {"warnings": graph_result.warnings, "analysis": analyze_graph(graph)},
                     indent=2,
                 )
             )
@@ -923,12 +924,12 @@ def main(argv: Optional[List[str]] = None) -> int:
             from .odpg import agent_context, load_graph, validate_graph
 
             graph = load_graph(args.graph)
-            result = validate_graph(graph)
-            if not result.valid:
-                print(json.dumps(result.to_dict(), indent=2))
+            graph_result = validate_graph(graph)
+            if not graph_result.valid:
+                print(json.dumps(graph_result.to_dict(), indent=2))
                 return 1
             payload = agent_context(graph, args.node, args.depth)
-            payload["warnings"] = result.warnings
+            payload["warnings"] = graph_result.warnings
             print(json.dumps(payload, indent=2))
             return 0
 

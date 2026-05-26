@@ -108,7 +108,7 @@ def iter_catalog_input_files(
     """Return YAML and JSON catalog fragment files under ``input_dir``."""
     root = Path(input_dir)
     patterns = ("*.yaml", "*.yml", "*.json")
-    paths = []
+    paths: List[Path] = []
     for pattern in patterns:
         paths.extend(root.rglob(pattern) if recursive else root.glob(pattern))
     return sorted(path for path in paths if path.is_file())
@@ -273,7 +273,9 @@ def build_catalog(
     """Build one ODPC catalog from catalog fragments in a folder."""
     root = Path(input_dir)
     output = Path(output_path).resolve() if output_path is not None else None
-    catalog = {collection: [] for collection in CATALOG_COLLECTIONS}
+    catalog: Dict[str, List[Any]] = {
+        collection: [] for collection in CATALOG_COLLECTIONS
+    }
     metadata_candidates: List[Dict[str, Any]] = []
     embedded_metadata_candidates: List[Dict[str, Any]] = []
 

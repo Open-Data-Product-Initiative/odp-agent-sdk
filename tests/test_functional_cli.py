@@ -615,7 +615,7 @@ def test_unified_cli_odpg_reasoning_commands(
     )
     assert _json_output(capsys)["focusNode"]["id"] == "AGENT-AVIATION-001"
 
-    output = tmp_path / "graph-explorer.html"
+    output = tmp_path / "output" / "graph-explorer.html"
     assert (
         main(
             [

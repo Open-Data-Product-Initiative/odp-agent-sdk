@@ -75,6 +75,15 @@ def test_generate_graph_explorer_writes_html(tmp_path):
     assert 'id="filter-confidence"' in html
 
 
+def test_generate_graph_explorer_creates_output_parent_directory(tmp_path):
+    output = tmp_path / "output" / "graph-explorer.html"
+
+    generate_graph_explorer(output_file=output)
+
+    assert output.exists()
+    assert "ODPG Graph Explorer" in output.read_text(encoding="utf-8")
+
+
 def test_build_graph_explorer_html_returns_document():
     html = build_graph_explorer_html(load_graph())
 

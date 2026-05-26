@@ -579,7 +579,7 @@ def generate_local_artifacts(
         lambda prompt, model_name: ollama_generate(prompt, model_name, ollama_url)
     )
 
-    artifacts = []
+    artifacts: List[GeneratedArtifact] = []
     for task in GENERATION_TASKS:
         prompt_context = (
             _generated_artifact_context(artifacts)
@@ -890,15 +890,19 @@ def _normalize_signal_fragments(document: dict) -> None:
         if isinstance(english_name, str):
             signal["id"] = _slugify_identifier(english_name)
 
-        for field in ("strength", "confidence"):
-            if field in signal:
-                signal[field] = _normalize_signal_enum(signal.get(field))
+        for signal_field in ("strength", "confidence"):
+            if signal_field in signal:
+                signal[signal_field] = _normalize_signal_enum(
+                    signal.get(signal_field)
+                )
 
         impact = signal.get("impact")
         if isinstance(impact, dict):
-            for field in ("valuePotential", "urgency"):
-                if field in impact:
-                    impact[field] = _normalize_signal_enum(impact.get(field))
+            for impact_field in ("valuePotential", "urgency"):
+                if impact_field in impact:
+                    impact[impact_field] = _normalize_signal_enum(
+                        impact.get(impact_field)
+                    )
 
 
 def _normalize_signal_enum(value: object) -> object:

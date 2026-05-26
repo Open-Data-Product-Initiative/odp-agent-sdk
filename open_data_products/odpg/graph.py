@@ -700,6 +700,7 @@ def generate_graph_explorer(
 
     html_out = build_graph_explorer_html(graph)
     output_path = Path(output_file)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(html_out, encoding="utf-8")
 
     return output_path
