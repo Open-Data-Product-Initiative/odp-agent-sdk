@@ -119,7 +119,8 @@ def test_build_artifacts_returns_package_artifact_contents():
 
 
 def test_write_artifacts_can_check_and_generate_to_target_directory(tmp_path):
-    changed = write_artifacts(tmp_path, check=True)
+    output_dir = tmp_path / "deep" / "artifacts"
+    changed = write_artifacts(output_dir, check=True)
 
     assert sorted(changed) == [
         Path("core.yaml"),
@@ -130,7 +131,7 @@ def test_write_artifacts_can_check_and_generate_to_target_directory(tmp_path):
         Path("value.yaml"),
     ]
 
-    written = write_artifacts(tmp_path)
+    written = write_artifacts(output_dir)
     assert written == changed
 
-    assert write_artifacts(tmp_path, check=True) == []
+    assert write_artifacts(output_dir, check=True) == []

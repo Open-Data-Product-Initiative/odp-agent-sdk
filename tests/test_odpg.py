@@ -217,7 +217,7 @@ def test_convert_jsonld_to_valid_odpg_graph():
 
 def test_convert_graphson_file_writes_yaml(tmp_path):
     source = tmp_path / "graph.graphson"
-    output = tmp_path / "graph.yaml"
+    output = tmp_path / "deep" / "converted" / "graph.yaml"
     source.write_text(
         """
 {
@@ -274,7 +274,7 @@ CREATE (u)-[:uses]->(p)
 
 def test_convert_cli_entry_point(tmp_path):
     source = tmp_path / "graph.ttl"
-    output = tmp_path / "graph.yaml"
+    output = tmp_path / "deep" / "converted" / "graph.yaml"
     source.write_text(
         """
 <product/orders> a <DataProduct> .

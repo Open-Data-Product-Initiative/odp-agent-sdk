@@ -12,6 +12,7 @@ from open_data_products.odpc import (
     render_catalog_schema_json,
     search_objects,
     validate_catalog,
+    write_catalog,
     write_catalog_html,
     write_catalog_artifacts,
 )
@@ -73,14 +74,15 @@ def test_build_catalog_artifacts_returns_derived_schema_artifact():
 
 
 def test_write_catalog_artifacts_can_check_and_generate_to_target_directory(tmp_path):
-    changed = write_catalog_artifacts(tmp_path, check=True)
+    output_dir = tmp_path / "deep" / "artifacts"
+    changed = write_catalog_artifacts(output_dir, check=True)
 
     assert changed == [Path("odpc.json")]
 
-    written = write_catalog_artifacts(tmp_path)
+    written = write_catalog_artifacts(output_dir)
     assert written == changed
 
-    assert write_catalog_artifacts(tmp_path, check=True) == []
+    assert write_catalog_artifacts(output_dir, check=True) == []
 
 
 def test_build_catalog_collects_fragments_and_product_references(tmp_path):
@@ -137,6 +139,16 @@ useCase:
     assert reference["productModel"]["$ref"] == "product.yaml"
 
 
+def test_write_catalog_creates_parent_directories(tmp_path):
+    output = tmp_path / "deep" / "catalog" / "catalog.yaml"
+
+    write_catalog(output, VALID_CATALOG)
+
+    assert output.read_text(encoding="utf-8").startswith(
+        "schema: https://opendataproducts.org/odpc-v1.0/schema/odpc.yaml"
+    )
+
+
 def test_render_and_write_catalog_html(tmp_path):
     html = render_catalog_html(VALID_CATALOG)
 
@@ -148,7 +160,7 @@ def test_render_and_write_catalog_html(tmp_path):
     assert '<span class="odp-count">0</span><span>Product References</span>' in html
     assert "Product References" in html
 
-    output = tmp_path / "catalog.html"
+    output = tmp_path / "deep" / "html" / "catalog.html"
     write_catalog_html(output, VALID_CATALOG)
 
     assert output.read_text(encoding="utf-8") == html

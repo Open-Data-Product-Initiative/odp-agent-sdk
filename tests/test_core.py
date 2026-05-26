@@ -169,6 +169,16 @@ class TestOpenDataProduct:
         finally:
             tmp_path.unlink(missing_ok=True)
 
+    def test_save_creates_parent_directories(self, sample_odps_product, tmp_path):
+        """Test saving OpenDataProduct creates missing parent directories."""
+        output = tmp_path / "deep" / "output" / "product.yaml"
+
+        sample_odps_product.save(output)
+
+        assert output.exists()
+        data = yaml.safe_load(output.read_text(encoding="utf-8"))
+        assert data["product"]["name"] == "Test Product"
+
     def test_validate_valid_product(self, sample_odps_product):
         """Test validation of valid product."""
         # This should not raise an exception

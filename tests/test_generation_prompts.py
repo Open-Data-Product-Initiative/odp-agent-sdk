@@ -567,6 +567,7 @@ def test_create_generation_client_checks_ollama(monkeypatch):
 def test_generate_local_artifacts_writes_yaml_outputs(tmp_path):
     """Test local generation with a fake model client."""
     prompts_seen = []
+    output_dir = tmp_path / "deep" / "fragments"
 
     def fake_client(prompt: str, model: str) -> str:
         prompts_seen.append((prompt, model))
@@ -622,7 +623,7 @@ graph:
 
     artifacts = generate_local_artifacts(
         GENERATION_SOURCE_DOCS,
-        tmp_path,
+        output_dir,
         model="qwen2.5",
         client=fake_client,
     )
@@ -638,7 +639,9 @@ graph:
     graph_prompt = prompts_seen[-1][0]
     assert "Source file: product_reference_test-product.yaml" in graph_prompt
     assert "Source file: signal_test-signal.yaml" in graph_prompt
-    graph = yaml.safe_load((tmp_path / "odpg_graph.yaml").read_text(encoding="utf-8"))
+    graph = yaml.safe_load(
+        (output_dir / "odpg_graph.yaml").read_text(encoding="utf-8")
+    )
     assert graph["graph"]["nodes"] == [
         {
             "id": "test-signal",
@@ -652,7 +655,9 @@ graph:
         },
     ]
     assert yaml.safe_load(
-        (tmp_path / "product_reference_test-product.yaml").read_text(encoding="utf-8")
+        (output_dir / "product_reference_test-product.yaml").read_text(
+            encoding="utf-8"
+        )
     ) == {
         "productReference": {
             "id": "test-product",
@@ -669,7 +674,7 @@ graph:
         }
     }
     assert yaml.safe_load(
-        (tmp_path / "signal_test-signal.yaml").read_text(encoding="utf-8")
+        (output_dir / "signal_test-signal.yaml").read_text(encoding="utf-8")
     ) == {
         "signal": {
             "id": "test-signal",
@@ -680,12 +685,13 @@ graph:
             "observedAt": "2026-05-20T00:00:00Z",
         }
     }
-    assert (tmp_path / "odpg_graph.yaml").is_file()
+    assert (output_dir / "odpg_graph.yaml").is_file()
 
 
 def test_generate_local_artifact_writes_one_selected_yaml_output(tmp_path):
     """Test generating only one selected artifact kind."""
     prompts_seen = []
+    output_dir = tmp_path / "deep" / "fragments"
 
     def fake_client(prompt: str, model: str) -> str:
         prompts_seen.append((prompt, model))
@@ -705,12 +711,12 @@ def test_generate_local_artifact_writes_one_selected_yaml_output(tmp_path):
     artifact = generate_local_artifact(
         "signal",
         GENERATION_SOURCE_DOCS / "turnaround-delay-signal.txt",
-        tmp_path,
+        output_dir,
         client=fake_client,
     )
 
     assert artifact.name == "signal:turnaround-delay-spike-signal"
-    assert artifact.output_path == tmp_path / "signal_turnaround-delay-spike-signal.yaml"
+    assert artifact.output_path == output_dir / "signal_turnaround-delay-spike-signal.yaml"
     assert artifact.valid_yaml is True
     assert "Turnaround Delay Spike Signal" in prompts_seen[0][0]
     assert "Passenger Connection Protection" not in prompts_seen[0][0]

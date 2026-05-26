@@ -561,6 +561,7 @@ class OpenDataProduct:
         else:
             content = self.to_json()
 
+        path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(content, encoding="utf-8")
 
     def add_data_contract(
