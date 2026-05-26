@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -12,6 +13,11 @@ import yaml
 
 from open_data_products.results import ValidationResult
 
+from .convert import (
+    DEFAULT_CONFIDENCE,
+    convert_file,
+    dump_graph_yaml,
+)
 from .graph import (
     agent_context,
     analyze_graph,
@@ -241,4 +247,63 @@ def generate_main(argv: Optional[List[str]] = None) -> int:
         )
     else:
         print(f"Graph Explorer generated successfully: {output}")
+    return 0
+
+
+def convert_main(argv: Optional[List[str]] = None) -> int:
+    """Convert an external graph format to ODPG YAML from the command line."""
+    parser = argparse.ArgumentParser(
+        description="Convert external graph formats to ODPG YAML.",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    parser.add_argument("-i", "--input", required=True, type=Path, help="Source graph")
+    parser.add_argument("-o", "--output", type=Path, help="Output ODPG YAML file")
+    parser.add_argument(
+        "--format",
+        help=(
+            "Source graph format. Supports JSON-LD, GraphML, GraphSON, RDF/Turtle, "
+            "OpenCypher, GQL, and Gremlin. Inferred from extension when omitted."
+        ),
+    )
+    parser.add_argument("--id", help="ODPG graph metadata id")
+    parser.add_argument("--name", help="ODPG graph metadata name")
+    parser.add_argument("--description", help="ODPG graph metadata description")
+    parser.add_argument(
+        "--confidence",
+        choices=["high", "medium", "low"],
+        default=DEFAULT_CONFIDENCE,
+        help="Confidence value assigned to converted edges",
+    )
+    parser.add_argument("--json", action="store_true", help="Emit JSON object output")
+    args = parser.parse_args(argv)
+
+    try:
+        document = convert_file(
+            input_path=args.input,
+            output_path=args.output,
+            source_format=args.format,
+            graph_id=args.id,
+            name=args.name,
+            description=args.description,
+            confidence=args.confidence,
+        )
+    except (FileNotFoundError, json.JSONDecodeError, ValueError, ET.ParseError) as exc:
+        print(f"Could not convert graph: {exc}", file=sys.stderr)
+        return 1
+
+    if args.output:
+        if args.json:
+            payload = {
+                "spec": "odpg",
+                "kind": "Graph",
+                "output": str(args.output),
+                "nodes": len(document["graph"]["nodes"]),
+                "edges": len(document["graph"]["edges"]),
+                "converted": True,
+            }
+            print(json.dumps(payload, indent=2))
+        else:
+            print(f"ODPG graph written successfully: {args.output}")
+    else:
+        print(dump_graph_yaml(document), end="")
     return 0

@@ -1,10 +1,14 @@
 from pathlib import Path
 
+import yaml
+
 from open_data_products.odpg import (
     agent_context,
     analyze_graph,
     build_graph_explorer_html,
     collect_relationship_types,
+    convert_file,
+    convert_graph,
     generate_graph_explorer,
     load_graph,
     search_graph_objects,
@@ -12,7 +16,12 @@ from open_data_products.odpg import (
     traverse_graph,
     validate_graph,
 )
-from open_data_products.odpg.cli import generate_main, search_main, validate_main
+from open_data_products.odpg.cli import (
+    convert_main,
+    generate_main,
+    search_main,
+    validate_main,
+)
 
 
 def test_bundled_graph_loads_and_validates():
@@ -74,7 +83,7 @@ def test_build_graph_explorer_html_returns_document():
     assert "const NODE_TYPES =" in html
     assert "const CONFIDENCE_LEVELS =" in html
     assert '"id": "edge-0"' in html
-    assert "produces: \"#059669\"" in html
+    assert 'produces: "#059669"' in html
 
 
 def test_cli_entry_points(tmp_path):
@@ -170,3 +179,104 @@ def test_invalid_graph_reports_missing_reference():
 
     assert not result.valid
     assert any("source does not match any node id" in error for error in result.errors)
+
+
+def test_convert_jsonld_to_valid_odpg_graph():
+    document = convert_graph(
+        {
+            "@graph": [
+                {
+                    "@id": "product/orders",
+                    "@type": "DataProduct",
+                    "supports": {"@id": "objective/retention"},
+                },
+                {"@id": "objective/retention", "@type": "BusinessObjective"},
+            ]
+        },
+        "jsonld",
+        graph_id="orders-graph",
+        name="Orders Graph",
+    )
+
+    result = validate_graph(document)
+
+    assert result.valid
+    assert document["graph"]["metadata"]["id"] == "orders-graph"
+    assert document["graph"]["nodes"][0]["type"] == "DataProduct"
+    assert document["graph"]["edges"][0]["type"] == "supports"
+
+
+def test_convert_graphson_file_writes_yaml(tmp_path):
+    source = tmp_path / "graph.graphson"
+    output = tmp_path / "graph.yaml"
+    source.write_text(
+        """
+{
+  "vertices": [
+    {"id": "product-orders", "label": "DataProduct"},
+    {"id": "use-case-retention", "label": "UseCase"}
+  ],
+  "edges": [
+    {
+      "outV": "use-case-retention",
+      "inV": "product-orders",
+      "label": "uses"
+    }
+  ]
+}
+""",
+        encoding="utf-8",
+    )
+
+    document = convert_file(source, output_path=output, name="Converted")
+    written = yaml.safe_load(output.read_text(encoding="utf-8"))
+
+    assert document == written
+    assert validate_graph(written).valid
+    assert written["graph"]["edges"][0]["confidence"] == "medium"
+
+
+def test_convert_graphml_and_cypher_formats():
+    graphml = """\
+<graphml>
+  <key id="label" for="node" attr.name="type"/>
+  <key id="edgeType" for="edge" attr.name="type"/>
+  <graph edgedefault="directed">
+    <node id="dp"><data key="label">DataProduct</data></node>
+    <node id="uc"><data key="label">UseCase</data></node>
+    <edge source="uc" target="dp"><data key="edgeType">uses</data></edge>
+  </graph>
+</graphml>
+"""
+    cypher = """
+CREATE (u:UseCase {id: 'delay-risk'})
+CREATE (p:DataProduct {id: 'flight-ops'})
+CREATE (u)-[:uses]->(p)
+"""
+
+    graphml_doc = convert_graph(graphml, "graphml")
+    cypher_doc = convert_graph(cypher, "cypher")
+
+    assert validate_graph(graphml_doc).valid
+    assert validate_graph(cypher_doc).valid
+    assert graphml_doc["graph"]["edges"][0]["type"] == "uses"
+    assert cypher_doc["graph"]["nodes"][0]["id"] == "delay-risk"
+
+
+def test_convert_cli_entry_point(tmp_path):
+    source = tmp_path / "graph.ttl"
+    output = tmp_path / "graph.yaml"
+    source.write_text(
+        """
+<product/orders> a <DataProduct> .
+<objective/retention> a <BusinessObjective> .
+<product/orders> <supports> <objective/retention> .
+""",
+        encoding="utf-8",
+    )
+
+    assert (
+        convert_main(["--input", str(source), "--output", str(output), "--json"]) == 0
+    )
+    assert output.exists()
+    assert validate_graph(yaml.safe_load(output.read_text(encoding="utf-8"))).valid

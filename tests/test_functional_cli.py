@@ -10,14 +10,11 @@ from open_data_products.cli import main
 pytestmark = pytest.mark.functional
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-ODPS_PRODUCT = REPO_ROOT / "examples" / "apps" / "pricing_402_builder" / "priced_product.yaml"
-ODPG_GRAPH = REPO_ROOT / "open_data_products" / "odpg" / "data" / "graph" / "graph.yaml"
-GENERATION_SOURCE_DOCS = (
-    REPO_ROOT
-    / "open_data_products"
-    / "generation"
-    / "source_docs"
+ODPS_PRODUCT = (
+    REPO_ROOT / "examples" / "apps" / "pricing_402_builder" / "priced_product.yaml"
 )
+ODPG_GRAPH = REPO_ROOT / "open_data_products" / "odpg" / "data" / "graph" / "graph.yaml"
+GENERATION_SOURCE_DOCS = REPO_ROOT / "open_data_products" / "generation" / "source_docs"
 
 
 def _json_output(capsys: pytest.CaptureFixture[str]) -> Dict[str, Any]:
@@ -52,6 +49,7 @@ def test_unified_cli_help_uses_compact_command_metavar(
     assert "odpv-search" in help_text
     assert "ODPG graph commands:" in help_text
     assert "odpg-generate" in help_text
+    assert "odpg-convert" in help_text
     assert "Product/Data Contract commands:" in help_text
     assert "Local generation commands:" in help_text
     assert "Examples:" in help_text
@@ -64,6 +62,10 @@ def test_unified_cli_help_uses_compact_command_metavar(
     assert "open-data-products resources --id odpv.terms --json" in help_text
     assert (
         "open-data-products odpg-generate graph.yaml --output graph-explorer.html --json"
+        in help_text
+    )
+    assert (
+        "open-data-products odpg-convert --input graph.graphml --output graph.yaml --json"
         in help_text
     )
     assert (
@@ -271,7 +273,10 @@ def test_unified_cli_local_generation_uses_default_paths(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     from open_data_products import generation
-    from open_data_products.cli import DEFAULT_GENERATION_INPUT, DEFAULT_GENERATION_OUTPUT
+    from open_data_products.cli import (
+        DEFAULT_GENERATION_INPUT,
+        DEFAULT_GENERATION_OUTPUT,
+    )
 
     observed = {}
 
@@ -627,6 +632,40 @@ def test_unified_cli_odpg_reasoning_commands(
     assert payload["spec"] == "odpg"
     assert payload["generated"] is True
     assert output.exists()
+
+    graph_source = tmp_path / "graph.graphson"
+    graph_yaml = tmp_path / "converted-graph.yaml"
+    graph_source.write_text(
+        """
+{
+  "vertices": [
+    {"id": "product-orders", "label": "DataProduct"},
+    {"id": "case-retention", "label": "UseCase"}
+  ],
+  "edges": [
+    {"outV": "case-retention", "inV": "product-orders", "label": "uses"}
+  ]
+}
+""",
+        encoding="utf-8",
+    )
+    assert (
+        main(
+            [
+                "odpg-convert",
+                "--input",
+                str(graph_source),
+                "--output",
+                str(graph_yaml),
+                "--json",
+            ]
+        )
+        == 0
+    )
+    convert_payload = _json_output(capsys)
+    assert convert_payload["spec"] == "odpg"
+    assert convert_payload["converted"] is True
+    assert graph_yaml.exists()
 
 
 def test_unified_cli_contract_workflow(

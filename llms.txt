@@ -116,6 +116,8 @@ ODPG graph reasoning commands:
 - `open-data-products odpg-traverse <graph.yaml> --start <node-id> --depth 2`
 - `open-data-products odpg-analyze <graph.yaml>`
 - `open-data-products odpg-agent-context <graph.yaml> --node <node-id> --depth 2`
+- `open-data-products odpg-convert --input <graph.graphml> --output <graph.yaml> --json`
+- `open-data-products odpg-generate <graph.yaml> --output <graph-explorer.html> --json`
 
 ## MCP Tools
 
@@ -227,7 +229,8 @@ standards-ready YAML fragments:
 - `open_data_products.odps`: ODPS data product models and validation helpers
 - `open_data_products.odpc`: ODPC catalog building, catalog helpers, object
   retrieval records, and derived catalog schema artifact generation/checking
-- `open_data_products.odpg`: ODPG graph validation, traversal, analysis, and context
+- `open_data_products.odpg`: ODPG graph validation, traversal, analysis,
+  context, external graph conversion, and explorer generation
 - `open_data_products.odpv`: ODPV vocabulary loading, validation, search,
   artifacts, term resolution, relationship compatibility, and term context
 - `open_data_products.generation`: editable LLM prompt templates for generating

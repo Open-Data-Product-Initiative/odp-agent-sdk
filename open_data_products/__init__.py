@@ -9,7 +9,7 @@ family. Each standard lives in its own namespace:
 - :mod:`open_data_products.odpv`
 """
 
-__version__ = "0.2.4"
+__version__ = "0.1.0"
 version = __version__
 
 from . import odpc
@@ -75,6 +75,7 @@ from .odpc import (
     write_catalog_html,
     write_catalog_artifacts,
 )
+from .odpg import convert_file, convert_graph, dump_graph_yaml
 from .odpv import (
     agent_vocabulary_context,
     check_vocabulary_relationship,
@@ -101,6 +102,8 @@ __all__ = [
     "build_catalog",
     "build_catalog_artifacts",
     "check_vocabulary_relationship",
+    "convert_file",
+    "convert_graph",
     "ContractToolAvailability",
     "ContractValidationResult",
     "ContractDocument",
@@ -116,6 +119,7 @@ __all__ = [
     "check_product_contract_alignment",
     "detect_document",
     "detect_datacontract_cli",
+    "dump_graph_yaml",
     "explain_contract",
     "export_contract",
     "extract_contract_schema",

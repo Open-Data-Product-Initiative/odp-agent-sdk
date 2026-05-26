@@ -63,6 +63,7 @@ ODPG graph commands:
   odpg-analyze         Run governance and strategic graph checks
   odpg-agent-context   Extract graph context around a node for agents
   odpg-generate        Generate a standalone graph explorer HTML file
+  odpg-convert         Convert JSON-LD, GraphML, GraphSON, RDF, Cypher, GQL, or Gremlin to ODPG YAML
 
 Product/Data Contract commands:
   product resolve-contracts   Resolve Data Contract references
@@ -93,6 +94,7 @@ Examples:
   open-data-products generate --input use-case.md --kind use-case --output fragments/ --json
   open-data-products odpg-agent-context graph.yaml --node DATA-PRODUCT-001
   open-data-products odpg-generate graph.yaml --output graph-explorer.html --json
+  open-data-products odpg-convert --input graph.graphml --output graph.yaml --json
   open-data-products product contract-report product.yaml contract.yaml --json
   open-data-products serve
 """
@@ -385,6 +387,35 @@ def main(argv: Optional[List[str]] = None) -> int:
         help="Output HTML file path",
     )
     odpg_generate_parser.add_argument("--json", action="store_true", help="Emit JSON")
+
+    odpg_convert_parser = subparsers.add_parser(
+        "odpg-convert", help="Convert external graph formats to ODPG YAML"
+    )
+    odpg_convert_parser.add_argument(
+        "-i", "--input", required=True, type=Path, help="Source graph file"
+    )
+    odpg_convert_parser.add_argument(
+        "-o", "--output", type=Path, help="Output ODPG YAML file"
+    )
+    odpg_convert_parser.add_argument(
+        "--format",
+        help=(
+            "Source graph format. Supports JSON-LD, GraphML, GraphSON, RDF/Turtle, "
+            "OpenCypher, GQL, and Gremlin. Inferred from extension when omitted."
+        ),
+    )
+    odpg_convert_parser.add_argument("--id", help="ODPG graph metadata id")
+    odpg_convert_parser.add_argument("--name", help="ODPG graph metadata name")
+    odpg_convert_parser.add_argument(
+        "--description", help="ODPG graph metadata description"
+    )
+    odpg_convert_parser.add_argument(
+        "--confidence",
+        choices=["high", "medium", "low"],
+        default="medium",
+        help="Confidence value assigned to converted edges",
+    )
+    odpg_convert_parser.add_argument("--json", action="store_true", help="Emit JSON")
 
     subparsers.add_parser("manifest", help="Emit the ARWS agent manifest").add_argument(
         "--json", action="store_true", help="Emit JSON"
@@ -915,6 +946,35 @@ def main(argv: Optional[List[str]] = None) -> int:
                 print(json.dumps(payload, indent=2))
             else:
                 print(f"Graph Explorer generated successfully: {output}")
+            return 0
+
+        if args.command == "odpg-convert":
+            from .odpg import convert_file, dump_graph_yaml
+
+            document = convert_file(
+                input_path=args.input,
+                output_path=args.output,
+                source_format=args.format,
+                graph_id=args.id,
+                name=args.name,
+                description=args.description,
+                confidence=args.confidence,
+            )
+            if args.output:
+                payload = {
+                    "spec": "odpg",
+                    "kind": "Graph",
+                    "output": str(args.output),
+                    "nodes": len(document["graph"]["nodes"]),
+                    "edges": len(document["graph"]["edges"]),
+                    "converted": True,
+                }
+                if args.json:
+                    print(json.dumps(payload, indent=2))
+                else:
+                    print(f"ODPG graph written successfully: {args.output}")
+            else:
+                print(dump_graph_yaml(document), end="")
             return 0
 
         if args.command == "manifest":

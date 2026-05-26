@@ -39,6 +39,7 @@ pytest -q
 | ODPG traversal | Not yet direct | Covered | Covered |
 | ODPG analysis | Not yet direct | Covered | Covered |
 | ODPG agent context | Not yet direct | Covered | Covered |
+| ODPG external graph conversion | Covered | Covered | Not mapped; conversion writes generated YAML |
 | Resolve product contracts | Covered | Covered | Covered |
 | Validate Data Contracts | Covered missing optional adapter | Covered through check-contract/report/alignment | Covered |
 | Summarize Data Contracts | Covered | Covered through contract-report | Covered |

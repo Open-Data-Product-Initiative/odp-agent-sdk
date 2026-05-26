@@ -60,7 +60,7 @@ def test_source_distribution_uses_positive_artifact_includes() -> None:
         "include pyproject.toml",
         "include llms.txt",
         "include docs/*.md",
-        "recursive-include examples *.py *.json *.yaml *.html *.md",
+        "recursive-include examples *.py *.json *.yaml *.html *.md *.graphml",
         "recursive-include images *.png",
         "recursive-include skills */SKILL.md",
         "recursive-exclude tests *",

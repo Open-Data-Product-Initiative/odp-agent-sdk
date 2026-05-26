@@ -231,6 +231,7 @@ open-data-products odpg-summary open_data_products/odpg/data/graph/graph.yaml
 open-data-products odpg-traverse open_data_products/odpg/data/graph/graph.yaml --start AGENT-AVIATION-001 --depth 2
 open-data-products odpg-analyze open_data_products/odpg/data/graph/graph.yaml
 open-data-products odpg-agent-context open_data_products/odpg/data/graph/graph.yaml --node AGENT-AVIATION-001 --depth 2
+open-data-products odpg-convert --input examples/graph.graphml --output /tmp/odp-converted-graph.yaml --json
 open-data-products odpg-generate open_data_products/odpg/data/graph/graph.yaml --output /tmp/odp-graph-explorer.html --json
 
 # Product-level Data Contract inspection
@@ -251,7 +252,7 @@ Live LLM generation requires Ollama or a configured provider API key; see
   Ollama/Qwen 2.5 and can use configured external providers such as OpenAI.
 - `open_data_products.odps`: ODPS v4.1 models, standards-aware validation, YAML/JSON I/O, compliance helpers, and `pricing_to_402`.
 - `open_data_products.odpc`: ODPC catalog building, loading, validation, explanation, and object guidance search.
-- `open_data_products.odpg`: ODPG graph validation, summary, traversal, analysis, agent context, object search, and graph explorer generation.
+- `open_data_products.odpg`: ODPG graph validation, summary, traversal, analysis, agent context, object search, external graph conversion, and graph explorer generation.
 - `open_data_products.odpv`: ODPV vocabulary loading, validation, search, and generated vocabulary artifacts.
 
 ## Development

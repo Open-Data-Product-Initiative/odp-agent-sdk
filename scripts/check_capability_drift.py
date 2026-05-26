@@ -100,6 +100,14 @@ DEFAULT_CAPABILITIES: Sequence[Capability] = (
         notes="MCP remains read-only; graph explorer generation is not exposed as an MCP tool.",
     ),
     Capability(
+        spec="ODPG",
+        upstream_source="odpg-v1.0/source/scripts/odpg_convert.py",
+        capability="Convert external graph formats into ODPG YAML",
+        api_symbol="open_data_products.odpg:convert_graph",
+        cli_marker="odpg-convert",
+        notes="Conversion writes generated YAML and is intentionally not exposed through the safe MCP surface.",
+    ),
+    Capability(
         spec="ODPV",
         upstream_source="odpv-v1.0/scripts/search_vocab.py",
         capability="Search ODPV vocabulary terms",

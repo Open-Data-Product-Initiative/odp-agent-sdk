@@ -1,5 +1,13 @@
 """Open Data Product Graph (ODPG) namespace."""
 
+from .convert import (
+    SUPPORTED_FORMATS,
+    convert_file,
+    convert_graph,
+    dump_graph_yaml,
+    infer_format,
+    normalize_format,
+)
 from .graph import (
     agent_context,
     analyze_graph,
@@ -23,15 +31,21 @@ SPEC_NAME = "Open Data Product Graph"
 __all__ = [
     "SPEC_ID",
     "SPEC_NAME",
+    "SUPPORTED_FORMATS",
     "agent_context",
     "analyze_graph",
     "build_graph_explorer_html",
     "collect_relationship_types",
+    "convert_file",
+    "convert_graph",
+    "dump_graph_yaml",
     "explain_graph",
     "generate_graph_explorer",
+    "infer_format",
     "load_graph",
     "load_graph_object_records",
     "load_schema",
+    "normalize_format",
     "render_graph_object_records",
     "search_graph_objects",
     "summarize_graph",

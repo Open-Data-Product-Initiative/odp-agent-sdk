@@ -211,6 +211,13 @@ open-data-products odpg-generate open_data_products/odpg/data/graph/graph.yaml -
 Generates a standalone HTML graph explorer for a bundled or user-supplied ODPG
 graph.
 
+```bash
+open-data-products odpg-convert --input examples/graph.graphml --output /tmp/odp-converted-graph.yaml --json
+```
+
+Converts external graph formats to ODPG YAML. Supported inputs include JSON-LD,
+GraphML, GraphSON, RDF/Turtle, OpenCypher, GQL, and Gremlin.
+
 ## Product-Level Data Contract Inspection
 
 ```bash

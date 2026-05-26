@@ -30,6 +30,7 @@ def test_default_inventory_tracks_odpg_source_scripts() -> None:
     assert "odpg-v1.0/source/scripts/odpg_validate.py" in sources
     assert "odpg-v1.0/source/scripts/odpg_agent_context.py" in sources
     assert "odpg-v1.0/source/scripts/generate_graph_explorer.py" in sources
+    assert "odpg-v1.0/source/scripts/odpg_convert.py" in sources
 
 
 def test_report_renders_history_friendly_capability_statuses() -> None:
@@ -74,6 +75,9 @@ def test_graph_explorer_capability_uses_unified_cli_marker() -> None:
     assert (
         marker_by_source["odpg-v1.0/source/scripts/generate_graph_explorer.py"]
         == "odpg-generate"
+    )
+    assert (
+        marker_by_source["odpg-v1.0/source/scripts/odpg_convert.py"] == "odpg-convert"
     )
 
 
