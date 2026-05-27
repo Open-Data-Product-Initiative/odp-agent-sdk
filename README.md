@@ -15,6 +15,18 @@ An AI-agent-first Python SDK for the OpenDataProducts.org standards family. It g
 
 The package still includes developer-facing Python helpers, but the primary contract is agent-ready: structured validation results, lightweight artifact summaries, reference discovery, Data Contract orchestration, bundled retrieval resources, a unified CLI, an MCP stdio server, and an ARWS agent manifest.
 
+## Installation
+
+```bash
+pip install open-data-products
+
+# Optional Data Contract validation adapter:
+pip install "open-data-products[contracts]"
+
+# For development:
+pip install "open-data-products[dev]"
+```
+
 ## AI Agent-First SDK
 
 ### Why Agent First
@@ -144,17 +156,6 @@ documents.
 ODPS field validation includes ISO language, country, currency, date/time,
 phone, email, and URI formats where those standards apply.
 
-## Installation
-
-```bash
-pip install open-data-products
-
-# Optional Data Contract validation adapter:
-pip install "open-data-products[contracts]"
-
-# For development:
-pip install "open-data-products[dev]"
-```
 
 ## Usage Guide
 
