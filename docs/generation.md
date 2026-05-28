@@ -132,6 +132,10 @@ open-data-products config generation --config my-generation.config.yaml --check
 open-data-products generate --config my-generation.config.yaml --prompts prompts/ --json
 ```
 
+The config check verifies required provider/model settings, catches common key
+typos such as `base_url`, rejects secret-looking values, and confirms configured
+input and prompt paths exist before generation runs.
+
 To use another provider already defined in the config, override only the
 provider:
 

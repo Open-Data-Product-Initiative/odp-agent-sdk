@@ -575,8 +575,11 @@ def validate_config(
     if provider_name is not None and not isinstance(provider_name, str):
         errors.append("provider must be a string")
         provider_name = None
-    selected_provider = provider_name or "ollama"
-    if providers and selected_provider not in providers:
+    if provider_name is None:
+        errors.append("provider is required in generation config files")
+    selected_provider = provider_name or ""
+    built_in_providers = {"ollama", "openai", "anthropic"}
+    if selected_provider and selected_provider not in providers and selected_provider not in built_in_providers:
         errors.append(f"providers.{selected_provider} is missing")
 
     _validate_optional_string(config, "model", "model", errors)
@@ -586,7 +589,11 @@ def validate_config(
     _validate_optional_string(config, "baseUrl", "baseUrl", errors)
     _validate_optional_string(config, "version", "version", errors)
     _validate_optional_positive_int(config, "maxTokens", "maxTokens", errors)
+    _validate_generation_paths(config, source_path, errors, warnings)
     _find_secret_values(config, "", errors)
+
+    if not _has_configured_model(config, providers, selected_provider):
+        errors.append("model is required at top level or on the selected provider")
 
     for name, value in providers.items():
         provider_path = f"providers.{name}"
@@ -663,6 +670,54 @@ def _validate_provider_config(
         not isinstance(api_key_env, str) or _looks_like_secret(api_key_env)
     ):
         errors.append(f"{path}.apiKeyEnv must be an environment variable name")
+
+
+def _has_configured_model(
+    config: Dict[str, Any],
+    providers: Dict[str, Any],
+    selected_provider: str,
+) -> bool:
+    if isinstance(config.get("model"), str) and config["model"].strip():
+        return True
+    provider = providers.get(selected_provider)
+    return (
+        isinstance(provider, dict)
+        and isinstance(provider.get("model"), str)
+        and bool(provider["model"].strip())
+    )
+
+
+def _validate_generation_paths(
+    config: Dict[str, Any],
+    config_path: Path,
+    errors: List[str],
+    warnings: List[str],
+) -> None:
+    input_path = config.get("input")
+    if isinstance(input_path, str):
+        candidate = Path(input_path).expanduser()
+        if not candidate.is_absolute():
+            candidate = Path.cwd() / candidate
+        if not candidate.exists():
+            errors.append(f"input path does not exist: {input_path}")
+
+    output_path = config.get("output")
+    if isinstance(output_path, str):
+        candidate = Path(output_path).expanduser()
+        if not candidate.is_absolute():
+            candidate = Path.cwd() / candidate
+        if not candidate.parent.exists():
+            warnings.append(
+                f"output parent does not exist yet and will be created: {output_path}"
+            )
+
+    prompt_path = config.get("prompts")
+    if isinstance(prompt_path, str):
+        candidate = Path(prompt_path).expanduser()
+        if not candidate.is_absolute():
+            candidate = Path.cwd() / candidate
+        if not candidate.is_dir():
+            errors.append(f"prompt folder does not exist: {prompt_path}")
 
 
 def _validate_optional_string(

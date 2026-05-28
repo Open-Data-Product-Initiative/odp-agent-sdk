@@ -70,9 +70,18 @@ def test_unified_cli_help_uses_compact_command_metavar(
         in help_text
     )
     assert (
-        "open-data-products generate --input source_docs/ --output fragments/ --json"
+        "open-data-products generate --input source_docs/ --output generated/ --json"
         in help_text
     )
+    assert (
+        "open-data-products config generation --copy-prompts-to prompts/"
+        in help_text
+    )
+    assert (
+        "open-data-products generate --config my-generation.config.yaml --prompts prompts/ --input source_docs/ --output generated/ --json"
+        in help_text
+    )
+    assert "generation.config.yaml --json" not in help_text
     assert "validate" in help_text
     assert "product" in help_text
 

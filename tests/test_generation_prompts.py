@@ -154,6 +154,48 @@ providers:
     assert "providers.claude.maxTokens must be a positive integer" in report["errors"]
 
 
+def test_validate_generation_config_rejects_implicit_defaults_and_missing_input(tmp_path):
+    """Test that commented-out provider/model settings are not silently accepted."""
+    config = tmp_path / "weak-generation.config.yaml"
+    config.write_text(
+        """
+# provider: claude
+# model: claude-sonnet-4-5
+input: missing/source_docs/
+output: generation/fragments/
+""",
+        encoding="utf-8",
+    )
+
+    report = validate_config("generation", config)
+
+    assert report["valid"] is False
+    assert "provider is required in generation config files" in report["errors"]
+    assert "model is required at top level or on the selected provider" in report[
+        "errors"
+    ]
+    assert "input path does not exist: missing/source_docs/" in report["errors"]
+
+
+def test_validate_generation_config_rejects_missing_custom_provider_profile(tmp_path):
+    """Test that provider names like groq require a provider profile."""
+    config = tmp_path / "missing-provider.config.yaml"
+    config.write_text(
+        """
+provider: groq
+model: openai/gpt-oss-120b
+input: .
+output: generation/fragments/
+""",
+        encoding="utf-8",
+    )
+
+    report = validate_config("generation", config)
+
+    assert report["valid"] is False
+    assert "providers.groq is missing" in report["errors"]
+
+
 def test_copy_config_template_writes_user_editable_file(tmp_path):
     """Test that PyPI users can copy the bundled config before editing."""
     output = tmp_path / "generation.config.yaml"

@@ -230,6 +230,10 @@ open-data-products generate \
   --json
 ```
 
+The config check verifies required provider/model settings, catches common key
+typos, rejects secret-looking values, and confirms configured input and prompt
+paths exist before generation runs.
+
 When installed from PyPI, the bundled generation config lives inside the
 package as a template. Copy it to a project-owned file before editing provider
 or model settings; do not edit files under `site-packages`. The

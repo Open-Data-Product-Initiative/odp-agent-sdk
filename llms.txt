@@ -224,6 +224,8 @@ Validate a copied config before generation with
 or `validate_config("generation", "my-generation.config.yaml")`. Print the
 selected YAML with
 `open-data-products config generation --config my-generation.config.yaml --print`.
+The check requires explicit provider/model settings, rejects key typos and
+secret-looking values, and verifies configured input and prompt paths exist.
 
 Use `list_generation_prompts()` and `load_generation_prompt(name)` from Python,
 or discover prompt resources with `open-data-products resources --json`.

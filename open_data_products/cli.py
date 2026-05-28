@@ -57,7 +57,7 @@ Discovery and agent commands:
   serve        Run the MCP server over stdio
 
 Local generation commands:
-  generate     Use local Ollama/Qwen prompts to create fragments and graph YAML
+  generate     Use configured LLM prompts to create fragments and graph YAML
 
 ODPG graph commands:
   odpg-summary         Summarize graph metadata and relationship counts
@@ -90,11 +90,12 @@ Examples:
   open-data-products resources --id odpc.objects --json
   open-data-products resources --id odpv.terms --json
   open-data-products config generation --copy-to my-generation.config.yaml
+  open-data-products config generation --copy-prompts-to prompts/
   open-data-products resources --json
-  open-data-products generate --json
-  open-data-products generate --config generation.config.yaml --json
-  open-data-products generate --input source_docs/ --output fragments/ --json
-  open-data-products generate --input use-case.md --kind use-case --output fragments/ --json
+  open-data-products generate --input source_docs/ --output generated/ --json
+  open-data-products generate --input use-case.md --kind use-case --output generated/ --json
+  open-data-products generate --config my-generation.config.yaml --provider groq --model openai/gpt-oss-120b --input source_docs/ --output generated/ --json
+  open-data-products generate --config my-generation.config.yaml --prompts prompts/ --input source_docs/ --output generated/ --json
   open-data-products odpg-agent-context graph.yaml --node DATA-PRODUCT-001
   open-data-products odpg-generate graph.yaml --output graph-explorer.html --json
   open-data-products odpg-convert --input graph.graphml --output graph.yaml --json
