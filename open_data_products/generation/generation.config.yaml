@@ -8,10 +8,10 @@
 #
 # The top-level keys below are generation defaults. `provider` selects the
 # default entry from the `providers` map, while `model`, `input`, and `output`
-# provide default runtime values. A provider-specific `model` overrides the
-# top-level model when that provider is selected. CLI flags such as
-# `--provider`, `--model`, `--input`, and `--output` override this file for one
-# run.
+# provide default runtime values. Provider-specific `model` values are examples
+# only; replace them with any model name your selected provider exposes. CLI
+# flags such as `--provider`, `--model`, `--input`, and `--output` override this
+# file for one run.
 
 provider: ollama
 model: qwen2.5
@@ -32,7 +32,22 @@ output: open_data_products/generation/fragments/
 providers:
   ollama:
     type: ollama
+    # Replace with any model available from your Ollama instance.
+    model: qwen2.5
     baseUrl: http://localhost:11434
+
+  # Local OpenAI-compatible chat servers such as LM Studio, vLLM, llama.cpp
+  # server, and LocalAI usually expose /v1/chat/completions. Replace `model`
+  # with the model name loaded in that server.
+  lmstudio:
+    type: openai-chat
+    model: local-model
+    baseUrl: http://localhost:1234/v1
+
+  vllm:
+    type: openai-chat
+    model: local-model
+    baseUrl: http://localhost:8000/v1
 
   openai:
     type: openai

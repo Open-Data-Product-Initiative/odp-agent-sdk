@@ -247,6 +247,14 @@ different LLM:
 ```bash
 open-data-products generate \
   --config my-generation.config.yaml \
+  --provider lmstudio \
+  --model any-local-model-loaded-in-the-server \
+  --input source_docs/ \
+  --output generated/ \
+  --json
+
+open-data-products generate \
+  --config my-generation.config.yaml \
   --provider groq \
   --model openai/gpt-oss-120b \
   --input source_docs/ \

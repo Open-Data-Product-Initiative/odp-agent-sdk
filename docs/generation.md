@@ -174,7 +174,21 @@ output: open_data_products/generation/fragments/
 providers:
   ollama:
     type: ollama
+    model: qwen2.5
     baseUrl: http://localhost:11434
+
+  # Local OpenAI-compatible chat servers such as LM Studio, vLLM, llama.cpp
+  # server, and LocalAI usually expose /v1/chat/completions. Replace `model`
+  # with the model name loaded in that server.
+  lmstudio:
+    type: openai-chat
+    model: local-model
+    baseUrl: http://localhost:1234/v1
+
+  vllm:
+    type: openai-chat
+    model: local-model
+    baseUrl: http://localhost:8000/v1
 
   openai:
     type: openai
@@ -229,6 +243,12 @@ Provider entries with `type: openai` use the OpenAI Responses request shape,
 Bearer token authentication, and `baseUrl + /responses`. That supports OpenAI
 and providers that expose a compatible Responses API endpoint, such as
 OpenRouter and Groq.
+
+Provider entries with `type: openai-chat` use the Chat Completions request
+shape, `baseUrl + /chat/completions`. Use this profile for local
+OpenAI-compatible servers such as LM Studio, vLLM, llama.cpp server, and
+LocalAI. Model names are not fixed by the SDK; set `model` to whatever the
+selected server exposes, or override it for one run with `--model`.
 
 Provider entries with `type: anthropic` use the Anthropic Messages API request
 shape, `x-api-key` authentication, `anthropic-version`, and

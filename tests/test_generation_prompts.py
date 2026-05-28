@@ -23,6 +23,7 @@ from open_data_products.generation import (
     list_generation_prompts,
     load_generation_prompt,
     list_ollama_models,
+    openai_chat_generate,
     openai_generate,
     print_config,
     render_generation_prompt,
@@ -39,6 +40,7 @@ from open_data_products import (
     get_config_path as get_public_config_path,
     list_generation_prompts as list_public_generation_prompts,
     load_generation_prompt as load_public_generation_prompt,
+    openai_chat_generate as openai_public_chat_generate,
     print_config as print_public_config,
     validate_config as validate_public_config,
 )
@@ -266,6 +268,7 @@ def test_generation_prompt_helpers_are_public_api():
     assert generate_public_local_artifact is generate_local_artifact
     assert generate_public_local_artifacts is generate_local_artifacts
     assert anthropic_public_generate is anthropic_generate
+    assert openai_public_chat_generate is openai_chat_generate
 
 
 def test_render_generation_prompt_inlines_source_documents():
@@ -409,6 +412,8 @@ def test_bundled_generation_config_includes_common_compatible_providers():
     assert "openrouter" in config["providers"]
     assert "groq" in config["providers"]
     assert "claude" in config["providers"]
+    assert "lmstudio" in config["providers"]
+    assert "vllm" in config["providers"]
 
     openrouter = resolve_generation_settings(
         DEFAULT_GENERATION_CONFIG,
@@ -425,6 +430,14 @@ def test_bundled_generation_config_includes_common_compatible_providers():
     assert groq.provider_type == "openai"
     assert groq.base_url == "https://api.groq.com/openai/v1"
     assert groq.api_key_env == "GROQ_API_KEY"
+    lmstudio = resolve_generation_settings(
+        DEFAULT_GENERATION_CONFIG,
+        provider="lmstudio",
+    )
+    assert lmstudio.provider_type == "openai-chat"
+    assert lmstudio.base_url == "http://localhost:1234/v1"
+    assert lmstudio.model == "local-model"
+    assert lmstudio.api_key_env is None
     claude = resolve_generation_settings(
         DEFAULT_GENERATION_CONFIG,
         provider="claude",
@@ -463,6 +476,35 @@ providers:
     assert settings.api_key_env == "TEST_ANTHROPIC_API_KEY"
     assert settings.api_version == "2023-06-01"
     assert settings.max_tokens == 4096
+
+
+def test_resolve_generation_settings_reads_openai_chat_provider(tmp_path):
+    """Test local chat providers keep arbitrary model names."""
+    config = tmp_path / "generation.config.yaml"
+    config.write_text(
+        """
+provider: lmstudio
+model: fallback-model
+input: .
+output: fragments
+providers:
+  lmstudio:
+    type: openai-chat
+    model: any-local-model-loaded-in-the-server
+    baseUrl: http://localhost:1234/v1
+""",
+        encoding="utf-8",
+    )
+
+    settings = resolve_generation_settings(config)
+    report = validate_config("generation", config)
+
+    assert settings.provider == "lmstudio"
+    assert settings.provider_type == "openai-chat"
+    assert settings.model == "any-local-model-loaded-in-the-server"
+    assert settings.base_url == "http://localhost:1234/v1"
+    assert settings.api_key_env is None
+    assert report["valid"] is True
 
 
 def test_openai_generate_requires_env(monkeypatch):
@@ -526,6 +568,42 @@ def test_openai_generate_reads_responses_output_text(monkeypatch):
             "gpt-test",
             api_key_env="TEST_OPENAI_API_KEY",
             base_url="https://api.openai.example/v1",
+        )
+        == "generated yaml"
+    )
+
+
+def test_openai_chat_generate_reads_chat_completion(monkeypatch):
+    """Test local OpenAI-compatible chat servers use chat completions."""
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return None
+
+        def read(self) -> bytes:
+            return b'{"choices":[{"message":{"content":"generated yaml"}}]}'
+
+    def fake_urlopen(req, timeout, context=None):
+        body = req.data.decode("utf-8")
+        assert req.full_url == "http://localhost:1234/v1/chat/completions"
+        assert req.headers["Accept"] == "application/json"
+        assert "Authorization" not in req.headers
+        assert '"model": "arbitrary-local-model"' in body
+        assert '"content": "prompt"' in body
+        assert timeout == 300
+        assert context is None
+        return FakeResponse()
+
+    monkeypatch.setattr("open_data_products.generation.request.urlopen", fake_urlopen)
+
+    assert (
+        openai_chat_generate(
+            "prompt",
+            "arbitrary-local-model",
+            base_url="http://localhost:1234/v1",
         )
         == "generated yaml"
     )

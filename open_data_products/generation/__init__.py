@@ -18,6 +18,7 @@ import yaml
 _PROMPT_DIR = Path(__file__).resolve().parent / "data" / "prompts"
 DEFAULT_OLLAMA_URL = "http://localhost:11434"
 DEFAULT_OPENAI_URL = "https://api.openai.com/v1"
+DEFAULT_OPENAI_CHAT_URL = "http://localhost:1234/v1"
 DEFAULT_ANTHROPIC_URL = "https://api.anthropic.com/v1"
 DEFAULT_ANTHROPIC_VERSION = "2023-06-01"
 DEFAULT_ANTHROPIC_MAX_TOKENS = 4096
@@ -366,6 +367,74 @@ def openai_generate(
     raise RuntimeError("OpenAI response did not contain generated text.")
 
 
+def openai_chat_generate(
+    prompt: str,
+    model: str,
+    api_key_env: Optional[str] = None,
+    base_url: str = DEFAULT_OPENAI_CHAT_URL,
+) -> str:
+    """Generate text with an OpenAI-compatible chat completions API."""
+    api_key = os.environ.get(api_key_env) if api_key_env else None
+    if api_key_env and not api_key:
+        raise RuntimeError(
+            f"OpenAI-compatible chat generation requires environment variable "
+            f"{api_key_env}. Set it before running generation."
+        )
+    if api_key and api_key_env:
+        _require_ascii_api_key(api_key, api_key_env, "OpenAI-compatible chat")
+
+    payload = json.dumps(
+        {
+            "model": model,
+            "messages": [{"role": "user", "content": prompt}],
+            "stream": False,
+        }
+    ).encode("utf-8")
+    headers = {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+        "User-Agent": DEFAULT_OPENAI_USER_AGENT,
+    }
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+    req = request.Request(
+        f"{base_url.rstrip('/')}/chat/completions",
+        data=payload,
+        headers=headers,
+        method="POST",
+    )
+    try:
+        with request.urlopen(req, timeout=DEFAULT_OPENAI_GENERATE_TIMEOUT) as response:
+            data = json.loads(response.read().decode("utf-8"))
+    except error.HTTPError as exc:
+        detail = _http_error_detail(exc)
+        message = f"OpenAI-compatible chat request failed with HTTP {exc.code}."
+        if detail:
+            message = f"{message} {detail}"
+        raise RuntimeError(message) from exc
+    except (OSError, error.URLError) as exc:
+        reason = getattr(exc, "reason", exc)
+        raise RuntimeError(
+            f"OpenAI-compatible chat request failed: {reason}"
+        ) from exc
+
+    choices = data.get("choices")
+    if isinstance(choices, list):
+        parts = []
+        for choice in choices:
+            if not isinstance(choice, dict):
+                continue
+            message = choice.get("message")
+            if isinstance(message, dict) and isinstance(message.get("content"), str):
+                parts.append(message["content"])
+            elif isinstance(choice.get("text"), str):
+                parts.append(choice["text"])
+        if parts:
+            return "\n".join(parts)
+
+    raise RuntimeError("OpenAI-compatible chat response did not contain generated text.")
+
+
 def anthropic_generate(
     prompt: str,
     model: str,
@@ -648,7 +717,7 @@ def _validate_provider_config(
     warnings: List[str],
 ) -> None:
     allowed_provider = {"type", "model", "baseUrl", "apiKeyEnv", "version", "maxTokens"}
-    allowed_types = {"anthropic", "ollama", "openai"}
+    allowed_types = {"anthropic", "ollama", "openai", "openai-chat"}
     for key in provider:
         if key not in allowed_provider:
             errors.append(f"Unknown generation config key: {path}.{key}")
@@ -844,6 +913,16 @@ def resolve_generation_settings(
         api_key_env = str(provider_config.get("apiKeyEnv") or "OPENAI_API_KEY")
         api_version = None
         max_tokens = None
+    elif provider_type == "openai-chat":
+        base_url = str(
+            provider_config.get("baseUrl")
+            or config.get("baseUrl")
+            or DEFAULT_OPENAI_CHAT_URL
+        )
+        api_key_value = provider_config.get("apiKeyEnv") or config.get("apiKeyEnv")
+        api_key_env = str(api_key_value) if api_key_value else None
+        api_version = None
+        max_tokens = None
     elif provider_type == "anthropic":
         base_url = str(
             provider_config.get("baseUrl")
@@ -890,6 +969,15 @@ def create_generation_client(settings: GenerationSettings) -> ModelClient:
         base_url = settings.base_url or DEFAULT_OPENAI_URL
         return lambda prompt, model_name: openai_generate(
             prompt, model_name, api_key_env=api_key_env, base_url=base_url
+        )
+
+    if settings.provider_type == "openai-chat":
+        base_url = settings.base_url or DEFAULT_OPENAI_CHAT_URL
+        return lambda prompt, model_name: openai_chat_generate(
+            prompt,
+            model_name,
+            api_key_env=settings.api_key_env,
+            base_url=base_url,
         )
 
     if settings.provider_type == "anthropic":
@@ -1384,6 +1472,7 @@ __all__ = [
     "DEFAULT_GENERATION_CONFIG",
     "DEFAULT_GENERATION_MODEL",
     "DEFAULT_OPENAI_GENERATE_TIMEOUT",
+    "DEFAULT_OPENAI_CHAT_URL",
     "DEFAULT_OPENAI_USER_AGENT",
     "DEFAULT_OPENAI_URL",
     "DEFAULT_OLLAMA_GENERATE_TIMEOUT",
@@ -1408,6 +1497,7 @@ __all__ = [
     "load_generation_prompt",
     "load_source_documents",
     "ollama_generate",
+    "openai_chat_generate",
     "openai_generate",
     "print_config",
     "render_generation_prompt",
