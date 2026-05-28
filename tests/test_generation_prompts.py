@@ -11,25 +11,35 @@ from open_data_products.generation import (
     DEFAULT_GENERATION_CONFIG,
     GenerationSettings,
     anthropic_generate,
+    copy_config_template,
     create_generation_client,
     ensure_ollama_model,
     generate_local_artifact,
     generate_local_artifacts,
+    get_config,
+    get_config_path,
     load_generation_config,
     list_generation_prompts,
     load_generation_prompt,
     list_ollama_models,
     openai_generate,
+    print_config,
     render_generation_prompt,
     resolve_generation_settings,
+    validate_config,
 )
 from open_data_products import (
     anthropic_generate as anthropic_public_generate,
+    copy_config_template as copy_public_config_template,
     ensure_ollama_model as ensure_public_ollama_model,
     generate_local_artifact as generate_public_local_artifact,
     generate_local_artifacts as generate_public_local_artifacts,
+    get_config as get_public_config,
+    get_config_path as get_public_config_path,
     list_generation_prompts as list_public_generation_prompts,
     load_generation_prompt as load_public_generation_prompt,
+    print_config as print_public_config,
+    validate_config as validate_public_config,
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -81,6 +91,90 @@ def test_generation_prompts_are_listed_and_loadable():
     )
     assert "product_reference_<id>.yaml" in load_generation_prompt(
         "odpg_graph_yaml.md"
+    )
+
+
+def test_generation_config_summary_exposes_template_and_resolved_settings():
+    """Test that users can discover the editable generation config template."""
+    summary = get_config("generation")
+
+    assert summary["domain"] == "generation"
+    assert summary["template_path"] == str(DEFAULT_GENERATION_CONFIG)
+    assert summary["editable"] is False
+    assert summary["copy_hint"].startswith("Copy this template")
+    assert summary["selected_provider"] == "ollama"
+    assert summary["resolved"]["model"] == "qwen2.5"
+    assert "claude" in summary["providers"]
+    assert summary["providers"]["claude"]["api_key_env"] == "ANTHROPIC_API_KEY"
+    assert "sk-" not in json.dumps(summary)
+    assert get_public_config is get_config
+    assert get_public_config_path is get_config_path
+    assert print_public_config is print_config
+    assert validate_public_config is validate_config
+
+
+def test_validate_generation_config_accepts_bundled_template():
+    """Test that the bundled generation config passes explicit validation."""
+    report = validate_config("generation", DEFAULT_GENERATION_CONFIG)
+
+    assert report["valid"] is True
+    assert report["errors"] == []
+    assert report["resolved"]["provider"] == "ollama"
+    assert report["resolved"]["model"] == "qwen2.5"
+
+
+def test_validate_generation_config_reports_user_mistakes(tmp_path):
+    """Test that edited config files fail before generation runs."""
+    config = tmp_path / "bad-generation.config.yaml"
+    config.write_text(
+        """
+provider: groq
+base_url: https://typo.example/v1
+providers:
+  groq:
+    type: openai
+    model: openai/gpt-oss-120b
+    apiKeyEnv: sk-secret-value
+  claude:
+    type: anthropic
+    model: claude-test
+    maxTokens: many
+""",
+        encoding="utf-8",
+    )
+
+    report = validate_config("generation", config)
+
+    assert report["valid"] is False
+    assert "Unknown top-level generation config key: base_url" in report["errors"]
+    assert "providers.groq.apiKeyEnv must be an environment variable name" in report[
+        "errors"
+    ]
+    assert "providers.claude.maxTokens must be a positive integer" in report["errors"]
+
+
+def test_copy_config_template_writes_user_editable_file(tmp_path):
+    """Test that PyPI users can copy the bundled config before editing."""
+    output = tmp_path / "generation.config.yaml"
+
+    result = copy_config_template("generation", output)
+
+    assert result == output
+    assert output.read_text(encoding="utf-8") == DEFAULT_GENERATION_CONFIG.read_text(
+        encoding="utf-8"
+    )
+    assert copy_public_config_template is copy_config_template
+
+
+def test_copy_config_template_accepts_folder_destination(tmp_path):
+    """Test that a folder destination receives the bundled config filename."""
+    output_dir = tmp_path / "configs" / "llm"
+
+    result = copy_config_template("generation", f"{output_dir}/")
+
+    assert result == output_dir / "generation.config.yaml"
+    assert result.read_text(encoding="utf-8") == DEFAULT_GENERATION_CONFIG.read_text(
+        encoding="utf-8"
     )
     assert "every edge `from` and `to` value appears in `graph.nodes`" in load_generation_prompt(
         "odpg_graph_yaml.md"

@@ -105,12 +105,23 @@ It also contains `odpg_graph.yaml`, which connects the generated fragment ids.
 ## Provider Configuration
 
 Use a generation config file when you want to select a provider, model, input
-folder, and output folder together. This is the normal path:
+folder, and output folder together. When installed from PyPI, treat the bundled
+config as a template inside the package, not as the file to edit. Copy it to a
+project-owned path first. The `my-generation.config.yaml` name is only an
+example for your copied file. You can also pass a folder path, such as
+`--copy-to config/`, and missing folders are created automatically:
 
 ```bash
-open-data-products generate \
-  --config open_data_products/generation/generation.config.yaml \
-  --json
+open-data-products config generation --copy-to my-generation.config.yaml
+```
+
+Then inspect or edit `my-generation.config.yaml`, validate it, and pass it
+explicitly:
+
+```bash
+open-data-products config generation --config my-generation.config.yaml --print
+open-data-products config generation --config my-generation.config.yaml --check
+open-data-products generate --config my-generation.config.yaml --json
 ```
 
 To use another provider already defined in the config, override only the
@@ -118,7 +129,7 @@ provider:
 
 ```bash
 open-data-products generate \
-  --config generation.config.yaml \
+  --config my-generation.config.yaml \
   --provider groq \
   --json
 ```
@@ -128,7 +139,7 @@ input, or output without editing the config:
 
 ```bash
 open-data-products generate \
-  --config generation.config.yaml \
+  --config my-generation.config.yaml \
   --provider openai \
   --model gpt-4.1-mini \
   --input source_docs/ \
@@ -190,7 +201,7 @@ the environment before running generation:
 
 ```bash
 export OPENAI_API_KEY="..."
-open-data-products generate --config generation.config.yaml --json
+open-data-products generate --config my-generation.config.yaml --json
 ```
 
 The SDK never prints API key values in JSON output or error messages. If a
@@ -219,7 +230,7 @@ To smoke-test OpenAI with one small source file while overriding config paths:
 ```bash
 export OPENAI_API_KEY="..."
 open-data-products generate \
-  --config generation.config.yaml \
+  --config my-generation.config.yaml \
   --provider openai \
   --model gpt-4.1-mini \
   --input open_data_products/generation/source_docs/baggage-belt-congestion-signal.txt \

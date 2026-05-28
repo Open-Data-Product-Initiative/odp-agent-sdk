@@ -200,13 +200,60 @@ open-data-products resources --id odpg.objects --json
 The LLM generation commands
 [require Ollama or configured provider credentials](docs/generation.md#llm-setup).
 
+Configure a project-owned generation config before changing provider or model
+settings:
+
+```bash
+open-data-products config generation --copy-to my-generation.config.yaml
+open-data-products config generation --config my-generation.config.yaml --print
+open-data-products config generation --config my-generation.config.yaml --check
+```
+
+When installed from PyPI, the bundled generation config lives inside the
+package as a template. Copy it to a project-owned file before editing provider
+or model settings; do not edit files under `site-packages`. The
+`my-generation.config.yaml` name below is only an example for your copied file.
+You can also pass a folder path, such as `--copy-to config/`, and missing
+folders are created automatically.
+
+Then generate artifacts from source documents:
+
 ```bash
 # LLM generation
-open-data-products generate --json
-open-data-products generate --config open_data_products/generation/generation.config.yaml --json
-open-data-products generate --config open_data_products/generation/generation.config.yaml --provider groq --json
-open-data-products generate --config open_data_products/generation/generation.config.yaml --provider claude --json
-open-data-products generate --config open_data_products/generation/generation.config.yaml --kind signal --json
+open-data-products generate \
+  --config my-generation.config.yaml \
+  --input source_docs/ \
+  --output generated/ \
+  --json
+
+open-data-products generate \
+  --config my-generation.config.yaml \
+  --input source_docs/turnaround-delay-signal.txt \
+  --kind signal \
+  --output generated/ \
+  --json
+```
+
+Override the configured provider or model for a single run when testing a
+different LLM:
+
+```bash
+open-data-products generate \
+  --config my-generation.config.yaml \
+  --provider groq \
+  --model openai/gpt-oss-120b \
+  --input source_docs/ \
+  --output generated/ \
+  --json
+
+open-data-products generate \
+  --config my-generation.config.yaml \
+  --provider claude \
+  --model claude-sonnet-4-5 \
+  --input source_docs/turnaround-delay-signal.txt \
+  --kind signal \
+  --output generated/ \
+  --json
 ```
 
 ```bash
@@ -251,7 +298,8 @@ Live LLM generation requires Ollama or a configured provider API key; see
 
 - `open_data_products.generation`: editable prompt templates and provider-backed
   generation helpers for ODPS, ODPC, and ODPG YAML artifacts. Defaults to local
-  Ollama/Qwen 2.5 and can use configured external providers such as OpenAI.
+  Ollama/Qwen 2.5 and can use copied config templates for external providers
+  such as OpenAI.
 - `open_data_products.odps`: ODPS v4.1 models, standards-aware validation, YAML/JSON I/O, compliance helpers, and `pricing_to_402`.
 - `open_data_products.odpc`: ODPC catalog building, loading, validation, explanation, and object guidance search.
 - `open_data_products.odpg`: ODPG graph validation, summary, traversal, analysis, agent context, object search, external graph conversion, and graph explorer generation.

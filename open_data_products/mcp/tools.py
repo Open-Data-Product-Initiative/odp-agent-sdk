@@ -27,6 +27,7 @@ from .. import (
     extract_contract_schema,
     explain_document,
     generate_product_contract_report,
+    get_config,
     get_resource,
     list_resources,
     load_document,
@@ -35,6 +36,7 @@ from .. import (
     resolve_references,
     summarize_contract,
     validate_contract,
+    validate_config,
     validate_document,
 )
 from ..odpc import (
@@ -119,6 +121,16 @@ def _h_list_resources(args: Dict[str, Any]) -> Dict[str, Any]:
 
 def _h_get_resource(args: Dict[str, Any]) -> Dict[str, Any]:
     return _json_envelope(get_resource(args["id"]).to_dict())
+
+
+def _h_get_config(args: Dict[str, Any]) -> Dict[str, Any]:
+    return _json_envelope(get_config(args.get("domain", "generation")))
+
+
+def _h_validate_config(args: Dict[str, Any]) -> Dict[str, Any]:
+    return _json_envelope(
+        validate_config(args.get("domain", "generation"), args.get("path"))
+    )
 
 
 def _h_load_summary(args: Dict[str, Any]) -> Dict[str, Any]:
@@ -379,6 +391,40 @@ TOOLS: List[Dict[str, Any]] = [
             ["id"],
         ),
         "handler": _h_get_resource,
+    },
+    {
+        "name": "get_config",
+        "description": "Inspect safe SDK config template and resolved provider/model settings.",
+        "class": "safe",
+        "inputSchema": _object_schema(
+            {
+                "domain": {
+                    "type": "string",
+                    "description": "Config domain to inspect. Currently supports generation.",
+                    "default": "generation",
+                }
+            }
+        ),
+        "handler": _h_get_config,
+    },
+    {
+        "name": "validate_config",
+        "description": "Validate safe SDK config files without contacting providers.",
+        "class": "safe",
+        "inputSchema": _object_schema(
+            {
+                "domain": {
+                    "type": "string",
+                    "description": "Config domain to validate. Currently supports generation.",
+                    "default": "generation",
+                },
+                "path": {
+                    "type": "string",
+                    "description": "Optional user-owned config file path.",
+                },
+            }
+        ),
+        "handler": _h_validate_config,
     },
     {
         "name": "load_summary",

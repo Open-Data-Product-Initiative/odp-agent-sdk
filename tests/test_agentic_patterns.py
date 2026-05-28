@@ -73,6 +73,8 @@ EXPECTED_TOOLS = {
     "resolve_references",
     "list_resources",
     "get_resource",
+    "get_config",
+    "validate_config",
     "load_summary",
     "catalog_artifacts",
     "search_terms",

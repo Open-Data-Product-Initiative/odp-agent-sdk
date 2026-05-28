@@ -8,15 +8,20 @@ needs one surface across ODPS, ODPC, ODPG, and ODPV documents:
 ```python
 from open_data_products import (
     detect_document,
+    copy_config_template,
     explain_document,
     generate_local_artifact,
     generate_local_artifacts,
+    get_config,
+    get_config_path,
     get_resource,
     list_resources,
     load_generation_prompt,
+    print_config,
     load_document,
     load_summary,
     resolve_references,
+    validate_config,
     validate_document,
 )
 
@@ -26,6 +31,11 @@ summary = explain_document(document)
 references = resolve_references(document)
 resources = list_resources()
 metadata = load_summary("examples/product.yaml")
+config = get_config("generation")
+config_path = get_config_path("generation")
+copy_config_template("generation", "my-generation.config.yaml")
+config_report = validate_config("generation", "my-generation.config.yaml")
+config_yaml = print_config("generation", "my-generation.config.yaml")
 prompt = load_generation_prompt("odps_data_product_fragment.md")
 signal = generate_local_artifact("signal", "signal.txt", "open_data_products/generation/fragments")
 artifacts = generate_local_artifacts("open_data_products/generation/source_docs", "open_data_products/generation/fragments")
@@ -47,6 +57,12 @@ artifacts = generate_local_artifacts("open_data_products/generation/source_docs"
   document body.
 - `list_resources()` and `get_resource(id)`: discover bundled schemas,
   prompt templates, vocabularies, examples, and JSONL retrieval records.
+- `get_config(domain="generation")`, `get_config_path(domain="generation")`,
+  `copy_config_template("generation", destination)`, `print_config(...)`, and
+  `validate_config("generation", path)`: discover the bundled config template,
+  copy it to a user-editable file, print the selected YAML, and validate safe
+  resolved provider/model settings without exposing secret values or contacting
+  providers.
 - `list_generation_prompts()` and `load_generation_prompt(name)`: discover and
   load editable LLM prompts for generating standards-ready YAML artifacts.
 - `generate_local_artifact(kind, source, output_dir, model="qwen2.5")`: generate
@@ -88,9 +104,9 @@ open-data-products refs graph.yaml --json
 open-data-products resources --json
 # Requires Ollama running locally and `ollama pull qwen2.5` for the default provider.
 open-data-products generate --json
-open-data-products generate --config generation.config.yaml --json
-open-data-products generate --config generation.config.yaml --provider groq --json
-open-data-products generate --config generation.config.yaml --provider claude --json
+open-data-products generate --config my-generation.config.yaml --json
+open-data-products generate --config my-generation.config.yaml --provider groq --json
+open-data-products generate --config my-generation.config.yaml --provider claude --json
 open-data-products summary examples/product.yaml
 open-data-products manifest --json
 open-data-products serve

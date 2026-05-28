@@ -52,6 +52,7 @@ ODPV vocabulary commands:
 
 Discovery and agent commands:
   resources    List bundled schemas, vocabularies, and indexes
+  config       Show or copy editable SDK config templates
   manifest     Emit the MCP/agent manifest
   serve        Run the MCP server over stdio
 
@@ -88,6 +89,7 @@ Examples:
   open-data-products odpv-context DataProduct --json
   open-data-products resources --id odpc.objects --json
   open-data-products resources --id odpv.terms --json
+  open-data-products config generation --copy-to my-generation.config.yaml
   open-data-products resources --json
   open-data-products generate --json
   open-data-products generate --config generation.config.yaml --json
@@ -153,6 +155,50 @@ def main(argv: Optional[List[str]] = None) -> int:
         "summary", help="Lightweight artifact reference for a document"
     )
     summary_parser.add_argument("document", help="Path to an ODP document")
+
+    config_parser = subparsers.add_parser(
+        "config", help="Show or copy SDK config templates"
+    )
+    config_parser.add_argument(
+        "domain",
+        nargs="?",
+        choices=["generation"],
+        default="generation",
+        help="Config domain to inspect. Defaults to generation.",
+    )
+    config_parser.add_argument(
+        "--config",
+        dest="config_path",
+        help="Inspect a user-owned config file instead of the bundled template.",
+    )
+    config_parser.add_argument(
+        "--copy-to",
+        dest="copy_to",
+        metavar="PATH",
+        help="Copy the bundled config template to a user-editable file.",
+    )
+    config_parser.add_argument(
+        "--copy",
+        dest="copy_to",
+        metavar="PATH",
+        help=argparse.SUPPRESS,
+    )
+    config_parser.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="Allow --copy-to to replace an existing file.",
+    )
+    config_parser.add_argument(
+        "--check",
+        action="store_true",
+        help="Validate the config file without contacting the LLM provider.",
+    )
+    config_parser.add_argument(
+        "--print",
+        action="store_true",
+        help="Print the raw YAML config template or selected config file.",
+    )
+    config_parser.add_argument("--json", action="store_true", help="Emit JSON")
 
     generate_parser = subparsers.add_parser(
         "generate",
@@ -569,6 +615,60 @@ def main(argv: Optional[List[str]] = None) -> int:
 
         if args.command == "summary":
             print(json.dumps(load_summary(args.document), indent=2))
+            return 0
+
+        if args.command == "config":
+            from . import generation
+
+            try:
+                if args.print:
+                    print(generation.print_config(args.domain, args.config_path), end="")
+                    return 0
+                if args.check:
+                    payload = generation.validate_config(args.domain, args.config_path)
+                else:
+                    payload = generation.get_config(args.domain, args.config_path)
+                if args.copy_to:
+                    copied_to = generation.copy_config_template(
+                        args.domain,
+                        args.copy_to,
+                        overwrite=args.overwrite,
+                    )
+                    payload["copied_to"] = str(copied_to)
+                    payload["config_path"] = str(copied_to)
+                    payload["editable"] = True
+            except (FileExistsError, FileNotFoundError, KeyError, ValueError) as exc:
+                print(str(exc), file=sys.stderr)
+                return 1
+
+            if args.json:
+                print(json.dumps(payload, indent=2))
+            else:
+                if args.check:
+                    print(f"Config domain: {payload['domain']}")
+                    print(f"Active config: {payload['config_path']}")
+                    print(f"Valid: {payload['valid']}")
+                    for error in payload["errors"]:
+                        print(f"Error: {error}")
+                    for warning in payload["warnings"]:
+                        print(f"Warning: {warning}")
+                    return 0 if payload["valid"] else 1
+                print(f"Config domain: {payload['domain']}")
+                print(f"Bundled template: {payload['template_path']}")
+                print(f"Active config: {payload['config_path']}")
+                if "copied_to" in payload:
+                    print(f"Copied editable config to: {payload['copied_to']}")
+                resolved = payload["resolved"]
+                print(f"Provider: {resolved['provider']}")
+                print(f"Model: {resolved['model']}")
+                print(f"Input: {resolved['input_path']}")
+                print(f"Output: {resolved['output_path']}")
+                print(
+                    "Edit a copied config and pass it with "
+                    "`open-data-products generate --config <path>`."
+                )
+            if args.check:
+                return 0 if payload["valid"] else 1
             return 0
 
         if args.command == "generate":

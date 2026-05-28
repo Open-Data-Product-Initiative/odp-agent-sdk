@@ -72,5 +72,11 @@ jobs:
       - name: Check distribution metadata
         run: python -m twine check dist/*
 
+      - name: Upload distribution artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/*
+
       - name: Publish distribution to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1

@@ -41,6 +41,7 @@ def test_unified_cli_help_uses_compact_command_metavar(
     assert "resources --id odpv.terms" in help_text
     assert "MCP search_terms" in help_text
     assert "Discovery and agent commands:" in help_text
+    assert "config       Show or copy editable SDK config templates" in help_text
     assert "ODPC catalog commands:" in help_text
     assert "odpc-summary" in help_text
     assert "odpc-search" in help_text
@@ -145,6 +146,95 @@ def test_unified_cli_resources_and_manifest(capsys: pytest.CaptureFixture[str]) 
         "search_terms",
         "agent_context",
     }
+
+
+def test_unified_cli_config_reports_generation_template(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    assert main(["config", "generation", "--json"]) == 0
+    payload = _json_output(capsys)
+
+    assert payload["domain"] == "generation"
+    assert payload["template_path"].endswith(
+        "open_data_products/generation/generation.config.yaml"
+    )
+    assert payload["resolved"]["provider"] == "ollama"
+    assert payload["resolved"]["model"] == "qwen2.5"
+    assert payload["editable"] is False
+    assert "claude" in payload["providers"]
+
+
+def test_unified_cli_config_prints_current_config(
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+) -> None:
+    config = tmp_path / "my-generation.config.yaml"
+    config.write_text(
+        "provider: groq\nproviders:\n  groq:\n    type: openai\n",
+        encoding="utf-8",
+    )
+
+    assert main(["config", "generation", "--config", str(config), "--print"]) == 0
+    output = capsys.readouterr().out
+
+    assert output.startswith("provider: groq")
+    assert "type: openai" in output
+    assert "Config domain:" not in output
+
+
+def test_unified_cli_config_copies_generation_template(
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+) -> None:
+    output = tmp_path / "generation.config.yaml"
+
+    assert main(["config", "generation", "--copy-to", str(output), "--json"]) == 0
+    payload = _json_output(capsys)
+
+    assert payload["domain"] == "generation"
+    assert payload["copied_to"] == str(output)
+    assert payload["config_path"] == str(output)
+    assert output.read_text(encoding="utf-8").startswith("# Generation config")
+
+
+def test_unified_cli_config_copies_generation_template_to_folder(
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+) -> None:
+    output_dir = tmp_path / "configs" / "llm"
+    expected = output_dir / "generation.config.yaml"
+
+    assert main(["config", "generation", "--copy-to", f"{output_dir}/", "--json"]) == 0
+    payload = _json_output(capsys)
+
+    assert payload["copied_to"] == str(expected)
+    assert payload["config_path"] == str(expected)
+    assert expected.read_text(encoding="utf-8").startswith("# Generation config")
+
+
+def test_unified_cli_config_check_reports_invalid_config(
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+) -> None:
+    config = tmp_path / "bad-generation.config.yaml"
+    config.write_text(
+        """
+provider: groq
+providers:
+  groq:
+    type: spaceship
+    model: gpt-test
+""",
+        encoding="utf-8",
+    )
+
+    assert main(["config", "generation", "--config", str(config), "--check", "--json"]) == 1
+    payload = _json_output(capsys)
+
+    assert payload["valid"] is False
+    assert "providers.groq.type must be one of anthropic, ollama, openai" in payload[
+        "errors"
+    ]
 
 
 def test_unified_cli_local_generation(

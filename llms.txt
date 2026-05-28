@@ -46,6 +46,11 @@ Use the top-level API when the input spec is unknown:
 - `get_resource(id)`
 - `list_generation_prompts()`
 - `load_generation_prompt(name)`
+- `get_config(domain="generation")`
+- `get_config_path(domain="generation")`
+- `copy_config_template("generation", destination)`
+- `print_config("generation", path)`
+- `validate_config("generation", path)`
 - `ensure_ollama_model(model="qwen2.5")`
 - `load_generation_config(path)`
 - `resolve_generation_settings(...)`
@@ -128,6 +133,8 @@ The MCP server exposes safe, read-only tools:
 - `resolve_references`
 - `list_resources`
 - `get_resource`
+- `get_config`
+- `validate_config`
 - `load_summary`
 - `catalog_artifacts`
 - `search_terms`
@@ -200,6 +207,18 @@ providers, use env vars such as `OPENAI_API_KEY`, `OPENROUTER_API_KEY`, or
 entry of `type: anthropic`. The OpenAI-compatible provider path has been
 smoke-tested with OpenAI `gpt-4.1-mini` and Groq `openai/gpt-oss-120b` for ODPC
 signal fragment generation.
+
+When the SDK is installed from PyPI, the bundled generation config is a
+template inside the package. Do not edit `site-packages`; run
+`open-data-products config generation --copy-to my-generation.config.yaml`, edit the
+copied file, then pass it with `open-data-products generate --config
+my-generation.config.yaml`. A folder target such as `--copy-to config/` creates
+missing folders and writes `generation.config.yaml` inside that folder.
+Validate a copied config before generation with
+`open-data-products config generation --config my-generation.config.yaml --check`
+or `validate_config("generation", "my-generation.config.yaml")`. Print the
+selected YAML with
+`open-data-products config generation --config my-generation.config.yaml --print`.
 
 Use `list_generation_prompts()` and `load_generation_prompt(name)` from Python,
 or discover prompt resources with `open-data-products resources --json`.

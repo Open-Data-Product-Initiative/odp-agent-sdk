@@ -7,6 +7,7 @@ import json
 import os
 from pathlib import Path
 import re
+import shutil
 import ssl
 from typing import Any, Callable, Dict, List, Optional, Sequence, Union
 from urllib import error, request
@@ -451,6 +452,264 @@ def load_generation_config(path: PathLike) -> Dict[str, Any]:
     if not isinstance(data, dict):
         raise ValueError("Generation config must be a YAML mapping.")
     return data
+
+
+def get_config_path(domain: str = "generation") -> Path:
+    """Return the bundled config template path for a settings domain."""
+    if domain != "generation":
+        raise KeyError(f"Unknown config domain: {domain}")
+    return DEFAULT_GENERATION_CONFIG
+
+
+def get_config(
+    domain: str = "generation",
+    config_path: Optional[PathLike] = None,
+) -> Dict[str, Any]:
+    """Return a safe, user-facing config summary."""
+    if domain != "generation":
+        raise KeyError(f"Unknown config domain: {domain}")
+
+    source_path = Path(config_path) if config_path else DEFAULT_GENERATION_CONFIG
+    config = load_generation_config(source_path)
+    settings = resolve_generation_settings(source_path)
+    providers = config.get("providers")
+    providers = providers if isinstance(providers, dict) else {}
+    return {
+        "domain": "generation",
+        "template_path": str(DEFAULT_GENERATION_CONFIG),
+        "config_path": str(source_path),
+        "editable": config_path is not None,
+        "copy_hint": (
+            "Copy this template to your project, edit provider/model settings, "
+            "then pass it with `open-data-products generate --config <path>`."
+        ),
+        "selected_provider": settings.provider,
+        "resolved": _generation_settings_dict(settings),
+        "providers": _provider_summaries(providers),
+    }
+
+
+def print_config(
+    domain: str = "generation",
+    config_path: Optional[PathLike] = None,
+) -> str:
+    """Return the raw YAML config template or user config content."""
+    if domain != "generation":
+        raise KeyError(f"Unknown config domain: {domain}")
+    source_path = Path(config_path) if config_path else DEFAULT_GENERATION_CONFIG
+    if not source_path.is_file():
+        raise FileNotFoundError(f"Generation config not found: {source_path}")
+    return source_path.read_text(encoding="utf-8")
+
+
+def validate_config(
+    domain: str = "generation",
+    config_path: Optional[PathLike] = None,
+) -> Dict[str, Any]:
+    """Validate a user-editable config file without contacting providers."""
+    if domain != "generation":
+        raise KeyError(f"Unknown config domain: {domain}")
+
+    source_path = Path(config_path) if config_path else DEFAULT_GENERATION_CONFIG
+    errors: List[str] = []
+    warnings: List[str] = []
+    try:
+        config = load_generation_config(source_path)
+    except (FileNotFoundError, ValueError) as exc:
+        return {
+            "domain": "generation",
+            "config_path": str(source_path),
+            "valid": False,
+            "errors": [str(exc)],
+            "warnings": [],
+            "resolved": None,
+        }
+
+    allowed_top = {
+        "provider",
+        "model",
+        "input",
+        "output",
+        "baseUrl",
+        "providers",
+        "version",
+        "maxTokens",
+    }
+    for key in config:
+        if key not in allowed_top:
+            errors.append(f"Unknown top-level generation config key: {key}")
+
+    providers = config.get("providers")
+    if providers is not None and not isinstance(providers, dict):
+        errors.append("providers must be a mapping")
+        providers = {}
+    providers = providers if isinstance(providers, dict) else {}
+
+    provider_name = config.get("provider")
+    if provider_name is not None and not isinstance(provider_name, str):
+        errors.append("provider must be a string")
+        provider_name = None
+    selected_provider = provider_name or "ollama"
+    if providers and selected_provider not in providers:
+        errors.append(f"providers.{selected_provider} is missing")
+
+    _validate_optional_string(config, "model", "model", errors)
+    _validate_optional_string(config, "input", "input", errors)
+    _validate_optional_string(config, "output", "output", errors)
+    _validate_optional_string(config, "baseUrl", "baseUrl", errors)
+    _validate_optional_string(config, "version", "version", errors)
+    _validate_optional_positive_int(config, "maxTokens", "maxTokens", errors)
+    _find_secret_values(config, "", errors)
+
+    for name, value in providers.items():
+        provider_path = f"providers.{name}"
+        if not isinstance(name, str):
+            errors.append("provider names must be strings")
+            continue
+        if not isinstance(value, dict):
+            errors.append(f"{provider_path} must be a mapping")
+            continue
+        _validate_provider_config(provider_path, value, errors, warnings)
+
+    resolved = None
+    if not errors:
+        try:
+            resolved = _generation_settings_dict(resolve_generation_settings(source_path))
+        except ValueError as exc:
+            errors.append(str(exc))
+
+    return {
+        "domain": "generation",
+        "config_path": str(source_path),
+        "valid": not errors,
+        "errors": errors,
+        "warnings": warnings,
+        "resolved": resolved,
+    }
+
+
+def copy_config_template(
+    domain: str,
+    destination: PathLike,
+    *,
+    overwrite: bool = False,
+) -> Path:
+    """Copy a bundled config template to a user-editable file."""
+    source = get_config_path(domain)
+    destination_text = str(destination)
+    target = Path(destination)
+    if target.is_dir() or destination_text.endswith(("/", "\\")):
+        target = target / source.name
+    if target.exists() and not overwrite:
+        raise FileExistsError(f"Config file already exists: {target}")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(source, target)
+    return target
+
+
+def _validate_provider_config(
+    path: str,
+    provider: Dict[str, Any],
+    errors: List[str],
+    warnings: List[str],
+) -> None:
+    allowed_provider = {"type", "model", "baseUrl", "apiKeyEnv", "version", "maxTokens"}
+    allowed_types = {"anthropic", "ollama", "openai"}
+    for key in provider:
+        if key not in allowed_provider:
+            errors.append(f"Unknown generation config key: {path}.{key}")
+
+    provider_type = provider.get("type")
+    if provider_type is not None and provider_type not in allowed_types:
+        errors.append(f"{path}.type must be one of anthropic, ollama, openai")
+    elif provider_type is None:
+        warnings.append(f"{path}.type is not set; provider name will be used")
+
+    _validate_optional_string(provider, "model", f"{path}.model", errors)
+    _validate_optional_string(provider, "baseUrl", f"{path}.baseUrl", errors)
+    _validate_optional_string(provider, "version", f"{path}.version", errors)
+    _validate_optional_positive_int(
+        provider, "maxTokens", f"{path}.maxTokens", errors
+    )
+    api_key_env = provider.get("apiKeyEnv")
+    if api_key_env is not None and (
+        not isinstance(api_key_env, str) or _looks_like_secret(api_key_env)
+    ):
+        errors.append(f"{path}.apiKeyEnv must be an environment variable name")
+
+
+def _validate_optional_string(
+    data: Dict[str, Any],
+    key: str,
+    path: str,
+    errors: List[str],
+) -> None:
+    value = data.get(key)
+    if value is not None and not isinstance(value, str):
+        errors.append(f"{path} must be a string")
+
+
+def _validate_optional_positive_int(
+    data: Dict[str, Any],
+    key: str,
+    path: str,
+    errors: List[str],
+) -> None:
+    value = data.get(key)
+    if value is None:
+        return
+    if not isinstance(value, int) or value <= 0:
+        errors.append(f"{path} must be a positive integer")
+
+
+def _find_secret_values(value: Any, path: str, errors: List[str]) -> None:
+    if isinstance(value, dict):
+        for key, item in value.items():
+            child_path = f"{path}.{key}" if path else str(key)
+            _find_secret_values(item, child_path, errors)
+    elif isinstance(value, list):
+        for index, item in enumerate(value):
+            _find_secret_values(item, f"{path}[{index}]", errors)
+    elif isinstance(value, str) and _looks_like_secret(value):
+        errors.append(f"{path} appears to contain a secret value")
+
+
+def _looks_like_secret(value: str) -> bool:
+    lowered = value.lower()
+    return (
+        value.startswith(("sk-", "sk_", "xoxb-", "ghp_"))
+        or "api_key=" in lowered
+        or "bearer " in lowered
+    )
+
+
+def _generation_settings_dict(settings: GenerationSettings) -> Dict[str, Any]:
+    return {
+        "provider": settings.provider,
+        "provider_type": settings.provider_type,
+        "model": settings.model,
+        "input_path": settings.input_path,
+        "output_path": settings.output_path,
+        "base_url": settings.base_url,
+        "api_key_env": settings.api_key_env,
+        "api_version": settings.api_version,
+        "max_tokens": settings.max_tokens,
+    }
+
+
+def _provider_summaries(providers: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
+    summaries = {}
+    for name, value in providers.items():
+        provider = value if isinstance(value, dict) else {}
+        summaries[str(name)] = {
+            "type": provider.get("type"),
+            "model": provider.get("model"),
+            "base_url": provider.get("baseUrl"),
+            "api_key_env": provider.get("apiKeyEnv"),
+            "api_version": provider.get("version"),
+            "max_tokens": provider.get("maxTokens"),
+        }
+    return summaries
 
 
 def resolve_generation_settings(
@@ -1035,10 +1294,13 @@ __all__ = [
     "GenerationSettings",
     "GenerationTask",
     "anthropic_generate",
+    "copy_config_template",
     "create_generation_client",
     "ensure_ollama_model",
     "generate_local_artifact",
     "generate_local_artifacts",
+    "get_config",
+    "get_config_path",
     "list_generation_prompts",
     "list_ollama_models",
     "load_generation_config",
@@ -1046,6 +1308,8 @@ __all__ = [
     "load_source_documents",
     "ollama_generate",
     "openai_generate",
+    "print_config",
     "render_generation_prompt",
     "resolve_generation_settings",
+    "validate_config",
 ]
