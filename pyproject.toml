@@ -90,10 +90,10 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/Open-Data-Product-Initiative/odps-python"
-Documentation = "https://github.com/Open-Data-Product-Initiative/odps-python#readme"
-Repository = "https://github.com/Open-Data-Product-Initiative/odps-python"
-"Bug Tracker" = "https://github.com/Open-Data-Product-Initiative/odps-python/issues"
+Homepage = "https://opendataproducts.org/sdk"
+Documentation = "https://github.com/Open-Data-Product-Initiative/odp-agent-sdk#readme"
+Repository = "https://github.com/Open-Data-Product-Initiative/odp-agent-sdk"
+"Bug Tracker" = "https://github.com/Open-Data-Product-Initiative/odp-agent-sdk/issues"
 
 [tool.setuptools]
 packages = [
