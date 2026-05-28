@@ -212,6 +212,31 @@ def test_unified_cli_config_copies_generation_template_to_folder(
     assert expected.read_text(encoding="utf-8").startswith("# Generation config")
 
 
+def test_unified_cli_config_copies_generation_prompts_to_folder(
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+) -> None:
+    output_dir = tmp_path / "prompts"
+
+    assert (
+        main(
+            [
+                "config",
+                "generation",
+                "--copy-prompts-to",
+                str(output_dir),
+                "--json",
+            ]
+        )
+        == 0
+    )
+    payload = _json_output(capsys)
+
+    assert payload["prompt_dir"] == str(output_dir)
+    assert "odpc_signal_fragment.md" in payload["copied_prompts"]
+    assert (output_dir / "odpc_signal_fragment.md").is_file()
+
+
 def test_unified_cli_config_check_reports_invalid_config(
     capsys: pytest.CaptureFixture[str],
     tmp_path: Path,
@@ -235,6 +260,72 @@ providers:
     assert "providers.groq.type must be one of anthropic, ollama, openai" in payload[
         "errors"
     ]
+
+
+def test_unified_cli_generation_uses_custom_prompt_dir(
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    from open_data_products import generation
+
+    prompt_dir = tmp_path / "prompts"
+    prompt_dir.mkdir()
+    (prompt_dir / "odpc_signal_fragment.md").write_text(
+        "CUSTOM\n{source_documents}\n", encoding="utf-8"
+    )
+    source = tmp_path / "source.txt"
+    source.write_text("source", encoding="utf-8")
+    output_dir = tmp_path / "generated"
+    observed: Dict[str, object] = {}
+
+    def fake_generate_local_artifact(
+        artifact_kind: str,
+        source_path: Union[str, Path],
+        output_path: Union[str, Path],
+        model: str = "qwen2.5",
+        ollama_url: str = "http://localhost:11434",
+        client: Optional[object] = None,
+        prompt_dir: Optional[Union[str, Path]] = None,
+    ) -> generation.GeneratedArtifact:
+        observed["prompt_dir"] = str(prompt_dir)
+        output = Path(output_path) / "signal.yaml"
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text("signal: {}\n", encoding="utf-8")
+        return generation.GeneratedArtifact(
+            name="odpc_signals",
+            prompt_name="odpc_signal_fragment.md",
+            output_path=output,
+            valid_yaml=True,
+        )
+
+    monkeypatch.setattr(generation, "generate_local_artifact", fake_generate_local_artifact)
+    monkeypatch.setattr(
+        generation,
+        "create_generation_client",
+        lambda settings: (lambda prompt, model: ""),
+    )
+
+    assert (
+        main(
+            [
+                "generate",
+                "--input",
+                str(source),
+                "--kind",
+                "signal",
+                "--output",
+                str(output_dir),
+                "--prompts",
+                str(prompt_dir),
+                "--json",
+            ]
+        )
+        == 0
+    )
+    _json_output(capsys)
+
+    assert observed["prompt_dir"] == str(prompt_dir)
 
 
 def test_unified_cli_local_generation(

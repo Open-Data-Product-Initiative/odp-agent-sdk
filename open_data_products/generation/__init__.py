@@ -58,6 +58,7 @@ class GenerationSettings:
     api_key_env: Optional[str] = None
     api_version: Optional[str] = None
     max_tokens: Optional[int] = None
+    prompt_path: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -144,20 +145,39 @@ GENERATION_TASK_ALIASES = {
 }
 
 
-def list_generation_prompts() -> List[str]:
+def list_generation_prompts(prompt_dir: Optional[PathLike] = None) -> List[str]:
     """List bundled local generation prompt filenames."""
-    return sorted(path.name for path in _PROMPT_DIR.glob("*.md"))
+    root = Path(prompt_dir) if prompt_dir else _PROMPT_DIR
+    return sorted(path.name for path in root.glob("*.md"))
 
 
-def load_generation_prompt(name: str) -> str:
+def load_generation_prompt(name: str, prompt_dir: Optional[PathLike] = None) -> str:
     """Load a bundled local generation prompt by filename."""
     if "/" in name or "\\" in name:
         raise KeyError(f"Unknown generation prompt: {name}")
 
-    prompt_path = _PROMPT_DIR / name
+    prompt_path = (Path(prompt_dir) if prompt_dir else _PROMPT_DIR) / name
     if not prompt_path.is_file():
         raise KeyError(f"Unknown generation prompt: {name}")
     return prompt_path.read_text(encoding="utf-8")
+
+
+def copy_generation_prompts(
+    destination: PathLike,
+    *,
+    overwrite: bool = False,
+) -> List[Path]:
+    """Copy bundled generation prompts to a user-editable folder."""
+    target = Path(destination)
+    target.mkdir(parents=True, exist_ok=True)
+    copied = []
+    for prompt_path in sorted(_PROMPT_DIR.glob("*.md")):
+        output = target / prompt_path.name
+        if output.exists() and not overwrite:
+            raise FileExistsError(f"Prompt file already exists: {output}")
+        shutil.copyfile(prompt_path, output)
+        copied.append(output)
+    return copied
 
 
 PathLike = Union[str, Path]
@@ -193,9 +213,13 @@ def load_source_documents(source_dir: PathLike) -> str:
     return "\n\n".join(sections)
 
 
-def render_generation_prompt(prompt_name: str, source_dir: PathLike) -> str:
+def render_generation_prompt(
+    prompt_name: str,
+    source_dir: PathLike,
+    prompt_dir: Optional[PathLike] = None,
+) -> str:
     """Render a generation prompt with source documents inlined."""
-    return load_generation_prompt(prompt_name).replace(
+    return load_generation_prompt(prompt_name, prompt_dir=prompt_dir).replace(
         "{source_documents}",
         load_source_documents(source_dir),
     )
@@ -486,6 +510,7 @@ def get_config(
         "selected_provider": settings.provider,
         "resolved": _generation_settings_dict(settings),
         "providers": _provider_summaries(providers),
+        "prompts": settings.prompt_path,
     }
 
 
@@ -530,6 +555,7 @@ def validate_config(
         "model",
         "input",
         "output",
+        "prompts",
         "baseUrl",
         "providers",
         "version",
@@ -556,6 +582,7 @@ def validate_config(
     _validate_optional_string(config, "model", "model", errors)
     _validate_optional_string(config, "input", "input", errors)
     _validate_optional_string(config, "output", "output", errors)
+    _validate_optional_string(config, "prompts", "prompts", errors)
     _validate_optional_string(config, "baseUrl", "baseUrl", errors)
     _validate_optional_string(config, "version", "version", errors)
     _validate_optional_positive_int(config, "maxTokens", "maxTokens", errors)
@@ -694,6 +721,7 @@ def _generation_settings_dict(settings: GenerationSettings) -> Dict[str, Any]:
         "api_key_env": settings.api_key_env,
         "api_version": settings.api_version,
         "max_tokens": settings.max_tokens,
+        "prompt_path": settings.prompt_path,
     }
 
 
@@ -719,6 +747,7 @@ def resolve_generation_settings(
     provider: Optional[str] = None,
     model: Optional[str] = None,
     ollama_url: Optional[str] = None,
+    prompt_dir: Optional[PathLike] = None,
 ) -> GenerationSettings:
     """Resolve generation settings from config plus CLI-style overrides."""
     config: Dict[str, Any] = load_generation_config(config_path) if config_path else {}
@@ -738,6 +767,8 @@ def resolve_generation_settings(
     )
     resolved_input = str(input_path or config.get("input") or "")
     resolved_output = str(output_path or config.get("output") or "")
+    resolved_prompts = prompt_dir or config.get("prompts")
+    resolved_prompt_path = str(resolved_prompts) if resolved_prompts else None
     api_version = None
     max_tokens = None
 
@@ -788,6 +819,7 @@ def resolve_generation_settings(
         api_key_env=api_key_env,
         api_version=api_version,
         max_tokens=max_tokens,
+        prompt_path=resolved_prompt_path,
     )
 
 
@@ -828,6 +860,7 @@ def generate_local_artifacts(
     model: str = DEFAULT_GENERATION_MODEL,
     ollama_url: str = DEFAULT_OLLAMA_URL,
     client: Optional[ModelClient] = None,
+    prompt_dir: Optional[PathLike] = None,
 ) -> List[GeneratedArtifact]:
     """Generate YAML fragments and graph YAML from source documents."""
     destination = Path(output_dir)
@@ -859,6 +892,7 @@ def generate_local_artifacts(
                 model_client,
                 prompt_context=prompt_context,
                 expected_graph_nodes=expected_graph_nodes,
+                prompt_dir=prompt_dir,
             )
         )
     return artifacts
@@ -871,6 +905,7 @@ def generate_local_artifact(
     model: str = DEFAULT_GENERATION_MODEL,
     ollama_url: str = DEFAULT_OLLAMA_URL,
     client: Optional[ModelClient] = None,
+    prompt_dir: Optional[PathLike] = None,
 ) -> GeneratedArtifact:
     """Generate one selected YAML artifact from source documents."""
     destination = Path(output_dir)
@@ -886,6 +921,7 @@ def generate_local_artifact(
         destination,
         model,
         model_client,
+        prompt_dir=prompt_dir,
     )
     if not artifacts:
         raise RuntimeError(f"No artifacts generated for kind: {artifact_kind}")
@@ -908,11 +944,14 @@ def _run_generation_task(
     model_client: ModelClient,
     prompt_context: Optional[str] = None,
     expected_graph_nodes: Optional[Sequence[dict]] = None,
+    prompt_dir: Optional[PathLike] = None,
 ) -> List[GeneratedArtifact]:
     prompt = (
-        _render_generation_prompt_context(task.prompt_name, prompt_context)
+        _render_generation_prompt_context(
+            task.prompt_name, prompt_context, prompt_dir=prompt_dir
+        )
         if prompt_context is not None
-        else render_generation_prompt(task.prompt_name, source)
+        else render_generation_prompt(task.prompt_name, source, prompt_dir=prompt_dir)
     )
     raw_output = model_client(prompt, model)
     yaml_output = _normalize_generated_output(
@@ -995,8 +1034,14 @@ def _fragment_file_name(prefix: str, item_id: str) -> str:
     return f"{prefix}_{_slugify_identifier(item_id)}.yaml"
 
 
-def _render_generation_prompt_context(prompt_name: str, context: str) -> str:
-    return load_generation_prompt(prompt_name).replace("{source_documents}", context)
+def _render_generation_prompt_context(
+    prompt_name: str,
+    context: str,
+    prompt_dir: Optional[PathLike] = None,
+) -> str:
+    return load_generation_prompt(prompt_name, prompt_dir=prompt_dir).replace(
+        "{source_documents}", context
+    )
 
 
 def _generated_artifact_context(artifacts: Sequence[GeneratedArtifact]) -> str:
@@ -1295,6 +1340,7 @@ __all__ = [
     "GenerationTask",
     "anthropic_generate",
     "copy_config_template",
+    "copy_generation_prompts",
     "create_generation_client",
     "ensure_ollama_model",
     "generate_local_artifact",

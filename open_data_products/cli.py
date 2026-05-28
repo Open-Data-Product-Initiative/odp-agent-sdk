@@ -184,6 +184,11 @@ def main(argv: Optional[List[str]] = None) -> int:
         help=argparse.SUPPRESS,
     )
     config_parser.add_argument(
+        "--copy-prompts-to",
+        metavar="DIR",
+        help="Copy bundled generation prompts to a user-editable folder.",
+    )
+    config_parser.add_argument(
         "--overwrite",
         action="store_true",
         help="Allow --copy-to to replace an existing file.",
@@ -254,6 +259,10 @@ def main(argv: Optional[List[str]] = None) -> int:
     generate_parser.add_argument(
         "--model",
         help="Model override. Defaults to config model or qwen2.5.",
+    )
+    generate_parser.add_argument(
+        "--prompts",
+        help="Prompt template folder override. Defaults to config prompts or bundled prompts.",
     )
     generate_parser.add_argument(
         "--ollama-url",
@@ -637,6 +646,13 @@ def main(argv: Optional[List[str]] = None) -> int:
                     payload["copied_to"] = str(copied_to)
                     payload["config_path"] = str(copied_to)
                     payload["editable"] = True
+                if args.copy_prompts_to:
+                    copied_prompts = generation.copy_generation_prompts(
+                        args.copy_prompts_to,
+                        overwrite=args.overwrite,
+                    )
+                    payload["prompt_dir"] = str(Path(args.copy_prompts_to))
+                    payload["copied_prompts"] = [path.name for path in copied_prompts]
             except (FileExistsError, FileNotFoundError, KeyError, ValueError) as exc:
                 print(str(exc), file=sys.stderr)
                 return 1
@@ -658,6 +674,8 @@ def main(argv: Optional[List[str]] = None) -> int:
                 print(f"Active config: {payload['config_path']}")
                 if "copied_to" in payload:
                     print(f"Copied editable config to: {payload['copied_to']}")
+                if "copied_prompts" in payload:
+                    print(f"Copied prompts to: {payload['prompt_dir']}")
                 resolved = payload["resolved"]
                 print(f"Provider: {resolved['provider']}")
                 print(f"Model: {resolved['model']}")
@@ -689,6 +707,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                     provider=args.provider,
                     model=args.model,
                     ollama_url=args.ollama_url,
+                    prompt_dir=args.prompts,
                 )
                 generation_input = settings.input_path or DEFAULT_GENERATION_INPUT
                 generation_output = settings.output_path or DEFAULT_GENERATION_OUTPUT
@@ -698,14 +717,21 @@ def main(argv: Optional[List[str]] = None) -> int:
                 return 1
 
             if args.kind == "all":
+                prompt_kwargs = (
+                    {"prompt_dir": settings.prompt_path} if settings.prompt_path else {}
+                )
                 artifacts = generation.generate_local_artifacts(
                     generation_input,
                     generation_output,
                     model=settings.model,
                     ollama_url=settings.base_url or generation.DEFAULT_OLLAMA_URL,
                     client=model_client,
+                    **prompt_kwargs,
                 )
             else:
+                prompt_kwargs = (
+                    {"prompt_dir": settings.prompt_path} if settings.prompt_path else {}
+                )
                 artifacts = [
                     generation.generate_local_artifact(
                         args.kind,
@@ -714,6 +740,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                         model=settings.model,
                         ollama_url=settings.base_url or generation.DEFAULT_OLLAMA_URL,
                         client=model_client,
+                        **prompt_kwargs,
                     )
                 ]
             valid_yaml = all(artifact.valid_yaml for artifact in artifacts)

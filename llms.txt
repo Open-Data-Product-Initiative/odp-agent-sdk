@@ -49,6 +49,7 @@ Use the top-level API when the input spec is unknown:
 - `get_config(domain="generation")`
 - `get_config_path(domain="generation")`
 - `copy_config_template("generation", destination)`
+- `copy_generation_prompts(destination)`
 - `print_config("generation", path)`
 - `validate_config("generation", path)`
 - `ensure_ollama_model(model="qwen2.5")`
@@ -214,6 +215,10 @@ template inside the package. Do not edit `site-packages`; run
 copied file, then pass it with `open-data-products generate --config
 my-generation.config.yaml`. A folder target such as `--copy-to config/` creates
 missing folders and writes `generation.config.yaml` inside that folder.
+Bundled prompts are templates too; run
+`open-data-products config generation --copy-prompts-to prompts/`, edit the
+copied Markdown files, then pass them with `open-data-products generate
+--prompts prompts/`.
 Validate a copied config before generation with
 `open-data-products config generation --config my-generation.config.yaml --check`
 or `validate_config("generation", "my-generation.config.yaml")`. Print the

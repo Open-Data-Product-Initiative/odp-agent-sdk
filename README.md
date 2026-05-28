@@ -200,13 +200,34 @@ open-data-products resources --id odpg.objects --json
 The LLM generation commands
 [require Ollama or configured provider credentials](docs/generation.md#llm-setup).
 
-Configure a project-owned generation config before changing provider or model
-settings:
+Use the bundled default config and bundled prompts as-is:
+
+```bash
+# LLM generation
+open-data-products generate \
+  --input source_docs/ \
+  --output generated/ \
+  --json
+
+open-data-products generate \
+  --input source_docs/turnaround-delay-signal.txt \
+  --kind signal \
+  --output generated/ \
+  --json
+```
+
+Customize provider, model, or paths with a project-owned config:
 
 ```bash
 open-data-products config generation --copy-to my-generation.config.yaml
 open-data-products config generation --config my-generation.config.yaml --print
 open-data-products config generation --config my-generation.config.yaml --check
+
+open-data-products generate \
+  --config my-generation.config.yaml \
+  --input source_docs/ \
+  --output generated/ \
+  --json
 ```
 
 When installed from PyPI, the bundled generation config lives inside the
@@ -215,24 +236,6 @@ or model settings; do not edit files under `site-packages`. The
 `my-generation.config.yaml` name below is only an example for your copied file.
 You can also pass a folder path, such as `--copy-to config/`, and missing
 folders are created automatically.
-
-Then generate artifacts from source documents:
-
-```bash
-# LLM generation
-open-data-products generate \
-  --config my-generation.config.yaml \
-  --input source_docs/ \
-  --output generated/ \
-  --json
-
-open-data-products generate \
-  --config my-generation.config.yaml \
-  --input source_docs/turnaround-delay-signal.txt \
-  --kind signal \
-  --output generated/ \
-  --json
-```
 
 Override the configured provider or model for a single run when testing a
 different LLM:
@@ -252,6 +255,21 @@ open-data-products generate \
   --model claude-sonnet-4-5 \
   --input source_docs/turnaround-delay-signal.txt \
   --kind signal \
+  --output generated/ \
+  --json
+```
+
+Generation uses bundled prompt templates by default. If you want to customize
+the prompts, copy them to a project-owned folder, edit the Markdown files, and
+pass that folder with `--prompts`:
+
+```bash
+open-data-products config generation --copy-prompts-to prompts/
+
+open-data-products generate \
+  --config my-generation.config.yaml \
+  --prompts prompts/ \
+  --input source_docs/ \
   --output generated/ \
   --json
 ```

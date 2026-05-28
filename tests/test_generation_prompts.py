@@ -11,6 +11,7 @@ from open_data_products.generation import (
     DEFAULT_GENERATION_CONFIG,
     GenerationSettings,
     anthropic_generate,
+    copy_generation_prompts,
     copy_config_template,
     create_generation_client,
     ensure_ollama_model,
@@ -182,6 +183,25 @@ def test_copy_config_template_accepts_folder_destination(tmp_path):
     assert "Do not use YAML document separators" in load_generation_prompt(
         "odpc_signal_fragment.md"
     )
+
+
+def test_copy_generation_prompts_and_load_custom_prompt(tmp_path):
+    """Test that users can copy and override bundled prompt templates."""
+    prompt_dir = tmp_path / "prompts"
+
+    copied = copy_generation_prompts(prompt_dir)
+
+    assert prompt_dir / "odpc_signal_fragment.md" in copied
+    custom = prompt_dir / "odpc_signal_fragment.md"
+    custom.write_text("CUSTOM PROMPT\n{source_documents}\n", encoding="utf-8")
+    prompt = render_generation_prompt(
+        "odpc_signal_fragment.md",
+        GENERATION_SOURCE_DOCS,
+        prompt_dir=prompt_dir,
+    )
+
+    assert prompt.startswith("CUSTOM PROMPT")
+    assert "--- Source file:" in prompt
 
 
 def test_generation_prompt_rejects_unknown_name():

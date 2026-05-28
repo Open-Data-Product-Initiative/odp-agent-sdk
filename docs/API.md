@@ -9,6 +9,7 @@ needs one surface across ODPS, ODPC, ODPG, and ODPV documents:
 from open_data_products import (
     detect_document,
     copy_config_template,
+    copy_generation_prompts,
     explain_document,
     generate_local_artifact,
     generate_local_artifacts,
@@ -34,9 +35,10 @@ metadata = load_summary("examples/product.yaml")
 config = get_config("generation")
 config_path = get_config_path("generation")
 copy_config_template("generation", "my-generation.config.yaml")
+copy_generation_prompts("prompts")
 config_report = validate_config("generation", "my-generation.config.yaml")
 config_yaml = print_config("generation", "my-generation.config.yaml")
-prompt = load_generation_prompt("odps_data_product_fragment.md")
+prompt = load_generation_prompt("odps_data_product_fragment.md", prompt_dir="prompts")
 signal = generate_local_artifact("signal", "signal.txt", "open_data_products/generation/fragments")
 artifacts = generate_local_artifacts("open_data_products/generation/source_docs", "open_data_products/generation/fragments")
 ```
@@ -58,11 +60,11 @@ artifacts = generate_local_artifacts("open_data_products/generation/source_docs"
 - `list_resources()` and `get_resource(id)`: discover bundled schemas,
   prompt templates, vocabularies, examples, and JSONL retrieval records.
 - `get_config(domain="generation")`, `get_config_path(domain="generation")`,
-  `copy_config_template("generation", destination)`, `print_config(...)`, and
-  `validate_config("generation", path)`: discover the bundled config template,
-  copy it to a user-editable file, print the selected YAML, and validate safe
-  resolved provider/model settings without exposing secret values or contacting
-  providers.
+  `copy_config_template("generation", destination)`, `copy_generation_prompts`,
+  `print_config(...)`, and `validate_config("generation", path)`: discover the
+  bundled config and prompt templates, copy them to user-editable files, print
+  the selected YAML, and validate safe resolved provider/model settings without
+  exposing secret values or contacting providers.
 - `list_generation_prompts()` and `load_generation_prompt(name)`: discover and
   load editable LLM prompts for generating standards-ready YAML artifacts.
 - `generate_local_artifact(kind, source, output_dir, model="qwen2.5")`: generate

@@ -11,7 +11,7 @@ family. Each standard lives in its own namespace:
 
 # flake8: noqa: E402
 
-__version__ = "0.1.2"
+__version__ = "0.1.3"
 version = __version__
 
 from . import odpc
@@ -57,6 +57,7 @@ from .contracts import (
 from .generation import (
     anthropic_generate,
     copy_config_template,
+    copy_generation_prompts,
     create_generation_client,
     ensure_ollama_model,
     generate_local_artifact,
@@ -146,6 +147,7 @@ __all__ = [
     "generate_product_contract_report",
     "anthropic_generate",
     "copy_config_template",
+    "copy_generation_prompts",
     "create_generation_client",
     "ensure_ollama_model",
     "generate_local_artifact",

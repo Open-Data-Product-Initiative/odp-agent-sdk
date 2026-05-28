@@ -33,6 +33,13 @@ open_data_products/generation/
   fragments/           # generated ODPC fragments, ODPG graph, HTML explorer
 ```
 
+When installed from PyPI, bundled prompt templates are package data. Copy them
+to a project-owned folder before editing:
+
+```bash
+open-data-products config generation --copy-prompts-to prompts/
+```
+
 The `source_docs/` folder is generic. Replace the bundled sample files with
 source documents for any domain. The generator reads `.md` and `.txt` files.
 
@@ -113,6 +120,7 @@ example for your copied file. You can also pass a folder path, such as
 
 ```bash
 open-data-products config generation --copy-to my-generation.config.yaml
+open-data-products config generation --copy-prompts-to prompts/
 ```
 
 Then inspect or edit `my-generation.config.yaml`, validate it, and pass it
@@ -121,7 +129,7 @@ explicitly:
 ```bash
 open-data-products config generation --config my-generation.config.yaml --print
 open-data-products config generation --config my-generation.config.yaml --check
-open-data-products generate --config my-generation.config.yaml --json
+open-data-products generate --config my-generation.config.yaml --prompts prompts/ --json
 ```
 
 To use another provider already defined in the config, override only the
@@ -130,6 +138,7 @@ provider:
 ```bash
 open-data-products generate \
   --config my-generation.config.yaml \
+  --prompts prompts/ \
   --provider groq \
   --json
 ```
@@ -140,6 +149,7 @@ input, or output without editing the config:
 ```bash
 open-data-products generate \
   --config my-generation.config.yaml \
+  --prompts prompts/ \
   --provider openai \
   --model gpt-4.1-mini \
   --input source_docs/ \
@@ -154,6 +164,8 @@ provider: ollama
 model: qwen2.5
 input: open_data_products/generation/source_docs/
 output: open_data_products/generation/fragments/
+# Optional project-owned prompt template folder.
+# prompts: prompts/
 
 providers:
   ollama:
