@@ -1,19 +1,24 @@
 # SDK Course Guides
 
-These short guides are designed for learners who installed the SDK from PyPI:
+These short guides are designed for learners who want to install the SDK from
+PyPI and try practical Open Data Products workflows.
 
 ```bash
 pip install open-data-products
 ```
 
-The first four guides do not use an LLM. They cover validation, explanation,
-vocabulary lookup, and graph conversion.
+Start with the setup guide if you have never worked with Python, `pip`, PyPI,
+or virtual environments before.
+
+The first four workflow guides do not use an LLM. They cover validation,
+explanation, vocabulary lookup, and graph conversion.
 
 The last four guides use the SDK generation command. They require Ollama with
 Qwen 2.5 or a configured online provider.
 
 ## Non-LLM Guides
 
+0. [Set up Python, pip, PyPI, and the SDK](00-setup-python.md)
 1. [Validate an ODPS product](01-validate-product.md)
 2. [Explain and summarize a product](02-explain-and-summarize.md)
 3. [Use the ODPV vocabulary helpers](03-use-vocabulary-helpers.md)

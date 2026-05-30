@@ -2,10 +2,16 @@
 
 The SDK can use a configured LLM provider to turn plain source documents into
 standards-ready ODPC fragments and ODPG graph YAML. The default provider is
-local Ollama with Qwen 2.5, and OpenAI can be selected through the generation
-config. This workflow stops before catalog publishing: it produces
-source-backed fragment files and a graph file that can be validated, inspected,
-and used by the existing ODPC/ODPG helpers.
+local Ollama with Qwen 2.5, but the same generation workflow also supports
+local OpenAI-compatible servers such as LM Studio, vLLM, llama.cpp server, and
+LocalAI. Through those servers, the SDK can run locally hosted models such as
+DeepSeek, Qwen, Llama, Mistral, Phi, Gemma, and other models exposed by the
+selected local runtime.
+
+Online providers can also be selected through the generation config, including
+OpenAI-compatible providers and Claude. This workflow stops before catalog
+publishing: it produces source-backed fragment files and a graph file that can
+be validated, inspected, and used by the existing ODPC/ODPG helpers.
 
 ## LLM Setup
 
@@ -21,6 +27,19 @@ The default provider is `ollama` and the default model is `qwen2.5`. External
 providers can be selected with a generation config file. OpenAI generation
 requires `OPENAI_API_KEY` in the environment; the SDK stores only the
 environment variable name in config.
+
+For LM Studio and similar local servers, use a provider entry with
+`type: openai-chat` and set the model to the name loaded in that server:
+
+```bash
+open-data-products generate \
+  --config my-generation.config.yaml \
+  --provider lmstudio \
+  --model deepseek-r1-distill-qwen-7b \
+  --input source_docs/ \
+  --output generated/ \
+  --json
+```
 
 ## Folder Layout
 
