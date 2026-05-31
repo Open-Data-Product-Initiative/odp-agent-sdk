@@ -31,7 +31,7 @@ def test_unified_cli_help_uses_compact_command_metavar(
 
     assert exc_info.value.code == 0
     help_text = capsys.readouterr().out
-    assert "usage: open-data-products [-h] COMMAND ..." in help_text
+    assert "usage: open-data-products [-h] [-V] COMMAND ..." in help_text
     assert "{validate,explain,refs" not in help_text
     assert "Core document commands:" in help_text
     assert "ODPC catalog commands:" in help_text
@@ -84,6 +84,18 @@ def test_unified_cli_help_uses_compact_command_metavar(
     assert "generation.config.yaml --json" not in help_text
     assert "validate" in help_text
     assert "product" in help_text
+
+
+@pytest.mark.parametrize("flag", ["--version", "-V"])
+def test_unified_cli_version_flag(
+    flag: str,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    with pytest.raises(SystemExit) as exc_info:
+        main([flag])
+
+    assert exc_info.value.code == 0
+    assert capsys.readouterr().out == "open-data-products 0.1.4\n"
 
 
 def test_product_cli_help_uses_compact_command_metavar_and_examples(

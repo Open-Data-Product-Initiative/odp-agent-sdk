@@ -8,6 +8,7 @@ import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Dict, List, Optional
 
+from . import __version__
 from .agent import (
     explain_document,
     load_document,
@@ -185,6 +186,12 @@ def main(argv: Optional[List[str]] = None) -> int:
         ),
         epilog=TOP_LEVEL_HELP,
         formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument(
+        "-V",
+        "--version",
+        action="version",
+        version=f"%(prog)s {__version__}",
     )
     subparsers = parser.add_subparsers(
         dest="command",

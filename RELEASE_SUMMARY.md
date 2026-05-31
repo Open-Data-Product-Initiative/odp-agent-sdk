@@ -13,6 +13,8 @@ flexibility for local and OpenAI-compatible LLM providers.
   metadata report by default.
 - `open-data-products summary <document> --json` preserves the previous
   machine-readable summary payload.
+- `open-data-products --version` and `open-data-products -V` now report the
+  installed SDK version.
 - Top-level `open-data-products --help` now shows current generation examples.
 - Help examples now use project-owned config names, `generated/` output folders,
   provider/model overrides, and custom prompt folder usage.
