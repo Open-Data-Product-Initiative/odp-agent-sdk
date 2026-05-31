@@ -15,6 +15,12 @@ from .agent import (
     resolve_references,
     validate_document,
 )
+from .odpg.graph import (
+    collect_relationship_types,
+    graph_metadata,
+    graph_payload,
+    localized_text,
+)
 from .odps import OpenDataProduct
 from .resources import get_resource, list_resources
 from .summary import load_summary
@@ -141,6 +147,42 @@ def _explain_json_payload(document: object, path: str) -> Dict[str, object]:
                 "objectives": len(document.product_strategy.objectives),
                 "product_kpis": len(document.product_strategy.product_kpis),
             }
+        return payload
+
+    if result.spec == "odpg" and isinstance(document, dict):
+        graph = graph_payload(document)
+        metadata = graph_metadata(document)
+        node_types = sorted(
+            {
+                str(node.get("type"))
+                for node in graph.get("nodes", [])
+                if isinstance(node, dict) and node.get("type")
+            }
+        )
+        node_references = [
+            str(node.get("$ref") or node.get("ref"))
+            for node in graph.get("nodes", [])
+            if isinstance(node, dict) and (node.get("$ref") or node.get("ref"))
+        ]
+        payload.update(
+            {
+                "schema": document.get("schema", ""),
+                "graph": {
+                    "id": metadata.get("id", ""),
+                    "name": localized_text(metadata.get("name")),
+                    "description": localized_text(metadata.get("description")),
+                    "domain": localized_text(metadata.get("domain")),
+                    "purpose": localized_text(metadata.get("purpose")),
+                    "status": metadata.get("status", ""),
+                    "visibility": metadata.get("visibility", ""),
+                },
+                "nodes": len(graph.get("nodes", [])),
+                "edges": len(graph.get("edges", [])),
+                "node_types": node_types,
+                "relationship_types": collect_relationship_types(document),
+                "node_references": node_references,
+            }
+        )
         return payload
 
     payload["summary"] = explain_document(document, path=Path(path))

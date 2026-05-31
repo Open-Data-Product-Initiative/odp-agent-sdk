@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Optional, Union
 
 import pytest
 
+from open_data_products import __version__
 from open_data_products.cli import main
 
 pytestmark = pytest.mark.functional
@@ -95,7 +96,7 @@ def test_unified_cli_version_flag(
         main([flag])
 
     assert exc_info.value.code == 0
-    assert capsys.readouterr().out == "open-data-products 0.1.4\n"
+    assert capsys.readouterr().out == f"open-data-products {__version__}\n"
 
 
 def test_product_cli_help_uses_compact_command_metavar_and_examples(

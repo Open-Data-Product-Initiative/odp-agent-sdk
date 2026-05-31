@@ -168,6 +168,52 @@ def test_top_level_cli_json_validate_and_explain(tmp_path, capsys):
     assert "summary" not in explain_payload
 
 
+def test_top_level_cli_json_explain_odpg_returns_structured_payload(
+    tmp_path, capsys
+):
+    path = tmp_path / "graph.yaml"
+    path.write_text(
+        yaml.safe_dump(
+            {
+                "schema": "https://opendataproducts.org/odpg-v1.0/schema/odpg.yaml",
+                "version": "1.0",
+                "kind": "Graph",
+                "graph": {
+                    "metadata": {
+                        "id": "GRAPH-AVIATION-001",
+                        "name": {"en": "Aviation Data Product Value Graph"},
+                        "description": {
+                            "en": "Graph describing how aviation data products connect."
+                        },
+                        "domain": {"en": "Aviation"},
+                        "purpose": {"en": "Support portfolio analysis."},
+                        "status": "draft",
+                        "visibility": "public",
+                    },
+                    "nodes": [],
+                    "edges": [],
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    assert main(["explain", str(path), "--json"]) == 0
+    explain_payload = json.loads(capsys.readouterr().out)
+
+    assert explain_payload["spec"] == "odpg"
+    assert explain_payload["kind"] == "Graph"
+    assert explain_payload["graph"]["id"] == "GRAPH-AVIATION-001"
+    assert explain_payload["graph"]["name"] == "Aviation Data Product Value Graph"
+    assert explain_payload["graph"]["status"] == "draft"
+    assert explain_payload["graph"]["visibility"] == "public"
+    assert explain_payload["nodes"] == 0
+    assert explain_payload["edges"] == 0
+    assert explain_payload["node_types"] == []
+    assert explain_payload["relationship_types"] == []
+    assert "summary" not in explain_payload
+
+
 def test_unified_validate_rejects_legacy_flat_odps_file(tmp_path):
     path = tmp_path / "legacy-flat-product.yaml"
     path.write_text(
