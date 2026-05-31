@@ -1,21 +1,20 @@
-# Release Summary: 0.1.5
+# Release Summary: 0.1.6
 
-Release 0.1.5 focuses on CLI output formatting and version reporting.
+Release 0.1.6 fixes config-free generation provider overrides for online and
+local OpenAI-compatible providers.
 
 ## Highlights
 
-- `open-data-products explain <document> --json` now returns structured ODPS
-  and ODPG JSON instead of embedding line-oriented explanations as JSON strings.
-- ODPG explain JSON includes graph metadata, node and edge counts, node types,
-  relationship types, and node references.
-- ODPS explain JSON includes product metadata, component count, compliance
-  level, production-readiness status, and data access state.
-- `open-data-products summary <document>` now prints a compact human-readable
-  metadata report by default.
-- `open-data-products summary <document> --json` preserves the previous
-  machine-readable summary payload.
-- `open-data-products --version` and `open-data-products -V` report the
-  installed SDK version.
+- `open-data-products generate --provider claude` now works without passing
+  `--config`; it resolves to the Anthropic Messages API client.
+- Config-free provider overrides now also work for `openrouter`, `groq`,
+  `lmstudio`, and `vllm`, matching the bundled generation config defaults.
+- Built-in provider defaults include provider type, model, base URL, and API
+  key environment variable where needed.
+- Generation now reaches the expected missing-key or local-connection checks
+  instead of failing with `Unsupported generation provider type`.
+- Added CLI-level regression coverage proving Claude generation wiring writes a
+  valid signal artifact while mocking only the network call.
 
 ## Verification
 

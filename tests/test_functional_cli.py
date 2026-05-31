@@ -602,6 +602,88 @@ def test_unified_cli_generation_accepts_model_override(
     assert payload["model"] == "llama3.2"
 
 
+def test_unified_cli_generation_uses_claude_without_config(
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    from open_data_products import generation
+
+    source = tmp_path / "signal-source.md"
+    source.write_text(
+        "Generate a signal about baggage belt congestion.",
+        encoding="utf-8",
+    )
+    output_dir = tmp_path / "generated"
+    observed: Dict[str, object] = {}
+
+    def fake_anthropic_generate(
+        prompt: str,
+        model: str,
+        api_key_env: str = "ANTHROPIC_API_KEY",
+        base_url: str = "https://api.anthropic.com/v1",
+        version: str = "2023-06-01",
+        max_tokens: int = 4096,
+    ) -> str:
+        observed.update(
+            {
+                "prompt": prompt,
+                "model": model,
+                "api_key_env": api_key_env,
+                "base_url": base_url,
+                "version": version,
+                "max_tokens": max_tokens,
+            }
+        )
+        return """signals:
+- id: baggage-belt-congestion-signal
+  name:
+    en: Baggage Belt Congestion Signal
+  description:
+    en: Baggage belt congestion exceeded the operating threshold.
+  type: operational
+  source:
+    origin: internal
+    method: baggage operations event stream
+  observedAt: "2026-05-20T00:00:00Z"
+"""
+
+    monkeypatch.setattr(generation, "anthropic_generate", fake_anthropic_generate)
+
+    assert (
+        main(
+            [
+                "generate",
+                "--provider",
+                "claude",
+                "--model",
+                "claude-sonnet-4-5",
+                "--input",
+                str(source),
+                "--kind",
+                "signal",
+                "--output",
+                str(output_dir),
+                "--json",
+            ]
+        )
+        == 0
+    )
+    payload = _json_output(capsys)
+
+    assert payload["provider"] == "claude"
+    assert payload["provider_type"] == "anthropic"
+    assert payload["model"] == "claude-sonnet-4-5"
+    assert payload["valid_yaml"] is True
+    assert payload["artifact_count"] == 1
+    assert payload["artifacts"][0]["name"] == "signal:baggage-belt-congestion-signal"
+    assert (output_dir / "signal_baggage-belt-congestion-signal.yaml").is_file()
+    assert observed["api_key_env"] == "ANTHROPIC_API_KEY"
+    assert observed["base_url"] == "https://api.anthropic.com/v1"
+    assert observed["version"] == "2023-06-01"
+    assert observed["max_tokens"] == 4096
+
+
 def test_unified_cli_generation_uses_config_provider(
     capsys: pytest.CaptureFixture[str],
     monkeypatch: pytest.MonkeyPatch,

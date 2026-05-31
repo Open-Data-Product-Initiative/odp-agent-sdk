@@ -29,6 +29,57 @@ DEFAULT_OPENAI_USER_AGENT = "open-data-products-python/0.2"
 DEFAULT_GENERATION_CONFIG = (
     Path(__file__).resolve().parent / "generation.config.yaml"
 )
+BUILT_IN_PROVIDERS: Dict[str, Dict[str, Any]] = {
+    "ollama": {
+        "type": "ollama",
+        "model": DEFAULT_GENERATION_MODEL,
+        "baseUrl": DEFAULT_OLLAMA_URL,
+    },
+    "openai": {
+        "type": "openai",
+        "model": "gpt-4.1-mini",
+        "baseUrl": DEFAULT_OPENAI_URL,
+        "apiKeyEnv": "OPENAI_API_KEY",
+    },
+    "openrouter": {
+        "type": "openai",
+        "model": "openai/gpt-4.1-mini",
+        "baseUrl": "https://openrouter.ai/api/v1",
+        "apiKeyEnv": "OPENROUTER_API_KEY",
+    },
+    "groq": {
+        "type": "openai",
+        "model": "openai/gpt-oss-120b",
+        "baseUrl": "https://api.groq.com/openai/v1",
+        "apiKeyEnv": "GROQ_API_KEY",
+    },
+    "lmstudio": {
+        "type": "openai-chat",
+        "model": "local-model",
+        "baseUrl": "http://localhost:1234/v1",
+    },
+    "vllm": {
+        "type": "openai-chat",
+        "model": "local-model",
+        "baseUrl": "http://localhost:8000/v1",
+    },
+    "claude": {
+        "type": "anthropic",
+        "model": "claude-sonnet-4-5",
+        "baseUrl": DEFAULT_ANTHROPIC_URL,
+        "apiKeyEnv": "ANTHROPIC_API_KEY",
+        "version": DEFAULT_ANTHROPIC_VERSION,
+        "maxTokens": DEFAULT_ANTHROPIC_MAX_TOKENS,
+    },
+    "anthropic": {
+        "type": "anthropic",
+        "model": "claude-sonnet-4-5",
+        "baseUrl": DEFAULT_ANTHROPIC_URL,
+        "apiKeyEnv": "ANTHROPIC_API_KEY",
+        "version": DEFAULT_ANTHROPIC_VERSION,
+        "maxTokens": DEFAULT_ANTHROPIC_MAX_TOKENS,
+    },
+}
 
 ModelClient = Callable[[str, str], str]
 
@@ -880,7 +931,8 @@ def resolve_generation_settings(
 
     provider_name = str(provider or config.get("provider") or "ollama")
     provider_config = providers.get(provider_name)
-    provider_config = provider_config if isinstance(provider_config, dict) else {}
+    if not isinstance(provider_config, dict):
+        provider_config = BUILT_IN_PROVIDERS.get(provider_name, {})
     provider_type = str(provider_config.get("type") or provider_name)
 
     resolved_model = str(

@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 from urllib import error
 
+import pytest
 import yaml
 
 from open_data_products.generation import (
@@ -445,6 +446,82 @@ def test_bundled_generation_config_includes_common_compatible_providers():
     assert claude.provider_type == "anthropic"
     assert claude.base_url == "https://api.anthropic.com/v1"
     assert claude.api_key_env == "ANTHROPIC_API_KEY"
+
+
+def test_resolve_generation_settings_supports_claude_without_config():
+    """Test CLI provider override works for Claude without a config file."""
+    settings = resolve_generation_settings(
+        provider="claude",
+        model="claude-sonnet-4-5",
+        input_path="source_docs",
+        output_path="fragments",
+    )
+
+    assert settings.provider == "claude"
+    assert settings.provider_type == "anthropic"
+    assert settings.model == "claude-sonnet-4-5"
+    assert settings.input_path == "source_docs"
+    assert settings.output_path == "fragments"
+    assert settings.base_url == "https://api.anthropic.com/v1"
+    assert settings.api_key_env == "ANTHROPIC_API_KEY"
+    assert settings.api_version == "2023-06-01"
+    assert settings.max_tokens == 4096
+
+
+@pytest.mark.parametrize(
+    ("provider", "provider_type", "model", "base_url", "api_key_env"),
+    [
+        (
+            "openrouter",
+            "openai",
+            "openai/gpt-4.1-mini",
+            "https://openrouter.ai/api/v1",
+            "OPENROUTER_API_KEY",
+        ),
+        (
+            "groq",
+            "openai",
+            "openai/gpt-oss-120b",
+            "https://api.groq.com/openai/v1",
+            "GROQ_API_KEY",
+        ),
+        (
+            "lmstudio",
+            "openai-chat",
+            "local-model",
+            "http://localhost:1234/v1",
+            None,
+        ),
+        (
+            "vllm",
+            "openai-chat",
+            "local-model",
+            "http://localhost:8000/v1",
+            None,
+        ),
+    ],
+)
+def test_resolve_generation_settings_supports_bundled_provider_names_without_config(
+    provider,
+    provider_type,
+    model,
+    base_url,
+    api_key_env,
+):
+    """Test bundled provider names work as CLI overrides without config."""
+    settings = resolve_generation_settings(
+        provider=provider,
+        input_path="source_docs",
+        output_path="fragments",
+    )
+
+    assert settings.provider == provider
+    assert settings.provider_type == provider_type
+    assert settings.model == model
+    assert settings.input_path == "source_docs"
+    assert settings.output_path == "fragments"
+    assert settings.base_url == base_url
+    assert settings.api_key_env == api_key_env
 
 
 def test_resolve_generation_settings_reads_anthropic_provider(tmp_path):
