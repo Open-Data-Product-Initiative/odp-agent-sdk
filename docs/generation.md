@@ -3,9 +3,11 @@
 The SDK can use a configured LLM provider to turn plain source documents into
 standards-ready ODPC fragments and ODPG graph YAML. The default provider is
 local Ollama with Qwen 2.5, but the same generation workflow also supports
-local OpenAI-compatible servers such as LM Studio, vLLM, llama.cpp server, and
-LocalAI. Through those servers, the SDK can run locally hosted models such as
-DeepSeek, Qwen, Llama, Mistral, Phi, Gemma, and other models exposed by the
+local OpenAI-compatible servers such as LM Studio, vLLM, llama.cpp server,
+LocalAI, text-generation-webui, and other compatible local runtimes. Through
+those servers, the SDK can run locally hosted models such as Llama, DeepSeek,
+Qwen, Mistral, Mixtral, Phi, Gemma, Code Llama, StarCoder, Yi, Command R,
+Falcon, Granite, Nemotron, Vicuna, WizardLM, and other models exposed by the
 selected local runtime.
 
 Online providers can also be selected through the generation config, including
@@ -197,8 +199,11 @@ providers:
     baseUrl: http://localhost:11434
 
   # Local OpenAI-compatible chat servers such as LM Studio, vLLM, llama.cpp
-  # server, and LocalAI usually expose /v1/chat/completions. Replace `model`
-  # with the model name loaded in that server.
+  # server, LocalAI, and text-generation-webui usually expose
+  # /v1/chat/completions. Replace `model` with the model name loaded in that
+  # server, such as Llama, DeepSeek, Qwen, Mistral, Mixtral, Phi, Gemma,
+  # Code Llama, StarCoder, Yi, Command R, Falcon, Granite, Nemotron, Vicuna,
+  # or WizardLM.
   lmstudio:
     type: openai-chat
     model: local-model
@@ -266,8 +271,12 @@ OpenRouter and Groq.
 Provider entries with `type: openai-chat` use the Chat Completions request
 shape, `baseUrl + /chat/completions`. Use this profile for local
 OpenAI-compatible servers such as LM Studio, vLLM, llama.cpp server, and
-LocalAI. Model names are not fixed by the SDK; set `model` to whatever the
-selected server exposes, or override it for one run with `--model`.
+LocalAI. They can also work with other local runtimes that expose compatible
+chat completions endpoints, such as text-generation-webui. Model names are not
+fixed by the SDK; set `model` to whatever the selected server exposes, or
+override it for one run with `--model`. Common local model families include
+Llama, DeepSeek, Qwen, Mistral, Mixtral, Phi, Gemma, Code Llama, StarCoder, Yi,
+Command R, Falcon, Granite, Nemotron, Vicuna, and WizardLM.
 
 Provider entries with `type: anthropic` use the Anthropic Messages API request
 shape, `x-api-key` authentication, `anthropic-version`, and
