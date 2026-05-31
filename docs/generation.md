@@ -39,6 +39,7 @@ open-data-products generate \
   --provider lmstudio \
   --model deepseek-r1-distill-qwen-7b \
   --input source_docs/ \
+  --kind signal \
   --output generated/ \
   --json
 ```
@@ -70,10 +71,9 @@ Filenames are included in prompts as source boundaries, for example:
 --- Source file: turnaround-delay-signal.txt ---
 ```
 
-The SDK does not route files by filename. In holistic generation, every source
-file is passed to each artifact prompt. In single-artifact generation, `--kind`
-selects the prompt. Descriptive filenames still help the model infer intent, so
-prefer names like `*-product.md`, `*-signal.txt`, `*-use-case.md`, and
+The SDK does not route files by filename. The `--kind` option selects the
+artifact prompt to run. Descriptive filenames still help the model infer intent,
+so prefer names like `*-product.md`, `*-signal.txt`, `*-use-case.md`, and
 `*-objective.txt`.
 
 ## Generate One Artifact
@@ -101,27 +101,22 @@ Single-artifact generation writes one YAML artifact to the output folder. For
 fragment kinds, the final filename comes from the generated object id, not from
 the source filename.
 
-## Generate The Full Set
+## Generate From A Folder
 
-Run without `--kind` to generate all supported artifacts from a source folder.
-The default input is `open_data_products/generation/source_docs/` and the
-default output is `open_data_products/generation/fragments/`, so this works:
-
-```bash
-open-data-products generate --json
-```
-
-You can also set the folders explicitly:
+Use an explicit `--kind` value when generating from a source folder:
 
 ```bash
 open-data-products generate \
   --input open_data_products/generation/source_docs/ \
+  --kind product \
   --output open_data_products/generation/fragments/ \
   --model qwen2.5 \
   --json
 ```
 
-The output folder contains separate ODPC fragment files:
+For selected-kind folder generation, each `.md` or `.txt` source document is
+processed separately with the selected prompt. The output folder contains one
+or more matching artifacts, depending on what the model can extract:
 
 - `productReference:` files such as `product_reference_<id>.yaml`
 - `useCase:` files such as `use_case_<id>.yaml`
@@ -150,7 +145,7 @@ explicitly:
 ```bash
 open-data-products config generation --config my-generation.config.yaml --print
 open-data-products config generation --config my-generation.config.yaml --check
-open-data-products generate --config my-generation.config.yaml --prompts prompts/ --json
+open-data-products generate --config my-generation.config.yaml --prompts prompts/ --kind signal --json
 ```
 
 The config check verifies required provider/model settings, catches common key
@@ -165,6 +160,7 @@ open-data-products generate \
   --config my-generation.config.yaml \
   --prompts prompts/ \
   --provider groq \
+  --kind signal \
   --json
 ```
 
@@ -178,6 +174,7 @@ open-data-products generate \
   --provider openai \
   --model gpt-4.1-mini \
   --input source_docs/ \
+  --kind signal \
   --output fragments/ \
   --json
 ```
@@ -255,7 +252,7 @@ the environment before running generation:
 
 ```bash
 export OPENAI_API_KEY="..."
-open-data-products generate --config my-generation.config.yaml --json
+open-data-products generate --config my-generation.config.yaml --kind signal --json
 ```
 
 The SDK never prints API key values in JSON output or error messages. If a

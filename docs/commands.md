@@ -65,15 +65,15 @@ These commands require local Ollama or configured provider credentials. See
 [LLM generation](generation.md#llm-setup) for setup details.
 
 ```bash
-open-data-products generate --json
+open-data-products generate --kind signal --json
 ```
 
-Runs the default generation workflow. By default, it reads source documents from
+Runs signal generation with default paths. By default, it reads source documents from
 `open_data_products/generation/source_docs/`, uses local Ollama with Qwen 2.5,
 and writes generated fragments to `open_data_products/generation/fragments/`.
 
 ```bash
-open-data-products generate --config open_data_products/generation/generation.config.yaml --json
+open-data-products generate --config open_data_products/generation/generation.config.yaml --kind signal --json
 ```
 
 Runs generation using a config file. The config can define provider, model,
@@ -81,8 +81,8 @@ input folder, output folder, base URL, and the environment variable name that
 contains the API key.
 
 ```bash
-open-data-products generate --config open_data_products/generation/generation.config.yaml --provider groq --json
-open-data-products generate --config open_data_products/generation/generation.config.yaml --provider claude --json
+open-data-products generate --config open_data_products/generation/generation.config.yaml --provider groq --kind signal --json
+open-data-products generate --config open_data_products/generation/generation.config.yaml --provider claude --kind signal --json
 ```
 
 Overrides the provider selected by the config. This lets you test the same
@@ -92,8 +92,8 @@ source documents with another configured backend without editing the file.
 open-data-products generate --config open_data_products/generation/generation.config.yaml --kind signal --json
 ```
 
-Generates one artifact type instead of the full set. Supported kinds include
-`product`, `use-case`, `objective`, `signal`, and `graph`.
+Generates the selected artifact type. Supported kinds include `product`,
+`use-case`, `objective`, `signal`, and `graph`.
 
 ## Generated Fragment Artifacts
 

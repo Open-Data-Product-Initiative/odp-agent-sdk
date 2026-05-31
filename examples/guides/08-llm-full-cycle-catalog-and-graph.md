@@ -73,19 +73,21 @@ checkpoint capacity and estimated wait time crosses the operating threshold.
 TXT
 ```
 
-## 3. Generate fragments and graph YAML
+## 3. Generate product fragments
 
 This command uses the default local provider, Ollama with Qwen 2.5:
 
 ```bash
 open-data-products generate \
   --input source_docs/ \
+  --kind product \
   --output fragments/ \
   --json
 ```
 
-The `fragments/` folder should now contain separate ODPC fragments and
-`odpg_graph.yaml`.
+The `fragments/` folder should now contain product reference fragments. Run the
+same command with `--kind use-case`, `--kind objective`, `--kind signal`, or
+`--kind graph` when you want those artifact types.
 
 ## 4. Validate the generated ODPG graph
 

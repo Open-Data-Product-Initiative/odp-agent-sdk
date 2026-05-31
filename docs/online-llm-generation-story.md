@@ -70,6 +70,7 @@ The CLI now supports provider-driven generation:
 ```bash
 open-data-products generate \
   --config generation.config.yaml \
+  --kind signal \
   --json
 ```
 
@@ -82,6 +83,7 @@ defined in the config:
 open-data-products generate \
   --config generation.config.yaml \
   --provider groq \
+  --kind signal \
   --json
 ```
 
@@ -92,6 +94,7 @@ export ANTHROPIC_API_KEY="..."
 open-data-products generate \
   --config generation.config.yaml \
   --provider claude \
+  --kind signal \
   --json
 ```
 

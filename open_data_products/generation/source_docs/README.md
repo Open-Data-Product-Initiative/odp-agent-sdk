@@ -16,12 +16,10 @@ filename in the prompt as a source boundary:
 ```
 
 That filename helps the local model understand what each document is about. The
-current SDK does not route files by filename. In holistic generation, every
-`.md` and `.txt` file in this folder is passed to each artifact prompt
-(`productReference`, `useCase`, `businessObjective`, `signal`, and then graph).
-For selected-kind generation, such as `--kind product`, each source document is
-processed separately with the selected prompt so multiple product source files
-can produce multiple product reference fragments.
+current SDK does not route files by filename. For selected-kind generation,
+such as `--kind product`, each source document is processed separately with the
+selected prompt so multiple product source files can produce multiple product
+reference fragments.
 
 The words in filenames still matter because the model sees them. Including
 terms such as `product`, `use-case`, `objective`, or `signal` makes it more

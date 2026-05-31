@@ -100,10 +100,10 @@ Examples:
   open-data-products config generation --copy-to my-generation.config.yaml
   open-data-products config generation --copy-prompts-to prompts/
   open-data-products resources --json
-  open-data-products generate --input source_docs/ --output generated/ --json
+  open-data-products generate --input source_docs/ --kind product --output generated/ --json
   open-data-products generate --input use-case.md --kind use-case --output generated/ --json
-  open-data-products generate --config my-generation.config.yaml --provider groq --model openai/gpt-oss-120b --input source_docs/ --output generated/ --json
-  open-data-products generate --config my-generation.config.yaml --prompts prompts/ --input source_docs/ --output generated/ --json
+  open-data-products generate --config my-generation.config.yaml --provider groq --model openai/gpt-oss-120b --input source_docs/ --kind signal --output generated/ --json
+  open-data-products generate --config my-generation.config.yaml --prompts prompts/ --input source_docs/ --kind graph --output generated/ --json
   open-data-products odpg-agent-context graph.yaml --node DATA-PRODUCT-001
   open-data-products odpg-generate graph.yaml --output graph-explorer.html --json
   open-data-products odpg-convert --input graph.graphml --output graph.yaml --json
@@ -345,15 +345,14 @@ def main(argv: Optional[List[str]] = None) -> int:
     generate_parser.add_argument(
         "--kind",
         choices=[
-            "all",
             "product",
             "use-case",
             "objective",
             "signal",
             "graph",
         ],
-        default="all",
-        help="Artifact kind to generate. Defaults to all.",
+        required=True,
+        help="Artifact kind to generate.",
     )
     generate_parser.add_argument(
         "--output",
@@ -788,7 +787,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                 print(f"Output: {resolved['output_path']}")
                 print(
                     "Edit a copied config and pass it with "
-                    "`open-data-products generate --config <path>`."
+                    "`open-data-products generate --config <path> --kind signal`."
                 )
             if args.check:
                 return 0 if payload["valid"] else 1
@@ -821,31 +820,18 @@ def main(argv: Optional[List[str]] = None) -> int:
                 print(str(exc), file=sys.stderr)
                 return 1
 
-            if args.kind == "all":
-                prompt_kwargs = (
-                    {"prompt_dir": settings.prompt_path} if settings.prompt_path else {}
-                )
-                artifacts = generation.generate_local_artifacts(
-                    generation_input,
-                    generation_output,
-                    model=settings.model,
-                    ollama_url=settings.base_url or generation.DEFAULT_OLLAMA_URL,
-                    client=model_client,
-                    **prompt_kwargs,
-                )
-            else:
-                prompt_kwargs = (
-                    {"prompt_dir": settings.prompt_path} if settings.prompt_path else {}
-                )
-                artifacts = generation.generate_local_artifacts_for_kind(
-                    args.kind,
-                    generation_input,
-                    generation_output,
-                    model=settings.model,
-                    ollama_url=settings.base_url or generation.DEFAULT_OLLAMA_URL,
-                    client=model_client,
-                    **prompt_kwargs,
-                )
+            prompt_kwargs = (
+                {"prompt_dir": settings.prompt_path} if settings.prompt_path else {}
+            )
+            artifacts = generation.generate_local_artifacts_for_kind(
+                args.kind,
+                generation_input,
+                generation_output,
+                model=settings.model,
+                ollama_url=settings.base_url or generation.DEFAULT_OLLAMA_URL,
+                client=model_client,
+                **prompt_kwargs,
+            )
             valid_yaml = all(artifact.valid_yaml for artifact in artifacts)
             payload = {
                 "spec": "generation",

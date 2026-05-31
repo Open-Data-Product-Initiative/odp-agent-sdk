@@ -71,7 +71,7 @@ def test_unified_cli_help_uses_compact_command_metavar(
         in help_text
     )
     assert (
-        "open-data-products generate --input source_docs/ --output generated/ --json"
+        "open-data-products generate --input source_docs/ --kind product --output generated/ --json"
         in help_text
     )
     assert (
@@ -79,7 +79,7 @@ def test_unified_cli_help_uses_compact_command_metavar(
         in help_text
     )
     assert (
-        "open-data-products generate --config my-generation.config.yaml --prompts prompts/ --input source_docs/ --output generated/ --json"
+        "open-data-products generate --config my-generation.config.yaml --prompts prompts/ --input source_docs/ --kind graph --output generated/ --json"
         in help_text
     )
     assert "generation.config.yaml --json" not in help_text
@@ -370,6 +370,49 @@ def test_unified_cli_generation_uses_custom_prompt_dir(
     assert observed["prompt_dir"] == str(prompt_dir)
 
 
+def test_unified_cli_local_generation_requires_kind(
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+) -> None:
+    with pytest.raises(SystemExit) as exc_info:
+        main(
+            [
+                "generate",
+                "--input",
+                str(GENERATION_SOURCE_DOCS),
+                "--output",
+                str(tmp_path),
+                "--model",
+                "qwen2.5",
+                "--json",
+            ]
+        )
+
+    assert exc_info.value.code == 2
+    assert "the following arguments are required: --kind" in capsys.readouterr().err
+
+
+def test_unified_cli_local_generation_rejects_all_kind(
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+) -> None:
+    with pytest.raises(SystemExit) as exc_info:
+        main(
+            [
+                "generate",
+                "--input",
+                str(GENERATION_SOURCE_DOCS),
+                "--output",
+                str(tmp_path),
+                "--kind",
+                "all",
+            ]
+        )
+
+    assert exc_info.value.code == 2
+    assert "invalid choice: 'all'" in capsys.readouterr().err
+
+
 def test_unified_cli_local_generation(
     capsys: pytest.CaptureFixture[str],
     monkeypatch: pytest.MonkeyPatch,
@@ -377,7 +420,8 @@ def test_unified_cli_local_generation(
 ) -> None:
     from open_data_products import generation
 
-    def fake_generate_local_artifacts(
+    def fake_generate_local_artifacts_for_kind(
+        artifact_kind: str,
         source_dir: Union[str, Path],
         output_dir: Union[str, Path],
         model: str = "qwen2.5",
@@ -398,8 +442,8 @@ def test_unified_cli_local_generation(
 
     monkeypatch.setattr(
         generation,
-        "generate_local_artifacts",
-        fake_generate_local_artifacts,
+        "generate_local_artifacts_for_kind",
+        fake_generate_local_artifacts_for_kind,
     )
     monkeypatch.setattr(
         generation,
@@ -417,6 +461,8 @@ def test_unified_cli_local_generation(
                 str(tmp_path),
                 "--model",
                 "qwen2.5",
+                "--kind",
+                "signal",
                 "--json",
             ]
         )
@@ -426,6 +472,7 @@ def test_unified_cli_local_generation(
 
     assert payload["kind"] == "LocalGeneration"
     assert payload["source"] == str(GENERATION_SOURCE_DOCS)
+    assert payload["artifact_kind"] == "signal"
     assert payload["output"] == str(tmp_path)
     assert payload["model"] == "qwen2.5"
     assert payload["valid_yaml"] is True
@@ -505,7 +552,8 @@ def test_unified_cli_local_generation_uses_default_paths(
 
     observed = {}
 
-    def fake_generate_local_artifacts(
+    def fake_generate_local_artifacts_for_kind(
+        artifact_kind: str,
         source_dir: Union[str, Path],
         output_dir: Union[str, Path],
         model: str = "qwen2.5",
@@ -525,8 +573,8 @@ def test_unified_cli_local_generation_uses_default_paths(
 
     monkeypatch.setattr(
         generation,
-        "generate_local_artifacts",
-        fake_generate_local_artifacts,
+        "generate_local_artifacts_for_kind",
+        fake_generate_local_artifacts_for_kind,
     )
     monkeypatch.setattr(
         generation,
@@ -534,7 +582,7 @@ def test_unified_cli_local_generation_uses_default_paths(
         lambda settings: (lambda prompt, model: ""),
     )
 
-    assert main(["generate", "--json"]) == 0
+    assert main(["generate", "--kind", "graph", "--json"]) == 0
     payload = _json_output(capsys)
 
     assert observed == {
@@ -558,6 +606,8 @@ def test_unified_cli_local_generation_rejects_positional_and_input(
                 str(GENERATION_SOURCE_DOCS),
                 "--output",
                 str(tmp_path),
+                "--kind",
+                "signal",
             ]
         )
         == 2
@@ -580,8 +630,8 @@ def test_unified_cli_generation_accepts_model_override(
     )
     monkeypatch.setattr(
         generation,
-        "generate_local_artifacts",
-        lambda source_dir, output_dir, model="qwen2.5", ollama_url="http://localhost:11434", client=None: [
+        "generate_local_artifacts_for_kind",
+        lambda artifact_kind, source_dir, output_dir, model="qwen2.5", ollama_url="http://localhost:11434", client=None: [
             generation.GeneratedArtifact(
                 name="odpg_graph",
                 prompt_name="odpg_graph_yaml.md",
@@ -600,6 +650,8 @@ def test_unified_cli_generation_accepts_model_override(
                 str(tmp_path),
                 "--model",
                 "llama3.2",
+                "--kind",
+                "graph",
                 "--json",
             ]
         )
@@ -721,8 +773,8 @@ providers:
     )
     monkeypatch.setattr(
         generation,
-        "generate_local_artifacts",
-        lambda source_dir, output_dir, model="qwen2.5", ollama_url="http://localhost:11434", client=None: [
+        "generate_local_artifacts_for_kind",
+        lambda artifact_kind, source_dir, output_dir, model="qwen2.5", ollama_url="http://localhost:11434", client=None: [
             generation.GeneratedArtifact(
                 name="odpg_graph",
                 prompt_name="odpg_graph_yaml.md",
@@ -732,7 +784,7 @@ providers:
         ],
     )
 
-    assert main(["generate", "--config", str(config), "--json"]) == 0
+    assert main(["generate", "--config", str(config), "--kind", "graph", "--json"]) == 0
     payload = _json_output(capsys)
 
     assert payload["source"] == str(GENERATION_SOURCE_DOCS)

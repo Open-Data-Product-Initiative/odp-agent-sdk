@@ -43,11 +43,12 @@ conflict with another aircraft movement.
 TXT
 ```
 
-## 3. Generate the full set
+## 3. Generate product fragments
 
 ```bash
 open-data-products generate \
   --input source_docs/ \
+  --kind product \
   --output fragments/ \
   --json
 ```
