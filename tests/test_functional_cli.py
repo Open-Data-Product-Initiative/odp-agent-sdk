@@ -315,7 +315,7 @@ def test_unified_cli_generation_uses_custom_prompt_dir(
     output_dir = tmp_path / "generated"
     observed: Dict[str, object] = {}
 
-    def fake_generate_local_artifact(
+    def fake_generate_local_artifacts_for_kind(
         artifact_kind: str,
         source_path: Union[str, Path],
         output_path: Union[str, Path],
@@ -323,19 +323,25 @@ def test_unified_cli_generation_uses_custom_prompt_dir(
         ollama_url: str = "http://localhost:11434",
         client: Optional[object] = None,
         prompt_dir: Optional[Union[str, Path]] = None,
-    ) -> generation.GeneratedArtifact:
+    ) -> List[generation.GeneratedArtifact]:
         observed["prompt_dir"] = str(prompt_dir)
         output = Path(output_path) / "signal.yaml"
         output.parent.mkdir(parents=True, exist_ok=True)
         output.write_text("signal: {}\n", encoding="utf-8")
-        return generation.GeneratedArtifact(
-            name="odpc_signals",
-            prompt_name="odpc_signal_fragment.md",
-            output_path=output,
-            valid_yaml=True,
-        )
+        return [
+            generation.GeneratedArtifact(
+                name="odpc_signals",
+                prompt_name="odpc_signal_fragment.md",
+                output_path=output,
+                valid_yaml=True,
+            )
+        ]
 
-    monkeypatch.setattr(generation, "generate_local_artifact", fake_generate_local_artifact)
+    monkeypatch.setattr(
+        generation,
+        "generate_local_artifacts_for_kind",
+        fake_generate_local_artifacts_for_kind,
+    )
     monkeypatch.setattr(
         generation,
         "create_generation_client",
@@ -434,28 +440,30 @@ def test_unified_cli_local_generation_can_select_one_kind(
 ) -> None:
     from open_data_products import generation
 
-    def fake_generate_local_artifact(
+    def fake_generate_local_artifacts_for_kind(
         artifact_kind: str,
         source: Union[str, Path],
         output_dir: Union[str, Path],
         model: str = "qwen2.5",
         ollama_url: str = "http://localhost:11434",
         client: Optional[object] = None,
-    ) -> generation.GeneratedArtifact:
+    ) -> List[generation.GeneratedArtifact]:
         output = Path(output_dir) / "odpc_use_cases.yaml"
         output.parent.mkdir(parents=True, exist_ok=True)
         output.write_text("useCases: []\n", encoding="utf-8")
-        return generation.GeneratedArtifact(
-            name="odpc_use_cases",
-            prompt_name="odpc_use_case_fragment.md",
-            output_path=output,
-            valid_yaml=True,
-        )
+        return [
+            generation.GeneratedArtifact(
+                name="odpc_use_cases",
+                prompt_name="odpc_use_case_fragment.md",
+                output_path=output,
+                valid_yaml=True,
+            )
+        ]
 
     monkeypatch.setattr(
         generation,
-        "generate_local_artifact",
-        fake_generate_local_artifact,
+        "generate_local_artifacts_for_kind",
+        fake_generate_local_artifacts_for_kind,
     )
     monkeypatch.setattr(
         generation,

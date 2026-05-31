@@ -837,17 +837,15 @@ def main(argv: Optional[List[str]] = None) -> int:
                 prompt_kwargs = (
                     {"prompt_dir": settings.prompt_path} if settings.prompt_path else {}
                 )
-                artifacts = [
-                    generation.generate_local_artifact(
-                        args.kind,
-                        generation_input,
-                        generation_output,
-                        model=settings.model,
-                        ollama_url=settings.base_url or generation.DEFAULT_OLLAMA_URL,
-                        client=model_client,
-                        **prompt_kwargs,
-                    )
-                ]
+                artifacts = generation.generate_local_artifacts_for_kind(
+                    args.kind,
+                    generation_input,
+                    generation_output,
+                    model=settings.model,
+                    ollama_url=settings.base_url or generation.DEFAULT_OLLAMA_URL,
+                    client=model_client,
+                    **prompt_kwargs,
+                )
             valid_yaml = all(artifact.valid_yaml for artifact in artifacts)
             payload = {
                 "spec": "generation",

@@ -1,24 +1,24 @@
-# Release Summary: 0.1.6
+# Release Summary: 0.1.7
 
-Release 0.1.6 fixes config-free generation provider overrides for online and
-local OpenAI-compatible providers.
+Release 0.1.7 fixes selected-kind LLM generation for directory inputs.
 
 ## Highlights
 
-- `open-data-products generate --provider claude` now works without passing
-  `--config`; it resolves to the Anthropic Messages API client.
-- Config-free provider overrides now also work for `openrouter`, `groq`,
-  `lmstudio`, and `vllm`, matching the bundled generation config defaults.
-- Built-in provider defaults include provider type, model, base URL, and API
-  key environment variable where needed.
-- Generation now reaches the expected missing-key or local-connection checks
-  instead of failing with `Unsupported generation provider type`.
-- Added CLI-level regression coverage proving Claude generation wiring writes a
-  valid signal artifact while mocking only the network call.
+- `open-data-products generate --kind product --input <source_docs/>` now
+  processes each `.md` and `.txt` source document separately with the selected
+  product prompt.
+- Multiple product source documents can now produce multiple
+  `product_reference_*.yaml` fragments in one command.
+- Holistic generation with `--kind all` keeps its existing behavior: it passes
+  the full source folder context through the product, use case, objective,
+  signal, and graph generation tasks.
+- The public Python API now exposes `generate_local_artifacts_for_kind()` for
+  selected-kind multi-source generation.
+- Bundled source document guidance now explains the distinction between
+  holistic generation and selected-kind generation.
 
 ## Verification
 
-- `pytest -q`
-- `python3 -c "import open_data_products"`
-- `python3 -m open_data_products.cli manifest --json | python3 -m json.tool`
-- `test ! -e docs/superpowers`
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m pytest tests/test_generation_prompts.py tests/test_functional_cli.py -q`
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m pytest tests/test_publish_workflow.py tests/test_namespace_layout.py -q`
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m build`

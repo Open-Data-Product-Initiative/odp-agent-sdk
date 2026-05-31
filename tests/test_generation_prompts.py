@@ -17,6 +17,7 @@ from open_data_products.generation import (
     create_generation_client,
     ensure_ollama_model,
     generate_local_artifact,
+    generate_local_artifacts_for_kind,
     generate_local_artifacts,
     get_config,
     get_config_path,
@@ -1044,6 +1045,76 @@ def test_generate_local_artifact_writes_one_selected_yaml_output(tmp_path):
             "observedAt": "2026-05-20T00:00:00Z",
         }
     }
+
+
+def test_generate_local_artifacts_for_kind_processes_each_source_file(tmp_path):
+    """Test selected-kind generation processes each source document."""
+    source_dir = tmp_path / "source_docs"
+    source_dir.mkdir()
+    source_dir.joinpath("airport-operations-product.md").write_text(
+        "# Airport Operations Product\n\n"
+        "A data product for flight schedule, gate assignment, and turnaround status.",
+        encoding="utf-8",
+    )
+    source_dir.joinpath("passenger-flow-product.md").write_text(
+        "# Passenger Flow Product\n\n"
+        "A data product for queue wait time, passenger volume, and gate allocation.",
+        encoding="utf-8",
+    )
+    prompts = []
+
+    def fake_client(prompt: str, model: str) -> str:
+        prompts.append(prompt)
+        if "airport-operations-product.md" in prompt:
+            return """productReferences:
+- id: airport-operations-performance
+  productID: airport-operations-performance
+  productVersion: "1.0.0"
+  name:
+    en: Airport Operations Performance Product
+  description:
+    en: Airport operations data product.
+  productModel:
+    standard: ODPS
+    version: "4.1"
+    format: yaml
+    $ref: products/airport-operations-performance.yaml
+"""
+        return """productReferences:
+- id: passenger-flow
+  productID: passenger-flow
+  productVersion: "1.0.0"
+  name:
+    en: Passenger Flow Product
+  description:
+    en: Passenger flow data product.
+  productModel:
+    standard: ODPS
+    version: "4.1"
+    format: yaml
+    $ref: products/passenger-flow.yaml
+"""
+
+    artifacts = generate_local_artifacts_for_kind(
+        "product",
+        source_dir,
+        tmp_path / "fragments",
+        client=fake_client,
+    )
+
+    assert [artifact.name for artifact in artifacts] == [
+        "productReference:airport-operations-performance",
+        "productReference:passenger-flow",
+    ]
+    assert len(prompts) == 2
+    assert "airport-operations-product.md" in prompts[0]
+    assert "passenger-flow-product.md" not in prompts[0]
+    assert "passenger-flow-product.md" in prompts[1]
+    assert "airport-operations-product.md" not in prompts[1]
+    assert (
+        tmp_path / "fragments" / "product_reference_airport-operations-performance.yaml"
+    ).is_file()
+    assert (tmp_path / "fragments" / "product_reference_passenger-flow.yaml").is_file()
 
 
 def test_generate_local_artifact_extracts_yaml_after_model_prose(tmp_path):

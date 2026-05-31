@@ -237,20 +237,10 @@ PathLike = Union[str, Path]
 
 def load_source_documents(source_dir: PathLike) -> str:
     """Load Markdown and text source documents as one prompt context."""
-    root = Path(source_dir)
-    if root.is_file():
-        paths = [root]
-    elif root.is_dir():
-        paths = sorted(
-            path
-            for path in root.iterdir()
-            if path.is_file() and path.suffix.lower() in {".md", ".txt"}
-        )
-    else:
-        raise FileNotFoundError(f"Source document path not found: {root}")
+    paths = _source_document_paths(source_dir)
 
     if not paths:
-        raise ValueError(f"No Markdown or text source documents found at {root}")
+        raise ValueError(f"No Markdown or text source documents found at {source_dir}")
 
     sections = []
     for path in paths:
@@ -263,6 +253,19 @@ def load_source_documents(source_dir: PathLike) -> str:
             )
         )
     return "\n\n".join(sections)
+
+
+def _source_document_paths(source: PathLike) -> List[Path]:
+    root = Path(source)
+    if root.is_file():
+        return [root]
+    if root.is_dir():
+        return sorted(
+            path
+            for path in root.iterdir()
+            if path.is_file() and path.suffix.lower() in {".md", ".txt"}
+        )
+    raise FileNotFoundError(f"Source document path not found: {root}")
 
 
 def render_generation_prompt(
@@ -1123,6 +1126,41 @@ def generate_local_artifact(
     return artifacts[0]
 
 
+def generate_local_artifacts_for_kind(
+    artifact_kind: str,
+    source: PathLike,
+    output_dir: PathLike,
+    model: str = DEFAULT_GENERATION_MODEL,
+    ollama_url: str = DEFAULT_OLLAMA_URL,
+    client: Optional[ModelClient] = None,
+    prompt_dir: Optional[PathLike] = None,
+) -> List[GeneratedArtifact]:
+    """Generate selected YAML artifacts by processing each source document."""
+    destination = Path(output_dir)
+    destination.mkdir(parents=True, exist_ok=True)
+    if client is None:
+        ensure_ollama_model(model, ollama_url)
+    model_client = client or (
+        lambda prompt, model_name: ollama_generate(prompt, model_name, ollama_url)
+    )
+    task = _generation_task_for(artifact_kind)
+    artifacts: List[GeneratedArtifact] = []
+    for source_path in _source_document_paths(source):
+        artifacts.extend(
+            _run_generation_task(
+                task,
+                source_path,
+                destination,
+                model,
+                model_client,
+                prompt_dir=prompt_dir,
+            )
+        )
+    if not artifacts:
+        raise RuntimeError(f"No artifacts generated for kind: {artifact_kind}")
+    return artifacts
+
+
 def _generation_task_for(artifact_kind: str) -> GenerationTask:
     task_name = GENERATION_TASK_ALIASES.get(artifact_kind)
     for task in GENERATION_TASKS:
@@ -1540,6 +1578,7 @@ __all__ = [
     "create_generation_client",
     "ensure_ollama_model",
     "generate_local_artifact",
+    "generate_local_artifacts_for_kind",
     "generate_local_artifacts",
     "get_config",
     "get_config_path",
