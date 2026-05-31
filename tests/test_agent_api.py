@@ -158,7 +158,14 @@ def test_top_level_cli_json_validate_and_explain(tmp_path, capsys):
     assert main(["explain", str(path), "--json"]) == 0
     explain_payload = json.loads(capsys.readouterr().out)
     assert explain_payload["spec"] == "odps"
-    assert "Agent Ready Product" in explain_payload["summary"]
+    assert explain_payload["product"]["id"] == "agent-ready-product"
+    assert explain_payload["product"]["name"] == "Agent Ready Product"
+    assert explain_payload["product"]["status"] == "production"
+    assert explain_payload["product"]["visibility"] == "public"
+    assert explain_payload["product"]["type"] == "dataset"
+    assert explain_payload["components"] == 1
+    assert explain_payload["data_access"] is None
+    assert "summary" not in explain_payload
 
 
 def test_unified_validate_rejects_legacy_flat_odps_file(tmp_path):

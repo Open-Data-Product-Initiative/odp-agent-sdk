@@ -6,7 +6,7 @@ import argparse
 import json
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING, Dict, List, Optional
 
 from .agent import (
     explain_document,
@@ -14,6 +14,7 @@ from .agent import (
     resolve_references,
     validate_document,
 )
+from .odps import OpenDataProduct
 from .resources import get_resource, list_resources
 from .summary import load_summary
 
@@ -103,6 +104,61 @@ Examples:
   open-data-products serve
 """
 
+
+def _explain_json_payload(document: object, path: str) -> Dict[str, object]:
+    """Return structured JSON payload for explain output."""
+    result = validate_document(document, path=path)
+    payload: Dict[str, object] = {
+        "spec": result.spec,
+        "kind": result.kind,
+        "path": path,
+    }
+    if result.version is not None:
+        payload["version"] = result.version
+
+    if isinstance(document, OpenDataProduct):
+        details = document.product_details
+        payload.update(
+            {
+                "schema": document.schema,
+                "version": str(document.version),
+                "product": {
+                    "id": details.product_id,
+                    "name": details.name,
+                    "status": details.status,
+                    "visibility": details.visibility,
+                    "type": details.type,
+                },
+                "components": document.component_count,
+                "compliance_level": document.compliance_level,
+                "production_ready": document.is_production_ready,
+                "data_access": "configured" if document.data_access else None,
+            }
+        )
+        if document.product_strategy:
+            payload["strategy"] = {
+                "objectives": len(document.product_strategy.objectives),
+                "product_kpis": len(document.product_strategy.product_kpis),
+            }
+        return payload
+
+    payload["summary"] = explain_document(document, path=Path(path))
+    return payload
+
+
+def _print_summary_report(summary: Dict[str, object]) -> None:
+    """Print lightweight document metadata for humans."""
+    lines = [
+        f"File: {summary['path']}",
+        f"Spec: {summary['spec']}",
+        f"Kind: {summary['kind'] or '(unknown)'}",
+        f"ID: {summary['id'] or '(not set)'}",
+        f"Bytes: {summary['byte_size']}",
+        f"Lines: {summary['line_count']}",
+        f"SHA-256: {summary['sha256']}",
+    ]
+    print("\n".join(lines))
+
 PRODUCT_HELP = """\
 Data Contract workflow commands:
   resolve-contracts   Find Data Contract references in an ODPS product
@@ -156,6 +212,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         "summary", help="Lightweight artifact reference for a document"
     )
     summary_parser.add_argument("document", help="Path to an ODP document")
+    summary_parser.add_argument("--json", action="store_true", help="Emit JSON")
 
     config_parser = subparsers.add_parser(
         "config", help="Show or copy SDK config templates"
@@ -583,21 +640,15 @@ def main(argv: Optional[List[str]] = None) -> int:
 
         if args.command == "explain":
             document = load_document(args.document)
-            summary = explain_document(document, path=Path(args.document))
             if args.json:
-                explanation_result = validate_document(document, path=args.document)
                 print(
                     json.dumps(
-                        {
-                            "spec": explanation_result.spec,
-                            "kind": explanation_result.kind,
-                            "path": args.document,
-                            "summary": summary,
-                        },
+                        _explain_json_payload(document, args.document),
                         indent=2,
                     )
                 )
             else:
+                summary = explain_document(document, path=Path(args.document))
                 print(summary, end="")
             return 0
 
@@ -624,7 +675,11 @@ def main(argv: Optional[List[str]] = None) -> int:
             return 0
 
         if args.command == "summary":
-            print(json.dumps(load_summary(args.document), indent=2))
+            summary = load_summary(args.document)
+            if args.json:
+                print(json.dumps(summary, indent=2))
+            else:
+                _print_summary_report(summary)
             return 0
 
         if args.command == "config":

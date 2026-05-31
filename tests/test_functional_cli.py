@@ -117,9 +117,23 @@ def test_unified_cli_document_workflow(capsys: pytest.CaptureFixture[str]) -> No
     assert main(["explain", str(ODPS_PRODUCT), "--json"]) == 0
     explain_payload = _json_output(capsys)
     assert explain_payload["spec"] == "odps"
-    assert "summary" in explain_payload
+    assert explain_payload["kind"] == "OpenDataProduct"
+    assert explain_payload["product"]["id"] == "agent-ready-product"
+    assert explain_payload["product"]["name"] == "Agent Ready Product"
+    assert explain_payload["product"]["status"] == "production"
+    assert explain_payload["components"] == 1
+    assert explain_payload["production_ready"] is False
+    assert "summary" not in explain_payload
 
     assert main(["summary", str(ODPS_PRODUCT)]) == 0
+    summary_output = capsys.readouterr().out
+    assert summary_output.startswith(f"File: {ODPS_PRODUCT}\n")
+    assert "Spec: odps\n" in summary_output
+    assert "Kind: OpenDataProduct\n" in summary_output
+    assert "SHA-256: " in summary_output
+    assert not summary_output.lstrip().startswith("{")
+
+    assert main(["summary", str(ODPS_PRODUCT), "--json"]) == 0
     summary_payload = _json_output(capsys)
     assert summary_payload["spec"] == "odps"
     assert "sha256" in summary_payload
