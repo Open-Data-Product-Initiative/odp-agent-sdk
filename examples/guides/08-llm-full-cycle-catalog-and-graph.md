@@ -80,7 +80,7 @@ This command uses the default local provider, Ollama with Qwen 2.5:
 ```bash
 open-data-products generate \
   --input source_docs/ \
-  --kind product \
+  --kind product-reference \
   --output fragments/ \
   --json
 ```

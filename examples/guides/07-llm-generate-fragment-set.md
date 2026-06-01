@@ -48,7 +48,7 @@ TXT
 ```bash
 open-data-products generate \
   --input source_docs/ \
-  --kind product \
+  --kind product-reference \
   --output fragments/ \
   --json
 ```

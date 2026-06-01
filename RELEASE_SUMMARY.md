@@ -1,17 +1,22 @@
 # Release Summary: 0.1.7
 
-Release 0.1.7 fixes selected-kind LLM generation for directory inputs.
+Release 0.1.7 fixes selected-kind LLM generation for directory inputs and makes
+product generation explicit.
 
 ## Highlights
 
-- `open-data-products generate --kind=product --input <source_docs/>` now
-  processes each `.md` and `.txt` source document separately with the selected
-  product prompt.
+- `open-data-products generate --kind=product-reference --input <source_docs/>`
+  now processes each `.md` and `.txt` source document separately with the ODPC
+  product reference prompt.
+- `open-data-products generate --kind=odps-product --input <source_docs/>`
+  generates full ODPS OpenDataProduct YAML documents.
 - Folder input now runs one selected-kind generation attempt per source file, so
-  a folder of product source documents produces matching
-  `product_reference_*.yaml` fragments in the output folder.
+  a folder of product source documents can produce matching
+  `product_reference_*.yaml` fragments or `odps_product_*.yaml` specs in the
+  output folder.
 - `open-data-products generate` now requires an explicit concrete `--kind`
-  value; the old full-set generation mode has been removed from the CLI.
+  value; the old full-set generation mode and ambiguous `--kind=product` value
+  have been removed from the CLI.
 - The public Python API now exposes `generate_local_artifacts_for_kind()` for
   selected-kind multi-source generation.
 - Bundled source document guidance now focuses on selected-kind generation and

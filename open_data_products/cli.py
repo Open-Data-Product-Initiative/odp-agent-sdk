@@ -65,7 +65,7 @@ Discovery and agent commands:
   serve        Run the MCP server over stdio
 
 Local generation commands:
-  generate     Use configured LLM prompts to create fragments and graph YAML
+  generate     Use configured LLM prompts to create selected YAML artifacts
 
 ODPG graph commands:
   odpg-summary         Summarize graph metadata and relationship counts
@@ -100,7 +100,8 @@ Examples:
   open-data-products config generation --copy-to my-generation.config.yaml
   open-data-products config generation --copy-prompts-to prompts/
   open-data-products resources --json
-  open-data-products generate --input source_docs/ --kind product --output generated/ --json
+  open-data-products generate --input source_docs/ --kind product-reference --output generated/ --json
+  open-data-products generate --input product.md --kind odps-product --output generated/ --json
   open-data-products generate --input use-case.md --kind use-case --output generated/ --json
   open-data-products generate --config my-generation.config.yaml --provider groq --model openai/gpt-oss-120b --input source_docs/ --kind signal --output generated/ --json
   open-data-products generate --config my-generation.config.yaml --prompts prompts/ --input source_docs/ --kind graph --output generated/ --json
@@ -314,7 +315,7 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     generate_parser = subparsers.add_parser(
         "generate",
-        help="Generate fragments and graph YAML with a local LLM",
+        help="Generate selected YAML artifacts with a local LLM",
     )
     generate_parser.add_argument(
         "source_dir",
@@ -345,7 +346,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     generate_parser.add_argument(
         "--kind",
         choices=[
-            "product",
+            "product-reference",
+            "odps-product",
             "use-case",
             "objective",
             "signal",

@@ -108,7 +108,7 @@ Use an explicit `--kind` value when generating from a source folder:
 ```bash
 open-data-products generate \
   --input open_data_products/generation/source_docs/ \
-  --kind product \
+  --kind product-reference \
   --output open_data_products/generation/fragments/ \
   --model qwen2.5 \
   --json
@@ -119,11 +119,14 @@ processed separately with the selected prompt. The output folder contains one
 or more matching artifacts, depending on what the model can extract:
 
 - `productReference:` files such as `product_reference_<id>.yaml`
+- `OpenDataProduct` files such as `odps_product_<id>.yaml`
 - `useCase:` files such as `use_case_<id>.yaml`
 - `businessObjective:` files such as `business_objective_<id>.yaml`
 - `signal:` files such as `signal_<id>.yaml`
+- `Graph` files such as `odpg_graph.yaml`
 
-It also contains `odpg_graph.yaml`, which connects the generated fragment ids.
+Use `--kind product-reference` for ODPC catalog references and
+`--kind odps-product` for full ODPS product YAML documents.
 
 ## Provider Configuration
 
@@ -340,6 +343,7 @@ Prompt templates are plain Markdown files under
 
 - `system.md`
 - `odps_data_product_fragment.md`
+- `odps_product_yaml.md`
 - `odpc_use_case_fragment.md`
 - `odpc_objective_fragment.md`
 - `odpc_signal_fragment.md`

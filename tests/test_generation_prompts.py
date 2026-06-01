@@ -66,6 +66,7 @@ def test_generation_prompts_are_listed_and_loadable():
         "odpc_use_case_fragment.md",
         "odpg_graph_yaml.md",
         "odps_data_product_fragment.md",
+        "odps_product_yaml.md",
         "system.md",
     ]
     for name in prompt_names:
@@ -80,6 +81,9 @@ def test_generation_prompts_are_listed_and_loadable():
     )
     assert "Never create `productReferences` for use cases" in load_generation_prompt(
         "odps_data_product_fragment.md"
+    )
+    assert "Return exactly one OpenDataProduct document" in load_generation_prompt(
+        "odps_product_yaml.md"
     )
     assert "dataNeeds:" in load_generation_prompt("odpc_use_case_fragment.md")
     assert "summary:" in load_generation_prompt("odpc_use_case_fragment.md")
@@ -1047,8 +1051,10 @@ def test_generate_local_artifact_writes_one_selected_yaml_output(tmp_path):
     }
 
 
-def test_generate_local_artifacts_for_kind_processes_each_source_file(tmp_path):
-    """Test selected-kind generation processes each source document."""
+def test_generate_local_artifacts_for_kind_processes_each_product_reference_source_file(
+    tmp_path,
+):
+    """Test product-reference generation processes each source document."""
     source_dir = tmp_path / "source_docs"
     source_dir.mkdir()
     source_dir.joinpath("airport-operations-product.md").write_text(
@@ -1096,7 +1102,7 @@ def test_generate_local_artifacts_for_kind_processes_each_source_file(tmp_path):
 """
 
     artifacts = generate_local_artifacts_for_kind(
-        "product",
+        "product-reference",
         source_dir,
         tmp_path / "fragments",
         client=fake_client,
@@ -1115,6 +1121,63 @@ def test_generate_local_artifacts_for_kind_processes_each_source_file(tmp_path):
         tmp_path / "fragments" / "product_reference_airport-operations-performance.yaml"
     ).is_file()
     assert (tmp_path / "fragments" / "product_reference_passenger-flow.yaml").is_file()
+
+
+def test_generate_local_artifacts_for_kind_rejects_product_alias(tmp_path):
+    """Test ambiguous product kind is not accepted."""
+    try:
+        generate_local_artifacts_for_kind(
+            "product",
+            GENERATION_SOURCE_DOCS / "turnaround-delay-signal.txt",
+            tmp_path,
+            client=lambda prompt, model: "",
+        )
+    except KeyError as exc:
+        assert "Unknown generation artifact kind: product" in str(exc)
+    else:
+        raise AssertionError("product alias should not be accepted")
+
+
+def test_generate_local_artifacts_for_kind_writes_full_odps_product(tmp_path):
+    """Test ODPS product generation writes a full OpenDataProduct document."""
+    source = tmp_path / "airport-operations-product.md"
+    source.write_text(
+        "# Airport Operations Performance\n\n"
+        "A public production dataset for airport operations performance.",
+        encoding="utf-8",
+    )
+
+    artifact = generate_local_artifacts_for_kind(
+        "odps-product",
+        source,
+        tmp_path / "fragments",
+        client=lambda prompt, model: """schema: https://opendataproducts.org/v4.1/schema/odps.json
+version: "4.1"
+product:
+  productID: airport-operations-performance
+  name: Airport Operations Performance
+  visibility: public
+  status: production
+  type: dataset
+""",
+    )[0]
+
+    assert artifact.name == "odpsProduct:airport-operations-performance"
+    assert artifact.output_path == (
+        tmp_path / "fragments" / "odps_product_airport-operations-performance.yaml"
+    )
+    assert artifact.valid_yaml is True
+    assert yaml.safe_load(artifact.output_path.read_text(encoding="utf-8")) == {
+        "schema": "https://opendataproducts.org/v4.1/schema/odps.json",
+        "version": "4.1",
+        "product": {
+            "productID": "airport-operations-performance",
+            "name": "Airport Operations Performance",
+            "visibility": "public",
+            "status": "production",
+            "type": "dataset",
+        },
+    }
 
 
 def test_generate_local_artifact_extracts_yaml_after_model_prose(tmp_path):

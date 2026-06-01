@@ -17,9 +17,9 @@ filename in the prompt as a source boundary:
 
 That filename helps the local model understand what each document is about. The
 current SDK does not route files by filename. For selected-kind generation,
-such as `--kind product`, each source document is processed separately with the
-selected prompt so multiple product source files can produce multiple product
-reference fragments.
+such as `--kind product-reference` or `--kind odps-product`, each source
+document is processed separately with the selected prompt so multiple product
+source files can produce multiple matching YAML artifacts.
 
 The words in filenames still matter because the model sees them. Including
 terms such as `product`, `use-case`, `objective`, or `signal` makes it more
@@ -30,6 +30,7 @@ Final fragment filenames are not copied from source filenames. They are derived
 from the generated YAML object ids:
 
 - `productReference.id` -> `product_reference_<id>.yaml`
+- `product.productID` -> `odps_product_<id>.yaml`
 - `useCase.id` -> `use_case_<id>.yaml`
 - `businessObjective.id` -> `business_objective_<id>.yaml`
 - `signal.id` -> `signal_<id>.yaml`

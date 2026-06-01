@@ -123,6 +123,10 @@ def test_resources_are_listable_and_retrievable():
 
     assert any(resource.id == "odpg.schema.yaml" for resource in resources)
     assert any(resource.id == "generation.prompt.system" for resource in resources)
+    assert any(
+        resource.id == "generation.prompt.odps_product_yaml"
+        for resource in resources
+    )
     assert get_resource("odpv.terms").id == "odpv.terms"
     assert get_resource("generation.prompt.system").type == "prompt"
 

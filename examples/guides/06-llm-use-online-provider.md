@@ -71,7 +71,7 @@ MD
 ```bash
 open-data-products generate \
   --config generation.config.yaml \
-  --kind product \
+  --kind product-reference \
   --json
 ```
 
@@ -79,4 +79,5 @@ open-data-products generate \
 
 - Provider settings belong in `generation.config.yaml`.
 - Secrets stay in environment variables.
-- `--kind product` generates one product reference fragment.
+- `--kind product-reference` generates one ODPC product reference fragment.
+- `--kind odps-product` generates one full ODPS product YAML document.

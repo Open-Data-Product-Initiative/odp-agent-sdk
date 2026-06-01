@@ -71,7 +71,11 @@ def test_unified_cli_help_uses_compact_command_metavar(
         in help_text
     )
     assert (
-        "open-data-products generate --input source_docs/ --kind product --output generated/ --json"
+        "open-data-products generate --input source_docs/ --kind product-reference --output generated/ --json"
+        in help_text
+    )
+    assert (
+        "open-data-products generate --input product.md --kind odps-product --output generated/ --json"
         in help_text
     )
     assert (

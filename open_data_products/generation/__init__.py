@@ -136,12 +136,20 @@ class GeneratedArtifact:
 
 GENERATION_TASKS: Sequence[GenerationTask] = (
     GenerationTask(
-        name="odps_data_products",
+        name="odpc_product_references",
         prompt_name="odps_data_product_fragment.md",
-        output_name="odps_data_products.yaml",
+        output_name="odpc_product_references.yaml",
         expected_root="productReferences",
         fragment_root="productReference",
         filename_prefix="product_reference",
+        graph_node_type="DataProduct",
+    ),
+    GenerationTask(
+        name="odps_products",
+        prompt_name="odps_product_yaml.md",
+        output_name="odps_product.yaml",
+        expected_root="product",
+        filename_prefix="odps_product",
         graph_node_type="DataProduct",
     ),
     GenerationTask(
@@ -179,11 +187,17 @@ GENERATION_TASKS: Sequence[GenerationTask] = (
     ),
 )
 
+HOLISTIC_GENERATION_TASKS: Sequence[GenerationTask] = tuple(
+    task for task in GENERATION_TASKS if task.name != "odps_products"
+)
+
 GENERATION_TASK_ALIASES = {
-    "product": "odps_data_products",
-    "data-product": "odps_data_products",
-    "data-products": "odps_data_products",
-    "odps": "odps_data_products",
+    "product-reference": "odpc_product_references",
+    "product-references": "odpc_product_references",
+    "odpc-product-reference": "odpc_product_references",
+    "odpc-product-references": "odpc_product_references",
+    "odps-product": "odps_products",
+    "odps-products": "odps_products",
     "use-case": "odpc_use_cases",
     "usecase": "odpc_use_cases",
     "use-cases": "odpc_use_cases",
@@ -1060,7 +1074,7 @@ def generate_local_artifacts(
     client: Optional[ModelClient] = None,
     prompt_dir: Optional[PathLike] = None,
 ) -> List[GeneratedArtifact]:
-    """Generate YAML fragments and graph YAML from source documents."""
+    """Generate legacy ODPC fragments and graph YAML from source documents."""
     destination = Path(output_dir)
     destination.mkdir(parents=True, exist_ok=True)
     if client is None:
@@ -1070,7 +1084,7 @@ def generate_local_artifacts(
     )
 
     artifacts: List[GeneratedArtifact] = []
-    for task in GENERATION_TASKS:
+    for task in HOLISTIC_GENERATION_TASKS:
         prompt_context = (
             _generated_artifact_context(artifacts)
             if task.name == "odpg_graph" and artifacts
@@ -1230,6 +1244,30 @@ def _write_generated_artifacts(
                 valid_yaml=True,
             )
         ]
+    if task.name == "odps_products":
+        document = yaml.safe_load(yaml_output)
+        if not isinstance(document, dict):
+            return []
+        product = document.get("product")
+        product_id = (
+            product.get("productID")
+            if isinstance(product, dict)
+            else None
+        )
+        product_id = str(product_id or "product")
+        output_path = destination / _fragment_file_name("odps_product", product_id)
+        output_path.write_text(
+            yaml.safe_dump(document, sort_keys=False, allow_unicode=True),
+            encoding="utf-8",
+        )
+        return [
+            GeneratedArtifact(
+                name=f"odpsProduct:{product_id}",
+                prompt_name=task.prompt_name,
+                output_path=output_path,
+                valid_yaml=True,
+            )
+        ]
 
     document = yaml.safe_load(yaml_output)
     if not isinstance(document, dict):
@@ -1339,7 +1377,10 @@ def _extract_yaml_document(task: GenerationTask, text: str) -> str:
     if _loads_as_mapping(text):
         return text
 
-    roots = ["graph"] if task.expected_root == "graph" else [task.expected_root]
+    if task.name == "odps_products":
+        roots = ["schema", "product"]
+    else:
+        roots = ["graph"] if task.expected_root == "graph" else [task.expected_root]
     lines = text.splitlines()
     for index, line in enumerate(lines):
         stripped = line.lstrip()
@@ -1464,6 +1505,16 @@ def _artifact_errors(
             "Generated YAML must contain expected root key "
             f"`{task.expected_root}` for {task.name}."
         ]
+    if task.name == "odps_products":
+        from open_data_products.odps import OpenDataProduct
+        from open_data_products.odps.exceptions import ODPSValidationError
+
+        try:
+            product = OpenDataProduct.from_dict(document)
+            product.validate()
+        except ODPSValidationError as exc:
+            return [str(exc)]
+        return []
     if task.expected_root != "graph" and not isinstance(
         document.get(task.expected_root), list
     ):

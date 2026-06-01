@@ -106,7 +106,14 @@ _RESOURCE_DEFINITIONS: Tuple[ResourceDefinition, ...] = (
         "generation",
         "prompt",
         "generation/data/prompts/odps_data_product_fragment.md",
-        "Prompt for generating ODPS data product fragments from source docs.",
+        "Prompt for generating ODPC product reference fragments from source docs.",
+    ),
+    (
+        "generation.prompt.odps_product_yaml",
+        "generation",
+        "prompt",
+        "generation/data/prompts/odps_product_yaml.md",
+        "Prompt for generating full ODPS product YAML from source docs.",
     ),
     (
         "generation.prompt.odpc_use_case_fragment",
