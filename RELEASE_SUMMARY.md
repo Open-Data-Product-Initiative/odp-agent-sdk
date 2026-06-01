@@ -1,6 +1,6 @@
-# Release Summary: 0.1.7
+# Release Summary: 0.1.8
 
-Release 0.1.7 fixes selected-kind LLM generation for directory inputs and makes
+Release 0.1.8 fixes selected-kind LLM generation for directory inputs and makes
 product generation explicit.
 
 ## Highlights
@@ -24,6 +24,9 @@ product generation explicit.
 
 ## Verification
 
-- `PYTHONDONTWRITEBYTECODE=1 python3 -m pytest tests/test_generation_prompts.py tests/test_functional_cli.py -q`
-- `PYTHONDONTWRITEBYTECODE=1 python3 -m pytest tests/test_publish_workflow.py tests/test_namespace_layout.py -q`
+- `pytest -q`
+- `python3 -c "import open_data_products"`
+- `python3 -m open_data_products.cli manifest --json | python3 -m json.tool`
+- `test ! -e docs/superpowers`
 - `PYTHONDONTWRITEBYTECODE=1 python3 -m build`
+- `python3 -m twine check dist/*`
