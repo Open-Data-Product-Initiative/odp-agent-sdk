@@ -205,7 +205,8 @@ Use the bundled default config and bundled prompts as-is:
 ```bash
 # LLM generation
 open-data-products generate \
-  --input source_docs/ \
+  --input source_docs/products/ \
+  --kind product-reference \
   --output generated/ \
   --json
 
@@ -225,7 +226,8 @@ open-data-products config generation --config my-generation.config.yaml --check
 
 open-data-products generate \
   --config my-generation.config.yaml \
-  --input source_docs/ \
+  --input source_docs/products/ \
+  --kind product-reference \
   --output generated/ \
   --json
 ```
@@ -249,7 +251,8 @@ open-data-products generate \
   --config my-generation.config.yaml \
   --provider lmstudio \
   --model any-local-model-loaded-in-the-server \
-  --input source_docs/ \
+  --input source_docs/products/ \
+  --kind product-reference \
   --output generated/ \
   --json
 
@@ -257,7 +260,8 @@ open-data-products generate \
   --config my-generation.config.yaml \
   --provider groq \
   --model openai/gpt-oss-120b \
-  --input source_docs/ \
+  --input source_docs/products/ \
+  --kind product-reference \
   --output generated/ \
   --json
 
@@ -281,7 +285,8 @@ open-data-products config generation --copy-prompts-to prompts/
 open-data-products generate \
   --config my-generation.config.yaml \
   --prompts prompts/ \
-  --input source_docs/ \
+  --input source_docs/signals/ \
+  --kind signal \
   --output generated/ \
   --json
 ```

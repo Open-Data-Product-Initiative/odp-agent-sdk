@@ -68,8 +68,9 @@ artifacts = generate_local_artifacts("open_data_products/generation/source_docs"
 - `list_generation_prompts()` and `load_generation_prompt(name)`: discover and
   load editable LLM prompts for generating standards-ready YAML artifacts.
 - `generate_local_artifact(kind, source, output_dir, model="qwen2.5")`: generate
-  one selected artifact kind (`product`, `use-case`, `objective`, `signal`, or
-  `graph`) from one Markdown/text source file or a source folder.
+  one selected artifact kind (`product-reference`, `odps-product`, `use-case`,
+  `objective`, `signal`, or `graph`) from one Markdown/text source file or a
+  source folder.
 - `generate_local_artifacts(source_dir, output_dir, model="qwen2.5")`: use the
   editable prompts and configured generation client to generate separate ODPC
   `productReference`, `useCase`, `businessObjective`, and `signal` fragment

@@ -26,6 +26,20 @@ terms such as `product`, `use-case`, `objective`, or `signal` makes it more
 likely that the model extracts the right kind of artifact from that source
 document, but this is prompt guidance, not deterministic file routing.
 
+For production-style folder generation, group source files by artifact type and
+run each `--kind` against its matching folder:
+
+```text
+source_docs/
+  products/
+  use_cases/
+  objectives/
+  signals/
+```
+
+For example, run `--kind signal` against `source_docs/signals/`, not against a
+mixed folder that also contains product or use-case source material.
+
 Final fragment filenames are not copied from source filenames. They are derived
 from the generated YAML object ids:
 

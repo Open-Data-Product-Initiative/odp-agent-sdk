@@ -13,7 +13,7 @@ or virtual environments before.
 The first four workflow guides do not use an LLM. They cover validation,
 explanation, vocabulary lookup, and graph conversion.
 
-The last four guides use the SDK generation command. They require Ollama with
+The last five guides use the SDK generation command. They require Ollama with
 Qwen 2.5 or a configured online provider.
 
 ## Non-LLM Guides
@@ -30,3 +30,4 @@ Qwen 2.5 or a configured online provider.
 2. [Generate one artifact with an online provider](06-llm-use-online-provider.md)
 3. [Generate a full fragment set from source documents](07-llm-generate-fragment-set.md)
 4. [Full cycle: source docs to catalog HTML and graph explorer](08-llm-full-cycle-catalog-and-graph.md)
+5. [Build catalog and graph from the same fragments](09-build-catalog-and-graph-from-fragments.md)

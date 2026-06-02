@@ -11,7 +11,7 @@ family. Each standard lives in its own namespace:
 
 # flake8: noqa: E402
 
-__version__ = "0.1.8"
+__version__ = "0.1.9"
 version = __version__
 
 from . import odpc
@@ -85,7 +85,7 @@ from .odpc import (
     write_catalog_html,
     write_catalog_artifacts,
 )
-from .odpg import convert_file, convert_graph, dump_graph_yaml
+from .odpg import build_graph, convert_file, convert_graph, dump_graph_yaml, write_graph
 from .odpv import (
     agent_vocabulary_context,
     check_vocabulary_relationship,
@@ -111,6 +111,7 @@ __all__ = [
     "agent_vocabulary_context",
     "build_catalog",
     "build_catalog_artifacts",
+    "build_graph",
     "check_vocabulary_relationship",
     "convert_file",
     "convert_graph",
@@ -167,6 +168,7 @@ __all__ = [
     "render_generation_prompt",
     "resolve_generation_settings",
     "validate_config",
+    "write_graph",
     "resolve_references",
     "resolve_vocabulary_term",
     "resolve_product_contracts",

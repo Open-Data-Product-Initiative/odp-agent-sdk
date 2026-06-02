@@ -95,7 +95,7 @@ Use these commands for machine-readable workflows:
 - `open-data-products resources --id <resource-id> --json`
 - `open-data-products summary <path>`
 - `open-data-products generate <source-file> --kind signal --output <generated-dir> --model qwen2.5 --json`
-- `open-data-products generate <source-docs-dir> --output <generated-dir> --model qwen2.5 --json`
+- `open-data-products generate <product-source-dir> --kind product-reference --output <generated-dir> --model qwen2.5 --json`
 - `open-data-products manifest --json`
 - `open-data-products serve`
 - `open-data-products odpc-build <fragments-dir> --output <catalog.yaml> --json`
@@ -213,13 +213,12 @@ signal fragment generation.
 When the SDK is installed from PyPI, the bundled generation config is a
 template inside the package. Do not edit `site-packages`; run
 `open-data-products config generation --copy-to my-generation.config.yaml`, edit the
-copied file, then pass it with `open-data-products generate --config
-my-generation.config.yaml`. A folder target such as `--copy-to config/` creates
-missing folders and writes `generation.config.yaml` inside that folder.
+copied file, then pass it with `open-data-products generate --config my-generation.config.yaml --kind signal`.
+A folder target such as `--copy-to config/` creates missing folders and writes
+`generation.config.yaml` inside that folder.
 Bundled prompts are templates too; run
 `open-data-products config generation --copy-prompts-to prompts/`, edit the
-copied Markdown files, then pass them with `open-data-products generate
---prompts prompts/`.
+copied Markdown files, then pass them with `open-data-products generate --prompts prompts/ --kind signal`.
 Validate a copied config before generation with
 `open-data-products config generation --config my-generation.config.yaml --check`
 or `validate_config("generation", "my-generation.config.yaml")`. Print the
@@ -234,16 +233,16 @@ user-controlled strings and should match the selected server's loaded model.
 Use `list_generation_prompts()` and `load_generation_prompt(name)` from Python,
 or discover prompt resources with `open-data-products resources --json`.
 
-Use `generate_local_artifact()` or `open-data-products generate --kind <kind>`
-to generate one selected artifact from one source file or folder. Supported
-kinds are `product`, `use-case`, `objective`, `signal`, and `graph`.
+Use `generate_local_artifact()`, `generate_local_artifacts_for_kind()`, or
+`open-data-products generate --kind <kind>` to generate selected artifacts from
+one source file or folder. Supported CLI kinds are `product-reference`,
+`odps-product`, `use-case`, `objective`, `signal`, and `graph`.
 
-Use `generate_local_artifacts()` or `open-data-products generate` without
-`--kind` to call the configured provider and write the holistic artifact set.
-ODPC outputs are separate fragment files with singular roots:
-`productReference`, `useCase`, `businessObjective`, and `signal`. In the
-holistic flow, ODPG graph generation receives those generated fragment YAML
-files as context so graph node ids can match the fragments.
+The CLI requires an explicit `--kind`. ODPC outputs are separate fragment files
+with singular roots: `productReference`, `useCase`, `businessObjective`, and
+`signal`. Use `--kind graph` when ODPG graph generation should receive those
+generated fragment YAML files as context so graph node ids can match the
+fragments.
 
 The prompt set is intended to guide a configured model from source documents to
 standards-ready YAML fragments:

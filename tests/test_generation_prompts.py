@@ -48,12 +48,7 @@ from open_data_products import (
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-GENERATION_SOURCE_DOCS = (
-    REPO_ROOT
-    / "open_data_products"
-    / "generation"
-    / "source_docs"
-)
+GENERATION_SOURCE_DOCS = REPO_ROOT / "open_data_products" / "generation" / "source_docs"
 
 
 def test_generation_prompts_are_listed_and_loadable():
@@ -64,6 +59,7 @@ def test_generation_prompts_are_listed_and_loadable():
         "odpc_objective_fragment.md",
         "odpc_signal_fragment.md",
         "odpc_use_case_fragment.md",
+        "odpg_edges_from_odpc_fragments.md",
         "odpg_graph_yaml.md",
         "odps_data_product_fragment.md",
         "odps_product_yaml.md",
@@ -71,13 +67,18 @@ def test_generation_prompts_are_listed_and_loadable():
     ]
     for name in prompt_names:
         prompt = load_generation_prompt(name)
-        assert "{source_documents}" in prompt
+        if name == "odpg_edges_from_odpc_fragments.md":
+            assert "{nodes}" in prompt
+            assert "{odpc_fragments}" in prompt
+        else:
+            assert "{source_documents}" in prompt
         assert "valid YAML" in prompt
     assert "top-level `productReferences` list" in load_generation_prompt(
         "odps_data_product_fragment.md"
     )
-    assert "Do not start the YAML with `- productReferences:`" in load_generation_prompt(
-        "odps_data_product_fragment.md"
+    assert (
+        "Do not start the YAML with `- productReferences:`"
+        in load_generation_prompt("odps_data_product_fragment.md")
     )
     assert "Never create `productReferences` for use cases" in load_generation_prompt(
         "odps_data_product_fragment.md"
@@ -91,16 +92,15 @@ def test_generation_prompts_are_listed_and_loadable():
     assert "Do not use `linkedUseCases`" in load_generation_prompt(
         "odpc_objective_fragment.md"
     )
-    assert "The `id` must describe the same signal as `name.en`" in load_generation_prompt(
-        "odpc_signal_fragment.md"
+    assert (
+        "The `id` must describe the same signal as `name.en`"
+        in load_generation_prompt("odpc_signal_fragment.md")
     )
     assert "Do not use `moderate`" in load_generation_prompt("odpc_signal_fragment.md")
     assert "`from`, `to`, `type`, and `confidence`" in load_generation_prompt(
         "odpg_graph_yaml.md"
     )
-    assert "product_reference_<id>.yaml" in load_generation_prompt(
-        "odpg_graph_yaml.md"
-    )
+    assert "product_reference_<id>.yaml" in load_generation_prompt("odpg_graph_yaml.md")
 
 
 def test_generation_config_summary_exposes_template_and_resolved_settings():
@@ -156,13 +156,16 @@ providers:
 
     assert report["valid"] is False
     assert "Unknown top-level generation config key: base_url" in report["errors"]
-    assert "providers.groq.apiKeyEnv must be an environment variable name" in report[
-        "errors"
-    ]
+    assert (
+        "providers.groq.apiKeyEnv must be an environment variable name"
+        in report["errors"]
+    )
     assert "providers.claude.maxTokens must be a positive integer" in report["errors"]
 
 
-def test_validate_generation_config_rejects_implicit_defaults_and_missing_input(tmp_path):
+def test_validate_generation_config_rejects_implicit_defaults_and_missing_input(
+    tmp_path,
+):
     """Test that commented-out provider/model settings are not silently accepted."""
     config = tmp_path / "weak-generation.config.yaml"
     config.write_text(
@@ -179,9 +182,9 @@ output: generation/fragments/
 
     assert report["valid"] is False
     assert "provider is required in generation config files" in report["errors"]
-    assert "model is required at top level or on the selected provider" in report[
-        "errors"
-    ]
+    assert (
+        "model is required at top level or on the selected provider" in report["errors"]
+    )
     assert "input path does not exist: missing/source_docs/" in report["errors"]
 
 
@@ -227,8 +230,9 @@ def test_copy_config_template_accepts_folder_destination(tmp_path):
     assert result.read_text(encoding="utf-8") == DEFAULT_GENERATION_CONFIG.read_text(
         encoding="utf-8"
     )
-    assert "every edge `from` and `to` value appears in `graph.nodes`" in load_generation_prompt(
-        "odpg_graph_yaml.md"
+    assert (
+        "every edge `from` and `to` value appears in `graph.nodes`"
+        in load_generation_prompt("odpg_graph_yaml.md")
     )
     assert "Do not use YAML document separators" in load_generation_prompt(
         "odpc_signal_fragment.md"
@@ -862,7 +866,9 @@ def test_create_generation_client_checks_ollama(monkeypatch):
         observed["model"] = model
         observed["base_url"] = base_url
 
-    monkeypatch.setattr("open_data_products.generation.ensure_ollama_model", fake_ensure)
+    monkeypatch.setattr(
+        "open_data_products.generation.ensure_ollama_model", fake_ensure
+    )
     monkeypatch.setattr(
         "open_data_products.generation.ollama_generate",
         lambda prompt, model, base_url: f"{model}@{base_url}:{prompt}",
@@ -955,9 +961,7 @@ graph:
     graph_prompt = prompts_seen[-1][0]
     assert "Source file: product_reference_test-product.yaml" in graph_prompt
     assert "Source file: signal_test-signal.yaml" in graph_prompt
-    graph = yaml.safe_load(
-        (output_dir / "odpg_graph.yaml").read_text(encoding="utf-8")
-    )
+    graph = yaml.safe_load((output_dir / "odpg_graph.yaml").read_text(encoding="utf-8"))
     assert graph["graph"]["nodes"] == [
         {
             "id": "test-signal",
@@ -971,9 +975,7 @@ graph:
         },
     ]
     assert yaml.safe_load(
-        (output_dir / "product_reference_test-product.yaml").read_text(
-            encoding="utf-8"
-        )
+        (output_dir / "product_reference_test-product.yaml").read_text(encoding="utf-8")
     ) == {
         "productReference": {
             "id": "test-product",
@@ -1032,7 +1034,9 @@ def test_generate_local_artifact_writes_one_selected_yaml_output(tmp_path):
     )
 
     assert artifact.name == "signal:turnaround-delay-spike-signal"
-    assert artifact.output_path == output_dir / "signal_turnaround-delay-spike-signal.yaml"
+    assert (
+        artifact.output_path == output_dir / "signal_turnaround-delay-spike-signal.yaml"
+    )
     assert artifact.valid_yaml is True
     assert "Turnaround Delay Spike Signal" in prompts_seen[0][0]
     assert "Passenger Connection Protection" not in prompts_seen[0][0]
@@ -1203,7 +1207,9 @@ signals:
     )
 
     assert artifact.valid_yaml is True
-    assert artifact.output_path == tmp_path / "signal_turnaround-delay-spike-signal.yaml"
+    assert (
+        artifact.output_path == tmp_path / "signal_turnaround-delay-spike-signal.yaml"
+    )
 
 
 def test_generate_local_artifact_rejects_wrong_fragment_shape(tmp_path):
@@ -1301,9 +1307,7 @@ def test_generate_local_artifact_normalizes_signal_enum_aliases(tmp_path):
     )
 
     assert artifact.valid_yaml is True
-    signal = yaml.safe_load(
-        artifact.output_path.read_text(encoding="utf-8")
-    )["signal"]
+    signal = yaml.safe_load(artifact.output_path.read_text(encoding="utf-8"))["signal"]
     assert signal["impact"]["valuePotential"] == "medium"
     assert signal["impact"]["urgency"] == "medium"
 
@@ -1328,9 +1332,9 @@ def test_generate_local_artifact_removes_objective_relationship_fields(tmp_path)
     )
 
     assert artifact.valid_yaml is True
-    objective = yaml.safe_load(
-        artifact.output_path.read_text(encoding="utf-8")
-    )["businessObjective"]
+    objective = yaml.safe_load(artifact.output_path.read_text(encoding="utf-8"))[
+        "businessObjective"
+    ]
     assert "linkedUseCases" not in objective
     assert "dataProducts" not in objective
 
@@ -1398,7 +1402,9 @@ graph:
             return "businessObjectives: []\n"
         return "signals: []\n"
 
-    artifacts = generate_local_artifacts(GENERATION_SOURCE_DOCS, tmp_path, client=fake_client)
+    artifacts = generate_local_artifacts(
+        GENERATION_SOURCE_DOCS, tmp_path, client=fake_client
+    )
 
     graph_artifact = artifacts[-1]
     assert graph_artifact.name == "odpg_graph"
@@ -1453,7 +1459,9 @@ graph:
   observedAt: "2026-05-20T00:00:00Z"
 """
 
-    artifacts = generate_local_artifacts(GENERATION_SOURCE_DOCS, tmp_path, client=fake_client)
+    artifacts = generate_local_artifacts(
+        GENERATION_SOURCE_DOCS, tmp_path, client=fake_client
+    )
 
     graph = yaml.safe_load(artifacts[-1].output_path.read_text(encoding="utf-8"))
     assert graph["graph"]["nodes"] == [

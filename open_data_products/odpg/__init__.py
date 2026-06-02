@@ -11,6 +11,7 @@ from .convert import (
 from .graph import (
     agent_context,
     analyze_graph,
+    build_graph,
     build_graph_explorer_html,
     collect_relationship_types,
     explain_graph,
@@ -23,6 +24,7 @@ from .graph import (
     summarize_graph,
     traverse_graph,
     validate_graph,
+    write_graph,
 )
 
 SPEC_ID = "odpg"
@@ -34,6 +36,7 @@ __all__ = [
     "SUPPORTED_FORMATS",
     "agent_context",
     "analyze_graph",
+    "build_graph",
     "build_graph_explorer_html",
     "collect_relationship_types",
     "convert_file",
@@ -51,4 +54,5 @@ __all__ = [
     "summarize_graph",
     "traverse_graph",
     "validate_graph",
+    "write_graph",
 ]

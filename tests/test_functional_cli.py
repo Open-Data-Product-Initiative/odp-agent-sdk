@@ -50,6 +50,7 @@ def test_unified_cli_help_uses_compact_command_metavar(
     assert "odpv-summary" in help_text
     assert "odpv-search" in help_text
     assert "ODPG graph commands:" in help_text
+    assert "odpg-build" in help_text
     assert "odpg-generate" in help_text
     assert "odpg-convert" in help_text
     assert "Product/Data Contract commands:" in help_text
@@ -79,11 +80,14 @@ def test_unified_cli_help_uses_compact_command_metavar(
         in help_text
     )
     assert (
-        "open-data-products config generation --copy-prompts-to prompts/"
-        in help_text
+        "open-data-products config generation --copy-prompts-to prompts/" in help_text
     )
     assert (
         "open-data-products generate --config my-generation.config.yaml --prompts prompts/ --input source_docs/ --kind graph --output generated/ --json"
+        in help_text
+    )
+    assert (
+        "open-data-products odpg-build fragments/ --output graph.yaml --json"
         in help_text
     )
     assert "generation.config.yaml --json" not in help_text
@@ -293,13 +297,17 @@ providers:
         encoding="utf-8",
     )
 
-    assert main(["config", "generation", "--config", str(config), "--check", "--json"]) == 1
+    assert (
+        main(["config", "generation", "--config", str(config), "--check", "--json"])
+        == 1
+    )
     payload = _json_output(capsys)
 
     assert payload["valid"] is False
-    assert "providers.groq.type must be one of anthropic, ollama, openai" in payload[
-        "errors"
-    ]
+    assert (
+        "providers.groq.type must be one of anthropic, ollama, openai"
+        in payload["errors"]
+    )
 
 
 def test_unified_cli_generation_uses_custom_prompt_dir(
@@ -908,6 +916,87 @@ product:
     html = html_output.read_text(encoding="utf-8")
     assert html.startswith("<!doctype html>")
     assert "Agent Ready Product" in html
+
+
+def test_unified_cli_builds_odpg_graph_from_odpc_fragments(
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    from open_data_products import generation
+
+    fragments = tmp_path / "fragments"
+    fragments.mkdir()
+    output = tmp_path / "graph.yaml"
+    (fragments / "product.yaml").write_text(
+        """
+productReference:
+  id: customer-analytics-product
+  name:
+    en: Customer Analytics Product
+  description:
+    en: Trusted customer analytics for retention decisions.
+""",
+        encoding="utf-8",
+    )
+    (fragments / "use-case.yaml").write_text(
+        """
+useCase:
+  id: customer-retention
+  name:
+    en: Customer Retention
+  description:
+    en: Improve retention decisions with trusted customer analytics.
+""",
+        encoding="utf-8",
+    )
+
+    def fake_create_generation_client(settings):
+        def fake_client(prompt: str, model: str) -> str:
+            assert "customer-retention" in prompt
+            return """
+edges:
+  - from: customer-retention
+    to: customer-analytics-product
+    type: dependsOn
+    confidence: high
+"""
+
+        return fake_client
+
+    monkeypatch.setattr(
+        generation,
+        "create_generation_client",
+        fake_create_generation_client,
+    )
+
+    assert (
+        main(
+            [
+                "odpg-build",
+                str(fragments),
+                "--output",
+                str(output),
+                "--id",
+                "customer-graph",
+                "--model",
+                "test-model",
+                "--json",
+            ]
+        )
+        == 0
+    )
+    payload = _json_output(capsys)
+    assert payload["spec"] == "odpg"
+    assert payload["kind"] == "Graph"
+    assert payload["output"] == str(output)
+    assert payload["valid"] is True
+    assert payload["nodeCount"] == 2
+    assert payload["edgeCount"] == 1
+
+    graph = __import__("yaml").safe_load(output.read_text(encoding="utf-8"))
+    assert graph["graph"]["metadata"]["id"] == "customer-graph"
+    assert graph["graph"]["edges"][0]["type"] == "dependsOn"
 
 
 def test_unified_cli_odpv_commands(capsys: pytest.CaptureFixture[str]) -> None:

@@ -92,8 +92,9 @@ source documents with another configured backend without editing the file.
 open-data-products generate --config open_data_products/generation/generation.config.yaml --kind signal --json
 ```
 
-Generates the selected artifact type. Supported kinds include `product`,
-`use-case`, `objective`, `signal`, and `graph`.
+Generates the selected artifact type. Supported kinds include
+`product-reference`, `odps-product`, `use-case`, `objective`, `signal`, and
+`graph`.
 
 ## Generated Fragment Artifacts
 

@@ -38,7 +38,7 @@ open-data-products generate \
   --config my-generation.config.yaml \
   --provider lmstudio \
   --model deepseek-r1-distill-qwen-7b \
-  --input source_docs/ \
+  --input source_docs/signals/ \
   --kind signal \
   --output generated/ \
   --json
@@ -76,6 +76,11 @@ artifact prompt to run. Descriptive filenames still help the model infer intent,
 so prefer names like `*-product.md`, `*-signal.txt`, `*-use-case.md`, and
 `*-objective.txt`.
 
+For folder generation, keep each artifact type in its own input folder, such as
+`source_docs/products/`, `source_docs/use_cases/`, `source_docs/objectives/`,
+and `source_docs/signals/`. This prevents a selected prompt like `--kind signal`
+from processing product or use-case prose.
+
 ## Generate One Artifact
 
 Use `--kind` when one source file should produce one selected artifact type:
@@ -91,7 +96,8 @@ open-data-products generate \
 
 Supported `--kind` values are:
 
-- `product`
+- `product-reference`
+- `odps-product`
 - `use-case`
 - `objective`
 - `signal`
@@ -103,11 +109,12 @@ the source filename.
 
 ## Generate From A Folder
 
-Use an explicit `--kind` value when generating from a source folder:
+Use an explicit `--kind` value when generating from a type-specific source
+folder:
 
 ```bash
 open-data-products generate \
-  --input open_data_products/generation/source_docs/ \
+  --input source_docs/products/ \
   --kind product-reference \
   --output open_data_products/generation/fragments/ \
   --model qwen2.5 \
@@ -115,8 +122,9 @@ open-data-products generate \
 ```
 
 For selected-kind folder generation, each `.md` or `.txt` source document is
-processed separately with the selected prompt. The output folder contains one
-or more matching artifacts, depending on what the model can extract:
+processed separately with the selected prompt. Put only matching source files in
+that folder. The output folder contains one or more matching artifacts,
+depending on what the model can extract:
 
 - `productReference:` files such as `product_reference_<id>.yaml`
 - `OpenDataProduct` files such as `odps_product_<id>.yaml`
@@ -176,7 +184,7 @@ open-data-products generate \
   --prompts prompts/ \
   --provider openai \
   --model gpt-4.1-mini \
-  --input source_docs/ \
+  --input source_docs/signals/ \
   --kind signal \
   --output fragments/ \
   --json

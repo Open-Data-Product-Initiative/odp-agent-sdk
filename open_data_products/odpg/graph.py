@@ -7,10 +7,32 @@ import html
 import json
 from collections import defaultdict, deque
 from pathlib import Path
-from typing import Any, Deque, DefaultDict, Dict, FrozenSet, List, Optional, Set, Tuple, Union, cast
+from typing import (
+    Any,
+    Callable,
+    Deque,
+    DefaultDict,
+    Dict,
+    FrozenSet,
+    List,
+    Optional,
+    Set,
+    Tuple,
+    Union,
+    cast,
+)
+
+import yaml
 
 from open_data_products._io import load_jsonl_records, load_mapping
 from open_data_products._search import search_records, searchable_record_text
+from open_data_products.odpc.catalog import (
+    CATALOG_COLLECTIONS,
+    collect_catalog_document,
+    iter_catalog_input_files,
+    load_catalog,
+    text_value,
+)
 from open_data_products.results import ValidationResult
 
 from . import _explorer_template
@@ -20,6 +42,10 @@ DEFAULT_SCHEMA_YAML = Path(__file__).resolve().parent / "data" / "schema" / "odp
 DEFAULT_OBJECTS_JSONL = (
     Path(__file__).resolve().parent / "data" / "graph" / "objects.jsonl"
 )
+SCHEMA_URI = "https://opendataproducts.org/odpg-v1.0/schema/odpg.yaml"
+DEFAULT_EDGE_PROMPT = "odpg_edges_from_odpc_fragments.md"
+DEFAULT_GRAPH_BUILD_MODEL = "qwen2.5"
+GraphBuildClient = Callable[[str, str], str]
 
 
 # --- ODPG relationship model (ODPG spec literals; graphs may add domain-specific types) ---
@@ -113,6 +139,13 @@ CORE_NODE_TYPES: FrozenSet[str] = frozenset(
     )
 )
 
+ODPC_COLLECTION_NODE_TYPES: Dict[str, str] = {
+    "businessObjectives": "BusinessObjective",
+    "productReferences": "DataProduct",
+    "signals": "KPI",
+    "useCases": "UseCase",
+}
+
 
 def load_graph(path: Optional[Union[Path, str]] = None) -> Dict[str, Any]:
     """Load an ODPG graph from YAML."""
@@ -129,6 +162,253 @@ def load_schema(path: Optional[Union[Path, str]] = None) -> Dict[str, Any]:
     """Load ODPG schema YAML from ``path`` or bundled package data."""
     schema_path = Path(path) if path is not None else DEFAULT_SCHEMA_YAML
     return load_mapping(schema_path, root_name="ODPG schema")
+
+
+def default_graph_metadata(
+    *,
+    graph_id: Optional[str] = None,
+    name: Optional[str] = None,
+    description: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Return metadata for a generated ODPG graph."""
+    return {
+        "id": graph_id or "GRAPH-GENERATED",
+        "name": {"en": name or "Generated ODPG Graph"},
+        "description": {
+            "en": description
+            or "Generated from ODPC fragments with LLM-inferred edges."
+        },
+    }
+
+
+def build_graph(
+    input_dir: Union[str, Path],
+    *,
+    recursive: bool = True,
+    output_path: Optional[Union[str, Path]] = None,
+    graph_id: Optional[str] = None,
+    name: Optional[str] = None,
+    description: Optional[str] = None,
+    client: Optional[GraphBuildClient] = None,
+    model: str = DEFAULT_GRAPH_BUILD_MODEL,
+    prompt_dir: Optional[Union[str, Path]] = None,
+) -> Dict[str, Any]:
+    """Build one ODPG graph from ODPC fragments in a folder."""
+    if client is None:
+        raise ValueError("A model client is required to infer ODPG graph edges.")
+
+    nodes, context = collect_odpc_graph_nodes(
+        input_dir,
+        recursive=recursive,
+        output_path=output_path,
+    )
+    if not nodes:
+        raise ValueError(f"No ODPC fragments found for graph nodes at {input_dir}")
+
+    prompt = render_edge_prompt(nodes, context, prompt_dir=prompt_dir)
+    raw_output = client(prompt, model)
+    edges = parse_generated_edges(raw_output, nodes)
+    document = {
+        "schema": SCHEMA_URI,
+        "version": "1.0",
+        "kind": "Graph",
+        "graph": {
+            "metadata": default_graph_metadata(
+                graph_id=graph_id,
+                name=name,
+                description=description,
+            ),
+            "nodes": nodes,
+            "edges": edges,
+        },
+    }
+    result = validate_graph(document)
+    if not result.valid:
+        raise ValueError("Generated ODPG graph is invalid: " + "; ".join(result.errors))
+    return document
+
+
+def write_graph(path: Union[str, Path], document: Dict[str, Any]) -> None:
+    """Write an ODPG graph document as YAML."""
+    output = Path(path)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(
+        yaml.safe_dump(document, sort_keys=False, allow_unicode=False),
+        encoding="utf-8",
+    )
+
+
+def collect_odpc_graph_nodes(
+    input_dir: Union[str, Path],
+    *,
+    recursive: bool = True,
+    output_path: Optional[Union[str, Path]] = None,
+) -> Tuple[List[Dict[str, Any]], str]:
+    """Return ODPG nodes and prompt context derived from ODPC fragments."""
+    root = Path(input_dir)
+    output = Path(output_path).resolve() if output_path is not None else None
+    catalog: Dict[str, List[Any]] = {
+        collection: [] for collection in CATALOG_COLLECTIONS
+    }
+    source_by_key: Dict[Tuple[str, str], Path] = {}
+    context_blocks: List[str] = []
+
+    for path in iter_catalog_input_files(root, recursive=recursive):
+        if output is not None and path.resolve() == output:
+            continue
+        before = _catalog_collection_lengths(catalog)
+        document = load_catalog(path)
+        collect_catalog_document(document, path, root, catalog, [], [])
+        for collection in CATALOG_COLLECTIONS:
+            added = catalog[collection][before[collection] :]
+            for item in added:
+                item_id = _object_id(item)
+                if item_id:
+                    source_by_key[(collection, item_id)] = path
+                    context_blocks.append(
+                        _fragment_context_block(collection, item, path, root)
+                    )
+
+    nodes: List[Dict[str, Any]] = []
+    seen: Set[str] = set()
+    for collection in CATALOG_COLLECTIONS:
+        node_type = ODPC_COLLECTION_NODE_TYPES[collection]
+        for item in catalog[collection]:
+            item_id = _object_id(item)
+            if not item_id or item_id in seen:
+                continue
+            seen.add(item_id)
+            source_path = source_by_key.get((collection, item_id))
+            if source_path is None:
+                continue
+            nodes.append(
+                {
+                    "id": item_id,
+                    "type": node_type,
+                    "$ref": source_path.relative_to(root).as_posix(),
+                }
+            )
+    return nodes, "\n\n".join(context_blocks)
+
+
+def render_edge_prompt(
+    nodes: List[Dict[str, Any]],
+    fragment_context: str,
+    *,
+    prompt_dir: Optional[Union[str, Path]] = None,
+) -> str:
+    """Render the LLM prompt for ODPG edge inference."""
+    from open_data_products.generation import load_generation_prompt
+
+    node_lines = [
+        f"- id: {node['id']}\n  type: {node['type']}\n  ref: {node['$ref']}"
+        for node in nodes
+    ]
+    return (
+        load_generation_prompt(DEFAULT_EDGE_PROMPT, prompt_dir=prompt_dir)
+        .replace("{nodes}", "\n".join(node_lines))
+        .replace("{odpc_fragments}", fragment_context)
+    )
+
+
+def parse_generated_edges(
+    raw_output: str,
+    nodes: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """Parse and validate generated edge YAML."""
+    text = _strip_markdown_fence(raw_output.strip())
+    document = yaml.safe_load(text)
+    if not isinstance(document, dict):
+        raise ValueError("Generated ODPG edges must be a YAML object with edges.")
+    raw_edges = document.get("edges")
+    if not isinstance(raw_edges, list) or not raw_edges:
+        raise ValueError("Generated ODPG edges must include at least one edge.")
+
+    node_ids = {str(node["id"]) for node in nodes}
+    edges: List[Dict[str, Any]] = []
+    seen: Set[Tuple[str, str, str]] = set()
+    for index, edge in enumerate(raw_edges):
+        if not isinstance(edge, dict):
+            raise ValueError(f"Generated edge at index {index} must be an object.")
+        source = str(edge.get("from") or "").strip()
+        target = str(edge.get("to") or "").strip()
+        edge_type = str(edge.get("type") or "").strip()
+        confidence = str(edge.get("confidence") or "").strip()
+        if source not in node_ids:
+            raise ValueError(f"Generated edge uses unknown node id: {source}")
+        if target not in node_ids:
+            raise ValueError(f"Generated edge uses unknown node id: {target}")
+        if not edge_type:
+            raise ValueError(f"Generated edge {source}->{target} is missing type.")
+        if confidence not in DEFAULT_CONFIDENCE_VALUES:
+            raise ValueError(
+                f"Generated edge {source}->{target} has invalid confidence: "
+                f"{confidence}"
+            )
+        key = (source, target, edge_type)
+        if key in seen:
+            continue
+        seen.add(key)
+        edges.append(
+            {
+                "from": source,
+                "to": target,
+                "type": edge_type,
+                "confidence": confidence,
+            }
+        )
+    return edges
+
+
+def _catalog_collection_lengths(catalog: Dict[str, List[Any]]) -> Dict[str, int]:
+    return {collection: len(catalog[collection]) for collection in CATALOG_COLLECTIONS}
+
+
+def _object_id(item: Any) -> str:
+    if not isinstance(item, dict):
+        return ""
+    for key in ("id", "productID"):
+        value = item.get(key)
+        if value:
+            return str(value)
+    return ""
+
+
+def _fragment_context_block(
+    collection: str,
+    item: Any,
+    path: Path,
+    root: Path,
+) -> str:
+    if not isinstance(item, dict):
+        return ""
+    name = text_value(item.get("name"), _object_id(item))
+    description = text_value(item.get("description"))
+    lines = [
+        f"--- Fragment: {path.relative_to(root).as_posix()} ---",
+        f"collection: {collection}",
+        f"id: {_object_id(item)}",
+        f"type: {ODPC_COLLECTION_NODE_TYPES[collection]}",
+        f"name: {name}",
+    ]
+    if description:
+        lines.append(f"description: {description}")
+    for key in ("status", "priority", "confidence", "strength", "type"):
+        value = item.get(key)
+        if value:
+            lines.append(f"{key}: {text_value(value)}")
+    return "\n".join(lines)
+
+
+def _strip_markdown_fence(text: str) -> str:
+    if text.startswith("```"):
+        lines = text.splitlines()
+        if lines and lines[0].startswith("```"):
+            lines = lines[1:]
+        if lines and lines[-1].strip() == "```":
+            lines = lines[:-1]
+        return "\n".join(lines).strip()
+    return text
 
 
 def graph_payload(document: Dict[str, Any]) -> Dict[str, Any]:
@@ -162,9 +442,7 @@ def _graph_edges(document: Dict[str, Any]) -> List[Dict[str, Any]]:
 
 def _node_by_id(document: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
     return {
-        str(node.get("id")): node
-        for node in _graph_nodes(document)
-        if node.get("id")
+        str(node.get("id")): node for node in _graph_nodes(document) if node.get("id")
     }
 
 

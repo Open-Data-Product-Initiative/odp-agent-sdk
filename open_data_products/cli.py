@@ -68,6 +68,7 @@ Local generation commands:
   generate     Use configured LLM prompts to create selected YAML artifacts
 
 ODPG graph commands:
+  odpg-build           Build one ODPG graph from ODPC fragments with LLM-inferred edges
   odpg-summary         Summarize graph metadata and relationship counts
   odpg-traverse        Discover relationship paths from a focus node
   odpg-analyze         Run governance and strategic graph checks
@@ -105,6 +106,7 @@ Examples:
   open-data-products generate --input use-case.md --kind use-case --output generated/ --json
   open-data-products generate --config my-generation.config.yaml --provider groq --model openai/gpt-oss-120b --input source_docs/ --kind signal --output generated/ --json
   open-data-products generate --config my-generation.config.yaml --prompts prompts/ --input source_docs/ --kind graph --output generated/ --json
+  open-data-products odpg-build fragments/ --output graph.yaml --json
   open-data-products odpg-agent-context graph.yaml --node DATA-PRODUCT-001
   open-data-products odpg-generate graph.yaml --output graph-explorer.html --json
   open-data-products odpg-convert --input graph.graphml --output graph.yaml --json
@@ -202,6 +204,7 @@ def _print_summary_report(summary: Dict[str, object]) -> None:
         f"SHA-256: {summary['sha256']}",
     ]
     print("\n".join(lines))
+
 
 PRODUCT_HELP = """\
 Data Contract workflow commands:
@@ -507,6 +510,59 @@ def main(argv: Optional[List[str]] = None) -> int:
     )
     odpg_summary_parser.add_argument("graph", help="Path to an ODPG graph file")
 
+    odpg_build_parser = subparsers.add_parser(
+        "odpg-build", help="Build an ODPG graph from ODPC fragments"
+    )
+    odpg_build_parser.add_argument(
+        "input_dir",
+        help="Folder containing ODPC product reference, use case, objective, or signal fragments",
+    )
+    odpg_build_parser.add_argument(
+        "--output",
+        "-o",
+        required=True,
+        help="Output graph YAML path",
+    )
+    odpg_build_parser.add_argument("--id", help="Graph metadata id to use or override")
+    odpg_build_parser.add_argument(
+        "--name", help="Graph metadata name.en to use or override"
+    )
+    odpg_build_parser.add_argument(
+        "--description",
+        help="Graph metadata description.en to use or override",
+    )
+    odpg_build_parser.add_argument(
+        "--no-recursive",
+        action="store_true",
+        help="Only read files directly inside input_dir.",
+    )
+    odpg_build_parser.add_argument(
+        "--no-validate",
+        action="store_true",
+        help="Write the graph without validating it against ODPG rules.",
+    )
+    odpg_build_parser.add_argument(
+        "--config",
+        help="Generation config path for the edge inference provider.",
+    )
+    odpg_build_parser.add_argument(
+        "--provider",
+        help="Provider override such as ollama, openai, openrouter, groq, lmstudio, or claude.",
+    )
+    odpg_build_parser.add_argument(
+        "--model",
+        help="Model override. Defaults to config model or qwen2.5.",
+    )
+    odpg_build_parser.add_argument(
+        "--prompts",
+        help="Prompt template folder override. Defaults to config prompts or bundled prompts.",
+    )
+    odpg_build_parser.add_argument(
+        "--ollama-url",
+        help="Local Ollama base URL. Defaults to http://localhost:11434.",
+    )
+    odpg_build_parser.add_argument("--json", action="store_true", help="Emit JSON")
+
     odpg_traverse_parser = subparsers.add_parser(
         "odpg-traverse", help="Discover ODPG relationship paths from a node"
     )
@@ -737,7 +793,9 @@ def main(argv: Optional[List[str]] = None) -> int:
 
             try:
                 if args.print:
-                    print(generation.print_config(args.domain, args.config_path), end="")
+                    print(
+                        generation.print_config(args.domain, args.config_path), end=""
+                    )
                     return 0
                 if args.check:
                     payload = generation.validate_config(args.domain, args.config_path)
@@ -1104,6 +1162,93 @@ def main(argv: Optional[List[str]] = None) -> int:
             print(json.dumps(summarize_graph(load_graph(args.graph)), indent=2))
             return 0
 
+        if args.command == "odpg-build":
+            from . import generation
+            from .odpg import build_graph, summarize_graph, validate_graph, write_graph
+
+            output = Path(args.output)
+            try:
+                settings = generation.resolve_generation_settings(
+                    config_path=args.config,
+                    input_path=args.input_dir,
+                    output_path=str(output),
+                    provider=args.provider,
+                    model=args.model,
+                    ollama_url=args.ollama_url,
+                    prompt_dir=args.prompts,
+                )
+                model_client = generation.create_generation_client(settings)
+                document = build_graph(
+                    args.input_dir,
+                    recursive=not args.no_recursive,
+                    output_path=output,
+                    graph_id=args.id,
+                    name=args.name,
+                    description=args.description,
+                    client=model_client,
+                    model=settings.model,
+                    prompt_dir=settings.prompt_path,
+                )
+                build_result = (
+                    validate_graph(document) if not args.no_validate else None
+                )
+            except (FileNotFoundError, KeyError, RuntimeError, ValueError) as exc:
+                if args.json:
+                    print(
+                        json.dumps(
+                            {
+                                "spec": "odpg",
+                                "kind": "Graph",
+                                "output": str(output),
+                                "valid": False,
+                                "errors": [str(exc)],
+                            },
+                            indent=2,
+                        )
+                    )
+                else:
+                    print(f"Could not build ODPG graph: {exc}", file=sys.stderr)
+                return 1
+
+            if build_result is not None and not build_result.valid:
+                if args.json:
+                    print(
+                        json.dumps(
+                            {
+                                "spec": "odpg",
+                                "kind": "Graph",
+                                "output": str(output),
+                                "valid": False,
+                                "errors": build_result.errors,
+                            },
+                            indent=2,
+                        )
+                    )
+                else:
+                    print("Generated graph is invalid:", file=sys.stderr)
+                    for error in build_result.errors:
+                        print(f"- {error}", file=sys.stderr)
+                return 1
+
+            write_graph(output, document)
+            summary = summarize_graph(document)
+            payload = {
+                "spec": "odpg",
+                "kind": "Graph",
+                "output": str(output),
+                "valid": True if build_result is not None else None,
+                "nodeCount": summary["nodeCount"],
+                "edgeCount": summary["edgeCount"],
+            }
+            if args.json:
+                print(json.dumps(payload, indent=2))
+            else:
+                print(
+                    f"Generated {output} "
+                    f"(nodes={payload['nodeCount']}, edges={payload['edgeCount']})"
+                )
+            return 0
+
         if args.command == "odpg-traverse":
             from .odpg import load_graph, traverse_graph, validate_graph
 
@@ -1132,7 +1277,10 @@ def main(argv: Optional[List[str]] = None) -> int:
                 return 1
             print(
                 json.dumps(
-                    {"warnings": graph_result.warnings, "analysis": analyze_graph(graph)},
+                    {
+                        "warnings": graph_result.warnings,
+                        "analysis": analyze_graph(graph),
+                    },
                     indent=2,
                 )
             )

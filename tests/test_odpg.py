@@ -6,6 +6,7 @@ from open_data_products.odpg import (
     agent_context,
     analyze_graph,
     build_graph_explorer_html,
+    build_graph,
     collect_relationship_types,
     convert_file,
     convert_graph,
@@ -15,6 +16,7 @@ from open_data_products.odpg import (
     summarize_graph,
     traverse_graph,
     validate_graph,
+    write_graph,
 )
 from open_data_products.odpg.cli import (
     convert_main,
@@ -188,6 +190,153 @@ def test_invalid_graph_reports_missing_reference():
 
     assert not result.valid
     assert any("source does not match any node id" in error for error in result.errors)
+
+
+def test_build_graph_converts_odpc_fragments_to_nodes_and_generates_edges(tmp_path):
+    fragments = tmp_path / "fragments"
+    fragments.mkdir()
+    (fragments / "product.yaml").write_text(
+        """
+productReference:
+  id: customer-analytics-product
+  name:
+    en: Customer Analytics Product
+  description:
+    en: Trusted customer analytics for retention decisions.
+""",
+        encoding="utf-8",
+    )
+    (fragments / "use-case.yaml").write_text(
+        """
+useCase:
+  id: customer-retention
+  name:
+    en: Customer Retention
+  description:
+    en: Improve retention decisions with trusted customer analytics.
+""",
+        encoding="utf-8",
+    )
+    (fragments / "objective.yaml").write_text(
+        """
+businessObjective:
+  id: reduce-churn
+  name:
+    en: Reduce Churn
+  description:
+    en: Reduce preventable customer churn.
+""",
+        encoding="utf-8",
+    )
+    (fragments / "signal.yaml").write_text(
+        """
+signal:
+  id: churn-risk-score
+  name:
+    en: Churn Risk Score
+  description:
+    en: Risk score used by retention teams.
+""",
+        encoding="utf-8",
+    )
+    prompts = []
+
+    def fake_client(prompt, model):
+        prompts.append(prompt)
+        assert model == "test-model"
+        return """
+edges:
+  - from: customer-retention
+    to: customer-analytics-product
+    type: dependsOn
+    confidence: high
+  - from: reduce-churn
+    to: churn-risk-score
+    type: measures
+    confidence: medium
+"""
+
+    graph = build_graph(
+        fragments,
+        graph_id="customer-graph",
+        name="Customer Graph",
+        client=fake_client,
+        model="test-model",
+    )
+
+    assert prompts
+    assert "customer-analytics-product" in prompts[0]
+    assert "Do not create nodes" in prompts[0]
+    assert validate_graph(graph).valid
+    assert graph["graph"]["metadata"]["id"] == "customer-graph"
+    assert graph["graph"]["metadata"]["name"] == {"en": "Customer Graph"}
+    assert graph["graph"]["nodes"] == [
+        {
+            "id": "customer-analytics-product",
+            "type": "DataProduct",
+            "$ref": "product.yaml",
+        },
+        {"id": "customer-retention", "type": "UseCase", "$ref": "use-case.yaml"},
+        {
+            "id": "reduce-churn",
+            "type": "BusinessObjective",
+            "$ref": "objective.yaml",
+        },
+        {"id": "churn-risk-score", "type": "KPI", "$ref": "signal.yaml"},
+    ]
+    assert graph["graph"]["edges"][0]["type"] == "dependsOn"
+
+
+def test_build_graph_rejects_llm_edges_for_unknown_nodes(tmp_path):
+    fragments = tmp_path / "fragments"
+    fragments.mkdir()
+    (fragments / "product.yaml").write_text(
+        """
+productReference:
+  id: customer-analytics-product
+  name:
+    en: Customer Analytics Product
+""",
+        encoding="utf-8",
+    )
+
+    def fake_client(prompt, model):
+        return """
+edges:
+  - from: unknown-node
+    to: customer-analytics-product
+    type: relatedTo
+    confidence: low
+"""
+
+    try:
+        build_graph(fragments, client=fake_client)
+    except ValueError as exc:
+        assert "unknown node id" in str(exc)
+    else:
+        raise AssertionError("build_graph accepted an edge with an unknown node id")
+
+
+def test_write_graph_creates_output_parent_directory(tmp_path):
+    output = tmp_path / "deep" / "graph.yaml"
+    graph = {
+        "schema": "https://opendataproducts.org/odpg-v1.0/schema/odpg.yaml",
+        "version": "1.0",
+        "kind": "Graph",
+        "graph": {
+            "metadata": {
+                "id": "empty-test",
+                "name": {"en": "Empty Test"},
+                "description": {"en": "Empty graph for writer coverage."},
+            },
+            "nodes": [],
+            "edges": [],
+        },
+    }
+
+    write_graph(output, graph)
+
+    assert yaml.safe_load(output.read_text(encoding="utf-8")) == graph
 
 
 def test_convert_jsonld_to_valid_odpg_graph():
