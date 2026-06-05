@@ -6,13 +6,13 @@ and an ODPG graph using Claude for LLM-assisted generation and edge inference.
 ## 1. Prepare folders
 
 ```bash
-mkdir -p odp-course/09-fragments-to-catalog-and-graph/source_docs/products
-mkdir -p odp-course/09-fragments-to-catalog-and-graph/source_docs/use_cases
-mkdir -p odp-course/09-fragments-to-catalog-and-graph/source_docs/objectives
-mkdir -p odp-course/09-fragments-to-catalog-and-graph/source_docs/signals
-mkdir -p odp-course/09-fragments-to-catalog-and-graph/fragments
-mkdir -p odp-course/09-fragments-to-catalog-and-graph/output
-cd odp-course/09-fragments-to-catalog-and-graph
+mkdir -p odps-sdk-guides/09-fragments-to-catalog-and-graph/source_docs/products
+mkdir -p odps-sdk-guides/09-fragments-to-catalog-and-graph/source_docs/use_cases
+mkdir -p odps-sdk-guides/09-fragments-to-catalog-and-graph/source_docs/objectives
+mkdir -p odps-sdk-guides/09-fragments-to-catalog-and-graph/source_docs/signals
+mkdir -p odps-sdk-guides/09-fragments-to-catalog-and-graph/fragments
+mkdir -p odps-sdk-guides/09-fragments-to-catalog-and-graph/output
+cd odps-sdk-guides/09-fragments-to-catalog-and-graph
 ```
 
 ## 2. Add source documents

@@ -6,9 +6,9 @@ same pattern works for OpenAI-compatible providers and Claude when configured.
 ## 1. Create a lesson folder
 
 ```bash
-mkdir -p odp-course/06-online-provider/source_docs
-mkdir -p odp-course/06-online-provider/fragments
-cd odp-course/06-online-provider
+mkdir -p odps-sdk-guides/06-online-provider/source_docs
+mkdir -p odps-sdk-guides/06-online-provider/fragments
+cd odps-sdk-guides/06-online-provider
 ```
 
 ## 2. Create a generation config

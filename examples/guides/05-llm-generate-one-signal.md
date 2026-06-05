@@ -15,9 +15,9 @@ Keep Ollama running locally.
 ## 2. Create a lesson folder
 
 ```bash
-mkdir -p odp-course/05-llm-signal/source_docs
-mkdir -p odp-course/05-llm-signal/fragments
-cd odp-course/05-llm-signal
+mkdir -p odps-sdk-guides/05-llm-signal/source_docs
+mkdir -p odps-sdk-guides/05-llm-signal/fragments
+cd odps-sdk-guides/05-llm-signal
 ```
 
 ## 3. Add one source file

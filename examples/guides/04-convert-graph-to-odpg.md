@@ -6,8 +6,8 @@ the result, and creates a standalone HTML graph explorer.
 ## 1. Create a lesson folder
 
 ```bash
-mkdir -p odp-course/04-graph
-cd odp-course/04-graph
+mkdir -p odps-sdk-guides/04-graph
+cd odps-sdk-guides/04-graph
 ```
 
 ## 2. Create `graph.graphml`

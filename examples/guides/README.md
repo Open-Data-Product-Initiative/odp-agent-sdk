@@ -1,4 +1,4 @@
-# SDK Course Guides
+# SDK Guides
 
 These short guides are designed for learners who want to install the SDK from
 PyPI and try practical Open Data Products workflows.

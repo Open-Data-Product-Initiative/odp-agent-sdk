@@ -6,7 +6,7 @@ the document without reading every line manually.
 ## 1. Start from the previous product
 
 ```bash
-cd odp-course/01-validate
+cd odps-sdk-guides/01-validate
 ```
 
 If you skipped Guide 1, create `product.yaml` first:

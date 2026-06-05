@@ -12,13 +12,13 @@ This guide shows the complete LLM-assisted flow:
 ## 1. Prepare folders
 
 ```bash
-mkdir -p odp-course/08-full-cycle/source_docs/products
-mkdir -p odp-course/08-full-cycle/source_docs/use_cases
-mkdir -p odp-course/08-full-cycle/source_docs/objectives
-mkdir -p odp-course/08-full-cycle/source_docs/signals
-mkdir -p odp-course/08-full-cycle/fragments
-mkdir -p odp-course/08-full-cycle/output
-cd odp-course/08-full-cycle
+mkdir -p odps-sdk-guides/08-full-cycle/source_docs/products
+mkdir -p odps-sdk-guides/08-full-cycle/source_docs/use_cases
+mkdir -p odps-sdk-guides/08-full-cycle/source_docs/objectives
+mkdir -p odps-sdk-guides/08-full-cycle/source_docs/signals
+mkdir -p odps-sdk-guides/08-full-cycle/fragments
+mkdir -p odps-sdk-guides/08-full-cycle/output
+cd odps-sdk-guides/08-full-cycle
 ```
 
 ## 2. Add source documents

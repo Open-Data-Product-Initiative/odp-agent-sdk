@@ -6,12 +6,12 @@ type-specific source folders.
 ## 1. Prepare folders
 
 ```bash
-mkdir -p odp-course/07-fragment-set/source_docs/products
-mkdir -p odp-course/07-fragment-set/source_docs/use_cases
-mkdir -p odp-course/07-fragment-set/source_docs/objectives
-mkdir -p odp-course/07-fragment-set/source_docs/signals
-mkdir -p odp-course/07-fragment-set/fragments
-cd odp-course/07-fragment-set
+mkdir -p odps-sdk-guides/07-fragment-set/source_docs/products
+mkdir -p odps-sdk-guides/07-fragment-set/source_docs/use_cases
+mkdir -p odps-sdk-guides/07-fragment-set/source_docs/objectives
+mkdir -p odps-sdk-guides/07-fragment-set/source_docs/signals
+mkdir -p odps-sdk-guides/07-fragment-set/fragments
+cd odps-sdk-guides/07-fragment-set
 ```
 
 ## 2. Add Markdown and text source files

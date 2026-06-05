@@ -6,8 +6,8 @@ machine-readable result.
 ## 1. Create a lesson folder
 
 ```bash
-mkdir -p odp-course/01-validate
-cd odp-course/01-validate
+mkdir -p odps-sdk-guides/01-validate
+cd odps-sdk-guides/01-validate
 ```
 
 ## 2. Create `product.yaml`

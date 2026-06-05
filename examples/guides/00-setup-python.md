@@ -32,8 +32,8 @@ py -m pip --version
 ### 2. Create a lesson folder
 
 ```powershell
-mkdir odp-course
-cd odp-course
+mkdir odps-sdk-guides
+cd odps-sdk-guides
 ```
 
 ### 3. Create and activate a virtual environment
@@ -85,8 +85,8 @@ python3 -m pip --version
 ### 2. Create a lesson folder
 
 ```bash
-mkdir -p odp-course
-cd odp-course
+mkdir -p odps-sdk-guides
+cd odps-sdk-guides
 ```
 
 ### 3. Create and activate a virtual environment
@@ -145,8 +145,8 @@ python3 -m pip --version
 ### 2. Create a lesson folder
 
 ```bash
-mkdir -p odp-course
-cd odp-course
+mkdir -p odps-sdk-guides
+cd odps-sdk-guides
 ```
 
 ### 3. Create and activate a virtual environment
@@ -171,7 +171,7 @@ open-data-products --help
 
 ## Install Optional Extras
 
-The normal course guides only require:
+The normal SDK guides only require:
 
 ```bash
 python -m pip install open-data-products
@@ -199,6 +199,6 @@ Now open [Guide 1: Validate an ODPS Product](01-validate-product.md).
 - Python runs the SDK.
 - `pip` installs Python packages from PyPI.
 - `open-data-products` is the package name on PyPI.
-- A virtual environment keeps course dependencies local to one folder.
+- A virtual environment keeps SDK guide dependencies local to one folder.
 - The `open-data-products` command is ready when `open-data-products --help`
   prints the command help.
