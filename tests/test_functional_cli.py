@@ -757,6 +757,110 @@ def test_unified_cli_generation_uses_claude_without_config(
     assert observed["max_tokens"] == 4096
 
 
+def test_unified_cli_odps_generation_passes_profile_and_components(
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    from open_data_products import generation
+
+    source = tmp_path / "meeting.txt"
+    source.write_text(
+        "Meeting transcript for a retention data product.",
+        encoding="utf-8",
+    )
+    output_dir = tmp_path / "products"
+    observed: Dict[str, object] = {}
+
+    def fake_generate_local_artifacts_for_kind(
+        artifact_kind: str,
+        source_dir: Union[str, Path],
+        output_dir: Union[str, Path],
+        model: str = "qwen2.5",
+        ollama_url: str = "http://localhost:11434",
+        client: Optional[object] = None,
+        profile: str = "minimal",
+        include_components: Optional[List[str]] = None,
+        max_source_chars: Optional[int] = None,
+    ) -> List[generation.GeneratedArtifact]:
+        observed.update(
+            {
+                "artifact_kind": artifact_kind,
+                "source": source_dir,
+                "output": output_dir,
+                "profile": profile,
+                "include_components": include_components,
+                "max_source_chars": max_source_chars,
+            }
+        )
+        output = Path(output_dir) / "odps_product_customer-retention.yaml"
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(
+            "product:\n  productID: customer-retention\n",
+            encoding="utf-8",
+        )
+        return [
+            generation.GeneratedArtifact(
+                name="odpsProduct:customer-retention",
+                prompt_name="odps_product_assemble_yaml.md",
+                output_path=output,
+                valid_yaml=True,
+                review_notes=["pricingPlans drafted for review."],
+                drafted_components=["pricingPlans", "dataAccess"],
+                evidence_gaps=["Missing pricing details."],
+            )
+        ]
+
+    monkeypatch.setattr(
+        generation,
+        "create_generation_client",
+        lambda settings: (lambda prompt, model: ""),
+    )
+    monkeypatch.setattr(
+        generation,
+        "generate_local_artifacts_for_kind",
+        fake_generate_local_artifacts_for_kind,
+    )
+
+    assert (
+        main(
+            [
+                "generate",
+                "--input",
+                str(source),
+                "--kind",
+                "odps-product",
+                "--profile",
+                "complete-draft",
+                "--include-components",
+                "pricingPlans,dataAccess",
+                "--max-source-chars",
+                "12000",
+                "--output",
+                str(output_dir),
+                "--json",
+            ]
+        )
+        == 0
+    )
+    payload = _json_output(capsys)
+
+    assert observed["profile"] == "complete-draft"
+    assert observed["include_components"] == ["pricingPlans", "dataAccess"]
+    assert observed["max_source_chars"] == 12000
+    assert payload["profile"] == "complete-draft"
+    assert payload["include_components"] == ["pricingPlans", "dataAccess"]
+    assert payload["max_source_chars"] == 12000
+    assert payload["artifacts"][0]["review_notes"] == [
+        "pricingPlans drafted for review."
+    ]
+    assert payload["artifacts"][0]["drafted_components"] == [
+        "pricingPlans",
+        "dataAccess",
+    ]
+    assert payload["artifacts"][0]["evidence_gaps"] == ["Missing pricing details."]
+
+
 def test_unified_cli_generation_uses_config_provider(
     capsys: pytest.CaptureFixture[str],
     monkeypatch: pytest.MonkeyPatch,

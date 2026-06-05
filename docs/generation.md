@@ -351,11 +351,21 @@ Prompt templates are plain Markdown files under
 
 - `system.md`
 - `odps_data_product_fragment.md`
-- `odps_product_yaml.md`
+- `odps_product_facts.md`
+- `odps_product_merge_facts.md`
+- `odps_product_minimal_yaml.md`
+- `odps_product_component_draft.md`
+- `odps_product_assemble_yaml.md`
+- `odps_product_repair_yaml.md`
 - `odpc_use_case_fragment.md`
 - `odpc_objective_fragment.md`
 - `odpc_signal_fragment.md`
 - `odpg_graph_yaml.md`
+
+`--kind odps-product` uses a multi-call prompt pipeline: extract facts,
+optionally chunk and merge facts for long sources with `--max-source-chars`,
+generate minimal ODPS YAML, optionally draft requested components, assemble the
+final document, validate locally, and repair once when validation fails.
 
 Use Python helpers to inspect or render prompts:
 

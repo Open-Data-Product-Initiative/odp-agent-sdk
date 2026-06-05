@@ -29,6 +29,116 @@ DEFAULT_OPENAI_USER_AGENT = "open-data-products-python/0.2"
 DEFAULT_GENERATION_CONFIG = (
     Path(__file__).resolve().parent / "generation.config.yaml"
 )
+ODPS_SLA_DIMENSIONS = {
+    "latency",
+    "uptime",
+    "responseTime",
+    "errorRate",
+    "endOfSupport",
+    "endOfLife",
+    "updateFrequency",
+    "timeToDetect",
+    "timeToNotify",
+    "timeToRepair",
+    "emailResponseTime",
+}
+ODPS_SLA_DIMENSION_ALIASES = {
+    "availability": "uptime",
+    "available": "uptime",
+    "freshness": "updateFrequency",
+    "datafreshness": "updateFrequency",
+    "data-freshness": "updateFrequency",
+    "refresh": "updateFrequency",
+    "refreshfrequency": "updateFrequency",
+    "refresh-frequency": "updateFrequency",
+}
+ODPS_SLA_UNITS = {
+    "percent",
+    "milliseconds",
+    "seconds",
+    "minutes",
+    "days",
+    "weeks",
+    "months",
+    "years",
+    "never",
+    "date",
+    "null",
+}
+ODPS_DATA_QUALITY_DIMENSIONS = {
+    "accuracy",
+    "completeness",
+    "conformity",
+    "consistency",
+    "coverage",
+    "timeliness",
+    "validity",
+    "uniqueness",
+}
+ODPS_DATA_QUALITY_DIMENSION_ALIASES = {
+    "freshness": "timeliness",
+    "datafreshness": "timeliness",
+    "data-freshness": "timeliness",
+}
+ODPS_DATA_QUALITY_UNITS = {"percentage", "number"}
+ODPS_PRODUCT_TYPES = {
+    "raw data",
+    "derived data",
+    "dataset",
+    "reports",
+    "analytic view",
+    "3D visualisation",
+    "algorithm",
+    "decision support",
+    "automated decision-making",
+    "data-enhanced product",
+    "data-driven service",
+    "data-enabled performance",
+    "bi-directional",
+}
+ODPS_PRODUCT_TYPE_ALIASES = {
+    "api": "data-driven service",
+    "service": "data-driven service",
+    "data-service": "data-driven service",
+    "ml-model": "algorithm",
+    "model": "algorithm",
+    "dashboard": "reports",
+    "report": "reports",
+}
+ODPS_GENERATION_PROFILES = ("minimal", "complete-draft")
+ODPS_COMPLETE_DRAFT_COMPONENTS = ("SLA", "dataQuality", "pricingPlans")
+ODPS_PRODUCT_COMPONENTS = (
+    "contract",
+    "SLA",
+    "dataQuality",
+    "pricingPlans",
+    "license",
+    "dataAccess",
+    "dataHolder",
+    "paymentGateways",
+    "productStrategy",
+)
+ODPS_PRODUCT_COMPONENT_ALIASES = {
+    "contract": "contract",
+    "sla": "SLA",
+    "SLA": "SLA",
+    "dq": "dataQuality",
+    "DQ": "dataQuality",
+    "dataquality": "dataQuality",
+    "dataQuality": "dataQuality",
+    "pricing": "pricingPlans",
+    "pricingplans": "pricingPlans",
+    "pricingPlans": "pricingPlans",
+    "license": "license",
+    "dataaccess": "dataAccess",
+    "dataAccess": "dataAccess",
+    "dataholder": "dataHolder",
+    "dataHolder": "dataHolder",
+    "paymentgateways": "paymentGateways",
+    "paymentGateways": "paymentGateways",
+    "productstrategy": "productStrategy",
+    "productStrategy": "productStrategy",
+}
 BUILT_IN_PROVIDERS: Dict[str, Dict[str, Any]] = {
     "ollama": {
         "type": "ollama",
@@ -122,6 +232,9 @@ class GeneratedArtifact:
     output_path: Path
     valid_yaml: bool
     errors: List[str] = field(default_factory=list)
+    review_notes: List[str] = field(default_factory=list)
+    drafted_components: List[str] = field(default_factory=list)
+    evidence_gaps: List[str] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         """Return a JSON-ready artifact summary."""
@@ -131,6 +244,9 @@ class GeneratedArtifact:
             "output": str(self.output_path),
             "valid_yaml": self.valid_yaml,
             "errors": list(self.errors),
+            "review_notes": list(self.review_notes),
+            "drafted_components": list(self.drafted_components),
+            "evidence_gaps": list(self.evidence_gaps),
         }
 
 
@@ -146,7 +262,7 @@ GENERATION_TASKS: Sequence[GenerationTask] = (
     ),
     GenerationTask(
         name="odps_products",
-        prompt_name="odps_product_yaml.md",
+        prompt_name="odps_product_minimal_yaml.md",
         output_name="odps_product.yaml",
         expected_root="product",
         filename_prefix="odps_product",
@@ -1118,6 +1234,9 @@ def generate_local_artifact(
     ollama_url: str = DEFAULT_OLLAMA_URL,
     client: Optional[ModelClient] = None,
     prompt_dir: Optional[PathLike] = None,
+    profile: str = "minimal",
+    include_components: Optional[Sequence[str]] = None,
+    max_source_chars: Optional[int] = None,
 ) -> GeneratedArtifact:
     """Generate one selected YAML artifact from source documents."""
     destination = Path(output_dir)
@@ -1127,8 +1246,23 @@ def generate_local_artifact(
     model_client = client or (
         lambda prompt, model_name: ollama_generate(prompt, model_name, ollama_url)
     )
+    task = _generation_task_for(artifact_kind)
+    if task.name == "odps_products":
+        artifacts = _generate_odps_product_artifacts(
+            source,
+            destination,
+            model,
+            model_client,
+            prompt_dir=prompt_dir,
+            profile=profile,
+            include_components=include_components,
+            max_source_chars=max_source_chars,
+        )
+        if not artifacts:
+            raise RuntimeError(f"No artifacts generated for kind: {artifact_kind}")
+        return artifacts[0]
     artifacts = _run_generation_task(
-        _generation_task_for(artifact_kind),
+        task,
         source,
         destination,
         model,
@@ -1148,6 +1282,9 @@ def generate_local_artifacts_for_kind(
     ollama_url: str = DEFAULT_OLLAMA_URL,
     client: Optional[ModelClient] = None,
     prompt_dir: Optional[PathLike] = None,
+    profile: str = "minimal",
+    include_components: Optional[Sequence[str]] = None,
+    max_source_chars: Optional[int] = None,
 ) -> List[GeneratedArtifact]:
     """Generate selected YAML artifacts by processing each source document."""
     destination = Path(output_dir)
@@ -1158,6 +1295,17 @@ def generate_local_artifacts_for_kind(
         lambda prompt, model_name: ollama_generate(prompt, model_name, ollama_url)
     )
     task = _generation_task_for(artifact_kind)
+    if task.name == "odps_products":
+        return _generate_odps_product_artifacts(
+            source,
+            destination,
+            model,
+            model_client,
+            prompt_dir=prompt_dir,
+            profile=profile,
+            include_components=include_components,
+            max_source_chars=max_source_chars,
+        )
     artifacts: List[GeneratedArtifact] = []
     for source_path in _source_document_paths(source):
         artifacts.extend(
@@ -1173,6 +1321,366 @@ def generate_local_artifacts_for_kind(
     if not artifacts:
         raise RuntimeError(f"No artifacts generated for kind: {artifact_kind}")
     return artifacts
+
+
+def _generate_odps_product_artifacts(
+    source: PathLike,
+    destination: Path,
+    model: str,
+    model_client: ModelClient,
+    prompt_dir: Optional[PathLike] = None,
+    profile: str = "minimal",
+    include_components: Optional[Sequence[str]] = None,
+    max_source_chars: Optional[int] = None,
+) -> List[GeneratedArtifact]:
+    if profile not in ODPS_GENERATION_PROFILES:
+        raise ValueError(
+            "Unknown ODPS generation profile: "
+            f"{profile}. Expected one of: {', '.join(ODPS_GENERATION_PROFILES)}"
+        )
+    requested_components = _resolve_odps_components(profile, include_components)
+    artifacts = [
+        _generate_one_odps_product(
+            source_path,
+            destination,
+            model,
+            model_client,
+            prompt_dir=prompt_dir,
+            requested_components=requested_components,
+            max_source_chars=max_source_chars,
+        )
+        for source_path in _source_document_paths(source)
+    ]
+    if not artifacts:
+        raise RuntimeError("No artifacts generated for kind: odps-product")
+    return artifacts
+
+
+def _resolve_odps_components(
+    profile: str,
+    include_components: Optional[Sequence[str]],
+) -> List[str]:
+    components: List[str] = []
+    if profile == "complete-draft":
+        components.extend(ODPS_COMPLETE_DRAFT_COMPONENTS)
+    for component in include_components or []:
+        normalized = _normalize_odps_component(component)
+        if normalized not in components:
+            components.append(normalized)
+    return components
+
+
+def _normalize_odps_component(component: str) -> str:
+    key = component.strip()
+    normalized = ODPS_PRODUCT_COMPONENT_ALIASES.get(key)
+    if not normalized:
+        compact = re.sub(r"[^A-Za-z]", "", key)
+        normalized = ODPS_PRODUCT_COMPONENT_ALIASES.get(compact)
+    if normalized:
+        return normalized
+    raise ValueError(
+        f"Unknown ODPS product component: {component}. Expected one of: "
+        + ", ".join(ODPS_PRODUCT_COMPONENTS)
+    )
+
+
+def _generate_one_odps_product(
+    source: Path,
+    destination: Path,
+    model: str,
+    model_client: ModelClient,
+    prompt_dir: Optional[PathLike],
+    requested_components: Sequence[str],
+    max_source_chars: Optional[int],
+) -> GeneratedArtifact:
+    task = _generation_task_for("odps-product")
+    source_documents = load_source_documents(source)
+    facts_yaml = _generate_odps_product_facts(
+        source_documents,
+        model,
+        model_client,
+        prompt_dir=prompt_dir,
+        max_source_chars=max_source_chars,
+    )
+    facts = _load_mapping_or_empty(facts_yaml)
+    evidence_gaps = _string_list(facts.get("evidenceGaps"))
+
+    minimal_prompt = _render_odps_prompt(
+        "odps_product_minimal_yaml.md",
+        prompt_dir=prompt_dir,
+        source_documents=source_documents,
+        product_facts=facts_yaml,
+    )
+    final_prompt_name = "odps_product_minimal_yaml.md"
+    final_yaml = _normalize_generated_output(
+        task,
+        _extract_yaml_document(
+            task,
+            _strip_markdown_fence(model_client(minimal_prompt, model)).strip(),
+        ),
+    )
+
+    review_notes: List[str] = []
+    drafted_components: List[str] = []
+    if requested_components:
+        component_prompt = _render_odps_prompt(
+            "odps_product_component_draft.md",
+            prompt_dir=prompt_dir,
+            source_documents=source_documents,
+            product_facts=facts_yaml,
+            minimal_odps=final_yaml,
+            requested_components="\n".join(
+                f"- {name}" for name in requested_components
+            ),
+        )
+        component_yaml = _extract_yaml_mapping(model_client(component_prompt, model))
+        component_document = _load_mapping_or_empty(component_yaml)
+        review_notes.extend(_string_list(component_document.get("reviewNotes")))
+        evidence_gaps.extend(_string_list(component_document.get("evidenceGaps")))
+        drafted_components.extend(
+            _string_list(component_document.get("draftedComponents"))
+            or list(requested_components)
+        )
+        assemble_prompt = _render_odps_prompt(
+            "odps_product_assemble_yaml.md",
+            prompt_dir=prompt_dir,
+            source_documents=source_documents,
+            product_facts=facts_yaml,
+            minimal_odps=final_yaml,
+            component_draft=component_yaml,
+        )
+        final_prompt_name = "odps_product_assemble_yaml.md"
+        final_yaml = _normalize_generated_output(
+            task,
+            _extract_yaml_document(
+                task,
+                _strip_markdown_fence(model_client(assemble_prompt, model)).strip(),
+            ),
+        )
+
+    errors = _artifact_errors(task, final_yaml)
+    if errors:
+        repair_prompt = _render_odps_prompt(
+            "odps_product_repair_yaml.md",
+            prompt_dir=prompt_dir,
+            generated_odps=final_yaml,
+            validation_errors="\n".join(f"- {error}" for error in errors),
+        )
+        repaired_yaml = _normalize_generated_output(
+            task,
+            _extract_yaml_document(
+                task,
+                _strip_markdown_fence(model_client(repair_prompt, model)).strip(),
+            ),
+        )
+        repaired_errors = _artifact_errors(task, repaired_yaml)
+        if not repaired_errors:
+            final_prompt_name = "odps_product_repair_yaml.md"
+            final_yaml = repaired_yaml
+            errors = []
+
+    return _write_odps_product_artifact(
+        task,
+        final_yaml,
+        destination,
+        valid_yaml=not errors,
+        errors=errors,
+        prompt_name=final_prompt_name,
+        review_notes=_dedupe_strings(review_notes),
+        drafted_components=_dedupe_components(drafted_components),
+        evidence_gaps=_dedupe_strings(evidence_gaps),
+    )
+
+
+def _generate_odps_product_facts(
+    source_documents: str,
+    model: str,
+    model_client: ModelClient,
+    prompt_dir: Optional[PathLike],
+    max_source_chars: Optional[int],
+) -> str:
+    if max_source_chars is not None and max_source_chars <= 0:
+        raise ValueError("max_source_chars must be a positive integer.")
+    if not max_source_chars or len(source_documents) <= max_source_chars:
+        facts_prompt = _render_odps_prompt(
+            "odps_product_facts.md",
+            prompt_dir=prompt_dir,
+            source_documents=source_documents,
+        )
+        return _extract_yaml_mapping(model_client(facts_prompt, model))
+
+    chunk_facts = []
+    chunks = _chunk_text(source_documents, max_source_chars)
+    for index, chunk in enumerate(chunks, start=1):
+        chunk_context = (
+            f"--- Source chunk {index} of {len(chunks)} ---\n"
+            f"{chunk.strip()}"
+        )
+        facts_prompt = _render_odps_prompt(
+            "odps_product_facts.md",
+            prompt_dir=prompt_dir,
+            source_documents=chunk_context,
+        )
+        chunk_facts.append(_extract_yaml_mapping(model_client(facts_prompt, model)))
+
+    merge_prompt = _render_odps_prompt(
+        "odps_product_merge_facts.md",
+        prompt_dir=prompt_dir,
+        source_documents=_chunk_summary_context(chunks),
+        fact_chunks="\n\n".join(
+            f"--- Fact chunk {index} ---\n{facts.strip()}"
+            for index, facts in enumerate(chunk_facts, start=1)
+        ),
+    )
+    return _extract_yaml_mapping(model_client(merge_prompt, model))
+
+
+def _chunk_text(text: str, max_chars: int) -> List[str]:
+    paragraphs = text.split("\n\n")
+    chunks: List[str] = []
+    current = ""
+    for paragraph in paragraphs:
+        candidate = paragraph if not current else current + "\n\n" + paragraph
+        if len(candidate) <= max_chars:
+            current = candidate
+            continue
+        if current:
+            chunks.append(current)
+            current = ""
+        if len(paragraph) <= max_chars:
+            current = paragraph
+        else:
+            chunks.extend(_hard_wrap_text(paragraph, max_chars))
+    if current:
+        chunks.append(current)
+    return chunks
+
+
+def _hard_wrap_text(text: str, max_chars: int) -> List[str]:
+    chunks = []
+    start = 0
+    while start < len(text):
+        end = min(start + max_chars, len(text))
+        if end < len(text):
+            split_at = text.rfind(" ", start, end)
+            if split_at > start:
+                end = split_at
+        chunk = text[start:end].strip()
+        if chunk:
+            chunks.append(chunk)
+        start = end
+        while start < len(text) and text[start].isspace():
+            start += 1
+    return chunks
+
+
+def _chunk_summary_context(chunks: Sequence[str]) -> str:
+    return "\n\n".join(
+        f"--- Source chunk {index} of {len(chunks)} ---\n{chunk[:1000].strip()}"
+        for index, chunk in enumerate(chunks, start=1)
+    )
+
+
+def _render_odps_prompt(
+    prompt_name: str,
+    prompt_dir: Optional[PathLike] = None,
+    **values: str,
+) -> str:
+    prompt = load_generation_prompt(prompt_name, prompt_dir=prompt_dir)
+    for key, value in values.items():
+        prompt = prompt.replace("{" + key + "}", value)
+    return prompt
+
+
+def _extract_yaml_mapping(text: str) -> str:
+    stripped = _strip_markdown_fence(text).strip()
+    if _loads_as_mapping(stripped):
+        return stripped
+    lines = stripped.splitlines()
+    for index, line in enumerate(lines):
+        if line[: len(line) - len(line.lstrip())]:
+            continue
+        candidate = "\n".join(lines[index:]).strip()
+        if _loads_as_mapping(candidate):
+            return candidate
+    return stripped
+
+
+def _load_mapping_or_empty(text: str) -> Dict[str, Any]:
+    try:
+        document = yaml.safe_load(text)
+    except yaml.YAMLError:
+        return {}
+    return document if isinstance(document, dict) else {}
+
+
+def _string_list(value: object) -> List[str]:
+    if isinstance(value, list):
+        return [str(item) for item in value if item is not None]
+    if isinstance(value, str):
+        return [value]
+    return []
+
+
+def _dedupe_strings(values: Sequence[str]) -> List[str]:
+    result: List[str] = []
+    for value in values:
+        if value not in result:
+            result.append(value)
+    return result
+
+
+def _dedupe_components(values: Sequence[str]) -> List[str]:
+    result: List[str] = []
+    for value in values:
+        component = _normalize_odps_component(value)
+        if component not in result:
+            result.append(component)
+    return result
+
+
+def _write_odps_product_artifact(
+    task: GenerationTask,
+    yaml_output: str,
+    destination: Path,
+    valid_yaml: bool,
+    errors: Sequence[str],
+    prompt_name: str,
+    review_notes: Sequence[str],
+    drafted_components: Sequence[str],
+    evidence_gaps: Sequence[str],
+) -> GeneratedArtifact:
+    try:
+        document = yaml.safe_load(yaml_output)
+    except yaml.YAMLError:
+        document = None
+    product = document.get("product") if isinstance(document, dict) else None
+    product_id = product.get("productID") if isinstance(product, dict) else None
+    if product_id is None and isinstance(product, dict):
+        details = product.get("details")
+        if isinstance(details, dict):
+            english = details.get("en")
+            if isinstance(english, dict):
+                product_id = english.get("productID")
+    product_id = str(product_id or "product")
+    output_path = destination / _fragment_file_name("odps_product", product_id)
+    if isinstance(document, dict):
+        output_path.write_text(
+            yaml.safe_dump(document, sort_keys=False, allow_unicode=True),
+            encoding="utf-8",
+        )
+    else:
+        output_path.write_text(yaml_output, encoding="utf-8")
+    return GeneratedArtifact(
+        name=f"odpsProduct:{product_id}",
+        prompt_name=prompt_name or task.prompt_name,
+        output_path=output_path,
+        valid_yaml=valid_yaml,
+        errors=list(errors),
+        review_notes=list(review_notes),
+        drafted_components=list(drafted_components),
+        evidence_gaps=list(evidence_gaps),
+    )
 
 
 def _generation_task_for(artifact_kind: str) -> GenerationTask:
@@ -1412,6 +1920,9 @@ def _normalize_generated_output(
     if not isinstance(document, dict):
         return text
 
+    if task.name == "odps_products":
+        _normalize_odps_product_document(document)
+        return yaml.safe_dump(document, sort_keys=False, allow_unicode=True).strip()
     if task.name == "odpc_signals":
         _normalize_signal_fragments(document)
         return yaml.safe_dump(document, sort_keys=False, allow_unicode=True).strip()
@@ -1422,6 +1933,403 @@ def _normalize_generated_output(
         _normalize_graph_nodes(document, expected_graph_nodes)
         return yaml.safe_dump(document, sort_keys=False, allow_unicode=True).strip()
     return text
+
+
+def _normalize_odps_product_document(document: dict) -> None:
+    product = document.get("product")
+    if not isinstance(product, dict):
+        return
+    _normalize_odps_v41_details(product)
+    _normalize_odps_sla(product.get("SLA"))
+    _normalize_odps_data_quality(product.get("dataQuality"))
+    _normalize_odps_pricing_plans(product.get("pricingPlans"))
+    _normalize_odps_data_access(product)
+
+
+def _normalize_odps_v41_details(product: Dict[str, Any]) -> None:
+    details = product.get("details")
+    if isinstance(details, dict) and details:
+        return
+    flat_detail_keys = (
+        "name",
+        "productID",
+        "visibility",
+        "status",
+        "type",
+        "valueProposition",
+        "description",
+        "categories",
+        "tags",
+        "brand",
+        "keywords",
+        "themes",
+        "geography",
+        "language",
+        "homepage",
+        "logoURL",
+        "created",
+        "updated",
+        "productSeries",
+        "standards",
+        "useCases",
+    )
+    detail_block = {
+        key: product.pop(key)
+        for key in flat_detail_keys
+        if key in product and product.get(key) is not None
+    }
+    if detail_block:
+        product_type = detail_block.get("type")
+        normalized_type = _normalize_odps_product_type(product_type)
+        if normalized_type:
+            detail_block["type"] = normalized_type
+        product["details"] = {"en": detail_block}
+
+
+def _normalize_odps_product_type(value: object) -> Optional[str]:
+    if not isinstance(value, str):
+        return None
+    stripped = value.strip()
+    if stripped in ODPS_PRODUCT_TYPES:
+        return stripped
+    compact = re.sub(r"[^a-z0-9]+", "-", stripped.lower()).strip("-")
+    return ODPS_PRODUCT_TYPE_ALIASES.get(compact)
+
+
+def _normalize_odps_sla(sla: object) -> None:
+    if not isinstance(sla, dict):
+        return
+    profiles = _component_profiles(sla)
+    definitions = []
+    for name, profile in profiles.items():
+        if not isinstance(profile, dict):
+            continue
+        dimensions = [
+            dimension
+            for dimension in (
+                _normalize_odps_dimension(
+                    dimension,
+                    allowed_dimensions=ODPS_SLA_DIMENSIONS,
+                    dimension_aliases=ODPS_SLA_DIMENSION_ALIASES,
+                    allowed_units=ODPS_SLA_UNITS,
+                    keep_description=False,
+                    stringify_objective=True,
+                )
+                for dimension in profile.get("dimensions", [])
+                if isinstance(dimension, dict)
+            )
+            if dimension
+        ]
+        definition: Dict[str, Any] = {
+            "name": {"en": _component_definition_title(name, "SLA")}
+        }
+        if dimensions:
+            definition["dimensions"] = dimensions
+        support = {}
+        for source_key, target_key in (
+            ("supportPhone", "phoneNumber"),
+            ("support_phone", "phoneNumber"),
+            ("supportEmail", "email"),
+            ("support_email", "email"),
+            ("serviceHours", "emailServiceHours"),
+            ("service_hours", "emailServiceHours"),
+            ("documentationURL", "documentationURL"),
+            ("documentation_url", "documentationURL"),
+        ):
+            value = profile.get(source_key)
+            if isinstance(value, str) and value.strip():
+                support[target_key] = value.strip()
+        if support:
+            definition["support"] = support
+        if len(definition) > 1:
+            definitions.append(definition)
+    sla.clear()
+    if definitions:
+        sla["declarative"] = definitions
+
+
+def _normalize_odps_data_quality(data_quality: object) -> None:
+    if not isinstance(data_quality, dict):
+        return
+    profiles = _component_profiles(data_quality)
+    definitions = []
+    for name, profile in profiles.items():
+        if not isinstance(profile, dict):
+            continue
+        dimensions = [
+            dimension
+            for dimension in (
+                _normalize_odps_dimension(
+                    dimension,
+                    allowed_dimensions=ODPS_DATA_QUALITY_DIMENSIONS,
+                    dimension_aliases=ODPS_DATA_QUALITY_DIMENSION_ALIASES,
+                    allowed_units=ODPS_DATA_QUALITY_UNITS,
+                    keep_description=True,
+                    stringify_objective=False,
+                )
+                for dimension in profile.get("dimensions", [])
+                if isinstance(dimension, dict)
+            )
+            if dimension
+        ]
+        definition: Dict[str, Any] = {
+            "name": {"en": _component_definition_title(name, "Data Quality")}
+        }
+        if dimensions:
+            definition["dimensions"] = dimensions
+        quality_checks = profile.get("qualityChecks") or profile.get("quality_checks")
+        if isinstance(quality_checks, dict):
+            definition["spec"] = quality_checks
+        if len(definition) > 1:
+            definitions.append(definition)
+    data_quality.clear()
+    if definitions:
+        data_quality["declarative"] = definitions
+
+
+def _component_definition_title(name: str, suffix: str) -> str:
+    if name == "default":
+        return f"Default {suffix}"
+    words = re.sub(r"[^A-Za-z0-9]+", " ", str(name)).strip()
+    return f"{words.title()} {suffix}" if words else suffix
+
+
+def _component_profiles(component: Dict[str, Any]) -> Dict[str, Any]:
+    profiles = component.get("profiles")
+    if isinstance(profiles, dict):
+        return profiles
+    dimensions = component.get("dimensions")
+    if isinstance(dimensions, list):
+        return {"default": {"dimensions": dimensions}}
+    declarative = component.get("declarative")
+    if isinstance(declarative, list):
+        return {"default": {"dimensions": declarative}}
+    return {}
+
+
+def _normalize_odps_dimension(
+    dimension: Dict[str, Any],
+    *,
+    allowed_dimensions: set,
+    dimension_aliases: Dict[str, str],
+    allowed_units: set,
+    keep_description: bool,
+    stringify_objective: bool,
+) -> Dict[str, Any]:
+    raw_name = dimension.get("name") or dimension.get("dimension")
+    name = _normalize_odps_dimension_name(
+        raw_name,
+        allowed_dimensions=allowed_dimensions,
+        dimension_aliases=dimension_aliases,
+    )
+    if not name:
+        return {}
+    normalized: Dict[str, Any] = {"dimension": name}
+    if "objective" in dimension:
+        objective = dimension["objective"]
+        normalized["objective"] = str(objective) if stringify_objective else objective
+    unit = _normalize_odps_unit(dimension.get("unit"), allowed_units)
+    if unit:
+        normalized["unit"] = unit
+    display_title = dimension.get("displayTitle") or dimension.get("display_title")
+    if display_title is not None:
+        normalized["displayTitle"] = display_title
+    description = dimension.get("description")
+    if keep_description and isinstance(description, str) and description.strip():
+        normalized["description"] = description.strip()
+    return normalized
+
+
+def _normalize_odps_dimension_name(
+    value: object,
+    *,
+    allowed_dimensions: set,
+    dimension_aliases: Dict[str, str],
+) -> Optional[str]:
+    if not isinstance(value, str):
+        return None
+    stripped = value.strip()
+    if stripped in allowed_dimensions:
+        return stripped
+    compact = re.sub(r"[^a-z0-9]+", "-", stripped.lower()).strip("-")
+    return dimension_aliases.get(compact) or dimension_aliases.get(
+        compact.replace("-", "")
+    )
+
+
+def _normalize_odps_unit(value: object, allowed_units: set) -> Optional[str]:
+    if not isinstance(value, str):
+        return None
+    stripped = value.strip()
+    return stripped if stripped in allowed_units else None
+
+
+def _normalize_odps_pricing_plans(pricing_plans: object) -> None:
+    if not isinstance(pricing_plans, dict):
+        return
+    plans = pricing_plans.pop("plans", None)
+    if isinstance(plans, list):
+        declarative = pricing_plans.setdefault("declarative", {})
+        if isinstance(declarative, dict):
+            existing = declarative.get("en")
+            normalized_plans = [
+                _normalize_odps_pricing_plan(plan)
+                for plan in plans
+                if isinstance(plan, dict)
+            ]
+            if isinstance(existing, list):
+                declarative["en"] = existing + normalized_plans
+            else:
+                declarative["en"] = normalized_plans
+    declarative = pricing_plans.get("declarative")
+    if isinstance(declarative, dict):
+        for language, plans in list(declarative.items()):
+            if isinstance(plans, list):
+                declarative[language] = [
+                    _normalize_odps_pricing_plan(plan)
+                    for plan in plans
+                    if isinstance(plan, dict)
+                ]
+    executable = pricing_plans.get("executable")
+    if isinstance(executable, list):
+        pricing_plans["executable"] = [
+            _normalize_odps_pricing_plan(plan)
+            for plan in executable
+            if isinstance(plan, dict)
+        ]
+
+
+def _normalize_odps_pricing_plan(plan: Dict[str, Any]) -> Dict[str, Any]:
+    normalized: Dict[str, Any] = {}
+    if "name" in plan:
+        normalized["name"] = plan["name"]
+    currency = plan.get("priceCurrency") or plan.get("currency")
+    if currency is not None:
+        normalized["priceCurrency"] = currency
+    if "price" in plan:
+        normalized["price"] = str(plan["price"])
+    billing_duration = _normalize_pricing_billing_duration(
+        plan.get("billingDuration") or plan.get("billingCycle")
+    )
+    if billing_duration:
+        normalized["billingDuration"] = billing_duration
+    unit = _normalize_pricing_unit(plan.get("unit"))
+    if unit:
+        normalized["unit"] = unit
+
+    notes = _pricing_plan_notes(plan)
+    if notes:
+        normalized["notes"] = notes
+    for key in ("paymentGateway", "dataQuality", "SLA", "access"):
+        reference = _normalize_pricing_component_reference(plan.get(key))
+        if reference:
+            normalized[key] = reference
+    for key in (
+        "minPrice",
+        "maxPrice",
+        "validFrom",
+        "validTo",
+        "qualityProfileReference",
+        "slaProfileReference",
+        "accessProfileReference",
+    ):
+        if key in plan:
+            normalized[key] = plan[key]
+    return normalized
+
+
+def _normalize_pricing_component_reference(value: object) -> Optional[Dict[str, str]]:
+    if not isinstance(value, dict):
+        return None
+    ref = value.get("$ref")
+    if not isinstance(ref, str) or not ref.strip():
+        return None
+    normalized_ref = ref.strip()
+    terminal = normalized_ref.rstrip("/").rsplit("/", 1)[-1]
+    if not terminal or terminal.isdigit():
+        return None
+    return {"$ref": normalized_ref}
+
+
+def _normalize_pricing_billing_duration(value: object) -> Optional[str]:
+    if not isinstance(value, str):
+        return None
+    normalized = value.strip().lower().replace("_", "-")
+    allowed = {"instant", "day", "week", "month", "year"}
+    return normalized if normalized in allowed else None
+
+
+def _normalize_pricing_unit(value: object) -> Optional[str]:
+    if not isinstance(value, str):
+        return None
+    normalized = re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
+    aliases = {
+        "one-time-payment": "One-time-payment",
+        "pay-per-use": "Pay-per-use",
+        "request": "On-request",
+        "on-request": "On-request",
+        "onrequest": "On-request",
+        "recurring": "Recurring",
+        "revenue-sharing": "Revenue-sharing",
+        "data-volume": "Data-volume",
+        "pay-what-you-want": "Pay-what-you-want",
+        "freemium": "Freemium",
+        "open-data": "Open-data",
+        "value-based": "Value-based",
+        "trial": "Trial",
+    }
+    return aliases.get(normalized)
+
+
+def _pricing_plan_notes(plan: Dict[str, Any]) -> str:
+    notes = []
+    for key in ("notes", "description", "additionalPricingDetails"):
+        value = plan.get(key)
+        if isinstance(value, str) and value.strip():
+            notes.append(value.strip())
+    conditions = plan.get("conditions")
+    if isinstance(conditions, list):
+        for condition in conditions:
+            if isinstance(condition, dict):
+                text_parts = [
+                    str(condition.get(key)).strip()
+                    for key in ("condition", "description")
+                    if condition.get(key)
+                ]
+                if text_parts:
+                    notes.append("; ".join(text_parts))
+            elif isinstance(condition, str) and condition.strip():
+                notes.append(condition.strip())
+    return " ".join(_dedupe_strings(notes))
+
+
+def _normalize_odps_data_access(product: Dict[str, Any]) -> None:
+    data_access = product.get("dataAccess")
+    if isinstance(data_access, dict):
+        default = data_access.get("default")
+        if isinstance(default, dict):
+            data_access["default"] = _normalize_odps_data_access_item(default)
+        for key, value in data_access.items():
+            if key in {"default", "$ref"}:
+                continue
+            if isinstance(value, dict):
+                data_access[key] = _normalize_odps_data_access_item(value)
+    elif isinstance(data_access, list):
+        items = [
+            _normalize_odps_data_access_item(item)
+            for item in data_access
+            if isinstance(item, dict)
+        ]
+        if items:
+            product["dataAccess"] = {"default": items[0]}
+
+
+def _normalize_odps_data_access_item(item: Dict[str, Any]) -> Dict[str, Any]:
+    normalized = dict(item)
+    output_port_type = normalized.pop("outputPorttype", None)
+    if output_port_type is not None and "outputPortType" not in normalized:
+        normalized["outputPortType"] = output_port_type
+    return normalized
 
 
 def _normalize_objective_fragments(document: dict) -> None:
@@ -1506,14 +2414,14 @@ def _artifact_errors(
             f"`{task.expected_root}` for {task.name}."
         ]
     if task.name == "odps_products":
-        from open_data_products.odps import OpenDataProduct
-        from open_data_products.odps.exceptions import ODPSValidationError
+        from open_data_products.agent import validate_document
 
         try:
-            product = OpenDataProduct.from_dict(document)
-            product.validate()
-        except ODPSValidationError as exc:
+            result = validate_document(document)
+        except (AttributeError, KeyError, TypeError, ValueError) as exc:
             return [str(exc)]
+        if not result.valid:
+            return _filter_odps_generation_validation_errors(result.errors)
         return []
     if task.expected_root != "graph" and not isinstance(
         document.get(task.expected_root), list
@@ -1554,6 +2462,17 @@ def _artifact_errors(
         if quality_errors:
             return quality_errors
     return []
+
+
+def _filter_odps_generation_validation_errors(errors: Sequence[str]) -> List[str]:
+    return [
+        error
+        for error in errors
+        if not (
+            error.startswith("/product/dataAccess:")
+            and "is not of type 'array'" in error
+        )
+    ]
 
 
 def _graph_coverage_errors(

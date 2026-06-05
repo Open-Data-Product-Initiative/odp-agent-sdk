@@ -44,6 +44,7 @@ from open_data_products import (
     load_generation_prompt as load_public_generation_prompt,
     openai_chat_generate as openai_public_chat_generate,
     print_config as print_public_config,
+    validate_document,
     validate_config as validate_public_config,
 )
 
@@ -62,7 +63,12 @@ def test_generation_prompts_are_listed_and_loadable():
         "odpg_edges_from_odpc_fragments.md",
         "odpg_graph_yaml.md",
         "odps_data_product_fragment.md",
-        "odps_product_yaml.md",
+        "odps_product_assemble_yaml.md",
+        "odps_product_component_draft.md",
+        "odps_product_facts.md",
+        "odps_product_merge_facts.md",
+        "odps_product_minimal_yaml.md",
+        "odps_product_repair_yaml.md",
         "system.md",
     ]
     for name in prompt_names:
@@ -70,7 +76,7 @@ def test_generation_prompts_are_listed_and_loadable():
         if name == "odpg_edges_from_odpc_fragments.md":
             assert "{nodes}" in prompt
             assert "{odpc_fragments}" in prompt
-        else:
+        elif name != "odps_product_repair_yaml.md":
             assert "{source_documents}" in prompt
         assert "valid YAML" in prompt
     assert "top-level `productReferences` list" in load_generation_prompt(
@@ -83,8 +89,24 @@ def test_generation_prompts_are_listed_and_loadable():
     assert "Never create `productReferences` for use cases" in load_generation_prompt(
         "odps_data_product_fragment.md"
     )
+    assert "Return evidence facts as valid YAML" in load_generation_prompt(
+        "odps_product_facts.md"
+    )
+    assert "Merge ODPS product fact chunks" in load_generation_prompt(
+        "odps_product_merge_facts.md"
+    )
     assert "Return exactly one OpenDataProduct document" in load_generation_prompt(
-        "odps_product_yaml.md"
+        "odps_product_minimal_yaml.md"
+    )
+    assert "requested ODPS product components" in load_generation_prompt(
+        "odps_product_component_draft.md"
+    )
+    assert (
+        "Assemble one valid ODPS OpenDataProduct YAML document"
+        in load_generation_prompt("odps_product_assemble_yaml.md")
+    )
+    assert "Repair one ODPS OpenDataProduct YAML document" in load_generation_prompt(
+        "odps_product_repair_yaml.md"
     )
     assert "dataNeeds:" in load_generation_prompt("odpc_use_case_fragment.md")
     assert "summary:" in load_generation_prompt("odpc_use_case_fragment.md")
@@ -1151,11 +1173,17 @@ def test_generate_local_artifacts_for_kind_writes_full_odps_product(tmp_path):
         encoding="utf-8",
     )
 
-    artifact = generate_local_artifacts_for_kind(
-        "odps-product",
-        source,
-        tmp_path / "fragments",
-        client=lambda prompt, model: """schema: https://opendataproducts.org/v4.1/schema/odps.json
+    prompts = []
+
+    def fake_client(prompt, model):
+        prompts.append(prompt)
+        if prompt.startswith("# Extract ODPS Product Facts"):
+            return """product:
+  productID: airport-operations-performance
+  name: Airport Operations Performance
+evidenceGaps: []
+"""
+        return """schema: https://opendataproducts.org/v4.1/schema/odps.json
 version: "4.1"
 product:
   productID: airport-operations-performance
@@ -1163,25 +1191,684 @@ product:
   visibility: public
   status: production
   type: dataset
-""",
+"""
+
+    artifact = generate_local_artifacts_for_kind(
+        "odps-product",
+        source,
+        tmp_path / "fragments",
+        client=fake_client,
     )[0]
 
+    assert [prompt.splitlines()[0] for prompt in prompts] == [
+        "# Extract ODPS Product Facts",
+        "# Generate Minimal ODPS Product YAML",
+    ]
     assert artifact.name == "odpsProduct:airport-operations-performance"
+    assert artifact.prompt_name == "odps_product_minimal_yaml.md"
+    assert artifact.review_notes == []
+    assert artifact.drafted_components == []
+    assert artifact.evidence_gaps == []
     assert artifact.output_path == (
         tmp_path / "fragments" / "odps_product_airport-operations-performance.yaml"
     )
     assert artifact.valid_yaml is True
-    assert yaml.safe_load(artifact.output_path.read_text(encoding="utf-8")) == {
+    document = yaml.safe_load(artifact.output_path.read_text(encoding="utf-8"))
+    assert validate_document(document).valid is True
+    assert document == {
         "schema": "https://opendataproducts.org/v4.1/schema/odps.json",
         "version": "4.1",
         "product": {
-            "productID": "airport-operations-performance",
-            "name": "Airport Operations Performance",
-            "visibility": "public",
-            "status": "production",
-            "type": "dataset",
+            "details": {
+                "en": {
+                    "productID": "airport-operations-performance",
+                    "name": "Airport Operations Performance",
+                    "visibility": "public",
+                    "status": "production",
+                    "type": "dataset",
+                }
+            },
         },
     }
+
+
+def test_generate_odps_product_complete_draft_uses_component_pipeline(tmp_path):
+    """Test complete-draft ODPS generation drafts components in separate calls."""
+    source = tmp_path / "customer-analytics-email.txt"
+    source.write_text(
+        "Email thread: we need a customer analytics dataset for retention teams.",
+        encoding="utf-8",
+    )
+    prompts = []
+
+    def fake_client(prompt, model):
+        prompts.append(prompt)
+        if prompt.startswith("# Extract ODPS Product Facts"):
+            return """product:
+  productID: customer-analytics
+  name: Customer Analytics
+evidenceGaps:
+  - No pricing terms were provided.
+"""
+        if prompt.startswith("# Generate Minimal ODPS Product YAML"):
+            return """schema: https://opendataproducts.org/v4.1/schema/odps.json
+version: "4.1"
+product:
+  productID: customer-analytics
+  name: Customer Analytics
+  visibility: public
+  status: draft
+  type: dataset
+"""
+        if prompt.startswith("# Draft ODPS Product Components"):
+            assert "SLA" in prompt
+            assert "dataQuality" in prompt
+            assert "pricingPlans" in prompt
+            return """components:
+  SLA:
+    profiles:
+      default:
+        dimensions:
+          - name: availability
+            objective: 99.5
+            unit: percent
+  dataQuality:
+    profiles:
+      default:
+        dimensions:
+          - name: freshness
+            objective: 24
+            unit: hours
+  pricingPlans:
+    declarative:
+      en:
+        - name: Review Needed Starter
+          priceCurrency: USD
+          price: 0
+          billingDuration: month
+          unit: recurring
+draftedComponents:
+  - SLA
+  - dataQuality
+  - pricingPlans
+reviewNotes:
+  - pricingPlans drafted because no pricing terms were provided.
+evidenceGaps:
+  - No pricing terms were provided.
+"""
+        if prompt.startswith("# Assemble ODPS Product YAML"):
+            return """schema: https://opendataproducts.org/v4.1/schema/odps.json
+version: "4.1"
+product:
+  productID: customer-analytics
+  name: Customer Analytics
+  visibility: public
+  status: draft
+  type: dataset
+  SLA:
+    profiles:
+      default:
+        dimensions:
+          - name: availability
+            objective: 99.5
+            unit: percent
+  dataQuality:
+    profiles:
+      default:
+        dimensions:
+          - name: freshness
+            objective: 24
+            unit: hours
+  pricingPlans:
+    declarative:
+      en:
+        - name: Review Needed Starter
+          priceCurrency: USD
+          price: 0
+          billingDuration: month
+          unit: recurring
+"""
+        raise AssertionError(f"unexpected prompt: {prompt[:80]}")
+
+    artifact = generate_local_artifacts_for_kind(
+        "odps-product",
+        source,
+        tmp_path / "products",
+        client=fake_client,
+        profile="complete-draft",
+    )[0]
+
+    assert [prompt.splitlines()[0] for prompt in prompts] == [
+        "# Extract ODPS Product Facts",
+        "# Generate Minimal ODPS Product YAML",
+        "# Draft ODPS Product Components",
+        "# Assemble ODPS Product YAML",
+    ]
+    assert artifact.name == "odpsProduct:customer-analytics"
+    assert artifact.valid_yaml is True
+    assert artifact.drafted_components == ["SLA", "dataQuality", "pricingPlans"]
+    assert artifact.review_notes == [
+        "pricingPlans drafted because no pricing terms were provided."
+    ]
+    assert artifact.evidence_gaps == ["No pricing terms were provided."]
+    document = yaml.safe_load(artifact.output_path.read_text(encoding="utf-8"))
+    assert {"SLA", "dataQuality", "pricingPlans"} <= set(document["product"])
+
+
+def test_generate_odps_product_include_components_controls_component_prompt(tmp_path):
+    """Test explicit component selection controls the component draft prompt."""
+    source = tmp_path / "access-notes.md"
+    source.write_text("Meeting notes for a partner API data product.", encoding="utf-8")
+    component_prompts = []
+
+    def fake_client(prompt, model):
+        if prompt.startswith("# Extract ODPS Product Facts"):
+            return "product:\n  productID: partner-api\n  name: Partner API\n"
+        if prompt.startswith("# Generate Minimal ODPS Product YAML"):
+            return """schema: https://opendataproducts.org/v4.1/schema/odps.json
+version: "4.1"
+product:
+  productID: partner-api
+  name: Partner API
+  visibility: public
+  status: draft
+  type: API
+"""
+        if prompt.startswith("# Draft ODPS Product Components"):
+            component_prompts.append(prompt)
+            requested = prompt.split("Requested ODPS product components:", 1)[1]
+            requested = requested.split("Minimal ODPS document:", 1)[0]
+            assert "dataAccess" in requested
+            assert "license" in requested
+            assert "pricingPlans" not in requested
+            return """components:
+  dataAccess:
+    default:
+      outputPorttype: API
+      format: JSON
+      authenticationMethod: API key
+  license:
+    scopeOfUse: internal
+draftedComponents:
+  - dataAccess
+  - license
+reviewNotes:
+  - dataAccess drafted from API context.
+"""
+        if prompt.startswith("# Assemble ODPS Product YAML"):
+            return """schema: https://opendataproducts.org/v4.1/schema/odps.json
+version: "4.1"
+product:
+  productID: partner-api
+  name: Partner API
+  visibility: public
+  status: draft
+  type: API
+  dataAccess:
+    default:
+      outputPorttype: API
+      format: JSON
+      authenticationMethod: API key
+  license:
+    scopeOfUse: internal
+"""
+        raise AssertionError(f"unexpected prompt: {prompt[:80]}")
+
+    artifact = generate_local_artifacts_for_kind(
+        "odps-product",
+        source,
+        tmp_path / "products",
+        client=fake_client,
+        include_components=["dataAccess", "license"],
+    )[0]
+
+    assert len(component_prompts) == 1
+    assert artifact.drafted_components == ["dataAccess", "license"]
+    assert artifact.review_notes == ["dataAccess drafted from API context."]
+
+
+def test_generate_odps_product_repairs_scalar_optional_component(tmp_path):
+    """Test invalid scalar ODPS components trigger repair instead of crashing."""
+    source = tmp_path / "license-notes.md"
+    source.write_text("Partner API product with a partner-use license.", encoding="utf-8")
+    prompt_headers = []
+
+    def fake_client(prompt, model):
+        prompt_headers.append(prompt.splitlines()[0])
+        if prompt.startswith("# Extract ODPS Product Facts"):
+            return "product:\n  productID: partner-api\n  name: Partner API\n"
+        if prompt.startswith("# Generate Minimal ODPS Product YAML"):
+            return """schema: https://opendataproducts.org/v4.1/schema/odps.json
+version: "4.1"
+product:
+  productID: partner-api
+  name: Partner API
+  visibility: public
+  status: draft
+  type: API
+"""
+        if prompt.startswith("# Draft ODPS Product Components"):
+            return """components:
+  license: internal partner use only
+draftedComponents:
+  - license
+reviewNotes:
+  - License drafted from partner-use context.
+"""
+        if prompt.startswith("# Assemble ODPS Product YAML"):
+            return """schema: https://opendataproducts.org/v4.1/schema/odps.json
+version: "4.1"
+product:
+  productID: partner-api
+  name: Partner API
+  visibility: public
+  status: draft
+  type: API
+  license: internal partner use only
+"""
+        if prompt.startswith("# Repair ODPS Product YAML"):
+            assert "/product/license" in prompt
+            assert "is not of type 'object'" in prompt
+            return """schema: https://opendataproducts.org/v4.1/schema/odps.json
+version: "4.1"
+product:
+  productID: partner-api
+  name: Partner API
+  visibility: public
+  status: draft
+  type: API
+  license:
+    scopeOfUse: internal partner use only
+    permanent: true
+    exclusive: false
+"""
+        raise AssertionError(f"unexpected prompt: {prompt[:80]}")
+
+    artifact = generate_local_artifacts_for_kind(
+        "odps-product",
+        source,
+        tmp_path / "products",
+        client=fake_client,
+        include_components=["license"],
+    )[0]
+
+    assert "# Repair ODPS Product YAML" in prompt_headers
+    assert artifact.valid_yaml is True
+    assert artifact.errors == []
+    document = yaml.safe_load(artifact.output_path.read_text(encoding="utf-8"))
+    assert document["product"]["license"]["scopeOfUse"] == "internal partner use only"
+
+
+def test_generate_odps_product_drops_unsupported_pricing_plan_fields(tmp_path):
+    """Test generated pricing plans keep only supported conservative ODPS fields."""
+    source = tmp_path / "pricing-notes.md"
+    source.write_text("Partner API product with pricing pending approval.", encoding="utf-8")
+
+    def fake_client(prompt, model):
+        if prompt.startswith("# Extract ODPS Product Facts"):
+            return "product:\n  productID: partner-api\n  name: Partner API\n"
+        if prompt.startswith("# Generate Minimal ODPS Product YAML"):
+            return """schema: https://opendataproducts.org/v4.1/schema/odps.json
+version: "4.1"
+product:
+  productID: partner-api
+  name: Partner API
+  visibility: public
+  status: draft
+  type: API
+"""
+        if prompt.startswith("# Draft ODPS Product Components"):
+            return """components:
+  pricingPlans:
+    plans:
+      - planID: partner-agreement-pending
+        name: Partner Agreement Pricing
+        description: Pricing model under partner agreements
+        currency: USD
+        billingCycle: Not specified
+        price: 0
+        unit: request
+        paymentGateway:
+          $ref: '#/product/paymentGateways/default'
+        dataQuality:
+          $ref: '#/product/dataQuality/default'
+        SLA:
+          $ref: '#/product/SLA/0'
+        access:
+          $ref: '#/product/dataAccess/API'
+        conditions:
+          - condition: Pricing terms pending approval
+            description: Final pricing model is not approved
+draftedComponents:
+  - pricingPlans
+reviewNotes:
+  - Pricing terms pending approval.
+"""
+        if prompt.startswith("# Assemble ODPS Product YAML"):
+            return """schema: https://opendataproducts.org/v4.1/schema/odps.json
+version: "4.1"
+product:
+  productID: partner-api
+  name: Partner API
+  visibility: public
+  status: draft
+  type: API
+  pricingPlans:
+    plans:
+      - planID: partner-agreement-pending
+        name: Partner Agreement Pricing
+        description: Pricing model under partner agreements
+        currency: USD
+        billingCycle: Not specified
+        price: 0
+        unit: request
+        paymentGateway:
+          $ref: '#/product/paymentGateways/default'
+        dataQuality:
+          $ref: '#/product/dataQuality/default'
+        SLA:
+          $ref: '#/product/SLA/0'
+        access:
+          $ref: '#/product/dataAccess/API'
+        conditions:
+          - condition: Pricing terms pending approval
+            description: Final pricing model is not approved
+"""
+        raise AssertionError(f"unexpected prompt: {prompt[:80]}")
+
+    artifact = generate_local_artifacts_for_kind(
+        "odps-product",
+        source,
+        tmp_path / "products",
+        client=fake_client,
+        include_components=["pricingPlans"],
+    )[0]
+
+    assert artifact.valid_yaml is True
+    document = yaml.safe_load(artifact.output_path.read_text(encoding="utf-8"))
+    plan = document["product"]["pricingPlans"]["declarative"]["en"][0]
+    assert plan == {
+        "name": "Partner Agreement Pricing",
+        "priceCurrency": "USD",
+        "price": "0",
+        "unit": "On-request",
+        "notes": (
+            "Pricing model under partner agreements Pricing terms pending "
+            "approval; Final pricing model is not approved"
+        ),
+        "paymentGateway": {"$ref": "#/product/paymentGateways/default"},
+        "dataQuality": {"$ref": "#/product/dataQuality/default"},
+        "access": {"$ref": "#/product/dataAccess/API"},
+    }
+    assert "SLA" not in plan
+
+
+def test_generate_odps_product_normalizes_data_quality_component_shape(tmp_path):
+    """Test generated data quality drafts keep only supported ODPS fields."""
+    source = tmp_path / "inventory-notes.md"
+    source.write_text("Inventory product with freshness concerns.", encoding="utf-8")
+
+    def fake_client(prompt, model):
+        if prompt.startswith("# Extract ODPS Product Facts"):
+            return "product:\n  productID: inventory\n  name: Inventory\n"
+        if prompt.startswith("# Generate Minimal ODPS Product YAML"):
+            return """schema: https://opendataproducts.org/v4.1/schema/odps.json
+version: "4.1"
+product:
+  productID: inventory
+  name: Inventory
+  visibility: public
+  status: draft
+  type: dataset
+"""
+        if prompt.startswith("# Draft ODPS Product Components"):
+            return """components:
+  dataQuality:
+    dimensions:
+      - name: freshness
+        description: Inventory data should be refreshed every five minutes
+        validationRules:
+          - rule: Stale inventory snapshots trigger checks
+            severity: high
+      - name: completeness
+        description: All required fields must be present
+        objective: 95
+        unit: percentage
+    monitoring:
+      description: Quality checks monitor freshness and completeness
+draftedComponents:
+  - dataQuality
+reviewNotes:
+  - Quality targets need review.
+"""
+        if prompt.startswith("# Assemble ODPS Product YAML"):
+            return """schema: https://opendataproducts.org/v4.1/schema/odps.json
+version: "4.1"
+product:
+  productID: inventory
+  name: Inventory
+  visibility: public
+  status: draft
+  type: dataset
+  dataQuality:
+    dimensions:
+      - name: freshness
+        description: Inventory data should be refreshed every five minutes
+        validationRules:
+          - rule: Stale inventory snapshots trigger checks
+            severity: high
+      - name: completeness
+        description: All required fields must be present
+        objective: 95
+        unit: percentage
+    monitoring:
+      description: Quality checks monitor freshness and completeness
+"""
+        raise AssertionError(f"unexpected prompt: {prompt[:80]}")
+
+    artifact = generate_local_artifacts_for_kind(
+        "odps-product",
+        source,
+        tmp_path / "products",
+        client=fake_client,
+        include_components=["dataQuality"],
+    )[0]
+
+    assert artifact.valid_yaml is True
+    document = yaml.safe_load(artifact.output_path.read_text(encoding="utf-8"))
+    assert document["product"]["dataQuality"] == {
+        "declarative": [
+            {
+                "name": {"en": "Default Data Quality"},
+                "dimensions": [
+                    {
+                        "dimension": "timeliness",
+                        "description": (
+                            "Inventory data should be refreshed every five minutes"
+                        ),
+                    },
+                    {
+                        "dimension": "completeness",
+                        "objective": 95,
+                        "unit": "percentage",
+                        "description": "All required fields must be present",
+                    },
+                ],
+            }
+        ]
+    }
+
+
+def test_generate_odps_product_normalizes_sla_component_shape(tmp_path):
+    """Test generated SLA drafts keep only supported ODPS dimensions and fields."""
+    source = tmp_path / "checkout-notes.md"
+    source.write_text("Checkout product with latency and freshness needs.", encoding="utf-8")
+
+    def fake_client(prompt, model):
+        if prompt.startswith("# Extract ODPS Product Facts"):
+            return "product:\n  productID: checkout\n  name: Checkout\n"
+        if prompt.startswith("# Generate Minimal ODPS Product YAML"):
+            return """schema: https://opendataproducts.org/v4.1/schema/odps.json
+version: "4.1"
+product:
+  productID: checkout
+  name: Checkout
+  visibility: public
+  status: draft
+  type: API
+"""
+        if prompt.startswith("# Draft ODPS Product Components"):
+            return """components:
+  SLA:
+    profiles:
+      default:
+        dimensions:
+          - name: availability
+            objective: 99.5
+            unit: percent
+            scope: Marketplace trading hours
+            description: High availability target
+          - name: latency
+            objective: 500
+            unit: milliseconds
+            description: Response time target
+          - name: dataFreshness
+            objective: 5
+            unit: minutes
+            description: Target refresh interval
+        support:
+          description: Support hours not specified
+draftedComponents:
+  - SLA
+reviewNotes:
+  - Support hours need review.
+"""
+        if prompt.startswith("# Assemble ODPS Product YAML"):
+            return """schema: https://opendataproducts.org/v4.1/schema/odps.json
+version: "4.1"
+product:
+  productID: checkout
+  name: Checkout
+  visibility: public
+  status: draft
+  type: API
+  SLA:
+    profiles:
+      default:
+        dimensions:
+          - name: availability
+            objective: 99.5
+            unit: percent
+            scope: Marketplace trading hours
+            description: High availability target
+          - name: latency
+            objective: 500
+            unit: milliseconds
+            description: Response time target
+          - name: dataFreshness
+            objective: 5
+            unit: minutes
+            description: Target refresh interval
+        support:
+          description: Support hours not specified
+"""
+        raise AssertionError(f"unexpected prompt: {prompt[:80]}")
+
+    artifact = generate_local_artifacts_for_kind(
+        "odps-product",
+        source,
+        tmp_path / "products",
+        client=fake_client,
+        include_components=["SLA"],
+    )[0]
+
+    assert artifact.valid_yaml is True
+    document = yaml.safe_load(artifact.output_path.read_text(encoding="utf-8"))
+    assert document["product"]["SLA"] == {
+        "declarative": [
+            {
+                "name": {"en": "Default SLA"},
+                "dimensions": [
+                    {"dimension": "uptime", "objective": "99.5", "unit": "percent"},
+                    {"dimension": "latency", "objective": "500", "unit": "milliseconds"},
+                    {"dimension": "updateFrequency", "objective": "5", "unit": "minutes"},
+                ],
+            }
+        ]
+    }
+
+
+def test_generate_odps_product_chunks_long_sources_before_minimal_yaml(tmp_path):
+    """Test long ODPS sources are chunked before merged facts drive YAML."""
+    source = tmp_path / "long-transcript.txt"
+    source.write_text(
+        "Customer analytics product discussion. " * 20,
+        encoding="utf-8",
+    )
+    prompt_headers = []
+
+    def fake_client(prompt, model):
+        prompt_headers.append(prompt.splitlines()[0])
+        if prompt.startswith("# Extract ODPS Product Facts"):
+            source_chunk = prompt.split("```text", 1)[1]
+            assert len(source_chunk) < 420
+            return """product:
+  productID: customer-analytics
+  name: Customer Analytics
+chunkEvidence:
+  - retention data product
+"""
+        if prompt.startswith("# Merge ODPS Product Facts"):
+            assert "retention data product" in prompt
+            return """product:
+  productID: customer-analytics
+  name: Customer Analytics
+evidenceGaps:
+  - Pricing is not discussed.
+"""
+        if prompt.startswith("# Generate Minimal ODPS Product YAML"):
+            assert "Pricing is not discussed." in prompt
+            return """schema: https://opendataproducts.org/v4.1/schema/odps.json
+version: "4.1"
+product:
+  productID: customer-analytics
+  name: Customer Analytics
+  visibility: public
+  status: draft
+  type: dataset
+"""
+        raise AssertionError(f"unexpected prompt: {prompt[:80]}")
+
+    artifact = generate_local_artifacts_for_kind(
+        "odps-product",
+        source,
+        tmp_path / "products",
+        client=fake_client,
+        max_source_chars=180,
+    )[0]
+
+    assert prompt_headers.count("# Extract ODPS Product Facts") > 1
+    assert "# Merge ODPS Product Facts" in prompt_headers
+    assert prompt_headers[-1] == "# Generate Minimal ODPS Product YAML"
+    assert artifact.evidence_gaps == ["Pricing is not discussed."]
+    assert artifact.valid_yaml is True
+
+
+def test_generate_odps_product_rejects_unknown_include_component(tmp_path):
+    """Test unknown ODPS component names fail before LLM calls."""
+    source = tmp_path / "product.md"
+    source.write_text("A product.", encoding="utf-8")
+
+    with pytest.raises(ValueError) as exc:
+        generate_local_artifacts_for_kind(
+            "odps-product",
+            source,
+            tmp_path / "products",
+            client=lambda prompt, model: "",
+            include_components=["unknown"],
+        )
+
+    assert "Unknown ODPS product component: unknown" in str(exc.value)
 
 
 def test_generate_local_artifact_extracts_yaml_after_model_prose(tmp_path):

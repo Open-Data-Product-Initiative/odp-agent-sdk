@@ -238,6 +238,15 @@ Use `generate_local_artifact()`, `generate_local_artifacts_for_kind()`, or
 one source file or folder. Supported CLI kinds are `product-reference`,
 `odps-product`, `use-case`, `objective`, `signal`, and `graph`.
 
+For `--kind odps-product`, folder input processes each Markdown/text file into
+one ODPS YAML product. The default `--profile minimal` is evidence-only.
+`--profile complete-draft` drafts `SLA`, `dataQuality`, and `pricingPlans` for
+review. `--include-components` accepts schema-backed product component names:
+`contract`, `SLA`, `dataQuality`, `pricingPlans`, `license`, `dataAccess`,
+`dataHolder`, `paymentGateways`, and `productStrategy`. `--max-source-chars`
+chunks long source files into fact-extraction calls, merges facts, then
+generates ODPS from the merged facts.
+
 The CLI requires an explicit `--kind`. ODPC outputs are separate fragment files
 with singular roots: `productReference`, `useCase`, `businessObjective`, and
 `signal`. Use `--kind graph` when ODPG graph generation should receive those

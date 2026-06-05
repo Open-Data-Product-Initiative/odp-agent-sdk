@@ -339,7 +339,7 @@ def parse_data_contract(data: Dict[str, Any]) -> DataContract:
 def parse_sla_dimension(data: Dict[str, Any]) -> SLADimension:
     """Parse an SLA dimension."""
     return SLADimension(
-        name=data.get("name", ""),
+        name=data.get("name") or data.get("dimension", ""),
         objective=data.get("objective", ""),
         unit=data.get("unit"),
     )
@@ -363,10 +363,17 @@ def parse_sla_profile(data: Dict[str, Any]) -> SLAProfile:
 
 def parse_sla(data: Dict[str, Any]) -> SLA:
     """Parse SLA data."""
+    profiles = data.get("profiles")
+    if not isinstance(profiles, dict):
+        profiles = {
+            f"declarative{index}": profile
+            for index, profile in enumerate(data.get("declarative", []), start=1)
+            if isinstance(profile, dict)
+        }
     return SLA(
         profiles={
             name: parse_sla_profile(profile)
-            for name, profile in data.get("profiles", {}).items()
+            for name, profile in profiles.items()
         },
         dollar_ref=data.get("$ref"),
     )
@@ -375,10 +382,10 @@ def parse_sla(data: Dict[str, Any]) -> SLA:
 def parse_data_quality_dimension(data: Dict[str, Any]) -> DataQualityDimension:
     """Parse a data quality dimension."""
     return DataQualityDimension(
-        name=data.get("name", ""),
+        name=data.get("name") or data.get("dimension", ""),
         objective=data.get("objective", ""),
         unit=data.get("unit"),
-        display_title=data.get("display_title"),
+        display_title=data.get("displayTitle") or data.get("display_title"),
         description=data.get("description"),
     )
 
@@ -397,10 +404,17 @@ def parse_data_quality_profile(data: Dict[str, Any]) -> DataQualityProfile:
 
 def parse_data_quality(data: Dict[str, Any]) -> DataQuality:
     """Parse data quality data."""
+    profiles = data.get("profiles")
+    if not isinstance(profiles, dict):
+        profiles = {
+            f"declarative{index}": profile
+            for index, profile in enumerate(data.get("declarative", []), start=1)
+            if isinstance(profile, dict)
+        }
     return DataQuality(
         profiles={
             name: parse_data_quality_profile(profile)
-            for name, profile in data.get("profiles", {}).items()
+            for name, profile in profiles.items()
         },
         dollar_ref=data.get("$ref"),
     )
@@ -424,8 +438,16 @@ def parse_data_access_method(data: Dict[str, Any]) -> DataAccessMethod:
     )
 
 
-def parse_data_access(data: Dict[str, Any]) -> DataAccess:
+def parse_data_access(data: Any) -> DataAccess:
     """Parse data access configuration."""
+    if isinstance(data, list):
+        methods = [method for method in data if isinstance(method, dict)]
+        default_method = parse_data_access_method(methods[0] if methods else {})
+        additional_methods = {
+            f"method{index}": parse_data_access_method(method)
+            for index, method in enumerate(methods[1:], start=2)
+        }
+        return DataAccess(default=default_method, additional_methods=additional_methods)
     default_method = parse_data_access_method(data["default"])
     additional_methods = {
         key: parse_data_access_method(method_data)

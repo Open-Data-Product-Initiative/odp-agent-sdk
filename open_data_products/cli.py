@@ -103,6 +103,7 @@ Examples:
   open-data-products resources --json
   open-data-products generate --input source_docs/ --kind product-reference --output generated/ --json
   open-data-products generate --input product.md --kind odps-product --output generated/ --json
+  open-data-products generate --input transcripts/ --kind odps-product --profile complete-draft --include-components SLA,dataQuality,pricingPlans --output products/ --json
   open-data-products generate --input use-case.md --kind use-case --output generated/ --json
   open-data-products generate --config my-generation.config.yaml --provider groq --model openai/gpt-oss-120b --input source_docs/ --kind signal --output generated/ --json
   open-data-products generate --config my-generation.config.yaml --prompts prompts/ --input source_docs/ --kind graph --output generated/ --json
@@ -204,6 +205,13 @@ def _print_summary_report(summary: Dict[str, object]) -> None:
         f"SHA-256: {summary['sha256']}",
     ]
     print("\n".join(lines))
+
+
+def _split_csv(value: Optional[str]) -> List[str]:
+    """Return non-empty comma-separated values with surrounding whitespace removed."""
+    if not value:
+        return []
+    return [item.strip() for item in value.split(",") if item.strip()]
 
 
 PRODUCT_HELP = """\
@@ -374,6 +382,30 @@ def main(argv: Optional[List[str]] = None) -> int:
     generate_parser.add_argument(
         "--prompts",
         help="Prompt template folder override. Defaults to config prompts or bundled prompts.",
+    )
+    generate_parser.add_argument(
+        "--profile",
+        choices=["minimal", "complete-draft"],
+        default="minimal",
+        help=(
+            "ODPS product generation profile. minimal is evidence-only; "
+            "complete-draft drafts SLA, dataQuality, and pricingPlans."
+        ),
+    )
+    generate_parser.add_argument(
+        "--include-components",
+        help=(
+            "Comma-separated ODPS product components to draft for --kind "
+            "odps-product, such as SLA,dataQuality,pricingPlans,dataAccess."
+        ),
+    )
+    generate_parser.add_argument(
+        "--max-source-chars",
+        type=int,
+        help=(
+            "Maximum source characters per ODPS product facts prompt before "
+            "chunking and merging facts. Applies to --kind odps-product."
+        ),
     )
     generate_parser.add_argument(
         "--ollama-url",
@@ -883,15 +915,30 @@ def main(argv: Optional[List[str]] = None) -> int:
             prompt_kwargs = (
                 {"prompt_dir": settings.prompt_path} if settings.prompt_path else {}
             )
-            artifacts = generation.generate_local_artifacts_for_kind(
-                args.kind,
-                generation_input,
-                generation_output,
-                model=settings.model,
-                ollama_url=settings.base_url or generation.DEFAULT_OLLAMA_URL,
-                client=model_client,
-                **prompt_kwargs,
+            include_components = _split_csv(args.include_components)
+            odps_kwargs = (
+                {
+                    "profile": args.profile,
+                    "include_components": include_components,
+                    "max_source_chars": args.max_source_chars,
+                }
+                if args.kind == "odps-product"
+                else {}
             )
+            try:
+                artifacts = generation.generate_local_artifacts_for_kind(
+                    args.kind,
+                    generation_input,
+                    generation_output,
+                    model=settings.model,
+                    ollama_url=settings.base_url or generation.DEFAULT_OLLAMA_URL,
+                    client=model_client,
+                    **prompt_kwargs,
+                    **odps_kwargs,
+                )
+            except (KeyError, RuntimeError, ValueError) as exc:
+                print(str(exc), file=sys.stderr)
+                return 1
             valid_yaml = all(artifact.valid_yaml for artifact in artifacts)
             response_kind = (
                 "LocalGeneration"
@@ -911,6 +958,10 @@ def main(argv: Optional[List[str]] = None) -> int:
                 "artifact_count": len(artifacts),
                 "artifacts": [artifact.to_dict() for artifact in artifacts],
             }
+            if args.kind == "odps-product":
+                payload["profile"] = args.profile
+                payload["include_components"] = include_components
+                payload["max_source_chars"] = args.max_source_chars
             if args.json:
                 print(json.dumps(payload, indent=2))
             else:

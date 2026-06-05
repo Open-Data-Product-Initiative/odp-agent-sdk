@@ -78,8 +78,12 @@ def validate_document(
                 version=version,
             )
         try:
-            assert isinstance(loaded, OpenDataProduct)
-            loaded.validate()
+            product = (
+                loaded
+                if isinstance(loaded, OpenDataProduct)
+                else OpenDataProduct.from_dict(loaded)
+            )
+            product.validate()
             return ValidationResult(True, spec, kind, path=source_path, version=version)
         except ODPSValidationError as exc:
             return ValidationResult(

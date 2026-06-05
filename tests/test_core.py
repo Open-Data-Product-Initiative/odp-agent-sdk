@@ -68,6 +68,60 @@ class TestOpenDataProduct:
         assert product.pricing_plans.plans[0].price_currency == "USD"
         assert pricing_to_402(product)["status"] == 402
 
+    def test_from_dict_accepts_v41_sla_and_data_quality_declarative(self):
+        """Test loading canonical ODPS v4.1 SLA and data quality shape."""
+        product = OpenDataProduct.from_dict(
+            {
+                "schema": "https://opendataproducts.org/v4.1/schema/odps.json",
+                "version": "4.1",
+                "product": {
+                    "details": {
+                        "en": {
+                            "name": "Agent Ready Product",
+                            "productID": "agent-ready-product",
+                            "visibility": "public",
+                            "status": "production",
+                            "type": "dataset",
+                        }
+                    },
+                    "SLA": {
+                        "declarative": [
+                            {
+                                "name": {"en": "Default SLA"},
+                                "dimensions": [
+                                    {
+                                        "dimension": "uptime",
+                                        "objective": "99.5",
+                                        "unit": "percent",
+                                    }
+                                ],
+                            }
+                        ]
+                    },
+                    "dataQuality": {
+                        "declarative": [
+                            {
+                                "name": {"en": "Default Data Quality"},
+                                "dimensions": [
+                                    {
+                                        "dimension": "completeness",
+                                        "objective": 95,
+                                        "unit": "percentage",
+                                    }
+                                ],
+                            }
+                        ]
+                    },
+                },
+            }
+        )
+
+        assert product.sla.profiles["declarative1"].dimensions[0].name == "uptime"
+        assert (
+            product.data_quality.profiles["declarative1"].dimensions[0].name
+            == "completeness"
+        )
+
     def test_to_dict(self, sample_odps_product):
         """Test converting OpenDataProduct to dictionary."""
         data = sample_odps_product.to_dict()

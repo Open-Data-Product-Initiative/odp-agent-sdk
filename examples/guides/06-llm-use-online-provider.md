@@ -81,3 +81,5 @@ open-data-products generate \
 - Secrets stay in environment variables.
 - `--kind product-reference` generates one ODPC product reference fragment.
 - `--kind odps-product` generates one full ODPS product YAML document.
+- `--profile complete-draft` and `--include-components` can draft optional
+  ODPS product components for review.

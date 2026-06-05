@@ -1,0 +1,37 @@
+Meeting transcript: customer retention analytics data product
+
+Participants:
+- Maya, Head of Retention Analytics
+- Leon, Data Platform Lead
+- Priya, Lifecycle Marketing Manager
+- Omar, Customer Success Operations
+
+Maya: The retention team needs a reusable customer analytics data product. We
+keep recreating customer extracts for churn review, campaign targeting, and
+customer-success prioritization. The product should combine account profile,
+subscription status, product usage, purchase history, support ticket volume,
+campaign contacts, and churn-risk signals.
+
+Priya: The main users are retention managers, lifecycle marketing analysts, and
+customer-success leads. They need weekly segments for renewal risk, onboarding
+risk, expansion opportunities, and customers who stopped using key features.
+
+Omar: Support ticket context is important. A customer with declining product
+usage and a growing unresolved ticket backlog should appear as high priority.
+We also want a freshness expectation. Daily refresh is enough for weekly churn
+review, but stale data over 24 hours should be flagged.
+
+Leon: The first version will be an internal dataset published from the customer
+warehouse. Access will be through governed warehouse tables and a BI semantic
+model. Authentication follows the existing single sign-on and role-based access
+controls. We do not have external pricing because this is an internal product.
+
+Maya: For success metrics, the product should help reduce preventable churn and
+improve campaign conversion. The team will review churn-risk coverage, segment
+freshness, and the number of high-risk accounts contacted before renewal.
+
+Open questions:
+- Exact owner email is not confirmed.
+- SLA support hours are not defined.
+- Pricing does not apply yet, but we may need a placeholder if the ODPS draft
+  requires commercial terms.

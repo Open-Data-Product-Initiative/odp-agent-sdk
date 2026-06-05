@@ -124,7 +124,15 @@ def test_resources_are_listable_and_retrievable():
     assert any(resource.id == "odpg.schema.yaml" for resource in resources)
     assert any(resource.id == "generation.prompt.system" for resource in resources)
     assert any(
-        resource.id == "generation.prompt.odps_product_yaml"
+        resource.id == "generation.prompt.odps_product_facts"
+        for resource in resources
+    )
+    assert any(
+        resource.id == "generation.prompt.odps_product_minimal_yaml"
+        for resource in resources
+    )
+    assert any(
+        resource.id == "generation.prompt.odps_product_merge_facts"
         for resource in resources
     )
     assert get_resource("odpv.terms").id == "odpv.terms"
@@ -242,6 +250,29 @@ def test_unified_validate_rejects_legacy_flat_odps_file(tmp_path):
     assert result.valid is False
     assert result.spec == "odps"
     assert any("product/details" in error for error in result.errors)
+
+
+def test_unified_validate_accepts_odps_mapping_with_v41_details():
+    result = validate_document(
+        {
+            "schema": "https://opendataproducts.org/v4.1/schema/odps.json",
+            "version": "4.1",
+            "product": {
+                "details": {
+                    "en": {
+                        "name": "Agent Ready Product",
+                        "productID": "agent-ready-product",
+                        "visibility": "public",
+                        "status": "production",
+                        "type": "dataset",
+                    }
+                }
+            },
+        }
+    )
+
+    assert result.valid is True
+    assert result.spec == "odps"
 
 
 def test_top_level_cli_resources_json(capsys):
