@@ -743,6 +743,7 @@ def test_unified_cli_generation_uses_claude_without_config(
     )
     payload = _json_output(capsys)
 
+    assert payload["kind"] == "Generation"
     assert payload["provider"] == "claude"
     assert payload["provider_type"] == "anthropic"
     assert payload["model"] == "claude-sonnet-4-5"

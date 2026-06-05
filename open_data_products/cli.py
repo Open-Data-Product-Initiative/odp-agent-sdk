@@ -893,9 +893,14 @@ def main(argv: Optional[List[str]] = None) -> int:
                 **prompt_kwargs,
             )
             valid_yaml = all(artifact.valid_yaml for artifact in artifacts)
+            response_kind = (
+                "LocalGeneration"
+                if settings.provider_type == "ollama"
+                else "Generation"
+            )
             payload = {
                 "spec": "generation",
-                "kind": "LocalGeneration",
+                "kind": response_kind,
                 "source": generation_input,
                 "artifact_kind": args.kind,
                 "output": generation_output,
