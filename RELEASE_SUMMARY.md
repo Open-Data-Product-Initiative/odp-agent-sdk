@@ -1,29 +1,34 @@
-# Release Summary: 0.1.9
+# Release Summary: 0.2.0
 
-Release 0.1.9 adds an LLM-assisted ODPG graph builder for ODPC fragment
-folders and tightens selected-kind generation guidance.
+Release 0.2.0 expands LLM-assisted generation from ODPC fragments into full
+ODPS product drafts built from source material such as transcripts, emails, and
+briefs.
 
 ## Highlights
 
-- `open-data-products odpg-build <fragments/> --output <graph.yaml>` now builds
-  one ODPG graph from ODPC product reference, use case, objective, and signal
-  fragments.
-- The new graph builder converts ODPC fragments into ODPG nodes
-  deterministically, then asks the configured LLM provider to infer only the
-  graph edges.
-- A dedicated `odpg_edges_from_odpc_fragments.md` prompt keeps edge inference
-  separate from node creation, so generated edges must reference known node ids.
-- The public Python API now exposes `build_graph()` and `write_graph()` for
-  ODPG graph construction from ODPC fragments.
-- New course guidance shows the full workflow: generate ODPC fragments, build an
-  ODPC catalog, build an ODPG graph from the same fragments, and generate the
-  graph explorer.
-- Generation examples now prefer type-specific source folders such as
-  `source_docs/products/`, `source_docs/use_cases/`,
-  `source_docs/objectives/`, and `source_docs/signals/` so each explicit
-  `--kind` prompt receives matching source material.
-- README, command docs, `llms.txt`, and guide examples now consistently show
-  `open-data-products generate` with the required concrete `--kind` value.
+- `open-data-products generate --kind odps-product` can now turn each file in an
+  input folder into a full ODPS YAML product draft.
+- `--profile minimal` remains the default evidence-first behavior, while
+  `--profile complete-draft` can draft required commercial and governance
+  sections such as `SLA`, `dataQuality`, and `pricingPlans`.
+- `--include-components` gives advanced control over optional root-level ODPS
+  sections, including access, license, payment gateway, SLA, data quality, and
+  pricing content.
+- `--max-source-chars` chunks long transcripts and other large source files,
+  extracts facts per chunk, and merges those facts before YAML generation.
+- ODPS product generation now uses purpose-specific prompts for fact extraction,
+  chunk merging, minimal YAML generation, component drafting, assembly, and
+  validation repair.
+- Generated ODPS YAML is normalized toward the bundled schema before output,
+  including schema-facing `SLA.declarative`, `dataQuality.declarative`, named
+  `$ref` links, pricing plan shape, and access field casing.
+- The generation result includes review notes, drafted component names, evidence
+  gaps, validation status, and repair warnings in `--json` output.
+- ODPS document validation now supports schema-shaped YAML mappings directly,
+  including declarative SLA and data quality sections.
+- New development documentation explains generation internals, ODPS validation,
+  data contracts, ODPC catalog building, ODPG graph building, MCP tools, and the
+  cross-spec agent surface.
 
 ## Verification
 
