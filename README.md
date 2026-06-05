@@ -166,6 +166,8 @@ below for implementation details:
 - [Agent surface](docs/agent-surface.md): MCP server, ARWS manifest, and bundled skills for agent hosts.
 - [Command guide](docs/commands.md): what each common CLI command does, what it reads, and what it writes.
 - [LLM generation](docs/generation.md): Ollama or configured external LLM source-doc to ODPC fragment and ODPG graph workflow.
+- [Generation development notes](docs/generation-development.md): contributor-facing prompt pipeline, ODPS normalization, validation, repair, and testing guidance.
+- [Development notes index](docs/development.md): contributor-facing internals notes for complex SDK surfaces.
 - [Data Contract workflows](docs/data-contracts.md): ODPS contract resolution, optional `datacontract-cli`, alignment, and reports.
 - [Capability drift reports](docs/capability-drift/README.md): dated SDK alignment reports against upstream specification tooling.
 - [Tooling development model](docs/tooling-development-model.md): human-facing explanation of how spec-level scripts mature into consolidated SDK capabilities.
