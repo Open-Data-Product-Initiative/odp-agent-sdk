@@ -628,6 +628,31 @@ def test_unified_cli_local_generation_rejects_positional_and_input(
     assert "either positional source_dir or --input" in capsys.readouterr().err
 
 
+def test_unified_cli_local_generation_hints_about_trailing_backslash_space(
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+) -> None:
+    assert (
+        main(
+            [
+                "generate",
+                "--input",
+                str(GENERATION_SOURCE_DOCS),
+                "--output",
+                str(tmp_path),
+                "--kind",
+                "signal",
+                " ",
+            ]
+        )
+        == 2
+    )
+
+    error = capsys.readouterr().err
+    assert "either positional source_dir or --input" in error
+    assert "trailing space after a line-continuation backslash" in error
+
+
 def test_unified_cli_generation_accepts_model_override(
     capsys: pytest.CaptureFixture[str],
     monkeypatch: pytest.MonkeyPatch,

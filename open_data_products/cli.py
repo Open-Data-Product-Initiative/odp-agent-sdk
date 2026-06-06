@@ -894,6 +894,12 @@ def main(argv: Optional[List[str]] = None) -> int:
                     "or --input, not both.",
                     file=sys.stderr,
                 )
+                if args.source_dir.strip() == "":
+                    print(
+                        "Check for a trailing space after a line-continuation "
+                        "backslash before the next option.",
+                        file=sys.stderr,
+                    )
                 return 2
             try:
                 settings = generation.resolve_generation_settings(
