@@ -93,6 +93,7 @@ from .odpv import (
     resolve_vocabulary_term,
 )
 from .pricing import pricing_to_402
+from .portfolio import explain_portfolio, render_portfolio
 from .resources import get_resource, list_resources
 from .results import Reference, Resource, ValidationResult
 from .summary import load_summary
@@ -137,6 +138,7 @@ __all__ = [
     "extract_contract_schema_from_document",
     "explain_document",
     "explain_product",
+    "explain_portfolio",
     "explain_vocabulary_term",
     "explain_vocabulary",
     "get_resource",
@@ -166,6 +168,7 @@ __all__ = [
     "render_catalog_html",
     "render_catalog_schema_json",
     "render_generation_prompt",
+    "render_portfolio",
     "resolve_generation_settings",
     "validate_config",
     "write_graph",

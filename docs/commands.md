@@ -219,6 +219,26 @@ open-data-products odpg-convert --input examples/graph.graphml --output /tmp/odp
 Converts external graph formats to ODPG YAML. Supported inputs include JSON-LD,
 GraphML, GraphSON, RDF/Turtle, OpenCypher, GQL, and Gremlin.
 
+## Portfolio Workspaces
+
+```bash
+open-data-products portfolio render generated/portfolio/ --json
+```
+
+Renders one static `index.html` from an existing portfolio workspace. The page
+combines ODPC catalog objects, linked ODPS product specs, ODPG graph data,
+artifact detail views, version links, and About information into one
+browser-openable file. Missing output parent directories are created before
+writing.
+
+```bash
+open-data-products portfolio explain generated/portfolio/ --json
+```
+
+Summarizes a portfolio workspace, including the browser entry point and counts
+for objectives, use cases, signals, product references, ODPS product specs,
+graph nodes, graph edges, and available versions.
+
 ## Product-Level Data Contract Inspection
 
 ```bash

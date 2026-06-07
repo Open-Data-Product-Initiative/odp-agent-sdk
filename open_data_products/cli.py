@@ -85,6 +85,10 @@ Product/Data Contract commands:
   product contract-schema     Summarize a Data Contract schema
   product export-contract     Export through datacontract-cli
 
+Portfolio workflow commands:
+  portfolio render    Render one static portfolio index.html
+  portfolio explain   Summarize a portfolio workspace
+
 Examples:
   open-data-products validate product.yaml --json
   open-data-products explain catalog.yaml
@@ -111,6 +115,7 @@ Examples:
   open-data-products odpg-agent-context graph.yaml --node DATA-PRODUCT-001
   open-data-products odpg-generate graph.yaml --output graph-explorer.html --json
   open-data-products odpg-convert --input graph.graphml --output graph.yaml --json
+  open-data-products portfolio render generated/portfolio/ --json
   open-data-products product contract-report product.yaml contract.yaml --json
   open-data-products serve
 """
@@ -228,6 +233,17 @@ Examples:
   open-data-products product resolve-contracts product.yaml --json
   open-data-products product contract-report product.yaml contract.yaml --json
   open-data-products product audit product.yaml --contract contract.yaml --json
+"""
+
+
+PORTFOLIO_HELP = """\
+Portfolio workflow commands:
+  render      Render one static browser-viewable portfolio page
+  explain     Summarize portfolio artifacts, counts, and browser entry point
+
+Examples:
+  open-data-products portfolio render generated/portfolio/ --json
+  open-data-products portfolio explain generated/portfolio/ --json
 """
 
 
@@ -674,6 +690,39 @@ def main(argv: Optional[List[str]] = None) -> int:
     )
 
     subparsers.add_parser("serve", help="Run the MCP server over stdio")
+
+    portfolio_parser = subparsers.add_parser(
+        "portfolio",
+        help="Portfolio workspace workflows",
+        epilog=PORTFOLIO_HELP,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    portfolio_subparsers = portfolio_parser.add_subparsers(
+        dest="portfolio_command",
+        metavar="PORTFOLIO_COMMAND",
+        required=True,
+    )
+    portfolio_render_parser = portfolio_subparsers.add_parser(
+        "render",
+        help="Render one static browser-viewable portfolio page",
+    )
+    portfolio_render_parser.add_argument("workspace", help="Portfolio workspace path")
+    portfolio_render_parser.add_argument(
+        "--output",
+        "-o",
+        help="Optional HTML output path. Defaults to <workspace>/index.html.",
+    )
+    portfolio_render_parser.add_argument(
+        "--json", action="store_true", help="Emit JSON"
+    )
+    portfolio_explain_parser = portfolio_subparsers.add_parser(
+        "explain",
+        help="Summarize a portfolio workspace",
+    )
+    portfolio_explain_parser.add_argument("workspace", help="Portfolio workspace path")
+    portfolio_explain_parser.add_argument(
+        "--json", action="store_true", help="Emit JSON"
+    )
 
     product_parser = subparsers.add_parser(
         "product",
@@ -1416,6 +1465,34 @@ def main(argv: Optional[List[str]] = None) -> int:
             from .mcp.server import serve
 
             return serve()
+
+        if args.command == "portfolio":
+            from .portfolio import explain_portfolio, render_portfolio
+
+            try:
+                if args.portfolio_command == "render":
+                    payload = render_portfolio(args.workspace, output_path=args.output)
+                elif args.portfolio_command == "explain":
+                    payload = explain_portfolio(args.workspace)
+                else:
+                    raise ValueError(
+                        f"Unknown portfolio command: {args.portfolio_command}"
+                    )
+            except (FileNotFoundError, ValueError) as exc:
+                print(str(exc), file=sys.stderr)
+                return 1
+
+            if args.json:
+                print(json.dumps(payload, indent=2))
+            else:
+                print(f"Workspace: {payload['workspace']}")
+                print(f"HTML: {payload['html']}")
+                if "productReferenceCount" in payload:
+                    print(f"Product references: {payload['productReferenceCount']}")
+                if "created" in payload:
+                    print(f"Created: {len(payload['created'])}")
+                    print(f"Updated: {len(payload['updated'])}")
+            return 0
 
         if args.command == "product" and args.product_command == "check-contract":
             from .contracts import validate_contract
