@@ -1,47 +1,169 @@
-# Portfolio Workflow Phased Plan
+# Portfolio Workflow Implementation Notes
 
-This plan defines the SDK's portfolio workflow layer. The goal is to turn
-multiple evidence streams into one maintained Open Data Products portfolio:
-ODPC catalog objects, ODPS product specifications, an ODPG graph, and one
-human-readable browser experience.
+This document is for SDK developers working on the portfolio workflow. It
+describes the current implementation contract, code boundaries, file formats,
+normalization rules, and regression tests that should be preserved when adding
+features.
 
-The low-level `generate` command remains useful for single artifacts. The new
-portfolio workflow should orchestrate those capabilities and preserve identity,
-links, state, and rendered views across reruns.
+The portfolio workflow turns multiple source lanes into one maintained Open
+Data Products workspace:
 
-## Core Idea
+- ODPC catalog fragments and `odpc/catalog.yaml`;
+- ODPS product specifications under `odps/products/`;
+- an ODPG graph under `odpg/graph.yaml`;
+- one static browser page at `index.html`;
+- state, identity, source hashes, reports, and version snapshots.
 
-Users often start from business objectives, use cases, market signals, product
-discussions, emails, meeting notes, and transcripts. Product specifications are
-only one part of the portfolio, and they are not always the first input.
+The low-level `generate` command remains the single-artifact generator. The
+portfolio workflow is the orchestration layer for full portfolio work.
 
-The SDK should support this flow:
+## Draft Output Contract
 
-1. Create a portfolio from existing source folders with one command.
-2. Generate connected ODPC, ODPS, and ODPG artifacts from the same evidence set.
-3. Render one `index.html` with tabs for catalog views, artifact details, and
-   graph exploration.
-4. Maintain the portfolio later with targeted refresh, render, explain, and
-   linking commands.
+Portfolio generation creates first-pass ODPC, ODPS, and ODPG artifacts from
+messy source material such as text files, emails, briefs, meeting notes, and
+transcripts. Generated ODPS product specifications are drafts. They should be
+schema-shaped, linked, reviewable, and useful as a quick start, but they are
+not automatically accepted product contracts.
 
-The build command must be non-interactive. It should not stop for human review,
-approval, link confirmation, or artifact selection between start and finish.
-Users should be able to run one command, wait for completion, and open the
-generated `index.html` in a browser.
+The SDK should therefore be strict about structure and validation, while being
+honest about uncertain content:
 
-## Workspace Contract
+- generated YAML should use ODPS v4.1 component shapes whenever evidence exists;
+- missing or weak evidence should appear in warnings, review notes, or evidence
+  gaps instead of being hidden;
+- commercial, access, license, SLA, and data quality content generated from
+  sparse material should remain review-needed draft content;
+- `index.html`, JSON reports, and docs should make clear that human review and
+  acceptance are required before generated ODPS specs are production-ready.
 
-The portfolio workflow should create and maintain a workspace at a path chosen
-by the user. Examples use `portfolio/`, but the command must allow any output
-directory such as `generated/portfolio/`, `/tmp/demo-portfolio/`, or a project
-folder committed by the user.
+## Code Ownership
+
+Primary implementation files:
+
+- `open_data_products/portfolio.py`: workspace orchestration, source scanning,
+  LLM prompt rendering, plan parsing, normalization, identity reconciliation,
+  artifact writing, sync, render, explain, graph embedding, version snapshots,
+  and HTML/CSS rendering.
+- `open_data_products/cli.py`: `open-data-products portfolio ...` command
+  registration and provider/client wiring.
+- `open_data_products/__init__.py`: public Python exports for
+  `build_portfolio`, `refresh_portfolio`, `sync_portfolio`,
+  `render_portfolio`, and `explain_portfolio`.
+- `open_data_products/odpg/graph.py`: standalone graph explorer rendering used
+  by the portfolio graph tab.
+- `open_data_products/odps/codecs.py`, `open_data_products/odps/core.py`, and
+  `open_data_products/odps/data/schema/odps.json`: ODPS v4.1 parser,
+  serializer, and schema behavior that portfolio output must satisfy.
+
+Primary test files:
+
+- `tests/test_portfolio.py`: portfolio workspace, build, rerun, sync, render,
+  graph, version, HTML escaping, and schema-normalization coverage.
+- `tests/test_core.py`: ODPS parser behavior used by portfolio validation.
+- `tests/test_generation_prompts.py`: single-artifact generation normalization
+  that should stay consistent with portfolio normalization.
+
+Do not add a second portfolio module unless the current file is intentionally
+split by stable responsibilities. If it is split, keep public imports stable.
+
+## Public API
+
+Python entry points:
+
+```python
+from open_data_products import (
+    build_portfolio,
+    refresh_portfolio,
+    sync_portfolio,
+    render_portfolio,
+    explain_portfolio,
+)
+```
+
+Function contracts:
+
+- `build_portfolio(workspace, ..., client, model, title=None)` requires a model
+  client and writes source-derived artifacts.
+- `refresh_portfolio(workspace, ..., client, model, title=None)` reuses saved
+  source lane paths from `portfolio-state.yaml` unless lane paths are supplied.
+  By default it sends only new or changed source files to the model.
+  `all_sources=True` forces full source-lane processing.
+- `sync_portfolio(workspace)` does not call an LLM. It refreshes generated
+  outputs from edited YAML artifacts.
+- `render_portfolio(workspace)` does not call an LLM. It renders `index.html`
+  from existing workspace files.
+- `explain_portfolio(workspace)` does not call an LLM. It returns counts,
+  browser entry point, validation status, and version metadata.
+
+Every public function returns a JSON-serializable dictionary. Paths may be
+returned as strings in reports, but internal helpers may use `Path`.
+
+## CLI Contract
+
+The CLI namespace is:
+
+```bash
+open-data-products portfolio build ...
+open-data-products portfolio refresh ...
+open-data-products portfolio sync ...
+open-data-products portfolio render ...
+open-data-products portfolio explain ...
+```
+
+Build example:
+
+```bash
+open-data-products portfolio build \
+  --objectives examples/portfolio/sources/objectives/ \
+  --use-cases examples/portfolio/sources/use-cases/ \
+  --signals examples/portfolio/sources/signals/ \
+  --products examples/portfolio/sources/products/ \
+  --title "Customer Intelligence Portfolio" \
+  --output examples/portfolio/workspace/ \
+  --provider claude \
+  --model claude-sonnet-4-5 \
+  --json
+```
+
+Refresh example:
+
+```bash
+open-data-products portfolio refresh examples/portfolio/workspace/ --json
+```
+
+Force a full source reprocessing refresh:
+
+```bash
+open-data-products portfolio refresh examples/portfolio/workspace/ --all-sources --json
+```
+
+Sync edited YAML without LLM generation:
+
+```bash
+open-data-products portfolio sync examples/portfolio/workspace/ --json
+```
+
+Render existing files without LLM generation:
+
+```bash
+open-data-products portfolio render examples/portfolio/workspace/ --json
+```
+
+All `--json` commands must emit one final JSON object, not a stream of partial
+objects. Reports should include workspace path, browser entry point, artifact
+counts, validation results, created/updated/unchanged paths, warnings, and
+overall `valid`.
+
+## Workspace Layout
+
+The workflow owns all generated folders under the selected workspace path and
+must create missing directories before writing.
 
 ```text
-portfolio/
+<workspace>/
   index.html
   portfolio.yaml
   portfolio-state.yaml
-  sources/
   odpc/
     catalog.yaml
     fragments/
@@ -51,373 +173,438 @@ portfolio/
       product_reference_*.yaml
   odps/
     products/
-      odps_product_*.yaml
+      *.yaml
   odpg/
     graph.yaml
-```
-
-`portfolio.yaml` is the human-readable source of truth for generated objects and
-links. It records objectives, use cases, signals, product references, ODPS
-product specs, evidence links, confidence, and unresolved gaps.
-
-`portfolio-state.yaml` is the rerun state file. It records source file hashes,
-stable generated IDs, artifact paths, and previous generation decisions.
-
-## Filesystem Behavior
-
-Portfolio commands must create all required folders before writing files. Users
-should not have to pre-create the workspace, `odpc/`, `odpc/fragments/`,
-`odps/`, `odps/products/`, `odpg/`, or any parent directory implied by
-`--output`.
-
-Any helper that writes YAML, HTML, state, or map files should call
-`mkdir(parents=True, exist_ok=True)` on the target parent directory before
-writing. Commands should fail only when an input path is missing or invalid, not
-because an output folder was absent.
-
-## HTML Experience
-
-`<workspace>/index.html` should be one static browser-openable page. Catalog
-and graph must not feel like separate products. They are views of the same
-portfolio.
-
-Required tabs:
-
-- Overview
-- Business Objectives
-- Use Cases
-- Products
-- Signals
-- Graph
-- About
-
-Each tab must include human-readable cards and detailed in-page views for its
-artifacts. Users should be able to inspect business objectives, use cases,
-signals, product references, and product specs without opening raw YAML first.
-
-Artifact detail views should show:
-
-- the artifact name, stable ID, status, priority, confidence, and type when
-  present;
-- description, source evidence, and evidence gaps;
-- related objectives, use cases, signals, products, and graph nodes;
-- generated links and raw YAML artifact paths;
-- warnings or weak-link notes relevant to that artifact.
-
-The Products tab has an extra two-layer model. Product cards come from ODPC
-`ProductReference` objects. Product detail panels come from linked ODPS product
-specs.
-
-Product detail views should show:
-
-- product name, `productID`, status, visibility, and type;
-- description and source evidence;
-- related objectives, use cases, and signals;
-- access, license, payment, pricing, SLA, and data quality sections when present;
-- data contract and schema references when present;
-- a link to the raw ODPS YAML artifact.
-
-The Graph tab should render the generated ODPG graph in the same page instead
-of producing a separate graph explorer page.
-
-`index.html` should include a version switcher when version snapshots exist.
-The latest portfolio remains available at `<workspace>/index.html`, and the
-switcher should let users open previous generated HTML snapshots without
-leaving the browser experience. Each listed version should show its timestamp,
-run type such as build or refresh, and a short change summary when available.
-
-The About tab or section should explain how the portfolio was created. It
-should state that the output was generated with the Open Data Products SDK and
-is grounded in the OpenDataProducts.org standards family: ODPC for catalog
-objects, ODPS for product specifications, ODPG for graph relationships, and
-ODPV for shared vocabulary where vocabulary support is used. It should also
-include the SDK version, generation timestamp, source lane counts, and links to
-the generated raw artifacts.
-
-## Command Shape
-
-Initial build command:
-
-```bash
-open-data-products portfolio build \
-  --use-cases inputs/use-cases/ \
-  --signals inputs/signals/ \
-  --products inputs/products/ \
-  --config generation.config.yaml \
-  --provider openai \
-  --model gpt-4.1-mini \
-  --output generated/portfolio/ \
-  --json
-```
-
-`--output` names the workspace directory to create or update. The command
-should also allow a single workspace argument once the workspace is initialized:
-
-```bash
-open-data-products portfolio build generated/portfolio/ --json
-```
-
-Maintenance commands operate on the chosen workspace path:
-
-```bash
-open-data-products portfolio render generated/portfolio/ --json
-open-data-products portfolio explain generated/portfolio/ --json
-open-data-products portfolio refresh generated/portfolio/ --json
-```
-
-Avoid overbuilding targeted maintenance commands before the workspace, state,
-and renderer are stable.
-
-When `--json` is set, the command should print one final JSON report after the
-process is complete. It should not stream partial JSON objects during the run.
-The report should include the workspace path, generated browser entry point,
-source counts, artifact counts, created/updated/unchanged files, warnings,
-unresolved links, weak links, validation results, and whether the command
-completed successfully.
-
-## LLM Orchestration
-
-`portfolio build` and `portfolio refresh` require LLM generation when they need
-to turn source documents into new or updated portfolio artifacts. They should
-reuse the existing generation provider flow: `--config`, `--provider`,
-`--model`, `--prompts`, and provider-specific settings such as `--ollama-url`
-should behave consistently with `open-data-products generate`.
-
-The LLM should be used for:
-
-- extracting candidate objectives, use cases, signals, product concepts, and
-  product facts from source lanes;
-- creating an internal portfolio plan with proposed IDs and links;
-- generating ODPC fragments;
-- generating ODPS product specs;
-- proposing ODPG relationships from the portfolio plan and generated artifacts;
-- repairing generated YAML when validation fails.
-
-Deterministic SDK code should be used for:
-
-- source scanning and hashing;
-- workspace and directory creation;
-- stable ID reuse from `portfolio-state.yaml`;
-- YAML parsing, normalization, and validation;
-- writing ODPC, ODPS, and ODPG artifacts;
-- rendering `index.html`;
-- creating version snapshots;
-- producing the final JSON report.
-
-`portfolio render` and `portfolio explain` should not call an LLM. They should
-operate only on existing workspace files.
-
-If LLM settings are missing or invalid, `portfolio build` and `portfolio refresh`
-should fail before writing partial generated artifacts. The final error should
-tell the user which provider or config value is missing.
-
-## Identity And Linking
-
-The portfolio workflow must own identity generation. IDs should not be guessed
-later by the catalog builder or graph renderer.
-
-Stable IDs are needed for:
-
-- `businessObjective.id`
-- `useCase.id`
-- `signal.id`
-- `productReference.id`
-- `productReference.productID`
-- ODPS `product.details.en.productID`
-- ODPG node IDs
-- `$ref` paths between ODPC, ODPS, and ODPG artifacts
-
-When a ProductReference and ODPS product spec are generated from the same
-portfolio plan, the workflow should assign the same `productID` and write a
-deterministic `productModel.$ref` from the ProductReference to the ODPS YAML.
-
-If source material is ambiguous, the workflow should write a warning to
-`portfolio.yaml` and `--json` output instead of silently inventing a confident
-link.
-
-## Rerun Behavior
-
-The workflow must be rerunnable. Adding new source material should not break
-existing IDs or links.
-
-Minimum rerun behavior:
-
-1. Scan configured source folders.
-2. Hash source files and compare them with `portfolio-state.yaml`.
-3. Preserve existing IDs for unchanged concepts.
-4. Generate artifacts for new or affected concepts.
-5. Rebuild `odpc/catalog.yaml`, `odpg/graph.yaml`, and `index.html`.
-6. Report created, updated, unchanged, removed, unresolved, and weakly linked
-   items in `--json`.
-
-The first implementation can regenerate derived YAML and HTML from the current
-portfolio map, but it must keep identity stable.
-
-## Portfolio Versioning
-
-Each successful `portfolio build` or `portfolio refresh` should create a version
-snapshot. The latest files stay at the workspace root, while snapshots live
-under `versions/`.
-
-```text
-<workspace>/
-  index.html
-  portfolio.yaml
-  portfolio-state.yaml
   versions/
-    2026-06-07T12-30-00Z/
+    <timestamp>/
       index.html
       portfolio.yaml
       report.json
 ```
 
-Default snapshot behavior should keep the previous browser experience and run
-metadata: `index.html`, `portfolio.yaml`, and `report.json`. Full raw artifact
-snapshots can be added later if needed, but the HTML history should exist from
-the first versioned implementation.
+Do not assume `odpc/`, `odpc/fragments/`, `odps/products/`, `odpg/`, or
+`versions/` already exist. Writers should call `mkdir(parents=True,
+exist_ok=True)` through `_write_yaml`, `_write_json_report`, or equivalent
+helpers.
 
-`index.html` should read version metadata generated by the workflow and expose
-the available versions through the version switcher. The latest page should
-link to each snapshot HTML file. Snapshot pages should link back to the latest
-page and show which version they represent.
+## Source Lanes
 
-## Phases
+`build` and `refresh` read these source lanes:
 
-### Phase 1: Portfolio Workspace And Static Renderer
+- `objectives`;
+- `useCases`;
+- `signals`;
+- `products`.
 
-Create the `portfolio` CLI namespace and a deterministic renderer that can build
-`index.html` from existing ODPC, ODPS, and ODPG artifacts.
+Accepted source suffixes are defined by `PORTFOLIO_SOURCE_SUFFIXES`:
 
-Deliverables:
+```text
+.md, .txt, .yaml, .yml, .json
+```
 
-- `open-data-products portfolio render <workspace>/ --json`
-- `portfolio.yaml` loader and validator
-- static `index.html` with tabs
-- About tab or section with SDK version, generation timestamp, source counts,
-  and ODPS standards family attribution
-- version switcher when version snapshots exist
-- product cards from ProductReference entries
-- product detail views from linked ODPS specs
-- artifact detail views for objectives, use cases, signals, product references,
-  and linked ODPS product specs
-- graph tab from ODPG YAML
-- tests for deterministic HTML output and escaped values
+Source lane collection lives in `_collect_source_lanes`,
+`_resolve_source_lane_paths`, `_collect_source_files`, and `_iter_source_files`.
+Source hashes are tracked by `_source_changes` and `_source_hashes`.
 
-This phase proves the human experience before adding more generation logic.
+If an input source path is missing, fail early. If an output path is missing,
+create it.
 
-### Phase 2: Portfolio Build From Source Lanes
+## Build Flow
 
-Add `portfolio build` to read multiple source lanes and create the first
-connected portfolio workspace.
+`build_portfolio` performs this sequence:
 
-Deliverables:
+1. Load previous `portfolio-state.yaml` when present.
+2. Snapshot existing workspace files before overwriting them.
+3. Resolve source lane paths from explicit CLI arguments or saved state.
+4. Collect source files and compare source hashes.
+5. Select the source files to process. Build processes all sources. Refresh
+   processes only new or changed sources unless `--all-sources` is set.
+6. Render a portfolio build prompt for the selected sources.
+7. Call the configured model client.
+8. Parse the YAML portfolio plan.
+9. For changed-only refresh, merge the returned delta plan into the current
+   workspace plan.
+10. Reconcile stable identities.
+11. Normalize generated ODPC, ODPS, and ODPG shapes.
+12. Apply the user-controlled workspace title.
+13. Write `portfolio.yaml`, `portfolio-state.yaml`, ODPC fragments, ODPS
+    product specs, ODPC catalog, ODPG graph, and `index.html`.
+14. Validate catalog, graph, and ODPS products.
+15. Return one JSON-serializable report.
 
-- `open-data-products portfolio build --use-cases ... --signals ... --products ...`
-- `--config`, `--provider`, `--model`, `--prompts`, and `--ollama-url` support
-  matching the existing generation command
-- source lane scanning for `.md`, `.txt`, `.yaml`, `.yml`, and `.json`
-- internal portfolio plan generation before final artifacts, with no human
-  approval gate
-- ODPC fragments for objectives, use cases, signals, and product references
-- ODPS product specs linked from ProductReference objects
-- `portfolio.yaml`, `portfolio-state.yaml`, `odpc/catalog.yaml`,
-  `odps/products/*.yaml`, `odpg/graph.yaml`, and `index.html`
-- final JSON report with workspace path, browser entry point, artifact counts,
-  source counts, validation results, created/updated files, unresolved links,
-  weak links, and warnings
+The LLM may propose names, descriptions, facts, products, and links, but
+deterministic SDK code owns workspace title, identity reconciliation, schema
+normalization, validation, rendering, snapshots, and final reporting.
 
-This phase makes the one-shot portfolio creation useful.
+## Refresh Source Selection
 
-### Phase 3: Stable Reruns
+Refresh defaults to changed-only source processing. The workflow still scans
+all saved source lanes and updates hashes, but only files reported as
+`created` or `updated` are included in the LLM prompt.
 
-Make `portfolio build <workspace>/` safe to run after new source material is
-added.
+`refresh --all-sources` sets `all_sources=True` and sends every current source
+file to the LLM.
 
-Deliverables:
+Changed-only refresh must merge the model output into the existing workspace
+plan. A delta plan may contain only one new use case, signal, product, or graph
+edge. It must not delete unchanged existing artifacts just because they were
+not included in the changed-source prompt.
 
-- source hash tracking in `portfolio-state.yaml`
-- stable ID reuse for unchanged concepts
-- warnings for deleted sources and unresolved links
-- rebuild of derived catalog, graph, and HTML outputs
-- version snapshot with `index.html`, `portfolio.yaml`, and `report.json`
-- tests that rerunning with added material preserves old IDs
+Relevant helpers:
 
-This phase turns the workflow from a demo generator into a maintainable
-portfolio workspace.
+- `_changed_source_lanes`;
+- `_plan_from_workspace`;
+- `_merge_portfolio_plans`;
+- `_merge_items_by_id`;
+- `_merge_products`;
+- `_merge_graph_edges`.
 
-### Phase 4: Targeted Maintenance
+Reports include both:
 
-Add focused commands for day-to-day maintenance once the workspace model is
-stable.
+- `sourceCounts`: all current source files by lane;
+- `processedSourceCounts`: files actually sent to the model by lane.
 
-Deliverables:
+`sync` is separate from refresh. It works from YAML artifacts only and must
+never call an LLM.
 
-- `portfolio explain <workspace>/`
-- `portfolio refresh <workspace>/`
-- optional `portfolio relink <workspace>/`
-- optional `portfolio add-source <workspace>/ <path>`
-- clear JSON output for agents and automation
+## Title Ownership
 
-This phase should stay conservative. Add only commands that solve repeated
-maintenance needs observed in the first workflow.
+The workspace title is user-controlled. `--title` sets it on build or refresh.
+The workflow persists it in `portfolio-state.yaml` and reuses it on reruns.
 
-### Phase 5: Public API And MCP Surface
+LLM-generated portfolio metadata must not rename:
 
-Expose the workflow through Python and agent surfaces after CLI behavior is
-stable.
+- the workspace;
+- the rendered page;
+- the catalog;
+- the graph.
 
-Deliverables:
+Title handling lives in `_resolve_workspace_title` and `_apply_workspace_title`.
 
-- explicit public exports in `open_data_products/__init__.py`
-- Python helpers under a focused portfolio module
-- safe read-only MCP tools for portfolio explanation, artifact summaries, and
-  link inspection
-- updates to `tests/test_agentic_patterns.py` if MCP tools are added
+## Identity And Linking
 
-State-changing MCP tools should not be added until the project intentionally
-expands beyond the current safe read-only MCP class.
+Stable IDs are managed by the workflow, not by the renderer.
 
-## Testing Strategy
+Tracked identity classes include:
 
-Use test-driven development for each phase.
+- business objective IDs;
+- use case IDs;
+- signal IDs;
+- product reference IDs;
+- product IDs;
+- ODPS `product.details.en.productID`;
+- graph node IDs and edge endpoints.
 
-Recommended test files:
+Identity reconciliation lives in `_reconcile_plan_identity`,
+`_identity_registry`, `_registry_by_fingerprint`, `_artifact_fingerprint`, and
+`_set_odps_product_id`.
 
-- `tests/test_portfolio.py` for workspace, state, map, and renderer behavior
-- `tests/test_functional_cli.py` for command behavior
-- `tests/test_examples.py` for committed example workspace outputs if examples
-  are added
-- `tests/test_agentic_patterns.py` only if the MCP surface changes
+Product references and ODPS product specs should share the same `productID`.
+Product references must include a deterministic ODPS link:
 
-Key regression tests:
+```yaml
+productModel:
+  standard: ODPS
+  version: "4.1"
+  format: yaml
+  $ref: ../odps/products/<product-id>.yaml
+```
 
-- build and render commands create missing output parent directories;
-- product cards render from ODPC ProductReference objects;
-- objective, use case, signal, and product detail panels render in the same
-  `index.html`;
-- product detail panels use linked ODPS specs when available;
-- graph tab renders from ODPG YAML in the same `index.html`;
-- version switcher links latest and previous HTML snapshots;
-- render and explain commands do not call an LLM;
-- build fails early when required LLM provider settings are missing;
-- rerun preserves IDs when unchanged source files are present;
-- rerun reports warnings instead of silently guessing ambiguous links;
-- generated HTML escapes source values.
+Do not silently invent high-confidence links. Ambiguous links should surface as
+warnings in `portfolio.yaml` and JSON reports.
 
-## First Implementation Boundary
+## Artifact Writing
 
-The first implementation should not try to solve every maintenance scenario.
-The smallest valuable version is:
+`_write_portfolio_artifacts` writes the main generated files:
 
-- one portfolio workspace;
-- one `index.html`;
-- artifact cards plus detail views for objectives, use cases, signals, and
-  products;
-- graph tab in the same HTML page;
-- version snapshots with browser switching;
-- generated ODPC, ODPS, and ODPG YAML underneath;
-- stable IDs across reruns;
-- clear JSON warnings.
+- `portfolio.yaml`;
+- `portfolio-state.yaml`;
+- ODPC fragments;
+- ODPS product YAML;
+- `odpc/catalog.yaml`;
+- `odpg/graph.yaml`.
 
-This is enough to make the SDK feel like a portfolio operating tool rather than
-only an isolated artifact generator.
+`_write_yaml` returns `(path, state)` where `state` is `created`, `updated`, or
+`unchanged`. Reports should preserve these states so agents and CI can tell
+what changed.
+
+Catalog rebuilds use `_catalog_document` for generated plans and
+`_catalog_from_fragments` for sync.
+
+Graph rebuilds use `_graph_document`, `_graph_nodes`, `_graph_node`, and
+`_graph_edge`.
+
+## ODPS Normalization
+
+Portfolio generation must produce ODPS v4.1 schema-shaped YAML, not just YAML
+that the Python loader can tolerate.
+
+Normalization starts in `_normalize_portfolio_plan` and delegates to
+`_normalize_odps_product`.
+
+Current ODPS normalization rules:
+
+- detail status and visibility are mapped to allowed ODPS values;
+- `product.details.en.productID` is kept aligned with the ODPC
+  `ProductReference.productID`;
+- legacy `pricing` is converted to `pricingPlans`;
+- list-based pricing is converted to `pricingPlans.declarative.<language>`;
+- `pricingPlanName` is mapped to `name`;
+- pricing `license` text is mapped to `description`;
+- missing pricing fields are made valid but visibly provisional:
+  `priceCurrency: XXX`, `price: "0"`, `billingDuration: month`,
+  `unit: On-request`;
+- `dataAccess` is emitted as a named ODPS v4.1 access method mapping;
+- `outputPorttype` is converted to `outputPortType`;
+- loose `details.en.SLA` values are moved to `product.SLA.declarative`;
+- loose generated `dataOps` is moved to `x-dataOps`.
+
+The bundled ODPS parser must also accept canonical v4.1 shapes. In particular,
+`OpenDataProduct.from_dict` and `parse_data_access` accept named `dataAccess`
+method mappings and `outputPortType`.
+
+When adding new generated component shapes, update both:
+
+- portfolio normalization tests in `tests/test_portfolio.py`;
+- ODPS parser or generation tests if the shape is shared by `generate`.
+
+## Sync Flow
+
+`sync_portfolio` is the maintenance path for users who edit YAML artifacts
+directly.
+
+Sync performs this sequence:
+
+1. Snapshot the existing workspace.
+2. Normalize ODPS product files in `odps/products/`.
+3. Rebuild `odpc/catalog.yaml` from `odpc/fragments/*.yaml`.
+4. Propagate linked ODPS product details back into matching ODPC product
+   references.
+5. Rewrite `portfolio-state.yaml` with current identity state.
+6. Re-render `index.html`.
+7. Return a JSON report.
+
+Sync must not call an LLM. It must refresh product names and descriptions in:
+
+- ODPS product YAML;
+- ODPC product reference fragments;
+- `odpc/catalog.yaml`;
+- Products tab in `index.html`;
+- embedded graph labels where graph nodes reference those products.
+
+Product-reference propagation lives in `_sync_product_references_from_odps`,
+`_merge_product_reference_details`, and `_odpc_product_visibility`.
+
+ODPS file repair lives in `_normalize_product_spec_files`.
+
+## Rendering
+
+`render_portfolio` loads the workspace with `load_portfolio_workspace`,
+validates artifacts, renders HTML with `render_portfolio_html`, and writes
+`index.html`.
+
+The static page is intentionally one browser-openable file. It contains:
+
+- Overview;
+- Business Objectives;
+- Use Cases;
+- Products;
+- Signals;
+- Graph;
+- About;
+- footer;
+- version switcher when snapshots exist.
+
+The Products tab renders ODPC product reference cards and linked ODPS product
+detail panels. Product detail rendering lives in `_render_product_card`,
+`_resolve_product`, and `_render_product_detail`.
+
+The graph tab embeds the ODPG graph explorer generated by
+`build_graph_explorer_html`. Portfolio-specific graph embedding lives in
+`_render_graph`, `_portfolio_graph_explorer_html`, `_graph_for_explorer`, and
+`_catalog_label_map`.
+
+Graph labels should prefer human-readable catalog/product labels while keeping
+stable graph node IDs unchanged.
+
+All user/source-derived strings in HTML must be escaped with `_escape` or
+`_escape_attr`.
+
+## Version Snapshots
+
+Build, refresh, and sync snapshot an existing workspace before writing new
+outputs. Snapshot behavior lives in `_snapshot_existing_workspace`,
+`_write_json_report`, `_refresh_portfolio_versions`, and `_portfolio_versions`.
+
+Current snapshot contents:
+
+- previous `index.html`;
+- previous `portfolio.yaml`;
+- `report.json` for the run that created the snapshot.
+
+Latest output remains at `<workspace>/index.html`. Previous HTML snapshots live
+under `versions/<timestamp>/index.html` and are exposed through the version
+switcher in the Overview tab.
+
+If full raw artifact snapshots are added later, keep the current browser
+history behavior intact.
+
+## Validation
+
+Portfolio validation is collected by `_portfolio_validation_results` and
+summarized by `_valid_portfolio`.
+
+Validation inputs:
+
+- `validate_catalog` for ODPC catalog mappings;
+- `validate_graph` for ODPG graph mappings;
+- `validate_document` for ODPS product paths.
+
+ODPS products should pass both the bundled JSON Schema and SDK semantic
+validators. Do not make portfolio reports `valid: true` by masking schema
+errors. Normalize generated output instead.
+
+The schema/parser boundary matters. When the schema changes, update:
+
+- `open_data_products/odps/data/schema/odps.json`;
+- `open_data_products/odps/core.py`;
+- `open_data_products/odps/codecs.py`;
+- portfolio and generation normalization tests.
+
+## Error Handling
+
+Build and refresh should fail before writing partial generated artifacts if LLM
+settings are missing or invalid.
+
+Render and sync should tolerate missing optional workspace files by using empty
+catalog, graph, product, or version structures where appropriate.
+
+Deleted sources are reported as warnings rather than silently ignored.
+
+Unsupported generated enum values should be normalized to conservative defaults
+and remain visible through generated YAML and JSON reports where possible.
+
+## Reports
+
+Portfolio reports should include:
+
+- `spec`;
+- `kind`;
+- `workspace`;
+- `html`;
+- `snapshot`;
+- source counts for build/refresh;
+- processed source counts for build/refresh;
+- artifact counts;
+- validation results;
+- created, updated, unchanged, and removed paths where applicable;
+- source changes for build/refresh;
+- warnings;
+- unresolved links;
+- weak links;
+- overall `valid`.
+
+Keep reports stable for automation. Additive fields are safer than renaming
+existing fields.
+
+## Examples
+
+The committed example structure should stay grouped under `examples/portfolio/`:
+
+```text
+examples/portfolio/
+  mockup/
+    index.html
+  sources/
+    objectives/
+    use-cases/
+    signals/
+    products/
+  workspace/
+    index.html
+    odpc/
+    odps/
+    odpg/
+```
+
+Do not spread example portfolio sources, mockups, and generated workspaces
+around the repository root.
+
+`examples/portfolio/workspace/` is a generated demo workspace. It is useful for
+manual browser checks, but regression safety should come from tests.
+
+## Testing Checklist
+
+Run focused tests after portfolio changes:
+
+```bash
+pytest -q tests/test_portfolio.py
+```
+
+Run parser tests after ODPS shape changes:
+
+```bash
+pytest -q tests/test_core.py
+```
+
+Run generation tests after shared normalization changes:
+
+```bash
+pytest -q tests/test_generation_prompts.py
+```
+
+Full pre-completion checks:
+
+```bash
+pytest -q
+python3 -c "import open_data_products"
+python3 -m open_data_products.cli manifest --json | python3 -m json.tool
+git diff --check
+find docs -path 'docs/superpowers' -o -path 'docs/superpowers/*'
+```
+
+Useful manual validation commands:
+
+```bash
+python3 -m open_data_products.cli portfolio sync examples/portfolio/workspace --json
+python3 -m open_data_products.cli validate examples/portfolio/workspace/odps/products/customer-health-signals.yaml --json
+```
+
+For explicit ODPS JSON Schema checks, use `jsonschema.Draft202012Validator`
+against `open_data_products/odps/data/schema/odps.json`.
+
+## Extension Points
+
+Prefer these extension points:
+
+- add source lanes by extending source collection, prompt shape, state, and
+  artifact mapping together;
+- add ODPS component normalization in `_normalize_odps_product`;
+- add detail rendering in `_render_product_detail`;
+- add graph relationship types through `ODPG_EDGE_TYPES` and
+  `ODPG_EDGE_TYPE_ALIASES`;
+- add report fields without renaming current fields;
+- add public helpers only after CLI and internal behavior are stable.
+
+Avoid these changes unless intentionally scoped:
+
+- introducing another CLI entry point outside `open-data-products`;
+- making render or sync call an LLM;
+- letting the LLM control workspace title;
+- returning full document bodies from future MCP tools;
+- accepting invalid ODPS output by suppressing schema errors;
+- storing absolute filesystem paths inside generated YAML references.
+
+## Developer Rule Of Thumb
+
+The portfolio workflow should feel like this:
+
+1. `build` creates a complete connected workspace from source lanes.
+2. `refresh` reruns source-driven generation while preserving identity.
+3. `sync` reflects curated YAML edits without starting over.
+4. `render` turns existing artifacts into one browser page.
+5. `explain` summarizes the workspace for humans, agents, and automation.
+
+When in doubt, keep LLM work at the evidence-to-plan boundary and keep all
+identity, linking, validation, filesystem writes, and rendering deterministic.

@@ -222,6 +222,56 @@ GraphML, GraphSON, RDF/Turtle, OpenCypher, GQL, and Gremlin.
 ## Portfolio Workspaces
 
 ```bash
+open-data-products portfolio build \
+  --objectives inputs/objectives/ \
+  --use-cases inputs/use-cases/ \
+  --signals inputs/signals/ \
+  --products inputs/products/ \
+  --title "Customer Intelligence Portfolio" \
+  --output generated/portfolio/ \
+  --json
+```
+
+Builds a portfolio workspace from source lanes. The command uses the configured
+LLM provider to create an internal portfolio plan, writes ODPC fragments and
+catalog YAML, linked ODPS product specs, ODPG graph YAML, and then renders the
+static `index.html` browser experience. Missing output folders are created
+before writing. The final JSON report includes source counts, artifact counts,
+created/updated/unchanged files, warnings, link findings, and the browser entry
+point.
+The report also includes validation results for the ODPC catalog, ODPG graph,
+and linked ODPS product specs.
+The LLM prompt asks for one structured YAML portfolio plan with explicit
+ProductReference-to-ODPS product linking rules, graph edge endpoint rules, and
+warnings for weak evidence.
+Use `--title` to set the human-controlled workspace title. The SDK persists
+that title in `portfolio-state.yaml` and reuses it on reruns so the page title,
+catalog name, and graph name do not drift with LLM output.
+
+After the first build, the workspace can be rerun without repeating the source
+folder flags:
+
+```bash
+open-data-products portfolio build generated/portfolio/ --json
+```
+
+The command reuses source lane paths saved in `portfolio-state.yaml`, compares
+current source hashes with the previous run, preserves stable artifact IDs for
+unchanged concepts, snapshots the previous `index.html`, and reports source
+changes plus removed source files in the final JSON output.
+
+```bash
+open-data-products portfolio sync generated/portfolio/ --json
+```
+
+Synchronizes a portfolio from edited YAML artifacts without calling an LLM. Use
+this when ODPC fragment YAML, ODPS product YAML, or graph YAML has been updated
+directly and the portfolio should be refreshed from those files. The command
+rebuilds `odpc/catalog.yaml` from `odpc/fragments/*.yaml`, keeps source lane
+state, updates the identity registry, snapshots the previous `index.html`, and
+renders a new browser view with one final JSON report.
+
+```bash
 open-data-products portfolio render generated/portfolio/ --json
 ```
 
@@ -238,6 +288,29 @@ open-data-products portfolio explain generated/portfolio/ --json
 Summarizes a portfolio workspace, including the browser entry point and counts
 for objectives, use cases, signals, product references, ODPS product specs,
 graph nodes, graph edges, and available versions.
+
+```bash
+open-data-products portfolio refresh generated/portfolio/ --json
+```
+
+Refreshes an existing portfolio workspace using source lane paths saved in
+`portfolio-state.yaml`. By default, refresh scans all saved source lanes but
+sends only new or changed source files to the LLM. The generated delta is then
+merged into the existing portfolio so unchanged artifacts are preserved.
+
+Use `--all-sources` when the full evidence set should be reprocessed:
+
+```bash
+open-data-products portfolio refresh generated/portfolio/ --all-sources --json
+```
+
+Before writing the refreshed latest files, the command snapshots the previous
+`index.html` and `portfolio.yaml` under `versions/<timestamp>/`, then writes a
+`report.json` for the refresh run. The latest `index.html` includes a version
+switcher so previous HTML snapshots can be opened from the browser. The final
+JSON report includes `sourceCounts` for all current sources,
+`processedSourceCounts` for the files sent to the LLM, and validation results
+for the refreshed catalog, graph, and linked product specs.
 
 ## Product-Level Data Contract Inspection
 

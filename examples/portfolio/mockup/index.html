@@ -1,0 +1,858 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Generated Demo Portfolio</title>
+  <style>
+    :root {
+      --odps-violet: #6c2a8e;
+      --odpc-orange: #f28c28;
+      --odpg-green: #2f9b58;
+      --odpv-blue: #1f78d1;
+      --odp-ink: #1e0a2e;
+      --odp-soft: #f7f3fa;
+      --odp-line: #e7e1ec;
+      --odp-muted: #6d6175;
+      --odp-black: #050505;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      color: var(--odp-ink);
+      background: #fff;
+      font: 16px/1.55 Poppins, Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    a { color: inherit; text-decoration: none; }
+
+    .topbar {
+      color: #fff;
+      background: var(--odp-black);
+      border-bottom: 4px solid var(--odps-violet);
+    }
+
+    .topbar-inner,
+    .wrap {
+      width: min(1180px, calc(100% - 32px));
+      margin: 0 auto;
+    }
+
+    .topbar-inner {
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      min-height: 58px;
+      gap: 24px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      font-weight: 700;
+    }
+
+    .hero {
+      color: #fff;
+      background:
+        linear-gradient(135deg, rgba(108, 42, 142, .96), rgba(30, 10, 46, .94)),
+        var(--odps-violet);
+    }
+
+    .hero .wrap {
+      padding: 46px 0 30px;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin: 0 0 14px;
+      font-size: .78rem;
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+
+    .hero .eyebrow { color: rgba(255, 255, 255, .82); }
+
+    h1 {
+      max-width: 780px;
+      margin: 0 0 14px;
+      font-size: clamp(2.25rem, 5vw, 4.55rem);
+      line-height: 1.02;
+      font-weight: 600;
+      letter-spacing: 0;
+    }
+
+    h2 {
+      margin: 0;
+      font-size: clamp(1.35rem, 2.5vw, 2rem);
+      line-height: 1.12;
+      font-weight: 600;
+    }
+
+    h3 {
+      margin: 0 0 8px;
+      font-size: 1.08rem;
+      line-height: 1.25;
+    }
+
+    .lead {
+      max-width: 760px;
+      margin: 0;
+      color: rgba(255, 255, 255, .86);
+      font-size: clamp(1rem, 2vw, 1.18rem);
+    }
+
+    main.wrap { padding: 26px 0 64px; }
+
+    .tab-radio {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+    }
+
+    .tabs {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding: 12px 0;
+      background: rgba(255, 255, 255, .96);
+      border-top: 1px solid var(--odp-line);
+      border-bottom: 1px solid var(--odp-line);
+      backdrop-filter: blur(10px);
+    }
+
+    .tabs label {
+      flex: 0 0 auto;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 40px;
+      padding: 8px 13px;
+      border: 1px solid var(--odp-line);
+      border-radius: 8px;
+      color: var(--odp-muted);
+      background: #fff;
+      cursor: pointer;
+      font-size: .9rem;
+      font-weight: 700;
+    }
+
+    #tab-overview:checked ~ .tabs label[for="tab-overview"],
+    #tab-objectives:checked ~ .tabs label[for="tab-objectives"],
+    #tab-use-cases:checked ~ .tabs label[for="tab-use-cases"],
+    #tab-products:checked ~ .tabs label[for="tab-products"],
+    #tab-signals:checked ~ .tabs label[for="tab-signals"],
+    #tab-graph:checked ~ .tabs label[for="tab-graph"],
+    #tab-about:checked ~ .tabs label[for="tab-about"] {
+      color: #fff;
+      border-color: var(--odps-violet);
+      background: var(--odps-violet);
+    }
+
+    .tab-panel {
+      display: none;
+      padding-top: 28px;
+    }
+
+    #tab-overview:checked ~ .panels .overview-panel,
+    #tab-objectives:checked ~ .panels .objectives-panel,
+    #tab-use-cases:checked ~ .panels .use-cases-panel,
+    #tab-products:checked ~ .panels .products-panel,
+    #tab-signals:checked ~ .panels .signals-panel,
+    #tab-graph:checked ~ .panels .graph-panel,
+    #tab-about:checked ~ .panels .about-panel {
+      display: block;
+    }
+
+    .section-head {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 18px;
+      margin-bottom: 16px;
+    }
+
+    .section-head p {
+      max-width: 540px;
+      margin: 0;
+      color: var(--odp-muted);
+    }
+
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 12px;
+      margin: 0 0 26px;
+    }
+
+    .metric,
+    .card,
+    .panel {
+      border: 1px solid var(--odp-line);
+      border-radius: 8px;
+      background: #fff;
+      box-shadow: 0 12px 32px rgba(30, 10, 46, .06);
+    }
+
+    .metric {
+      min-height: 104px;
+      padding: 16px;
+    }
+
+    .metric strong {
+      display: block;
+      font-size: 2.1rem;
+      line-height: 1;
+    }
+
+    .metric span {
+      display: block;
+      margin-top: 8px;
+      color: var(--odp-muted);
+      font-size: .8rem;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    .card {
+      position: relative;
+      min-height: 216px;
+      padding: 18px;
+    }
+
+    .card::before {
+      content: "";
+      position: absolute;
+      inset: 0 auto 0 0;
+      width: 4px;
+      border-radius: 8px 0 0 8px;
+      background: var(--odpc-orange);
+    }
+
+    .card.product::before { background: var(--odps-violet); }
+    .card.signal::before { background: var(--odpv-blue); }
+    .card.graph::before { background: var(--odpg-green); }
+    .wide { grid-column: span 2; }
+
+    .chip-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      min-height: 24px;
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: var(--odp-soft);
+      color: var(--odp-muted);
+      font-size: .74rem;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .chip.odps { color: #fff; background: var(--odps-violet); }
+    .chip.odpc { color: #fff; background: var(--odpc-orange); }
+    .chip.odpg { color: #fff; background: var(--odpg-green); }
+    .chip.odpv { color: #fff; background: var(--odpv-blue); }
+
+    .card p,
+    .panel p {
+      margin: 0 0 14px;
+      color: var(--odp-muted);
+    }
+
+    .facts {
+      display: grid;
+      grid-template-columns: max-content 1fr;
+      gap: 6px 12px;
+      margin: 0;
+      font-size: .9rem;
+    }
+
+    .facts dt {
+      color: var(--odp-muted);
+      font-weight: 700;
+    }
+
+    .facts dd { margin: 0; }
+
+    details {
+      margin-top: 14px;
+      padding-top: 12px;
+      border-top: 1px solid var(--odp-line);
+    }
+
+    summary {
+      cursor: pointer;
+      color: var(--odps-violet);
+      font-weight: 700;
+    }
+
+    .version-list,
+    .node-list,
+    .edge-list {
+      margin: 0;
+      padding: 0;
+    }
+
+    .version-list li,
+    .node-list li,
+    .edge-list li {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      margin: 0 0 8px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--odp-line);
+      list-style: none;
+    }
+
+    .version-row {
+      align-items: center;
+    }
+
+    .version-action {
+      color: var(--odps-violet);
+      font-weight: 700;
+    }
+
+    .version-history {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid var(--odp-line);
+    }
+
+    .version-history summary {
+      color: var(--odps-violet);
+      cursor: pointer;
+      font-weight: 700;
+    }
+
+    .version-table {
+      width: 100%;
+      margin-top: 12px;
+      border-collapse: collapse;
+      font-size: .9rem;
+    }
+
+    .version-table th,
+    .version-table td {
+      padding: 9px 6px;
+      border-bottom: 1px solid var(--odp-line);
+      text-align: left;
+      vertical-align: top;
+    }
+
+    .version-table th {
+      color: var(--odp-muted);
+      font-size: .76rem;
+      text-transform: uppercase;
+    }
+
+    .overview-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 340px;
+      gap: 16px;
+    }
+
+    .actions-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+      margin: 0 0 22px;
+    }
+
+    .action-card {
+      position: relative;
+      padding: 16px;
+      border: 1px solid var(--odp-line);
+      border-radius: 8px;
+      background: var(--odp-soft);
+    }
+
+    .action-card strong {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 1rem;
+    }
+
+    .action-card p {
+      margin: 0 0 12px;
+      color: var(--odp-muted);
+      font-size: .92rem;
+    }
+
+    .action-link {
+      color: var(--odps-violet);
+      font-weight: 700;
+    }
+
+    .panel { padding: 18px; }
+
+    .graph-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 320px;
+      gap: 18px;
+      align-items: stretch;
+    }
+
+    .graph-canvas {
+      min-height: 520px;
+      padding: 20px;
+      border: 1px solid var(--odp-line);
+      border-radius: 8px;
+      background:
+        radial-gradient(circle at 15% 20%, rgba(242, 140, 40, .13), transparent 28%),
+        radial-gradient(circle at 80% 22%, rgba(108, 42, 142, .14), transparent 30%),
+        linear-gradient(135deg, rgba(47, 155, 88, .08), transparent 48%),
+        #fff;
+      box-shadow: 0 12px 32px rgba(30, 10, 46, .06);
+    }
+
+    .graph-map {
+      width: 100%;
+      height: 460px;
+    }
+
+    .edge {
+      stroke: #c8bfd1;
+      stroke-width: 2.5;
+    }
+
+    .node circle {
+      stroke: #fff;
+      stroke-width: 4;
+      filter: drop-shadow(0 8px 12px rgba(30, 10, 46, .16));
+    }
+
+    .node text {
+      fill: var(--odp-ink);
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .side-panel {
+      display: grid;
+      gap: 14px;
+    }
+
+    .about-card {
+      padding: 26px;
+      border-radius: 8px;
+      color: #fff;
+      background: var(--odp-ink);
+    }
+
+    .about-card p {
+      max-width: 820px;
+      color: rgba(255, 255, 255, .82);
+    }
+
+    .about-card .chip {
+      color: #fff;
+      background: rgba(255, 255, 255, .12);
+    }
+
+    .footer {
+      margin-top: 42px;
+      padding: 24px 0 34px;
+      color: rgba(255, 255, 255, .78);
+      background: var(--odp-black);
+      border-top: 4px solid var(--odps-violet);
+      font-size: .92rem;
+    }
+
+    .footer-inner {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 18px;
+      align-items: start;
+    }
+
+    .footer p {
+      max-width: 760px;
+      margin: 0;
+    }
+
+    .footer-links {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 12px;
+      font-weight: 700;
+    }
+
+    .footer-links a {
+      color: #fff;
+    }
+
+    @media (max-width: 900px) {
+      .overview-grid,
+      .graph-layout {
+        grid-template-columns: 1fr;
+      }
+
+      .summary {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .actions-grid,
+      .grid {
+        grid-template-columns: 1fr;
+      }
+
+      .wide { grid-column: auto; }
+
+      .footer-inner {
+        grid-template-columns: 1fr;
+      }
+
+      .footer-links {
+        justify-content: flex-start;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="#overview" aria-label="Open Data Products portfolio">
+        <span>Open Data Products Portfolio</span>
+      </a>
+    </div>
+  </header>
+
+  <section class="hero">
+    <div class="wrap">
+      <div>
+        <p class="eyebrow">AI Agent First Portfolio Workspace</p>
+        <h1>Generated Demo Portfolio</h1>
+        <p class="lead">A browser-ready portfolio view connecting objectives, use cases, signals, product references, detailed ODPS product specs, and graph relationships.</p>
+      </div>
+    </div>
+  </section>
+
+  <main class="wrap">
+    <input class="tab-radio" type="radio" name="portfolio-tab" id="tab-overview" checked>
+    <input class="tab-radio" type="radio" name="portfolio-tab" id="tab-objectives">
+    <input class="tab-radio" type="radio" name="portfolio-tab" id="tab-use-cases">
+    <input class="tab-radio" type="radio" name="portfolio-tab" id="tab-products">
+    <input class="tab-radio" type="radio" name="portfolio-tab" id="tab-signals">
+    <input class="tab-radio" type="radio" name="portfolio-tab" id="tab-graph">
+    <input class="tab-radio" type="radio" name="portfolio-tab" id="tab-about">
+
+    <nav class="tabs" aria-label="Portfolio tabs">
+      <label for="tab-overview">Overview</label>
+      <label for="tab-objectives">Objectives</label>
+      <label for="tab-use-cases">Use Cases</label>
+      <label for="tab-products">Products</label>
+      <label for="tab-signals">Signals</label>
+      <label for="tab-graph">Graph</label>
+      <label for="tab-about">About</label>
+    </nav>
+
+    <div class="panels">
+      <section class="tab-panel overview-panel" id="overview">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow" style="color: var(--odps-violet);">Portfolio Overview</p>
+            <h2>Generated workspace summary</h2>
+          </div>
+          <p>One page for the portfolio catalog, ODPS product details, graph relationships, versions, and generation context.</p>
+        </div>
+        <section class="summary" aria-label="Portfolio summary">
+          <article class="metric"><strong>1</strong><span>Objective</span></article>
+          <article class="metric"><strong>2</strong><span>Use Cases</span></article>
+          <article class="metric"><strong>1</strong><span>Signal</span></article>
+          <article class="metric"><strong>1</strong><span>Product</span></article>
+          <article class="metric"><strong>4</strong><span>Graph Nodes</span></article>
+          <article class="metric"><strong>2</strong><span>Graph Edges</span></article>
+        </section>
+        <section aria-label="Recommended next actions">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow" style="color: var(--odps-violet);">Operational Guidance</p>
+              <h2>Recommended next actions</h2>
+            </div>
+            <p>Suggested follow-ups are derived from warnings, validation, graph coverage, weak links, and incomplete product details.</p>
+          </div>
+          <div class="actions-grid">
+            <article class="action-card">
+              <span class="chip">Review</span>
+              <strong>Confirm renewal-product link</strong>
+              <p>One new use case is connected to Customer Product with medium confidence.</p>
+              <label class="action-link" for="tab-use-cases">Open Use Cases</label>
+            </article>
+            <article class="action-card">
+              <span class="chip">Complete</span>
+              <strong>Expand commercial evidence</strong>
+              <p>Customer Product has pricing and SLA placeholders that should be reviewed.</p>
+              <label class="action-link" for="tab-products">Open Products</label>
+            </article>
+            <article class="action-card">
+              <span class="chip">Validate</span>
+              <strong>Check graph coverage</strong>
+              <p>Review whether every objective and signal has a useful relationship path.</p>
+              <label class="action-link" for="tab-graph">Open Graph</label>
+            </article>
+          </div>
+        </section>
+        <div class="overview-grid">
+          <article class="panel">
+            <div class="chip-row"><span class="chip odpc">ODPC</span><span class="chip odps">ODPS</span><span class="chip odpg">ODPG</span></div>
+            <h3>Portfolio status</h3>
+            <p>The workspace links business demand, product references, detailed ODPS products, and graph relationships generated from source lanes.</p>
+            <dl class="facts">
+              <dt>HTML</dt><dd>index.html</dd>
+              <dt>Catalog</dt><dd>odpc/catalog.yaml</dd>
+              <dt>Graph</dt><dd>odpg/graph.yaml</dd>
+            </dl>
+          </article>
+          <aside class="panel">
+            <h3>Portfolio versions</h3>
+            <p>Latest page is always this `index.html`; previous snapshots open from version folders.</p>
+            <ul class="version-list">
+              <li class="version-row"><strong>Current</strong><span>latest</span></li>
+              <li class="version-row"><a href="versions/2026-06-07T12-30-00Z/index.html">2026-06-07T12-30-00Z</a><a class="version-action" href="versions/2026-06-07T12-30-00Z/index.html">Open</a></li>
+              <li class="version-row"><a href="versions/2026-06-06T18-20-12Z/index.html">2026-06-06T18-20-12Z</a><a class="version-action" href="versions/2026-06-06T18-20-12Z/index.html">Open</a></li>
+            </ul>
+            <details class="version-history">
+              <summary>Show all 37 versions</summary>
+              <table class="version-table">
+                <thead>
+                  <tr><th>Version</th><th>Run</th><th>Summary</th><th></th></tr>
+                </thead>
+                <tbody>
+                  <tr><td>2026-06-07T12-30-00Z</td><td>refresh</td><td>Added renewal source</td><td><a class="version-action" href="versions/2026-06-07T12-30-00Z/index.html">Open</a></td></tr>
+                  <tr><td>2026-06-06T18-20-12Z</td><td>sync</td><td>Edited use case YAML</td><td><a class="version-action" href="versions/2026-06-06T18-20-12Z/index.html">Open</a></td></tr>
+                  <tr><td>2026-06-05T09-10-22Z</td><td>build</td><td>Initial portfolio</td><td><a class="version-action" href="versions/2026-06-05T09-10-22Z/index.html">Open</a></td></tr>
+                </tbody>
+              </table>
+            </details>
+          </aside>
+        </div>
+      </section>
+
+      <section class="tab-panel objectives-panel" id="objectives">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow" style="color: var(--odpc-orange);">Business-Led Starting Point</p>
+            <h2>Business Objectives</h2>
+          </div>
+          <p>Objectives make the portfolio business-led before products become the center of gravity.</p>
+        </div>
+        <div class="grid">
+          <article class="card">
+            <div class="chip-row"><span class="chip odpc">ODPC</span><span class="chip">High Priority</span></div>
+            <h3>Improve Retention</h3>
+            <p>Reduce customer churn by identifying accounts that need timely intervention.</p>
+            <dl class="facts">
+              <dt>ID</dt><dd>OBJ-RETENTION</dd>
+              <dt>Status</dt><dd>active</dd>
+              <dt>Linked</dt><dd>Retention Workflow, Customer Product</dd>
+            </dl>
+          </article>
+        </div>
+      </section>
+
+      <section class="tab-panel use-cases-panel" id="use-cases">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow" style="color: var(--odpc-orange);">Operational Demand</p>
+            <h2>Use Cases</h2>
+          </div>
+          <p>Use cases are the practical starting points for deciding which data products should exist.</p>
+        </div>
+        <div class="grid">
+          <article class="card">
+            <div class="chip-row"><span class="chip odpc">ODPC</span><span class="chip">active</span></div>
+            <h3>Retention Workflow</h3>
+            <p>Help teams intervene before churn through account-level analytics and targeted outreach.</p>
+            <dl class="facts">
+              <dt>ID</dt><dd>UC-RETENTION</dd>
+              <dt>Product</dt><dd>Customer Product</dd>
+              <dt>Signal</dt><dd>Churn Signal</dd>
+            </dl>
+          </article>
+          <article class="card">
+            <div class="chip-row"><span class="chip odpc">ODPC</span><span class="chip">proposed</span></div>
+            <h3>Renewal Save Workflow</h3>
+            <p>Prioritize renewal-risk accounts and coordinate save actions with commercial teams.</p>
+            <dl class="facts">
+              <dt>ID</dt><dd>UC-RENEWAL</dd>
+              <dt>Product</dt><dd>Customer Product</dd>
+              <dt>Confidence</dt><dd>medium</dd>
+            </dl>
+          </article>
+        </div>
+      </section>
+
+      <section class="tab-panel products-panel" id="products">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow" style="color: var(--odps-violet);">Product Reference + ODPS Detail</p>
+            <h2>Products</h2>
+          </div>
+          <p>Product cards start from ODPC references and open into detailed ODPS product specifications.</p>
+        </div>
+        <div class="grid">
+          <article class="card product wide">
+            <div class="chip-row"><span class="chip odps">ODPS</span><span class="chip odpc">ODPC Reference</span><span class="chip">internal</span></div>
+            <h3>Customer Product</h3>
+            <p>Customer analytics product for retention, renewal, and churn-risk workflows.</p>
+            <dl class="facts">
+              <dt>Product ID</dt><dd>customer-product</dd>
+              <dt>Status</dt><dd>production</dd>
+              <dt>Raw ODPS</dt><dd>../odps/products/customer-product.yaml</dd>
+            </dl>
+            <details open>
+              <summary>Product details</summary>
+              <p>Includes access readiness, pricing plan, SLA, data quality expectations, and related use cases when present in ODPS YAML.</p>
+              <dl class="facts">
+                <dt>Pricing</dt><dd>Internal Starter, USD 0 per request</dd>
+                <dt>SLA</dt><dd>availability: best effort</dd>
+                <dt>Data Quality</dt><dd>freshness: daily</dd>
+              </dl>
+            </details>
+          </article>
+        </div>
+      </section>
+
+      <section class="tab-panel signals-panel" id="signals">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow" style="color: var(--odpv-blue);">Market And Portfolio Signals</p>
+            <h2>Signals</h2>
+          </div>
+          <p>Signals explain why a product or use case matters now, and how confident the evidence is.</p>
+        </div>
+        <div class="grid">
+          <article class="card signal">
+            <div class="chip-row"><span class="chip odpv">Vocabulary</span><span class="chip">high confidence</span></div>
+            <h3>Churn Signal</h3>
+            <p>Market signal for retention risk and rising churn pressure.</p>
+            <dl class="facts">
+              <dt>ID</dt><dd>SIG-CHURN</dd>
+              <dt>Type</dt><dd>market</dd>
+            </dl>
+          </article>
+        </div>
+      </section>
+
+      <section class="tab-panel graph-panel" id="graph">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow" style="color: var(--odpg-green);">ODPG Graph View</p>
+            <h2>Visual relationship map</h2>
+          </div>
+          <p>Graph is one artifact tab in the same navigation, but it gets a visual explorer layout.</p>
+        </div>
+        <div class="graph-layout">
+          <section class="graph-canvas" aria-label="Graph visualization">
+            <svg class="graph-map" viewBox="0 0 760 460" role="img" aria-labelledby="graph-title graph-desc">
+              <title id="graph-title">Portfolio graph</title>
+              <desc id="graph-desc">A visual graph connecting retention use cases to a customer product and churn signal.</desc>
+              <line class="edge" x1="150" y1="120" x2="360" y2="220"></line>
+              <line class="edge" x1="150" y1="340" x2="360" y2="220"></line>
+              <line class="edge" x1="560" y1="120" x2="360" y2="220"></line>
+              <line class="edge" x1="360" y1="220" x2="560" y2="340"></line>
+              <g class="node">
+                <circle cx="150" cy="120" r="48" fill="#f28c28"></circle>
+                <text x="150" y="118" text-anchor="middle">Objective</text>
+                <text x="150" y="137" text-anchor="middle">RETENTION</text>
+              </g>
+              <g class="node">
+                <circle cx="150" cy="340" r="48" fill="#f28c28"></circle>
+                <text x="150" y="338" text-anchor="middle">Use Case</text>
+                <text x="150" y="357" text-anchor="middle">RENEWAL</text>
+              </g>
+              <g class="node">
+                <circle cx="360" cy="220" r="58" fill="#6c2a8e"></circle>
+                <text x="360" y="218" text-anchor="middle">Product</text>
+                <text x="360" y="238" text-anchor="middle">CUSTOMER</text>
+              </g>
+              <g class="node">
+                <circle cx="560" cy="120" r="48" fill="#1f78d1"></circle>
+                <text x="560" y="118" text-anchor="middle">Signal</text>
+                <text x="560" y="137" text-anchor="middle">CHURN</text>
+              </g>
+              <g class="node">
+                <circle cx="560" cy="340" r="48" fill="#2f9b58"></circle>
+                <text x="560" y="338" text-anchor="middle">Graph</text>
+                <text x="560" y="357" text-anchor="middle">VALUE</text>
+              </g>
+            </svg>
+          </section>
+          <aside class="side-panel" aria-label="Graph details">
+            <section class="panel">
+              <div class="chip-row"><span class="chip odps">Selected</span><span class="chip">DataProduct</span></div>
+              <h3>Customer Product</h3>
+              <p>Connected to two use cases and one market signal. Product details are available in the Products tab.</p>
+              <dl class="facts">
+                <dt>ID</dt><dd>PR-CUSTOMER</dd>
+                <dt>Product ID</dt><dd>customer-product</dd>
+                <dt>Edges</dt><dd>3</dd>
+              </dl>
+            </section>
+            <section class="panel">
+              <h3>Nodes</h3>
+              <ul class="node-list">
+                <li><strong>OBJ-RETENTION</strong><span>BusinessObjective</span></li>
+                <li><strong>UC-RETENTION</strong><span>UseCase</span></li>
+                <li><strong>SIG-CHURN</strong><span>KPI</span></li>
+                <li><strong>PR-CUSTOMER</strong><span>DataProduct</span></li>
+              </ul>
+            </section>
+            <section class="panel">
+              <h3>Edges</h3>
+              <ul class="edge-list">
+                <li><strong>UC-RETENTION uses PR-CUSTOMER</strong><span>high</span></li>
+                <li><strong>UC-RENEWAL uses PR-CUSTOMER</strong><span>medium</span></li>
+              </ul>
+            </section>
+          </aside>
+        </div>
+      </section>
+
+      <section class="tab-panel about-panel" id="about">
+        <article class="about-card">
+          <div class="chip-row"><span class="chip">SDK 0.2.0</span><span class="chip">ODPC</span><span class="chip">ODPS</span><span class="chip">ODPG</span><span class="chip">ODPV</span></div>
+          <h2>About this portfolio</h2>
+          <p>This portfolio was generated with the Open Data Products SDK and is grounded in the OpenDataProducts.org standards family: ODPC for catalog objects, ODPS for product specifications, ODPG for graph relationships, and ODPV for shared vocabulary where used.</p>
+        </article>
+      </section>
+    </div>
+  </main>
+  <footer class="footer">
+    <div class="wrap footer-inner">
+      <p>Generated with the Open Data Products SDK. This static portfolio keeps catalog artifacts, ODPS product specs, ODPG graph data, version snapshots, and review guidance together in one browser-openable file.</p>
+      <nav class="footer-links" aria-label="Portfolio artifact links">
+        <a href="odpc/catalog.yaml">Catalog YAML</a>
+        <a href="odpg/graph.yaml">Graph YAML</a>
+        <a href="#overview">Back to top</a>
+      </nav>
+    </div>
+  </footer>
+</body>
+</html>

@@ -125,6 +125,26 @@ def test_generation_prompts_are_listed_and_loadable():
     assert "product_reference_<id>.yaml" in load_generation_prompt("odpg_graph_yaml.md")
 
 
+def test_odps_generation_prompts_include_named_v41_component_example():
+    """Test ODPS prompts show the named v4.1 component and pricing ref shape."""
+    component_prompt = load_generation_prompt("odps_product_component_draft.md")
+    assemble_prompt = load_generation_prompt("odps_product_assemble_yaml.md")
+    prompts = "\n".join([component_prompt, assemble_prompt])
+
+    assert "productStrategy:" in prompts
+    assert "dataHolder:" in prompts
+    assert "paymentGateways:" in prompts
+    assert "license:" in prompts
+    assert "scope:" in prompts
+    assert "#/product/paymentGateways/default" in prompts
+    assert "#/product/dataQuality/declarative/default" in prompts
+    assert "#/product/SLA/declarative/default" in prompts
+    assert "#/product/dataAccess/API" in prompts
+    assert "scopeOfUse" not in prompts
+    assert "#/product/SLA/declarative/0" not in prompts
+    assert "#/product/dataQuality/declarative/0" not in prompts
+
+
 def test_generation_config_summary_exposes_template_and_resolved_settings():
     """Test that users can discover the editable generation config template."""
     summary = get_config("generation")
@@ -1430,7 +1450,9 @@ product:
 def test_generate_odps_product_repairs_scalar_optional_component(tmp_path):
     """Test invalid scalar ODPS components trigger repair instead of crashing."""
     source = tmp_path / "license-notes.md"
-    source.write_text("Partner API product with a partner-use license.", encoding="utf-8")
+    source.write_text(
+        "Partner API product with a partner-use license.", encoding="utf-8"
+    )
     prompt_headers = []
 
     def fake_client(prompt, model):
@@ -1502,7 +1524,9 @@ product:
 def test_generate_odps_product_drops_unsupported_pricing_plan_fields(tmp_path):
     """Test generated pricing plans keep only supported conservative ODPS fields."""
     source = tmp_path / "pricing-notes.md"
-    source.write_text("Partner API product with pricing pending approval.", encoding="utf-8")
+    source.write_text(
+        "Partner API product with pricing pending approval.", encoding="utf-8"
+    )
 
     def fake_client(prompt, model):
         if prompt.startswith("# Extract ODPS Product Facts"):
@@ -1677,8 +1701,8 @@ product:
     assert artifact.valid_yaml is True
     document = yaml.safe_load(artifact.output_path.read_text(encoding="utf-8"))
     assert document["product"]["dataQuality"] == {
-        "declarative": [
-            {
+        "declarative": {
+            "default": {
                 "name": {"en": "Default Data Quality"},
                 "dimensions": [
                     {
@@ -1695,14 +1719,16 @@ product:
                     },
                 ],
             }
-        ]
+        }
     }
 
 
 def test_generate_odps_product_normalizes_sla_component_shape(tmp_path):
     """Test generated SLA drafts keep only supported ODPS dimensions and fields."""
     source = tmp_path / "checkout-notes.md"
-    source.write_text("Checkout product with latency and freshness needs.", encoding="utf-8")
+    source.write_text(
+        "Checkout product with latency and freshness needs.", encoding="utf-8"
+    )
 
     def fake_client(prompt, model):
         if prompt.startswith("# Extract ODPS Product Facts"):
@@ -1785,16 +1811,24 @@ product:
     assert artifact.valid_yaml is True
     document = yaml.safe_load(artifact.output_path.read_text(encoding="utf-8"))
     assert document["product"]["SLA"] == {
-        "declarative": [
-            {
+        "declarative": {
+            "default": {
                 "name": {"en": "Default SLA"},
                 "dimensions": [
                     {"dimension": "uptime", "objective": "99.5", "unit": "percent"},
-                    {"dimension": "latency", "objective": "500", "unit": "milliseconds"},
-                    {"dimension": "updateFrequency", "objective": "5", "unit": "minutes"},
+                    {
+                        "dimension": "latency",
+                        "objective": "500",
+                        "unit": "milliseconds",
+                    },
+                    {
+                        "dimension": "updateFrequency",
+                        "objective": "5",
+                        "unit": "minutes",
+                    },
                 ],
             }
-        ]
+        }
     }
 
 

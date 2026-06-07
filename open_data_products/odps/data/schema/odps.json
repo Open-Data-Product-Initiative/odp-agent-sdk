@@ -233,7 +233,6 @@
                     "$ref": "#/$defs/License"
                 },
                 "dataAccess": {
-                    "type": "object",
                     "$ref": "#/$defs/DataAccess"
                 },
                 "dataHolder": {
@@ -241,7 +240,6 @@
                     "$ref": "#/$defs/DataHolder"
                 },
                 "paymentGateways": {
-                    "type": "object",
                     "$ref": "#/$defs/PaymentGateway"
                 },
                 "productStrategy": {
@@ -298,16 +296,16 @@
             "type": "object",
             "properties": {
                 "declarative": {
-                    "type": "array",
-                    "description": "defines the dimensions and aimed/intended SLA levels in defined unit.",
-                    "items": {
+                    "type": "object",
+                    "description": "Named SLA packages keyed by stable names such as default or premium.",
+                    "additionalProperties": {
                         "$ref": "#/$defs/SlaDefinition"
                     }
                 },
                 "executable": {
-                    "type": "array",
-                    "description": "Grouping element for SLA monitoring logic. Monitoring definitions are provided as code in the spec field for each dimension.",
-                    "items": {
+                    "type": "object",
+                    "description": "Named SLA monitoring logic packages keyed by stable names.",
+                    "additionalProperties": {
                         "$ref": "#/$defs/SlaDefinition"
                     }
                 }
@@ -318,32 +316,32 @@
             "description": "Contains array of data quality dimensions with optional computational monitoring object. Under this element Data Quality is divided into declarative and executable parts.",
             "properties": {
                 "declarative": {
-                    "type": "array",
-                    "description": "Captures target levels for defined quality dimensions.",
-                    "items": {
+                    "type": "object",
+                    "description": "Named data quality packages keyed by stable names such as default or premium.",
+                    "additionalProperties": {
                         "$ref": "#/$defs/DQDefinition"
                     }
                 },
                 "executable": {
-                    "type": "array",
-                    "description": "Allows integration with supported Everything as Code tools.",
-                    "items": {
+                    "type": "object",
+                    "description": "Named executable data quality packages keyed by stable names.",
+                    "additionalProperties": {
                         "$ref": "#/$defs/DQDefinition"
                     }
                 }
             }
         },
         "DataAccess": {
-            "type": "array",
-            "description": "This object must always be present and named exactly default.",
-            "items": {
+            "type": "object",
+            "description": "Named data access methods keyed by stable names such as API or CSV.",
+            "additionalProperties": {
                 "$ref": "#/$defs/DataAccessItem"
             }
         },
         "PaymentGateway": {
-            "type": "array",
-            "description": "This object must always be present and named exactly default.",
-            "items": {
+            "type": "object",
+            "description": "Named payment gateway definitions keyed by stable names such as default.",
+            "additionalProperties": {
                 "$ref": "#/$defs/PaymentGateways"
             }
         },
@@ -607,12 +605,14 @@
                     "description": "the description of the SLA dimension"
                 },
                 "displayTitle": {
-                    "type": "array",
+                    "type": "object",
                     "description": "Dimension title to be shown in UIs.",
-                    "items": {
-                        "type": "object",
-                        "$ref": "#/$defs/Languages"
-                    }
+                    "$ref": "#/$defs/Languages"
+                },
+                "displaytitle": {
+                    "type": "object",
+                    "description": "Dimension title to be shown in UIs.",
+                    "$ref": "#/$defs/Languages"
                 }
             }
         },

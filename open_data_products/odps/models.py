@@ -216,6 +216,9 @@ class SLADimension:
     name: str
     objective: Union[str, int, float]
     unit: Optional[str] = None
+    display_title: Optional[Dict[str, str]] = None
+    description: Optional[str] = None
+    weight: Optional[int] = None
 
 
 @dataclass
@@ -306,7 +309,7 @@ class PricingPlans:
 class License:
     """Licensing information with comprehensive optional attributes"""
 
-    scope_of_use: str
+    scope_of_use: str = ""
     geographical_area: List[str] = field(default_factory=list)
     permanent: bool = True
     exclusive: bool = False
@@ -326,6 +329,9 @@ class License:
     warranties: Optional[str] = None
     damages: Optional[str] = None  # Liability and damages clauses
     confidentiality_clauses: Optional[str] = None
+    scope: Optional[Dict[str, Any]] = None
+    termination: Optional[Dict[str, Any]] = None
+    governance: Optional[Dict[str, Any]] = None
 
 
 @dataclass

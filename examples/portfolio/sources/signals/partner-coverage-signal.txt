@@ -1,0 +1,14 @@
+Market and internal signal observed on 2026-05-29:
+
+Regional sales leaders reported that partner-led opportunities are increasing
+in northern Europe, but partner coverage is uneven. Current planning happens in
+spreadsheets and does not connect partner pipeline with customer segment or
+health data.
+
+This signal may support a partner expansion planning use case. Evidence is
+directional because the team has not yet agreed which partner metrics should be
+standardized.
+
+Signal type: portfolio
+Confidence: medium
+Related area: partner planning, sales coverage, regional expansion

@@ -93,7 +93,13 @@ from .odpv import (
     resolve_vocabulary_term,
 )
 from .pricing import pricing_to_402
-from .portfolio import explain_portfolio, render_portfolio
+from .portfolio import (
+    build_portfolio,
+    explain_portfolio,
+    refresh_portfolio,
+    render_portfolio,
+    sync_portfolio,
+)
 from .resources import get_resource, list_resources
 from .results import Reference, Resource, ValidationResult
 from .summary import load_summary
@@ -113,6 +119,7 @@ __all__ = [
     "build_catalog",
     "build_catalog_artifacts",
     "build_graph",
+    "build_portfolio",
     "check_vocabulary_relationship",
     "convert_file",
     "convert_graph",
@@ -168,8 +175,10 @@ __all__ = [
     "render_catalog_html",
     "render_catalog_schema_json",
     "render_generation_prompt",
+    "refresh_portfolio",
     "render_portfolio",
     "resolve_generation_settings",
+    "sync_portfolio",
     "validate_config",
     "write_graph",
     "resolve_references",

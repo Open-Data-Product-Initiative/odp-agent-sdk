@@ -103,7 +103,7 @@ PRICING_PLAN_MAPPING = {
 }
 
 DATA_ACCESS_MAPPING = {
-    "output_port_type": "outputPorttype",
+    "output_port_type": "outputPortType",
     "access_url": "accessURL",
     "authentication_method": "authenticationMethod",
     "specs_url": "specsURL",
@@ -342,6 +342,11 @@ def parse_sla_dimension(data: Dict[str, Any]) -> SLADimension:
         name=data.get("name") or data.get("dimension", ""),
         objective=data.get("objective", ""),
         unit=data.get("unit"),
+        display_title=data.get("displayTitle")
+        or data.get("displaytitle")
+        or data.get("display_title"),
+        description=data.get("description"),
+        weight=data.get("weight"),
     )
 
 
@@ -365,15 +370,18 @@ def parse_sla(data: Dict[str, Any]) -> SLA:
     """Parse SLA data."""
     profiles = data.get("profiles")
     if not isinstance(profiles, dict):
-        profiles = {
-            f"declarative{index}": profile
-            for index, profile in enumerate(data.get("declarative", []), start=1)
-            if isinstance(profile, dict)
-        }
+        declarative = data.get("declarative", {})
+        if isinstance(declarative, dict):
+            profiles = declarative
+        else:
+            profiles = {
+                f"declarative{index}": profile
+                for index, profile in enumerate(declarative, start=1)
+                if isinstance(profile, dict)
+            }
     return SLA(
         profiles={
-            name: parse_sla_profile(profile)
-            for name, profile in profiles.items()
+            name: parse_sla_profile(profile) for name, profile in profiles.items()
         },
         dollar_ref=data.get("$ref"),
     )
@@ -406,11 +414,15 @@ def parse_data_quality(data: Dict[str, Any]) -> DataQuality:
     """Parse data quality data."""
     profiles = data.get("profiles")
     if not isinstance(profiles, dict):
-        profiles = {
-            f"declarative{index}": profile
-            for index, profile in enumerate(data.get("declarative", []), start=1)
-            if isinstance(profile, dict)
-        }
+        declarative = data.get("declarative", {})
+        if isinstance(declarative, dict):
+            profiles = declarative
+        else:
+            profiles = {
+                f"declarative{index}": profile
+                for index, profile in enumerate(declarative, start=1)
+                if isinstance(profile, dict)
+            }
     return DataQuality(
         profiles={
             name: parse_data_quality_profile(profile)
@@ -425,7 +437,7 @@ def parse_data_access_method(data: Dict[str, Any]) -> DataAccessMethod:
     return DataAccessMethod(
         name=data.get("name"),
         description=data.get("description"),
-        output_port_type=data.get("outputPorttype"),
+        output_port_type=data.get("outputPortType") or data.get("outputPorttype"),
         format=data.get("format"),
         access_url=data.get("accessURL"),
         authentication_method=data.get("authenticationMethod"),
@@ -448,11 +460,15 @@ def parse_data_access(data: Any) -> DataAccess:
             for index, method in enumerate(methods[1:], start=2)
         }
         return DataAccess(default=default_method, additional_methods=additional_methods)
-    default_method = parse_data_access_method(data["default"])
+    if "default" in data:
+        default_key = "default"
+    else:
+        default_key = next(iter(data), "default")
+    default_method = parse_data_access_method(data.get(default_key, {}))
     additional_methods = {
         key: parse_data_access_method(method_data)
         for key, method_data in data.items()
-        if key not in {"default", "$ref"}
+        if key not in {default_key, "$ref"}
     }
     return DataAccess(
         default=default_method,
@@ -465,6 +481,9 @@ def parse_license(data: Dict[str, Any]) -> License:
     """Parse license data."""
     return License(
         scope_of_use=data.get("scopeOfUse", ""),
+        scope=data.get("scope"),
+        termination=data.get("termination"),
+        governance=data.get("governance"),
         geographical_area=data.get("geographicalArea", []),
         permanent=data.get("permanent", True),
         exclusive=data.get("exclusive", False),
@@ -501,6 +520,17 @@ def parse_payment_gateway(data: Dict[str, Any]) -> PaymentGateway:
 
 def parse_payment_gateways(data: Dict[str, Any]) -> PaymentGateways:
     """Parse payment gateway collection."""
+    if not isinstance(data.get("gateways"), list) and not isinstance(
+        data.get("named_gateways"), dict
+    ):
+        return PaymentGateways(
+            named_gateways={
+                name: parse_payment_gateway(gateway)
+                for name, gateway in data.items()
+                if name != "$ref" and isinstance(gateway, dict)
+            },
+            dollar_ref=data.get("$ref"),
+        )
     return PaymentGateways(
         gateways=[
             parse_payment_gateway(gateway) for gateway in data.get("gateways", [])
@@ -563,17 +593,16 @@ def serialize_data_quality(data_quality: DataQuality) -> Dict[str, Any]:
     return cast(Dict[str, Any], clean_none(data))
 
 
-def serialize_data_access(data_access: DataAccess) -> Dict[str, Any]:
+def serialize_data_access(data_access: DataAccess) -> List[Dict[str, Any]]:
     """Serialize data access configuration."""
-    data: Dict[str, Any] = {"default": asdict(data_access.default)}
-    convert_snake_to_camel(data["default"], DATA_ACCESS_MAPPING)
-    for key, method in data_access.additional_methods.items():
+    default = asdict(data_access.default)
+    convert_snake_to_camel(default, DATA_ACCESS_MAPPING)
+    methods = [default]
+    for method in data_access.additional_methods.values():
         method_dict = asdict(method)
         convert_snake_to_camel(method_dict, DATA_ACCESS_MAPPING)
-        data[key] = method_dict
-    if data_access.dollar_ref:
-        data["$ref"] = data_access.dollar_ref
-    return data
+        methods.append(method_dict)
+    return methods
 
 
 def serialize_license(license_data: License) -> Dict[str, Any]:

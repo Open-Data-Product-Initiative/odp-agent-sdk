@@ -2,17 +2,2232 @@
 
 from __future__ import annotations
 
+import hashlib
 import html
+import json
+import shutil
+from copy import deepcopy
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Union
+
+import yaml
 
 from . import __version__
 from ._io import load_mapping
 from .odpc import load_catalog
 from .odpc.catalog import text_value
-from .odpg import load_graph
+from .odpg import build_graph_explorer_html, load_graph
 
 DEFAULT_PORTFOLIO_HTML = "index.html"
+PORTFOLIO_SOURCE_SUFFIXES = (".md", ".txt", ".yaml", ".yml", ".json")
+PortfolioBuildClient = Callable[[str, str], str]
+ODPC_STATUSES = {"draft", "active", "paused", "completed", "retired"}
+ODPC_STATUS_ALIASES = {
+    "proposed": "draft",
+    "planned": "draft",
+    "planning": "draft",
+    "development": "active",
+    "testing": "active",
+    "acceptance": "active",
+    "production": "active",
+    "sunset": "retired",
+    "deprecated": "retired",
+    "archived": "retired",
+}
+ODPS_STATUSES = {
+    "announcement",
+    "draft",
+    "development",
+    "testing",
+    "acceptance",
+    "production",
+    "sunset",
+    "retired",
+}
+ODPS_STATUS_ALIASES = {
+    "proposed": "draft",
+    "planned": "announcement",
+    "planning": "announcement",
+    "active": "production",
+    "completed": "production",
+    "paused": "sunset",
+    "deprecated": "sunset",
+    "archived": "retired",
+}
+ODPS_VISIBILITIES = {"private", "invitation", "organisation", "dataspace", "public"}
+ODPS_VISIBILITY_ALIASES = {
+    "internal": "organisation",
+    "organization": "organisation",
+    "organisation": "organisation",
+    "restricted": "invitation",
+    "external": "public",
+    "open": "public",
+}
+ODPS_SLA_DIMENSIONS = {
+    "latency",
+    "uptime",
+    "responseTime",
+    "errorRate",
+    "endOfSupport",
+    "endOfLife",
+    "updateFrequency",
+    "timeToDetect",
+    "timeToNotify",
+    "timeToRepair",
+    "emailResponseTime",
+}
+ODPS_SLA_UNITS = {
+    "percent",
+    "milliseconds",
+    "seconds",
+    "minutes",
+    "days",
+    "weeks",
+    "months",
+    "years",
+    "never",
+    "date",
+    "null",
+}
+ODPS_SLA_UNIT_ALIASES = {
+    "day": "days",
+    "daily": "days",
+    "week": "weeks",
+    "weekly": "weeks",
+    "month": "months",
+    "monthly": "months",
+    "year": "years",
+    "yearly": "years",
+    "percentage": "percent",
+}
+ODPC_SIGNAL_TYPES = {
+    "demand",
+    "competitive",
+    "market",
+    "technology",
+    "policy",
+    "operational",
+    "quality",
+    "usage",
+    "risk",
+    "gap",
+}
+ODPC_SIGNAL_TYPE_ALIASES = {
+    "portfolio": "operational",
+    "product": "operational",
+    "business": "demand",
+    "commercial": "market",
+}
+ODPG_EDGE_TYPES = {
+    "uses",
+    "supports",
+    "contributesTo",
+    "measures",
+    "tracks",
+    "dependsOn",
+    "produces",
+    "consumes",
+    "governedBy",
+    "ownedBy",
+    "alignsWith",
+    "alignWith",
+    "relatedTo",
+    "impacts",
+    "derivedFrom",
+    "exposes",
+    "monitors",
+    "identifies",
+}
+ODPG_EDGE_TYPE_ALIASES = {
+    "informs": "relatedTo",
+    "influences": "impacts",
+    "enables": "supports",
+    "needs": "uses",
+}
+ODPS_PRICING_UNITS = {
+    "One-time-payment",
+    "Pay-per-use",
+    "Recurring",
+    "Revenue-sharing",
+    "Data-volume",
+    "Pay-what-you-want",
+    "Freemium",
+    "Open-data",
+    "Value-based",
+    "On-request",
+    "Trial",
+}
+ODPS_PRICING_UNIT_ALIASES = {
+    "free": "Open-data",
+    "open": "Open-data",
+    "subscription": "Recurring",
+    "monthly": "Recurring",
+    "month": "Recurring",
+    "usage": "Pay-per-use",
+    "request": "Pay-per-use",
+}
+
+
+def build_portfolio(
+    workspace: Union[str, Path],
+    *,
+    objectives: Optional[Union[str, Path]] = None,
+    use_cases: Optional[Union[str, Path]] = None,
+    signals: Optional[Union[str, Path]] = None,
+    products: Optional[Union[str, Path]] = None,
+    title: Optional[str] = None,
+    client: Optional[PortfolioBuildClient] = None,
+    model: str = "qwen2.5",
+    run_kind: str = "PortfolioBuild",
+    process_all_sources: bool = True,
+) -> Dict[str, object]:
+    """Build a portfolio workspace from source lanes using an LLM client."""
+    root = Path(workspace)
+    previous_state = _load_optional_mapping(root / "portfolio-state.yaml")
+    snapshot = _snapshot_existing_workspace(root, run_kind)
+    lane_paths = _resolve_source_lane_paths(
+        previous_state,
+        objectives=Path(objectives) if objectives is not None else None,
+        use_cases=Path(use_cases) if use_cases is not None else None,
+        signals=Path(signals) if signals is not None else None,
+        products=Path(products) if products is not None else None,
+    )
+    lanes = _collect_source_lanes(
+        objectives=(
+            Path(lane_paths["objectives"]) if "objectives" in lane_paths else None
+        ),
+        use_cases=Path(lane_paths["useCases"]) if "useCases" in lane_paths else None,
+        signals=Path(lane_paths["signals"]) if "signals" in lane_paths else None,
+        products=Path(lane_paths["products"]) if "products" in lane_paths else None,
+    )
+    source_changes = _source_changes(previous_state, lanes)
+    has_previous_sources = bool(_source_hashes_by_lane(previous_state))
+    process_lanes = (
+        lanes
+        if process_all_sources or not has_previous_sources
+        else _changed_source_lanes(lanes, source_changes)
+    )
+    if any(process_lanes.values()):
+        if client is None:
+            raise ValueError("A model client is required to build a portfolio.")
+        prompt = render_portfolio_build_prompt(process_lanes)
+        plan = parse_portfolio_plan(client(prompt, model))
+        plan = _reconcile_plan_identity(plan, previous_state)
+        if not process_all_sources and has_previous_sources:
+            plan = _merge_portfolio_plans(_plan_from_workspace(root), plan)
+    else:
+        plan = _plan_from_workspace(root)
+    plan = _reconcile_plan_identity(plan, previous_state)
+    plan = _normalize_portfolio_plan(plan)
+    workspace_title = _resolve_workspace_title(title, previous_state)
+    plan = _apply_workspace_title(plan, workspace_title)
+    warnings = [str(item) for item in plan.get("warnings", []) if item]
+    warnings.extend(_source_change_warnings(source_changes))
+
+    created: List[str] = []
+    updated: List[str] = []
+    unchanged: List[str] = []
+    written = _write_portfolio_artifacts(
+        root,
+        plan,
+        lanes,
+        lane_paths=lane_paths,
+        title=workspace_title,
+    )
+    for path, state in written:
+        if state == "created":
+            created.append(str(path))
+        elif state == "updated":
+            updated.append(str(path))
+        else:
+            unchanged.append(str(path))
+
+    render_result = render_portfolio(root)
+    validation_results = render_result["validationResults"]
+    for path in render_result["created"]:
+        created.append(str(path))
+    for path in render_result["updated"]:
+        updated.append(str(path))
+    for path in render_result["unchanged"]:
+        unchanged.append(str(path))
+
+    artifact_counts = _artifact_counts(plan)
+    source_counts = {name: len(files) for name, files in lanes.items()}
+    processed_source_counts = {
+        name: len(files) for name, files in process_lanes.items()
+    }
+    result: Dict[str, object] = {
+        "spec": "portfolio",
+        "kind": run_kind,
+        "workspace": str(root),
+        "html": str(root / DEFAULT_PORTFOLIO_HTML),
+        "snapshot": str(snapshot) if snapshot is not None else None,
+        "sourceCounts": source_counts,
+        "processedSourceCounts": processed_source_counts,
+        "artifactCounts": artifact_counts,
+        "validationResults": validation_results,
+        "created": created,
+        "updated": updated,
+        "unchanged": unchanged,
+        "removed": source_changes["removed"],
+        "sourceChanges": source_changes["lanes"],
+        "warnings": warnings,
+        "unresolvedLinks": [],
+        "weakLinks": [],
+        "valid": _valid_portfolio(validation_results),
+    }
+    if snapshot is not None:
+        _write_json_report(snapshot / "report.json", result)
+        _refresh_portfolio_versions(root)
+    return result
+
+
+def refresh_portfolio(
+    workspace: Union[str, Path],
+    *,
+    objectives: Optional[Union[str, Path]] = None,
+    use_cases: Optional[Union[str, Path]] = None,
+    signals: Optional[Union[str, Path]] = None,
+    products: Optional[Union[str, Path]] = None,
+    title: Optional[str] = None,
+    client: Optional[PortfolioBuildClient] = None,
+    model: str = "qwen2.5",
+    all_sources: bool = False,
+) -> Dict[str, object]:
+    """Refresh an existing portfolio workspace from saved or supplied source lanes."""
+    root = Path(workspace)
+    state = _load_optional_mapping(root / "portfolio-state.yaml")
+    lane_paths = state.get("sourceLanePaths") if isinstance(state, dict) else None
+    if not isinstance(lane_paths, dict):
+        lane_paths = {}
+    return build_portfolio(
+        root,
+        objectives=objectives or lane_paths.get("objectives"),
+        use_cases=use_cases or lane_paths.get("useCases"),
+        signals=signals or lane_paths.get("signals"),
+        products=products or lane_paths.get("products"),
+        title=title,
+        client=client,
+        model=model,
+        run_kind="PortfolioRefresh",
+        process_all_sources=all_sources,
+    )
+
+
+def sync_portfolio(workspace: Union[str, Path]) -> Dict[str, object]:
+    """Sync edited YAML artifacts into catalog, state, and rendered HTML."""
+    root = Path(workspace)
+    previous_state = _load_optional_mapping(root / "portfolio-state.yaml")
+    snapshot = _snapshot_existing_workspace(root, "PortfolioSync")
+    product_writes = _normalize_product_spec_files(root)
+    catalog = _catalog_from_fragments(root)
+    product_specs = _load_product_specs(root)
+    reference_writes = _sync_product_references_from_odps(root, catalog, product_specs)
+    written: List[Tuple[Path, str]] = [
+        *product_writes,
+        *reference_writes,
+        _write_yaml(root / "odpc" / "catalog.yaml", catalog),
+        _write_yaml(
+            root / "portfolio-state.yaml",
+            _synced_portfolio_state(previous_state, catalog),
+        ),
+    ]
+    render_result = render_portfolio(root)
+    validation_results = render_result["validationResults"]
+    created, updated, unchanged = _group_written_paths(written)
+    created.extend(str(path) for path in render_result["created"])
+    updated.extend(str(path) for path in render_result["updated"])
+    unchanged.extend(str(path) for path in render_result["unchanged"])
+    data = load_portfolio_workspace(root)
+    result: Dict[str, object] = {
+        "spec": "portfolio",
+        "kind": "PortfolioSync",
+        "workspace": str(root),
+        "html": str(root / DEFAULT_PORTFOLIO_HTML),
+        "snapshot": str(snapshot) if snapshot is not None else None,
+        "artifactCounts": _workspace_artifact_counts(data),
+        "validationResults": validation_results,
+        "created": created,
+        "updated": updated,
+        "unchanged": unchanged,
+        "warnings": data["warnings"],
+        "valid": _valid_portfolio(validation_results),
+    }
+    if snapshot is not None:
+        _write_json_report(snapshot / "report.json", result)
+        _refresh_portfolio_versions(root)
+    return result
+
+
+def render_portfolio_build_prompt(lanes: Dict[str, List[Dict[str, str]]]) -> str:
+    """Render the internal portfolio build prompt from source lane content."""
+    sections = [
+        "Create one Open Data Products portfolio plan as YAML.",
+        "Return only YAML. Do not include markdown fences, prose, or comments.",
+        "",
+        "Use this exact top-level shape:",
+        "metadata:",
+        "  id: generated-portfolio",
+        "  name: Portfolio name",
+        "  description: Evidence-based portfolio description",
+        "businessObjectives:",
+        "  - id: OBJ-STABLE-ID",
+        "    name:",
+        "      en: Objective name",
+        "    description:",
+        "      en: Objective description grounded in source evidence",
+        "    status: proposed",
+        "    priority: medium",
+        "useCases:",
+        "  - id: UC-STABLE-ID",
+        "    name:",
+        "      en: Use case name",
+        "    description:",
+        "      en: Use case description grounded in source evidence",
+        "    status: proposed",
+        "    priority: medium",
+        "signals:",
+        "  - id: SIG-STABLE-ID",
+        "    name:",
+        "      en: Signal name",
+        "    description:",
+        "      en: Signal description grounded in source evidence",
+        "    type: market",
+        "    confidence: medium",
+        "products:",
+        "  - productReference:",
+        "      id: PR-STABLE-ID",
+        "      productID: stable-product-id",
+        '      productVersion: "4.1"',
+        "      name:",
+        "        en: Product name",
+        "      description:",
+        "        en: Product reference description grounded in source evidence",
+        "      status: proposed",
+        "      visibility: internal",
+        "      type: dataset",
+        "    odpsProduct:",
+        "      schema: https://opendataproducts.org/v4.1/schema/odps.json",
+        '      version: "4.1"',
+        "      product:",
+        "        details:",
+        "          en:",
+        "            name: Product name",
+        "            productID: stable-product-id",
+        "            description: Product specification description grounded in source evidence",
+        "            visibility: internal",
+        "            status: proposed",
+        "            type: dataset",
+        "            valueProposition: Business value grounded in source evidence",
+        "        productStrategy:",
+        "          status: Planned",
+        "          objectives:",
+        "            - en: Portfolio objective supported by this product.",
+        "          contributesToKPI:",
+        "            id: KPI-RETENTION",
+        "            name: Retention performance",
+        "            unit: percentage",
+        "            target: 100",
+        "          productKPIs:",
+        "            - id: KPI-PRODUCT-COVERAGE",
+        "              name: Product coverage",
+        "              unit: percentage",
+        "              target: 95",
+        "              calculation: Covered records divided by eligible records.",
+        "        dataHolder:",
+        "          legalName: Example Data Products Ltd",
+        "          contactName: Data Product Owner",
+        "          email: data-products@example.com",
+        "          businessDomain: Revenue Operations",
+        "        dataAccess:",
+        "          API:",
+        "            name:",
+        "              en: API",
+        "            description:",
+        "              en: Internal access during pilot",
+        "            outputPortType: API",
+        "            format: JSON",
+        "            authenticationMethod: OAuth",
+        "        pricingPlans:",
+        "          declarative:",
+        "            en:",
+        "              - name: Internal Starter",
+        "                description: Internal use only",
+        "                priceCurrency: XXX",
+        '                price: "0"',
+        "                billingDuration: month",
+        "                unit: On-request",
+        "                paymentGateway:",
+        '                  $ref: "#/product/paymentGateways/default"',
+        "                dataQuality:",
+        '                  $ref: "#/product/dataQuality/declarative/default"',
+        "                SLA:",
+        '                  $ref: "#/product/SLA/declarative/default"',
+        "                access:",
+        '                  $ref: "#/product/dataAccess/API"',
+        "              - name: Premium",
+        "                description: Higher support and quality package",
+        "                priceCurrency: XXX",
+        '                price: "0"',
+        "                billingDuration: month",
+        "                unit: On-request",
+        "                paymentGateway:",
+        '                  $ref: "#/product/paymentGateways/default"',
+        "                dataQuality:",
+        '                  $ref: "#/product/dataQuality/declarative/premium"',
+        "                SLA:",
+        '                  $ref: "#/product/SLA/declarative/premium"',
+        "                access:",
+        '                  $ref: "#/product/dataAccess/API"',
+        "        SLA:",
+        "          declarative:",
+        "            default:",
+        "              name:",
+        "                en: The Basic SLA",
+        "              description:",
+        "                en: The basic SLA package.",
+        "              dimensions:",
+        "                - dimension: uptime",
+        "                  displaytitle:",
+        "                    en: Uptime",
+        "                  objective: 90",
+        "                  unit: percent",
+        "                  weight: 50",
+        "                - dimension: responseTime",
+        "                  objective: 200",
+        "                  unit: milliseconds",
+        "                  weight: 30",
+        "                - dimension: updateFrequency",
+        "                  objective: 30",
+        "                  unit: minutes",
+        "                  weight: 20",
+        "            premium:",
+        "              name:",
+        "                en: The Premium SLA",
+        "              description:",
+        "                en: The Premium SLA package.",
+        "              dimensions:",
+        "                - dimension: uptime",
+        "                  displaytitle:",
+        "                    en: Uptime",
+        "                  objective: 99",
+        "                  unit: percent",
+        "                  weight: 70",
+        "                - dimension: responseTime",
+        "                  objective: 100",
+        "                  unit: milliseconds",
+        "                  weight: 20",
+        "                - dimension: updateFrequency",
+        "                  objective: 5",
+        "                  unit: minutes",
+        "                  weight: 10",
+        "        dataQuality:",
+        "          declarative:",
+        "            default:",
+        "              description: The basic data quality package.",
+        "              dimensions:",
+        "                - dimension: completeness",
+        "                  displayTitle: Completeness",
+        "                  objective: 95",
+        "                  unit: percentage",
+        "                  weight: 50",
+        "                  description: Required fields are populated.",
+        "            premium:",
+        "              description: The premium data quality package.",
+        "              dimensions:",
+        "                - dimension: completeness",
+        "                  displayTitle: Completeness",
+        "                  objective: 98",
+        "                  unit: percentage",
+        "                  weight: 60",
+        "                  description: Required fields are populated.",
+        "                - dimension: timeliness",
+        "                  objective: 95",
+        "                  unit: percentage",
+        "                  weight: 40",
+        "                  description: Records are updated within the expected window.",
+        "        paymentGateways:",
+        "          default:",
+        "            description:",
+        "              en: Internal chargeback or manual billing process.",
+        "            type: Custom",
+        "            version: v1",
+        "        license:",
+        "          scope:",
+        "            definition: Internal use for evidence-supported workflows.",
+        "            restrictions: No resale or external redistribution.",
+        "            geographicalArea:",
+        "              - EU",
+        "            permanent: false",
+        "            exclusive: false",
+        "            rights:",
+        "              - Display",
+        "              - Distribution",
+        "              - Adaptation",
+        "          termination:",
+        "            noticePeriod: 30",
+        "            terminationConditions: Access ends when approved use ends.",
+        "          governance:",
+        "            ownership: Business owner governs use; data platform governs operations.",
+        "            audit: Access and usage are reviewed periodically.",
+        "graphEdges:",
+        "  - source: UC-STABLE-ID",
+        "    target: PR-STABLE-ID",
+        "    type: uses",
+        "    confidence: medium",
+        "warnings:",
+        "  - Evidence gap or weak-link note",
+        "",
+        "Linking rules:",
+        "- Generate stable, deterministic IDs from names and concepts.",
+        "- productReference.productID must match odpsProduct.product.details.en.productID.",
+        '- productModel.$ref must be "../odps/products/<productID>.yaml"; the SDK will add it to productReference.',
+        "- Graph edge source and target values must use generated stable IDs from objectives, use cases, signals, or product references.",
+        "- Prefer linking use cases to product references when the evidence supports the relationship.",
+        "- Do not invent confident facts. If evidence is missing, use warnings and lower confidence.",
+        "- Keep all values schema-shaped YAML mappings, not narrative paragraphs at the root.",
+        "- Use only facts supported by the source lanes. Draft minimal viable ODPS details when product evidence is sparse.",
+        "",
+        "ODPS v4.1 product component rules:",
+        "- dataAccess must be a named mapping of access method objects, such as dataAccess.API. Use outputPortType with this exact casing.",
+        "- pricingPlans.declarative.en must be a list of pricing plan objects with name, priceCurrency, price, billingDuration, and unit.",
+        "- SLA must be an object, never a list. Use SLA.declarative as a named mapping such as default and premium.",
+        "- Each SLA declarative profile must contain dimensions with dimension, objective, and unit.",
+        "- dataQuality must be an object, never a list. Use dataQuality.declarative as a named mapping such as default and premium.",
+        "- Pricing plan references must use named paths such as #/product/SLA/declarative/default, #/product/dataQuality/declarative/default, and #/product/dataAccess/API.",
+        "- paymentGateway refs must use named paths such as #/product/paymentGateways/default.",
+        "- Never use array-index reference paths such as #/product/SLA/0 or #/product/dataQuality/declarative/0.",
+        "- license uses scope, termination, and governance. Do not emit legacy license fields.",
+        "- Do not place SLA inside product.details.en. SLA belongs at product.SLA.",
+        "- Do not emit pricing. Use pricingPlans.",
+        "- Do not emit dataOps. If operational evidence is useful, describe it in warnings or an optional x-* extension.",
+        "- x-* extension fields are allowed because they are ODPS extensions, but they must not replace schema fields like SLA, dataQuality, dataAccess, or pricingPlans.",
+        "- If evidence is missing for a schema component, emit a minimal pending schema-shaped component and add a warning.",
+    ]
+    for lane_name, files in lanes.items():
+        sections.append(f"\n# Source lane: {lane_name}")
+        if not files:
+            sections.append("(no files)")
+            continue
+        for source in files:
+            sections.append(f"\n## {source['path']}\n{source['text']}")
+    return "\n".join(sections)
+
+
+def parse_portfolio_plan(raw_output: str) -> Dict[str, Any]:
+    """Parse a model-generated portfolio plan YAML mapping."""
+    text = _extract_yaml_text(raw_output)
+    data = yaml.safe_load(text)
+    if not isinstance(data, dict):
+        raise ValueError("Portfolio plan must contain a YAML object at the root")
+    return data
+
+
+def _collect_source_lanes(
+    *,
+    objectives: Optional[Path],
+    use_cases: Optional[Path],
+    signals: Optional[Path],
+    products: Optional[Path],
+) -> Dict[str, List[Dict[str, str]]]:
+    lanes = {
+        "objectives": objectives,
+        "useCases": use_cases,
+        "signals": signals,
+        "products": products,
+    }
+    return {name: _collect_source_files(path) for name, path in lanes.items()}
+
+
+def _resolve_source_lane_paths(
+    previous_state: Dict[str, Any],
+    *,
+    objectives: Optional[Path],
+    use_cases: Optional[Path],
+    signals: Optional[Path],
+    products: Optional[Path],
+) -> Dict[str, str]:
+    saved = previous_state.get("sourceLanePaths")
+    if not isinstance(saved, dict):
+        saved = {}
+    lanes = {
+        "objectives": objectives or saved.get("objectives"),
+        "useCases": use_cases or saved.get("useCases"),
+        "signals": signals or saved.get("signals"),
+        "products": products or saved.get("products"),
+    }
+    return {name: str(path) for name, path in lanes.items() if path is not None}
+
+
+def _collect_source_files(path: Optional[Path]) -> List[Dict[str, str]]:
+    if path is None:
+        return []
+    if not path.exists():
+        raise FileNotFoundError(f"Portfolio source path not found: {path}")
+    paths = [path] if path.is_file() else sorted(_iter_source_files(path))
+    files = []
+    for source_path in paths:
+        text = source_path.read_text(encoding="utf-8")
+        files.append(
+            {
+                "path": str(source_path),
+                "text": text,
+                "sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
+            }
+        )
+    return files
+
+
+def _source_changes(
+    previous_state: Dict[str, Any],
+    lanes: Dict[str, List[Dict[str, str]]],
+) -> Dict[str, Any]:
+    previous_sources = previous_state.get("sources")
+    if not isinstance(previous_sources, dict):
+        previous_sources = {}
+    lane_changes: Dict[str, Dict[str, List[str]]] = {}
+    removed: List[str] = []
+    for lane_name, files in lanes.items():
+        previous_by_path = _source_hashes(previous_sources.get(lane_name))
+        current_by_path = {
+            source["path"]: source["sha256"]
+            for source in files
+            if "path" in source and "sha256" in source
+        }
+        created = sorted(set(current_by_path) - set(previous_by_path))
+        deleted = sorted(set(previous_by_path) - set(current_by_path))
+        changed = sorted(
+            path
+            for path, sha in current_by_path.items()
+            if path in previous_by_path and previous_by_path[path] != sha
+        )
+        unchanged = sorted(
+            path
+            for path, sha in current_by_path.items()
+            if path in previous_by_path and previous_by_path[path] == sha
+        )
+        lane_changes[lane_name] = {
+            "created": created,
+            "updated": changed,
+            "unchanged": unchanged,
+            "removed": deleted,
+        }
+        removed.extend(deleted)
+    return {"lanes": lane_changes, "removed": sorted(removed)}
+
+
+def _source_hashes(value: Any) -> Dict[str, str]:
+    if not isinstance(value, list):
+        return {}
+    hashes = {}
+    for item in value:
+        if isinstance(item, dict) and item.get("path") and item.get("sha256"):
+            hashes[str(item["path"])] = str(item["sha256"])
+    return hashes
+
+
+def _source_hashes_by_lane(state: Dict[str, Any]) -> Dict[str, Dict[str, str]]:
+    sources = state.get("sources") if isinstance(state, dict) else None
+    if not isinstance(sources, dict):
+        return {}
+    return {
+        str(lane): _source_hashes(files)
+        for lane, files in sources.items()
+        if _source_hashes(files)
+    }
+
+
+def _changed_source_lanes(
+    lanes: Dict[str, List[Dict[str, str]]],
+    source_changes: Dict[str, Any],
+) -> Dict[str, List[Dict[str, str]]]:
+    changes = source_changes.get("lanes")
+    if not isinstance(changes, dict):
+        return {name: [] for name in lanes}
+    changed_lanes: Dict[str, List[Dict[str, str]]] = {}
+    for lane_name, files in lanes.items():
+        lane_change = changes.get(lane_name)
+        if not isinstance(lane_change, dict):
+            changed_lanes[lane_name] = []
+            continue
+        changed_paths = set(lane_change.get("created", [])) | set(
+            lane_change.get("updated", [])
+        )
+        changed_lanes[lane_name] = [
+            source for source in files if source.get("path") in changed_paths
+        ]
+    return changed_lanes
+
+
+def _source_change_warnings(source_changes: Dict[str, Any]) -> List[str]:
+    removed = source_changes.get("removed")
+    if not isinstance(removed, list):
+        return []
+    return [f"Source file no longer present: {path}" for path in removed]
+
+
+def _resolve_workspace_title(
+    title: Optional[str],
+    previous_state: Dict[str, Any],
+) -> Optional[str]:
+    explicit = _text(title)
+    if explicit:
+        return explicit
+    saved = previous_state.get("title") if isinstance(previous_state, dict) else None
+    saved_title = _text(saved)
+    return saved_title or None
+
+
+def _apply_workspace_title(
+    plan: Dict[str, Any],
+    title: Optional[str],
+) -> Dict[str, Any]:
+    if not title:
+        return plan
+    titled = deepcopy(plan)
+    metadata = titled.get("metadata")
+    if not isinstance(metadata, dict):
+        metadata = {}
+        titled["metadata"] = metadata
+    metadata["name"] = title
+    return titled
+
+
+def _iter_source_files(path: Path) -> Iterable[Path]:
+    for child in path.rglob("*"):
+        if child.is_file() and child.suffix.lower() in PORTFOLIO_SOURCE_SUFFIXES:
+            yield child
+
+
+def _write_portfolio_artifacts(
+    root: Path,
+    plan: Dict[str, Any],
+    lanes: Dict[str, List[Dict[str, str]]],
+    lane_paths: Optional[Dict[str, str]] = None,
+    title: Optional[str] = None,
+) -> List[Tuple[Path, str]]:
+    written: List[Tuple[Path, str]] = []
+    written.append(_write_yaml(root / "portfolio.yaml", _portfolio_map(plan, lanes)))
+    written.append(
+        _write_yaml(
+            root / "portfolio-state.yaml",
+            _portfolio_state(plan, lanes, lane_paths or {}, title),
+        )
+    )
+
+    fragments_dir = root / "odpc" / "fragments"
+    catalog = _catalog_document(plan)
+    for item in _list(plan, "businessObjectives"):
+        written.append(
+            _write_yaml(
+                fragments_dir / f"business_objective_{_file_id(item)}.yaml",
+                {"businessObjective": item},
+            )
+        )
+    for item in _list(plan, "useCases"):
+        written.append(
+            _write_yaml(
+                fragments_dir / f"use_case_{_file_id(item)}.yaml",
+                {"useCase": item},
+            )
+        )
+    for item in _list(plan, "signals"):
+        written.append(
+            _write_yaml(
+                fragments_dir / f"signal_{_file_id(item)}.yaml",
+                {"signal": item},
+            )
+        )
+
+    product_specs = []
+    product_references = []
+    for product in _list(plan, "products"):
+        reference = product.get("productReference")
+        odps_product = product.get("odpsProduct")
+        if not isinstance(reference, dict) or not isinstance(odps_product, dict):
+            continue
+        product_id = _text(reference.get("productID") or reference.get("id"))
+        product_path = Path("odps") / "products" / f"{_path_id(product_id)}.yaml"
+        reference = dict(reference)
+        reference["productModel"] = {
+            "standard": "ODPS",
+            "version": str(odps_product.get("version") or "4.1"),
+            "format": "yaml",
+            "$ref": f"../{product_path.as_posix()}",
+        }
+        product_references.append(reference)
+        product_specs.append(odps_product)
+        written.append(
+            _write_yaml(
+                fragments_dir / f"product_reference_{_file_id(reference)}.yaml",
+                {"productReference": reference},
+            )
+        )
+        written.append(_write_yaml(root / product_path, odps_product))
+
+    if product_references:
+        catalog["catalog"]["productReferences"] = product_references
+    written.append(_write_yaml(root / "odpc" / "catalog.yaml", catalog))
+    written.append(_write_yaml(root / "odpg" / "graph.yaml", _graph_document(plan)))
+    return written
+
+
+def _write_yaml(path: Path, document: Dict[str, Any]) -> Tuple[Path, str]:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    content = yaml.safe_dump(document, sort_keys=False, allow_unicode=False)
+    existed = path.exists()
+    previous = path.read_text(encoding="utf-8") if existed else None
+    path.write_text(content, encoding="utf-8")
+    state = "unchanged" if previous == content else "updated" if existed else "created"
+    return path, state
+
+
+def _group_written_paths(
+    written: List[Tuple[Path, str]],
+) -> Tuple[List[str], List[str], List[str]]:
+    created: List[str] = []
+    updated: List[str] = []
+    unchanged: List[str] = []
+    for path, state in written:
+        if state == "created":
+            created.append(str(path))
+        elif state == "updated":
+            updated.append(str(path))
+        else:
+            unchanged.append(str(path))
+    return created, updated, unchanged
+
+
+def _write_json_report(path: Path, report: Dict[str, object]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+
+
+def _snapshot_existing_workspace(root: Path, run_kind: str) -> Optional[Path]:
+    html_path = root / DEFAULT_PORTFOLIO_HTML
+    if not html_path.exists():
+        return None
+    snapshot_id = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H-%M-%SZ")
+    snapshot = root / "versions" / snapshot_id
+    suffix = 1
+    while snapshot.exists():
+        snapshot = root / "versions" / f"{snapshot_id}-{suffix}"
+        suffix += 1
+    snapshot.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(html_path, snapshot / DEFAULT_PORTFOLIO_HTML)
+    portfolio_path = root / "portfolio.yaml"
+    if portfolio_path.exists():
+        shutil.copy2(portfolio_path, snapshot / "portfolio.yaml")
+    _write_json_report(
+        snapshot / "report.json",
+        {
+            "spec": "portfolio",
+            "kind": run_kind,
+            "snapshot": str(snapshot),
+            "html": str(snapshot / DEFAULT_PORTFOLIO_HTML),
+        },
+    )
+    return snapshot
+
+
+def _refresh_portfolio_versions(root: Path) -> None:
+    portfolio_path = root / "portfolio.yaml"
+    portfolio = _load_optional_mapping(portfolio_path)
+    versions = _portfolio_versions(root, {})
+    if not versions:
+        return
+    portfolio["versions"] = versions
+    _write_yaml(portfolio_path, portfolio)
+    render_portfolio(root)
+
+
+def _portfolio_map(
+    plan: Dict[str, Any],
+    lanes: Dict[str, List[Dict[str, str]]],
+) -> Dict[str, Any]:
+    metadata = plan.get("metadata") if isinstance(plan.get("metadata"), dict) else {}
+    return {
+        "metadata": {
+            "id": metadata.get("id", "generated-portfolio"),
+            "name": metadata.get("name", "Generated Portfolio"),
+            "description": metadata.get(
+                "description", "Generated from portfolio source lanes."
+            ),
+            "generatedAt": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "sdkVersion": __version__,
+        },
+        "sources": {name: {"count": len(files)} for name, files in lanes.items()},
+        "warnings": [str(item) for item in plan.get("warnings", []) if item],
+    }
+
+
+def _portfolio_state(
+    plan: Dict[str, Any],
+    lanes: Dict[str, List[Dict[str, str]]],
+    lane_paths: Dict[str, str],
+    title: Optional[str],
+) -> Dict[str, Any]:
+    state: Dict[str, Any] = {
+        "version": 1,
+        "sourceLanePaths": dict(lane_paths),
+        "sources": {
+            name: [
+                {
+                    "path": source["path"],
+                    "sha256": source["sha256"],
+                }
+                for source in files
+            ]
+            for name, files in lanes.items()
+        },
+        "identityRegistry": _identity_registry(plan),
+    }
+    if title:
+        state["title"] = title
+    return state
+
+
+def _synced_portfolio_state(
+    previous_state: Dict[str, Any],
+    catalog: Dict[str, Any],
+) -> Dict[str, Any]:
+    state = dict(previous_state) if isinstance(previous_state, dict) else {}
+    state["version"] = state.get("version", 1)
+    state.setdefault("sourceLanePaths", {})
+    state.setdefault("sources", {})
+    state["identityRegistry"] = _identity_registry(_plan_from_catalog(catalog))
+    return state
+
+
+def _reconcile_plan_identity(
+    plan: Dict[str, Any],
+    previous_state: Dict[str, Any],
+) -> Dict[str, Any]:
+    registry = previous_state.get("identityRegistry")
+    if not isinstance(registry, dict):
+        return plan
+
+    reconciled = deepcopy(plan)
+    id_remap: Dict[str, str] = {}
+    for collection, registry_key in (
+        ("businessObjectives", "businessObjectives"),
+        ("useCases", "useCases"),
+        ("signals", "signals"),
+    ):
+        previous_by_fingerprint = _registry_by_fingerprint(registry.get(registry_key))
+        for item in _list(reconciled, collection):
+            previous = previous_by_fingerprint.get(_artifact_fingerprint(item))
+            if not previous:
+                continue
+            proposed_id = _text(item.get("id"))
+            stable_id = _text(previous.get("id"))
+            if proposed_id and stable_id and proposed_id != stable_id:
+                id_remap[proposed_id] = stable_id
+                item["id"] = stable_id
+
+    previous_products = _registry_by_fingerprint(registry.get("products"))
+    for product in _list(reconciled, "products"):
+        reference = product.get("productReference")
+        odps_product = product.get("odpsProduct")
+        if not isinstance(reference, dict):
+            continue
+        previous = previous_products.get(_artifact_fingerprint(reference))
+        if not previous:
+            continue
+        proposed_id = _text(reference.get("id"))
+        stable_id = _text(previous.get("id"))
+        if proposed_id and stable_id and proposed_id != stable_id:
+            id_remap[proposed_id] = stable_id
+            reference["id"] = stable_id
+        proposed_product_id = _text(reference.get("productID"))
+        stable_product_id = _text(previous.get("productID"))
+        if proposed_product_id and stable_product_id:
+            if proposed_product_id != stable_product_id:
+                id_remap[proposed_product_id] = stable_product_id
+            reference["productID"] = stable_product_id
+            _set_odps_product_id(odps_product, stable_product_id)
+
+    for edge in _list(reconciled, "graphEdges"):
+        for key in ("source", "target"):
+            value = _text(edge.get(key))
+            if value in id_remap:
+                edge[key] = id_remap[value]
+
+    return reconciled
+
+
+def _identity_registry(plan: Dict[str, Any]) -> Dict[str, List[Dict[str, str]]]:
+    return {
+        "businessObjectives": [
+            _registry_entry(item, "id") for item in _list(plan, "businessObjectives")
+        ],
+        "useCases": [_registry_entry(item, "id") for item in _list(plan, "useCases")],
+        "signals": [_registry_entry(item, "id") for item in _list(plan, "signals")],
+        "products": [_product_registry_entry(item) for item in _list(plan, "products")],
+    }
+
+
+def _registry_entry(item: Dict[str, Any], id_key: str) -> Dict[str, str]:
+    return {
+        "fingerprint": _artifact_fingerprint(item),
+        id_key: _text(item.get(id_key)),
+    }
+
+
+def _product_registry_entry(product: Dict[str, Any]) -> Dict[str, str]:
+    reference = product.get("productReference")
+    if not isinstance(reference, dict):
+        reference = {}
+    return {
+        "fingerprint": _artifact_fingerprint(reference),
+        "id": _text(reference.get("id")),
+        "productID": _text(reference.get("productID")),
+    }
+
+
+def _registry_by_fingerprint(value: Any) -> Dict[str, Dict[str, str]]:
+    if not isinstance(value, list):
+        return {}
+    entries = {}
+    for item in value:
+        if isinstance(item, dict):
+            fingerprint = _text(item.get("fingerprint"))
+            if fingerprint:
+                entries[fingerprint] = {str(key): str(val) for key, val in item.items()}
+    return entries
+
+
+def _artifact_fingerprint(item: Dict[str, Any]) -> str:
+    return _normalize_identity_text(_text(item.get("name") or item.get("id")))
+
+
+def _normalize_identity_text(value: str) -> str:
+    return " ".join(value.casefold().split())
+
+
+def _set_odps_product_id(value: Any, product_id: str) -> None:
+    if not isinstance(value, dict):
+        return
+    product = value.get("product")
+    if not isinstance(product, dict):
+        return
+    details = product.get("details")
+    if isinstance(details, dict):
+        english = details.get("en")
+        if isinstance(english, dict):
+            english["productID"] = product_id
+            return
+    product["productID"] = product_id
+
+
+def _normalize_portfolio_plan(plan: Dict[str, Any]) -> Dict[str, Any]:
+    normalized = deepcopy(plan)
+    for item in _list(normalized, "businessObjectives"):
+        item["status"] = _normalize_enum(
+            item.get("status"), ODPC_STATUSES, ODPC_STATUS_ALIASES, "draft"
+        )
+    for item in _list(normalized, "useCases"):
+        item["status"] = _normalize_enum(
+            item.get("status"), ODPC_STATUSES, ODPC_STATUS_ALIASES, "draft"
+        )
+    for item in _list(normalized, "signals"):
+        item["type"] = _normalize_enum(
+            item.get("type"), ODPC_SIGNAL_TYPES, ODPC_SIGNAL_TYPE_ALIASES, "operational"
+        )
+        if not isinstance(item.get("source"), dict):
+            item["source"] = {
+                "origin": "internal",
+                "method": "generated portfolio source lanes",
+            }
+        if not _text(item.get("observedAt")):
+            item["observedAt"] = datetime.now(timezone.utc).strftime(
+                "%Y-%m-%dT%H:%M:%SZ"
+            )
+
+    for product in _list(normalized, "products"):
+        reference = product.get("productReference")
+        if isinstance(reference, dict):
+            reference["status"] = _normalize_enum(
+                reference.get("status"), ODPC_STATUSES, ODPC_STATUS_ALIASES, "draft"
+            )
+        _normalize_odps_product(product.get("odpsProduct"))
+
+    for edge in _list(normalized, "graphEdges"):
+        source = _text(edge.get("source") or edge.get("from"))
+        target = _text(edge.get("target") or edge.get("to"))
+        edge_type = _normalize_enum(
+            edge.get("type"), ODPG_EDGE_TYPES, ODPG_EDGE_TYPE_ALIASES, "relatedTo"
+        )
+        confidence = _normalize_enum(
+            edge.get("confidence"), {"high", "medium", "low"}, {}, "medium"
+        )
+        edge.clear()
+        edge["source"] = source
+        edge["target"] = target
+        edge["type"] = edge_type
+        edge["confidence"] = confidence
+
+    return normalized
+
+
+def _normalize_odps_product(value: Any) -> None:
+    if not isinstance(value, dict):
+        return
+    product = value.get("product")
+    if isinstance(product, dict):
+        _normalize_odps_generated_sections(product)
+        _normalize_odps_pricing_plans(product)
+        _normalize_odps_data_access(product)
+    details = _odps_details_mapping(value)
+    if details is None:
+        return
+    details["status"] = _normalize_enum(
+        details.get("status"), ODPS_STATUSES, ODPS_STATUS_ALIASES, "draft"
+    )
+    details["visibility"] = _normalize_enum(
+        details.get("visibility"),
+        ODPS_VISIBILITIES,
+        ODPS_VISIBILITY_ALIASES,
+        "private",
+    )
+
+
+def _odps_details_mapping(value: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    product = value.get("product")
+    if not isinstance(product, dict):
+        return None
+    details = product.get("details")
+    if isinstance(details, dict):
+        english = details.get("en")
+        if isinstance(english, dict):
+            return english
+    return product if isinstance(product, dict) else None
+
+
+def _normalize_odps_generated_sections(product: Dict[str, Any]) -> None:
+    data_ops = product.pop("dataOps", None)
+    if data_ops is not None:
+        data_ops = _normalize_loose_data_ops(data_ops)
+        if data_ops is not None:
+            product["x-dataOps"] = data_ops
+
+    details = product.get("details")
+    detail_sla = None
+    if isinstance(details, dict):
+        english = details.get("en")
+        if isinstance(english, dict):
+            _normalize_odps_detail_use_cases(english)
+            detail_sla = english.pop("SLA", None)
+
+    sla = product.get("SLA")
+    if isinstance(sla, list):
+        normalized_sla = _normalize_sla_list(sla)
+        if isinstance(detail_sla, dict):
+            _merge_sla_dimensions(normalized_sla, _sla_from_loose_details(detail_sla))
+        if isinstance(data_ops, dict):
+            _merge_sla_dimensions(
+                normalized_sla, _sla_from_data_ops_update_frequency(data_ops)
+            )
+        product["SLA"] = normalized_sla
+    elif isinstance(sla, dict):
+        normalized_sla = _normalize_loose_sla(sla)
+        if isinstance(detail_sla, dict):
+            _merge_sla_dimensions(normalized_sla, _sla_from_loose_details(detail_sla))
+        if isinstance(data_ops, dict):
+            _merge_sla_dimensions(
+                normalized_sla, _sla_from_data_ops_update_frequency(data_ops)
+            )
+        product["SLA"] = normalized_sla
+    elif isinstance(detail_sla, dict):
+        product["SLA"] = _sla_from_loose_details(detail_sla)
+        if isinstance(data_ops, dict):
+            _merge_sla_dimensions(
+                product["SLA"], _sla_from_data_ops_update_frequency(data_ops)
+            )
+    elif isinstance(data_ops, dict):
+        data_ops_sla = _sla_from_data_ops_update_frequency(data_ops)
+        if _first_named_profile(data_ops_sla.get("declarative")) is not None:
+            product["SLA"] = data_ops_sla
+
+    data_quality = product.get("dataQuality")
+    if isinstance(data_quality, list):
+        product["dataQuality"] = _normalize_data_quality_list(data_quality)
+    elif isinstance(data_quality, dict):
+        product["dataQuality"] = _normalize_loose_data_quality(data_quality)
+
+
+def _normalize_loose_data_ops(value: Any) -> Optional[Dict[str, Any]]:
+    if isinstance(value, list):
+        merged: Dict[str, Any] = {}
+        for item in value:
+            if isinstance(item, dict):
+                merged.update(item)
+        value = merged
+    if not isinstance(value, dict):
+        return None
+    normalized = dict(value)
+    for key in ("infrastructure", "format", "dataQuality", "updateFrequency"):
+        item = normalized.get(key)
+        if isinstance(item, list):
+            first = next((entry for entry in item if isinstance(entry, dict)), None)
+            if first is not None:
+                normalized[key] = first
+    return normalized
+
+
+def _normalize_odps_detail_use_cases(details: Dict[str, Any]) -> None:
+    use_cases = details.get("useCases")
+    if isinstance(use_cases, str):
+        text = use_cases.strip()
+        details["useCases"] = (
+            [{"useCase": {"useCaseTitle": text, "useCaseDescription": text}}]
+            if text
+            else []
+        )
+        return
+    if isinstance(use_cases, list):
+        normalized = []
+        for item in use_cases:
+            if isinstance(item, str) and item.strip():
+                normalized.append(
+                    {
+                        "useCase": {
+                            "useCaseTitle": item.strip(),
+                            "useCaseDescription": item.strip(),
+                        }
+                    }
+                )
+            elif isinstance(item, dict):
+                normalized.append(item)
+        details["useCases"] = normalized
+
+
+def _normalize_loose_sla(sla: Dict[str, Any]) -> Dict[str, Any]:
+    declarative = sla.get("declarative")
+    if isinstance(declarative, dict):
+        return sla
+    if isinstance(declarative, list):
+        return {"declarative": _named_profiles_from_list(declarative, "default")}
+    description = _text(sla.get("description"))
+    normalized = _sla_from_loose_details(sla)
+    profile = normalized["declarative"]["default"]
+    if description:
+        profile["description"] = {"en": description}
+    return normalized
+
+
+def _normalize_sla_list(items: List[Any]) -> Dict[str, Any]:
+    profiles = [
+        profile
+        for item in items
+        if isinstance(item, dict)
+        for profile in [_sla_profile_from_loose_mapping(item)]
+        if profile is not None
+    ]
+    if not profiles:
+        profiles = [{"name": {"en": "Default SLA"}, "dimensions": []}]
+    return {"declarative": _named_profiles_from_list(profiles, "default")}
+
+
+def _named_profiles_from_list(
+    profiles: List[Dict[str, Any]], first_key: str
+) -> Dict[str, Dict[str, Any]]:
+    named: Dict[str, Dict[str, Any]] = {}
+    for index, profile in enumerate(profiles):
+        key = first_key if index == 0 else _profile_key(profile, index)
+        while key in named:
+            key = f"{key}-{index + 1}"
+        named[key] = profile
+    return named
+
+
+def _profile_key(profile: Dict[str, Any], index: int) -> str:
+    name = _text(profile.get("id") or profile.get("key"))
+    if not name:
+        name = _text(profile.get("name"))
+    normalized = _path_id(name)
+    if normalized in {"", "default-sla", "default-data-quality"}:
+        return f"profile-{index + 1}"
+    if "premium" in normalized:
+        return "premium"
+    return normalized or f"profile-{index + 1}"
+
+
+def _sla_profile_from_loose_mapping(item: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    if isinstance(item.get("dimensions"), list):
+        profile = dict(item)
+        profile["dimensions"] = [
+            _normalize_sla_dimension(dimension)
+            for dimension in item["dimensions"]
+            if isinstance(dimension, dict)
+        ]
+        if not isinstance(profile.get("name"), dict):
+            profile["name"] = {"en": _text(profile.get("name"), "Default SLA")}
+        return profile
+
+    language, content = _language_content(item)
+    source = content if isinstance(content, dict) else item
+    description = _text(source.get("description"))
+    profile: Dict[str, Any] = {
+        "name": {"en": _text(source.get("name"), "Default SLA")},
+        "dimensions": _sla_dimensions_from_loose_mapping(source),
+    }
+    if description:
+        profile["description"] = {language: description}
+    return profile
+
+
+def _language_content(item: Dict[str, Any]) -> Tuple[str, Any]:
+    for key, value in item.items():
+        if isinstance(key, str) and len(key) == 2 and isinstance(value, dict):
+            return key, value
+    return "en", item
+
+
+def _sla_dimensions_from_loose_mapping(item: Dict[str, Any]) -> List[Dict[str, Any]]:
+    dimensions = []
+    for key, value in item.items():
+        if key in {"name", "description", "dimensions"}:
+            continue
+        dimension = key
+        if key == "availability":
+            dimension = "uptime"
+        if dimension not in ODPS_SLA_DIMENSIONS:
+            continue
+        objective = _text(value)
+        if objective:
+            dimensions.append(
+                {
+                    "dimension": dimension,
+                    "objective": objective,
+                    "unit": "null",
+                }
+            )
+    if not dimensions and _text(item.get("objective")):
+        dimensions.append(
+            {
+                "dimension": "updateFrequency",
+                "objective": _text(item.get("objective")),
+                "unit": "null",
+            }
+        )
+    return dimensions
+
+
+def _normalize_sla_dimension(dimension: Dict[str, Any]) -> Dict[str, Any]:
+    normalized = dict(dimension)
+    normalized["dimension"] = _normalize_enum(
+        normalized.get("dimension") or normalized.get("name"),
+        ODPS_SLA_DIMENSIONS,
+        {},
+        "updateFrequency",
+    )
+    if "objective" not in normalized:
+        normalized["objective"] = _text(normalized.get("target"), "pending")
+    if not _text(normalized.get("unit")):
+        normalized["unit"] = "null"
+    else:
+        normalized["unit"] = _normalize_enum(
+            normalized.get("unit"), ODPS_SLA_UNITS, ODPS_SLA_UNIT_ALIASES, "null"
+        )
+    return normalized
+
+
+def _sla_from_data_ops_update_frequency(data_ops: Dict[str, Any]) -> Dict[str, Any]:
+    update_frequency = data_ops.get("updateFrequency")
+    if not isinstance(update_frequency, dict):
+        return {"declarative": []}
+    objective = update_frequency.get("value")
+    unit = _normalize_enum(
+        update_frequency.get("unit"), ODPS_SLA_UNITS, ODPS_SLA_UNIT_ALIASES, "days"
+    )
+    if objective is None or objective == "":
+        return {"declarative": []}
+    return {
+        "declarative": {
+            "default": {
+                "name": {"en": "Default SLA"},
+                "dimensions": [
+                    {
+                        "dimension": "updateFrequency",
+                        "objective": objective,
+                        "unit": unit,
+                    }
+                ],
+            }
+        }
+    }
+
+
+def _merge_sla_dimensions(target: Dict[str, Any], source: Dict[str, Any]) -> None:
+    target_profile = _first_named_profile(target.get("declarative"))
+    source_profile = _first_named_profile(source.get("declarative"))
+    if target_profile is None or source_profile is None:
+        return
+    target_dimensions = target_profile.setdefault("dimensions", [])
+    if not isinstance(target_dimensions, list):
+        target_profile["dimensions"] = []
+        target_dimensions = target_profile["dimensions"]
+    existing = {
+        _text(item.get("dimension"))
+        for item in target_dimensions
+        if isinstance(item, dict)
+    }
+    for item in source_profile.get("dimensions", []):
+        if not isinstance(item, dict):
+            continue
+        dimension = _text(item.get("dimension"))
+        if dimension and dimension not in existing:
+            target_dimensions.append(item)
+            existing.add(dimension)
+
+
+def _first_named_profile(value: Any) -> Optional[Dict[str, Any]]:
+    if isinstance(value, dict):
+        for profile in value.values():
+            if isinstance(profile, dict):
+                return profile
+    if isinstance(value, list):
+        for profile in value:
+            if isinstance(profile, dict):
+                return profile
+    return None
+
+
+def _normalize_loose_data_quality(data_quality: Dict[str, Any]) -> Dict[str, Any]:
+    declarative = data_quality.get("declarative")
+    if isinstance(declarative, dict):
+        return data_quality
+    if isinstance(declarative, list):
+        return {"declarative": _named_profiles_from_list(declarative, "default")}
+    description = _text(data_quality.get("policyDescription"))
+    if not description:
+        description = _text(data_quality.get("description"))
+    return {
+        "declarative": {
+            "default": {
+                "dimensions": [
+                    {
+                        "dimension": "validity",
+                        "objective": 0,
+                        "unit": "percentage",
+                        "description": description or "Data quality policy pending.",
+                    }
+                ]
+            }
+        }
+    }
+
+
+def _normalize_data_quality_list(items: List[Any]) -> Dict[str, Any]:
+    profiles = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        language, content = _language_content(item)
+        source = content if isinstance(content, dict) else item
+        description = _text(source.get("description"))
+        profiles.append(
+            {
+                "description": description or "Data quality policy pending.",
+                "dimensions": [
+                    {
+                        "dimension": "validity",
+                        "objective": 0,
+                        "unit": "percentage",
+                        "description": description
+                        or f"Data quality policy pending ({language}).",
+                    }
+                ],
+            }
+        )
+    return {
+        "declarative": (
+            _named_profiles_from_list(profiles, "default") if profiles else {}
+        )
+    }
+
+
+def _sla_from_loose_details(sla: Dict[str, Any]) -> Dict[str, Any]:
+    dimensions = []
+    update_frequency = _text(sla.get("updateFrequency"))
+    if update_frequency:
+        dimensions.append(
+            {
+                "dimension": "updateFrequency",
+                "objective": update_frequency,
+                "unit": "days",
+            }
+        )
+    for key, value in sla.items():
+        if key == "updateFrequency":
+            continue
+        objective = _text(value)
+        if objective and key in ODPS_SLA_DIMENSIONS:
+            dimensions.append(
+                {"dimension": key, "objective": objective, "unit": "null"}
+            )
+    return {
+        "declarative": {
+            "default": {
+                "name": {"en": "Default SLA"},
+                "dimensions": dimensions,
+            }
+        }
+    }
+
+
+def _normalize_odps_pricing_plans(product: Dict[str, Any]) -> None:
+    legacy_pricing = product.pop("pricing", None)
+    if "pricingPlans" not in product and legacy_pricing is not None:
+        product["pricingPlans"] = legacy_pricing
+
+    pricing = product.get("pricingPlans")
+    if isinstance(pricing, list):
+        product["pricingPlans"] = {"declarative": _pricing_language_map(pricing)}
+        return
+    if not isinstance(pricing, dict):
+        return
+    plans = pricing.pop("plans", None)
+    if isinstance(plans, list):
+        declarative = pricing.setdefault("declarative", {})
+        if isinstance(declarative, dict):
+            existing = declarative.get("en")
+            normalized_plans = [
+                _normalize_portfolio_pricing_plan(plan)
+                for plan in plans
+                if isinstance(plan, dict)
+            ]
+            if isinstance(existing, list):
+                declarative["en"] = existing + normalized_plans
+            else:
+                declarative["en"] = normalized_plans
+    declarative = pricing.get("declarative")
+    if isinstance(declarative, dict):
+        for language, plans_for_language in list(declarative.items()):
+            if isinstance(plans_for_language, list):
+                declarative[language] = [
+                    _normalize_portfolio_pricing_plan(plan)
+                    for plan in plans_for_language
+                    if isinstance(plan, dict)
+                ]
+
+
+def _normalize_odps_data_access(product: Dict[str, Any]) -> None:
+    data_access = product.get("dataAccess")
+    if isinstance(data_access, list):
+        named_items = [
+            (
+                _data_access_key(item, None),
+                _normalize_odps_data_access_item(item),
+            )
+            for item in data_access
+            if isinstance(item, dict)
+        ]
+        if named_items:
+            product["dataAccess"] = _unique_named_items(named_items)
+        return
+
+    if not isinstance(data_access, dict):
+        return
+
+    if _looks_like_data_access_method(data_access):
+        product["dataAccess"] = {
+            _data_access_key(data_access, None): _normalize_odps_data_access_item(
+                data_access
+            )
+        }
+        return
+
+    items = []
+    for key, value in list(data_access.items()):
+        if key == "$ref" or not isinstance(value, dict):
+            continue
+        method = _normalize_odps_data_access_item(value, method_name=key)
+        items.append((_data_access_key(method, key), method))
+
+    if items:
+        product["dataAccess"] = _unique_named_items(items)
+
+
+def _unique_named_items(
+    items: List[Tuple[str, Dict[str, Any]]],
+) -> Dict[str, Dict[str, Any]]:
+    named: Dict[str, Dict[str, Any]] = {}
+    for index, (key, value) in enumerate(items, start=1):
+        candidate = key or f"item{index}"
+        while candidate in named:
+            candidate = f"{key}-{index}"
+        named[candidate] = value
+    return named
+
+
+def _data_access_key(item: Dict[str, Any], fallback: Optional[str]) -> str:
+    output_port_type = _text(item.get("outputPortType") or item.get("outputPorttype"))
+    name = _text(item.get("name"))
+    key = output_port_type or name or _text(fallback) or "API"
+    if key.casefold() == "api":
+        return "API"
+    return _path_id(key)
+
+
+def _looks_like_data_access_method(value: Dict[str, Any]) -> bool:
+    method_keys = {
+        "name",
+        "description",
+        "outputPorttype",
+        "outputPortType",
+        "format",
+        "accessURL",
+        "authenticationMethod",
+        "specsURL",
+        "documentationURL",
+        "specification",
+        "version",
+        "reference",
+        "accessInstructions",
+    }
+    return any(key in value for key in method_keys)
+
+
+def _normalize_odps_data_access_item(
+    item: Dict[str, Any], method_name: Optional[str] = None
+) -> Dict[str, Any]:
+    normalized = dict(item)
+    legacy_output_port_type = normalized.pop("outputPorttype", None)
+    output_port_type = normalized.get("outputPortType")
+    if output_port_type is None:
+        normalized["outputPortType"] = (
+            _text(legacy_output_port_type)
+            or _infer_output_port_type(method_name)
+            or "API"
+        )
+    elif legacy_output_port_type is not None:
+        normalized["outputPortType"] = _text(output_port_type) or _text(
+            legacy_output_port_type
+        )
+    return normalized
+
+
+def _infer_output_port_type(method_name: Optional[str]) -> Optional[str]:
+    if not method_name:
+        return None
+    lowered = method_name.casefold()
+    if "file" in lowered or "download" in lowered:
+        return "file"
+    if "database" in lowered or "sql" in lowered or "query" in lowered:
+        return "database"
+    if "stream" in lowered:
+        return "stream"
+    if "webhook" in lowered:
+        return "webhook"
+    if "ai" in lowered or "agent" in lowered or "mcp" in lowered:
+        return "AI"
+    if "api" in lowered:
+        return "API"
+    return None
+
+
+def _pricing_language_map(plans: List[Any]) -> Dict[str, List[Dict[str, Any]]]:
+    language_map: Dict[str, List[Dict[str, Any]]] = {}
+    for plan in plans:
+        if not isinstance(plan, dict):
+            continue
+        language_keys = {
+            key: value
+            for key, value in plan.items()
+            if isinstance(key, str) and isinstance(value, dict) and len(key) == 2
+        }
+        if language_keys:
+            for language, value in language_keys.items():
+                language_map.setdefault(language, []).append(
+                    _normalize_portfolio_pricing_plan(value)
+                )
+        else:
+            language_map.setdefault("en", []).append(
+                _normalize_portfolio_pricing_plan(plan)
+            )
+    return language_map or {"en": []}
+
+
+def _normalize_portfolio_pricing_plan(plan: Dict[str, Any]) -> Dict[str, Any]:
+    normalized = dict(plan)
+    plan_name = normalized.pop("plan", None)
+    if "price" not in normalized and "priceAmount" in normalized:
+        normalized["price"] = normalized.pop("priceAmount")
+    else:
+        normalized.pop("priceAmount", None)
+    if "name" not in normalized and "pricingPlanName" in normalized:
+        normalized["name"] = normalized.pop("pricingPlanName")
+    if "name" not in normalized and plan_name is not None:
+        normalized["name"] = plan_name
+    elif _text(normalized.get("name")) == "On-request" and plan_name is not None:
+        normalized["name"] = plan_name
+    if "description" not in normalized and "license" in normalized:
+        normalized["description"] = normalized.pop("license")
+    for key in ("name", "description"):
+        value = normalized.get(key)
+        if isinstance(value, dict):
+            normalized[key] = _text(value)
+    if not _text(normalized.get("name")):
+        normalized["name"] = "On-request"
+    if not _text(normalized.get("priceCurrency")):
+        normalized["priceCurrency"] = "XXX"
+    if not _text(normalized.get("price")):
+        normalized["price"] = "0"
+    if not _text(normalized.get("billingDuration")):
+        normalized["billingDuration"] = "month"
+    unit = _text(normalized.get("unit"))
+    normalized["unit"] = _normalize_enum(
+        unit,
+        ODPS_PRICING_UNITS,
+        ODPS_PRICING_UNIT_ALIASES,
+        "On-request",
+    )
+    normalized["price"] = str(normalized["price"])
+    return normalized
+
+
+def _normalize_enum(
+    value: Any,
+    allowed: Iterable[str],
+    aliases: Dict[str, str],
+    default: str,
+) -> str:
+    text = _text(value)
+    if text in allowed:
+        return text
+    lowered = text.casefold().strip()
+    if lowered in aliases:
+        return aliases[lowered]
+    for candidate in allowed:
+        if candidate.casefold() == lowered:
+            return candidate
+    return default
+
+
+def _catalog_from_fragments(root: Path) -> Dict[str, Any]:
+    existing = _load_optional_mapping(root / "odpc" / "catalog.yaml")
+    catalog_root = existing.get("catalog") if isinstance(existing, dict) else {}
+    metadata = {}
+    if isinstance(catalog_root, dict) and isinstance(
+        catalog_root.get("metadata"), dict
+    ):
+        metadata = catalog_root["metadata"]
+    catalog: Dict[str, Any] = {"metadata": metadata or _default_catalog_metadata(root)}
+    fragments = _fragment_collections(root / "odpc" / "fragments")
+    for key in ("businessObjectives", "useCases", "signals", "productReferences"):
+        if fragments[key]:
+            catalog[key] = fragments[key]
+    return {
+        "schema": existing.get(
+            "schema", "https://opendataproducts.org/odpc-v1.0/schema/odpc.yaml"
+        ),
+        "version": str(existing.get("version") or "1.0"),
+        "kind": existing.get("kind", "Catalog"),
+        "catalog": catalog,
+    }
+
+
+def _sync_product_references_from_odps(
+    root: Path,
+    catalog: Dict[str, Any],
+    product_specs: Dict[str, Dict[str, Any]],
+) -> List[Tuple[Path, str]]:
+    catalog_root = catalog.get("catalog")
+    if not isinstance(catalog_root, dict):
+        return []
+    writes: List[Tuple[Path, str]] = []
+    for reference in _list(catalog_root, "productReferences"):
+        product_id = _text(reference.get("productID") or reference.get("id"))
+        product_info = product_specs.get(product_id)
+        if not product_info:
+            continue
+        document = product_info.get("document")
+        if not isinstance(document, dict):
+            continue
+        details = _product_details(document)
+        if _merge_product_reference_details(reference, details):
+            writes.append(
+                _write_yaml(
+                    root
+                    / "odpc"
+                    / "fragments"
+                    / f"product_reference_{_file_id(reference)}.yaml",
+                    {"productReference": reference},
+                )
+            )
+    return writes
+
+
+def _merge_product_reference_details(
+    reference: Dict[str, Any],
+    details: Dict[str, Any],
+) -> bool:
+    changed = False
+    for source_key, target_key in (
+        ("name", "name"),
+        ("description", "description"),
+        ("valueProposition", "valueProposition"),
+    ):
+        value = _text(details.get(source_key))
+        if value and reference.get(target_key) != {"en": value}:
+            reference[target_key] = {"en": value}
+            changed = True
+    for key in ("status", "type"):
+        value = _text(details.get(key))
+        if value and reference.get(key) != value:
+            reference[key] = value
+            changed = True
+    visibility = _odpc_product_visibility(details.get("visibility"))
+    if visibility and reference.get("visibility") != visibility:
+        reference["visibility"] = visibility
+        changed = True
+    return changed
+
+
+def _odpc_product_visibility(value: Any) -> str:
+    visibility = _text(value)
+    if visibility in {"public", "internal", "restricted", "private"}:
+        return visibility
+    if visibility == "organisation":
+        return "internal"
+    if visibility == "invitation":
+        return "restricted"
+    return ""
+
+
+def _default_catalog_metadata(root: Path) -> Dict[str, Any]:
+    portfolio = _load_optional_mapping(root / "portfolio.yaml")
+    metadata = portfolio.get("metadata") if isinstance(portfolio, dict) else {}
+    name = (
+        metadata.get("name", "Portfolio") if isinstance(metadata, dict) else "Portfolio"
+    )
+    description = (
+        metadata.get("description", "Portfolio synced from YAML artifacts.")
+        if isinstance(metadata, dict)
+        else "Portfolio synced from YAML artifacts."
+    )
+    return {
+        "id": (
+            metadata.get("id", "CAT-PORTFOLIO")
+            if isinstance(metadata, dict)
+            else "CAT-PORTFOLIO"
+        ),
+        "name": {"en": name},
+        "description": {"en": description},
+    }
+
+
+def _fragment_collections(fragments_dir: Path) -> Dict[str, List[Dict[str, Any]]]:
+    collections: Dict[str, List[Dict[str, Any]]] = {
+        "businessObjectives": [],
+        "useCases": [],
+        "signals": [],
+        "productReferences": [],
+    }
+    if not fragments_dir.exists():
+        return collections
+    keys = {
+        "businessObjective": "businessObjectives",
+        "useCase": "useCases",
+        "signal": "signals",
+        "productReference": "productReferences",
+    }
+    for path in sorted(
+        [
+            *fragments_dir.glob("*.yaml"),
+            *fragments_dir.glob("*.yml"),
+            *fragments_dir.glob("*.json"),
+        ]
+    ):
+        document = load_mapping(path, root_name="ODPC fragment")
+        for source_key, target_key in keys.items():
+            value = document.get(source_key)
+            if isinstance(value, dict):
+                collections[target_key].append(value)
+    return collections
+
+
+def _plan_from_catalog(catalog: Dict[str, Any]) -> Dict[str, Any]:
+    catalog_root = catalog.get("catalog") if isinstance(catalog, dict) else {}
+    if not isinstance(catalog_root, dict):
+        catalog_root = {}
+    return {
+        "businessObjectives": _list(catalog_root, "businessObjectives"),
+        "useCases": _list(catalog_root, "useCases"),
+        "signals": _list(catalog_root, "signals"),
+        "products": [
+            {"productReference": item}
+            for item in _list(catalog_root, "productReferences")
+        ],
+    }
+
+
+def _plan_from_workspace(root: Path) -> Dict[str, Any]:
+    catalog_path = root / "odpc" / "catalog.yaml"
+    catalog = load_catalog(catalog_path) if catalog_path.exists() else _empty_catalog()
+    plan = _plan_from_catalog(catalog)
+    product_specs = _load_product_specs(root)
+    for product in _list(plan, "products"):
+        reference = product.get("productReference")
+        if not isinstance(reference, dict):
+            continue
+        product_id = _text(reference.get("productID") or reference.get("id"))
+        product_info = product_specs.get(product_id)
+        if isinstance(product_info, dict):
+            document = product_info.get("document")
+            if isinstance(document, dict):
+                product["odpsProduct"] = document
+
+    graph_path = root / "odpg" / "graph.yaml"
+    graph = load_graph(graph_path) if graph_path.exists() else _empty_graph()
+    graph_payload = graph.get("graph") if isinstance(graph, dict) else {}
+    if isinstance(graph_payload, dict):
+        edges = []
+        for edge in _list(graph_payload, "edges"):
+            edges.append(
+                {
+                    "source": _text(edge.get("source") or edge.get("from")),
+                    "target": _text(edge.get("target") or edge.get("to")),
+                    "type": _text(edge.get("type"), "relatedTo"),
+                    "confidence": _text(edge.get("confidence"), "medium"),
+                }
+            )
+        if edges:
+            plan["graphEdges"] = edges
+    return plan
+
+
+def _merge_portfolio_plans(
+    existing: Dict[str, Any],
+    delta: Dict[str, Any],
+) -> Dict[str, Any]:
+    merged = deepcopy(existing) if isinstance(existing, dict) else {}
+    if not isinstance(delta, dict):
+        return merged
+    metadata = delta.get("metadata")
+    if isinstance(metadata, dict) and not isinstance(merged.get("metadata"), dict):
+        merged["metadata"] = metadata
+    for collection in ("businessObjectives", "useCases", "signals"):
+        merged[collection] = _merge_items_by_id(
+            _list(merged, collection), _list(delta, collection)
+        )
+    merged["products"] = _merge_products(
+        _list(merged, "products"), _list(delta, "products")
+    )
+    merged["graphEdges"] = _merge_graph_edges(
+        _list(merged, "graphEdges"), _list(delta, "graphEdges")
+    )
+    warnings = [
+        *_string_list(merged.get("warnings")),
+        *_string_list(delta.get("warnings")),
+    ]
+    if warnings:
+        merged["warnings"] = list(dict.fromkeys(warnings))
+    return merged
+
+
+def _merge_items_by_id(
+    existing: List[Dict[str, Any]],
+    delta: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    merged = {
+        (_text(item.get("id")) or _artifact_fingerprint(item)): item
+        for item in existing
+    }
+    for item in delta:
+        key = _text(item.get("id")) or _artifact_fingerprint(item)
+        merged[key] = item
+    return list(merged.values())
+
+
+def _string_list(value: Any) -> List[str]:
+    if not isinstance(value, list):
+        return []
+    return [str(item) for item in value if item]
+
+
+def _merge_products(
+    existing: List[Dict[str, Any]],
+    delta: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    merged = {_product_merge_key(item): item for item in existing}
+    for item in delta:
+        merged[_product_merge_key(item)] = item
+    return list(merged.values())
+
+
+def _product_merge_key(product: Dict[str, Any]) -> str:
+    reference = product.get("productReference")
+    if isinstance(reference, dict):
+        return _text(
+            reference.get("productID") or reference.get("id")
+        ) or _artifact_fingerprint(reference)
+    return _artifact_fingerprint(product)
+
+
+def _merge_graph_edges(
+    existing: List[Dict[str, Any]],
+    delta: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    merged = {_graph_edge_key(item): item for item in existing}
+    for item in delta:
+        merged[_graph_edge_key(item)] = item
+    return list(merged.values())
+
+
+def _graph_edge_key(edge: Dict[str, Any]) -> str:
+    source = _text(edge.get("source") or edge.get("from"))
+    target = _text(edge.get("target") or edge.get("to"))
+    edge_type = _text(edge.get("type"), "relatedTo")
+    return f"{source}|{edge_type}|{target}"
+
+
+def _catalog_document(plan: Dict[str, Any]) -> Dict[str, Any]:
+    metadata = plan.get("metadata") if isinstance(plan.get("metadata"), dict) else {}
+    catalog: Dict[str, Any] = {
+        "metadata": {
+            "id": metadata.get("id", "CAT-PORTFOLIO"),
+            "name": {"en": metadata.get("name", "Generated Portfolio")},
+            "description": {
+                "en": metadata.get(
+                    "description", "Generated from portfolio source lanes."
+                )
+            },
+        }
+    }
+    collections = (
+        ("businessObjectives", "businessObjectives"),
+        ("useCases", "useCases"),
+        ("signals", "signals"),
+    )
+    for source_key, target_key in collections:
+        items = _list(plan, source_key)
+        if items:
+            catalog[target_key] = items
+    return {
+        "schema": "https://opendataproducts.org/odpc-v1.0/schema/odpc.yaml",
+        "version": "1.0",
+        "kind": "Catalog",
+        "catalog": catalog,
+    }
+
+
+def _graph_document(plan: Dict[str, Any]) -> Dict[str, Any]:
+    metadata = plan.get("metadata") if isinstance(plan.get("metadata"), dict) else {}
+    nodes = []
+    nodes.extend(
+        _graph_nodes(
+            _list(plan, "businessObjectives"),
+            "BusinessObjective",
+            "business_objective",
+        )
+    )
+    nodes.extend(_graph_nodes(_list(plan, "useCases"), "UseCase", "use_case"))
+    nodes.extend(_graph_nodes(_list(plan, "signals"), "KPI", "signal"))
+    for product in _list(plan, "products"):
+        reference = product.get("productReference")
+        if isinstance(reference, dict):
+            nodes.append(_graph_node(reference, "DataProduct", "product_reference"))
+    return {
+        "schema": "https://opendataproducts.org/odpg-v1.0/schema/odpg.yaml",
+        "version": "1.0",
+        "kind": "Graph",
+        "graph": {
+            "metadata": {
+                "id": f"{metadata.get('id', 'portfolio')}-graph",
+                "name": {"en": metadata.get("name", "Generated Portfolio")},
+                "description": {
+                    "en": metadata.get(
+                        "description",
+                        "Generated portfolio relationship graph.",
+                    )
+                },
+            },
+            "nodes": nodes,
+            "edges": [_graph_edge(edge) for edge in _list(plan, "graphEdges")],
+        },
+    }
+
+
+def _graph_nodes(
+    items: List[Dict[str, Any]],
+    node_type: str,
+    fragment_prefix: str,
+) -> List[Dict[str, Any]]:
+    return [_graph_node(item, node_type, fragment_prefix) for item in items]
+
+
+def _graph_node(
+    item: Dict[str, Any],
+    node_type: str,
+    fragment_prefix: str,
+) -> Dict[str, Any]:
+    item_id = _text(item.get("id") or item.get("productID"))
+    return {
+        "id": item_id,
+        "type": node_type,
+        "$ref": f"../odpc/fragments/{fragment_prefix}_{_path_id(item_id)}.yaml",
+    }
+
+
+def _graph_edge(edge: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        "from": _text(edge.get("source") or edge.get("from")),
+        "to": _text(edge.get("target") or edge.get("to")),
+        "type": _text(edge.get("type"), "relatedTo"),
+        "confidence": _text(edge.get("confidence"), "medium"),
+    }
+
+
+def _artifact_counts(plan: Dict[str, Any]) -> Dict[str, int]:
+    return {
+        "businessObjectives": len(_list(plan, "businessObjectives")),
+        "useCases": len(_list(plan, "useCases")),
+        "signals": len(_list(plan, "signals")),
+        "productReferences": len(_list(plan, "products")),
+        "odpsProducts": len(_list(plan, "products")),
+        "graphEdges": len(_list(plan, "graphEdges")),
+    }
+
+
+def _workspace_artifact_counts(data: Dict[str, Any]) -> Dict[str, int]:
+    catalog = data["catalog"].get("catalog", {})
+    graph = data["graph"].get("graph", {})
+    return {
+        "businessObjectives": _count(catalog, "businessObjectives"),
+        "useCases": _count(catalog, "useCases"),
+        "signals": _count(catalog, "signals"),
+        "productReferences": _count(catalog, "productReferences"),
+        "odpsProducts": len(data["products"]),
+        "graphNodes": _count(graph, "nodes"),
+        "graphEdges": _count(graph, "edges"),
+    }
+
+
+def _extract_yaml_text(raw_output: str) -> str:
+    if "```" not in raw_output:
+        return raw_output
+    parts = raw_output.split("```")
+    if len(parts) < 3:
+        return raw_output
+    candidate = parts[1]
+    if candidate.lstrip().startswith(("yaml", "yml")):
+        candidate = candidate.split("\n", 1)[1] if "\n" in candidate else ""
+    return candidate
+
+
+def _file_id(item: Dict[str, Any]) -> str:
+    return _path_id(_text(item.get("id") or item.get("productID"), "item"))
+
+
+def _path_id(value: str) -> str:
+    cleaned = "".join(
+        char if char.isalnum() or char in "._-" else "-" for char in value
+    )
+    return cleaned.strip("-") or "item"
 
 
 def render_portfolio(
@@ -24,6 +2239,7 @@ def render_portfolio(
     root = Path(workspace)
     data = load_portfolio_workspace(root)
     html_text = render_portfolio_html(data)
+    validation_results = _portfolio_validation_results(data)
     output = (
         Path(output_path) if output_path is not None else root / DEFAULT_PORTFOLIO_HTML
     )
@@ -43,7 +2259,8 @@ def render_portfolio(
         "updated": [],
         "unchanged": [],
         "warnings": data["warnings"],
-        "valid": True,
+        "validationResults": validation_results,
+        "valid": _valid_portfolio(validation_results),
     }
     result[changed_key] = [str(output)]
     return result
@@ -55,6 +2272,7 @@ def explain_portfolio(workspace: Union[str, Path]) -> Dict[str, object]:
     data = load_portfolio_workspace(root)
     catalog = data["catalog"].get("catalog", {})
     graph = data["graph"].get("graph", {})
+    validation_results = _portfolio_validation_results(data)
     return {
         "spec": "portfolio",
         "kind": "PortfolioExplain",
@@ -69,7 +2287,8 @@ def explain_portfolio(workspace: Union[str, Path]) -> Dict[str, object]:
         "graphEdgeCount": _count(graph, "edges"),
         "versionCount": len(data["versions"]),
         "warnings": data["warnings"],
-        "valid": True,
+        "validationResults": validation_results,
+        "valid": _valid_portfolio(validation_results),
     }
 
 
@@ -98,6 +2317,51 @@ def load_portfolio_workspace(workspace: Union[str, Path]) -> Dict[str, Any]:
     }
 
 
+def _portfolio_validation_results(data: Dict[str, Any]) -> Dict[str, Any]:
+    from .agent import validate_document
+    from .odpc import validate_catalog
+    from .odpg import validate_graph
+
+    catalog_result = validate_catalog(data["catalog"])
+    graph_result = validate_graph(data["graph"])
+    product_results = []
+    for product in data["products"].values():
+        path = product.get("path")
+        if isinstance(path, Path):
+            try:
+                result = validate_document(path)
+                product_results.append(result.to_dict())
+            except (OSError, ValueError, TypeError, AttributeError) as exc:
+                product_results.append(
+                    {
+                        "valid": False,
+                        "spec": "odps",
+                        "kind": "OpenDataProduct",
+                        "path": str(path),
+                        "errors": [str(exc)],
+                    }
+                )
+    return {
+        "catalog": {
+            "valid": catalog_result.valid,
+            "errors": list(catalog_result.errors),
+        },
+        "graph": graph_result.to_dict(),
+        "products": product_results,
+    }
+
+
+def _valid_portfolio(validation_results: Dict[str, Any]) -> bool:
+    catalog = validation_results.get("catalog", {})
+    graph = validation_results.get("graph", {})
+    products = validation_results.get("products", [])
+    return (
+        bool(catalog.get("valid"))
+        and bool(graph.get("valid"))
+        and all(bool(product.get("valid")) for product in products)
+    )
+
+
 def render_portfolio_html(data: Dict[str, Any]) -> str:
     """Render portfolio workspace data to static HTML."""
     portfolio = data["portfolio"]
@@ -114,6 +2378,9 @@ def render_portfolio_html(data: Dict[str, Any]) -> str:
     signals = _list(catalog_root, "signals")
     product_references = _list(catalog_root, "productReferences")
     graph = data["graph"].get("graph", {})
+    description = _text(
+        metadata.get("description"), "Generated Open Data Products portfolio."
+    )
 
     html_parts = [
         "<!doctype html>",
@@ -127,111 +2394,99 @@ def render_portfolio_html(data: Dict[str, Any]) -> str:
         "</style>",
         "</head>",
         "<body>",
-        "<main>",
-        '<header class="odp-header">',
-        f"<h1>{_escape(title)}</h1>",
-        f'<p class="odp-muted">{_escape(_text(metadata.get("description"), "Generated Open Data Products portfolio."))}</p>',
+        '<header class="topbar">',
+        '<div class="topbar-inner">',
+        '<a class="brand" href="#overview" aria-label="Open Data Products portfolio">Open Data Products Portfolio</a>',
+        "</div>",
         "</header>",
-        _render_nav(),
-        _render_overview(catalog_root, graph, data["products"], data["versions"]),
-        _render_artifact_section(
-            "objectives", "Business Objectives", business_objectives
+        '<section class="hero">',
+        '<div class="wrap">',
+        '<p class="eyebrow">AI Agent First Portfolio Workspace</p>',
+        f"<h1>{_escape(title)}</h1>",
+        f'<p class="lead">{_escape(description)}</p>',
+        "</div>",
+        "</section>",
+        '<main class="wrap">',
+        _render_tab_inputs(),
+        _render_tab_nav(),
+        '<div class="panels">',
+        _render_overview(
+            catalog_root,
+            graph,
+            data["products"],
+            data["versions"],
+            data["warnings"],
         ),
-        _render_artifact_section("use-cases", "Use Cases", use_cases),
-        _render_artifact_section("signals", "Signals", signals),
+        _render_artifact_panel(
+            "objectives",
+            "Objectives",
+            "Business Objectives",
+            "Business-Led Starting Point",
+            "Objectives make the portfolio business-led before products become the center of gravity.",
+            business_objectives,
+        ),
+        _render_artifact_panel(
+            "use-cases",
+            "Use Cases",
+            "Use Cases",
+            "Operational Demand",
+            "Use cases are the practical starting points for deciding which data products should exist.",
+            use_cases,
+        ),
         _render_products(product_references, data["products"]),
-        _render_graph(graph),
+        _render_artifact_panel(
+            "signals",
+            "Signals",
+            "Signals",
+            "Market And Portfolio Signals",
+            "Signals explain why a product or use case matters now, and how confident the evidence is.",
+            signals,
+            card_class=" signal",
+        ),
+        _render_graph(data["graph"], _catalog_label_map(catalog_root)),
         _render_about(data),
+        "</div>",
         "</main>",
+        _render_footer(data),
         "</body>",
         "</html>",
     ]
     return "\n".join(html_parts) + "\n"
 
 
-def _load_optional_mapping(path: Path) -> Dict[str, Any]:
-    if not path.exists():
-        return {}
-    return load_mapping(path, root_name="Portfolio")
+def _render_tab_inputs() -> str:
+    tabs = (
+        "overview",
+        "objectives",
+        "use-cases",
+        "products",
+        "signals",
+        "graph",
+        "about",
+    )
+    inputs = []
+    for index, tab in enumerate(tabs):
+        checked = " checked" if index == 0 else ""
+        inputs.append(
+            f'<input class="tab-radio" type="radio" name="portfolio-tab" id="tab-{tab}"{checked}>'
+        )
+    return "".join(inputs)
 
 
-def _empty_catalog() -> Dict[str, Any]:
-    return {"catalog": {"metadata": {"name": {"en": "Portfolio"}}}}
-
-
-def _empty_graph() -> Dict[str, Any]:
-    return {"graph": {"metadata": {}, "nodes": [], "edges": []}}
-
-
-def _load_product_specs(root: Path) -> Dict[str, Dict[str, Any]]:
-    products: Dict[str, Dict[str, Any]] = {}
-    product_dir = root / "odps" / "products"
-    for path in sorted(
-        [
-            *product_dir.glob("*.yaml"),
-            *product_dir.glob("*.yml"),
-            *product_dir.glob("*.json"),
-        ]
-    ):
-        try:
-            document = load_mapping(path, root_name="ODPS product")
-        except ValueError:
-            continue
-        details = _product_details(document)
-        product_id = _text(details.get("productID") or details.get("id"), path.stem)
-        products[product_id] = {"path": path, "document": document}
-    return products
-
-
-def _portfolio_versions(root: Path, portfolio: Dict[str, Any]) -> List[Dict[str, str]]:
-    versions = []
-    metadata_versions = portfolio.get("versions")
-    if isinstance(metadata_versions, list):
-        for item in metadata_versions:
-            if not isinstance(item, dict):
-                continue
-            version_id = str(item.get("id") or item.get("version") or "")
-            html_path = str(item.get("html") or f"versions/{version_id}/index.html")
-            if version_id:
-                versions.append(
-                    {
-                        "id": version_id,
-                        "type": str(
-                            item.get("type") or item.get("runType") or "snapshot"
-                        ),
-                        "summary": str(item.get("summary") or ""),
-                        "html": html_path,
-                    }
-                )
-    if versions:
-        return versions
-    versions_root = root / "versions"
-    if versions_root.exists():
-        for path in sorted(versions_root.glob("*/index.html")):
-            version_id = path.parent.name
-            versions.append(
-                {
-                    "id": version_id,
-                    "type": "snapshot",
-                    "summary": "",
-                    "html": path.relative_to(root).as_posix(),
-                }
-            )
-    return versions
-
-
-def _render_nav() -> str:
-    links = [
+def _render_tab_nav() -> str:
+    tabs = [
         ("overview", "Overview"),
-        ("objectives", "Business Objectives"),
+        ("objectives", "Objectives"),
         ("use-cases", "Use Cases"),
         ("products", "Products"),
         ("signals", "Signals"),
         ("graph", "Graph"),
         ("about", "About"),
     ]
-    items = "".join(f'<a href="#{anchor}">{label}</a>' for anchor, label in links)
-    return f'<nav class="odp-tabs">{items}</nav>'
+    labels = "".join(
+        f'<label for="tab-{tab}">{_escape(label)}</label>' for tab, label in tabs
+    )
+    return f'<nav class="tabs" aria-label="Portfolio tabs">{labels}</nav>'
 
 
 def _render_overview(
@@ -239,56 +2494,213 @@ def _render_overview(
     graph: Dict[str, Any],
     products: Dict[str, Dict[str, Any]],
     versions: List[Dict[str, str]],
+    warnings: List[str],
 ) -> str:
     counts = [
-        ("Business Objectives", _count(catalog, "businessObjectives")),
+        ("Objective", _count(catalog, "businessObjectives")),
         ("Use Cases", _count(catalog, "useCases")),
-        ("Signals", _count(catalog, "signals")),
-        ("Products", _count(catalog, "productReferences")),
-        ("ODPS Specs", len(products)),
+        ("Signal", _count(catalog, "signals")),
+        ("Product", _count(catalog, "productReferences")),
         ("Graph Nodes", _count(graph, "nodes")),
         ("Graph Edges", _count(graph, "edges")),
     ]
-    cards = "".join(
-        f"<li><strong>{count}</strong><span>{_escape(label)}</span></li>"
+    metrics = "".join(
+        f'<article class="metric"><strong>{count}</strong><span>{_escape(label)}</span></article>'
         for label, count in counts
     )
-    version_html = _render_versions(versions)
     return (
-        '<section id="overview" class="odp-section">'
-        "<h2>Overview</h2>"
-        f'<ul class="odp-summary">{cards}</ul>'
-        f"{version_html}"
+        '<section class="tab-panel overview-panel" id="overview">'
+        '<div class="section-head"><div>'
+        '<p class="eyebrow">Portfolio Overview</p>'
+        "<h2>Generated workspace summary</h2>"
+        "</div><p>One page for the portfolio catalog, ODPS product details, "
+        "graph relationships, versions, and generation context.</p></div>"
+        f'<section class="summary" aria-label="Portfolio summary">{metrics}</section>'
+        f"{_render_recommended_actions(catalog, graph, products, warnings)}"
+        f"{_render_portfolio_status()}"
+        f"{_render_versions(versions)}"
+        "</section>"
+    )
+
+
+def _render_portfolio_status() -> str:
+    return (
+        '<section class="overview-section" aria-label="Portfolio status">'
+        '<div class="section-head"><div>'
+        '<p class="eyebrow">Workspace</p>'
+        "<h2>Portfolio status</h2>"
+        "</div></div>"
+        '<div class="overview-card-grid">'
+        '<article class="action-card overview-card status-card">'
+        '<div class="chip-row"><span class="chip odpc">ODPC</span>'
+        '<span class="chip odps">ODPS</span><span class="chip odpg">ODPG</span></div>'
+        "<p>The workspace links business demand, product references, detailed "
+        "ODPS products, and graph relationships generated from source lanes.</p>"
+        f'{_render_facts([("HTML", "index.html"), ("Catalog", "odpc/catalog.yaml"), ("Graph", "odpg/graph.yaml")])}'
+        "</article>"
+        "</div>"
+        "</section>"
+    )
+
+
+def _render_recommended_actions(
+    catalog: Dict[str, Any],
+    graph: Dict[str, Any],
+    products: Dict[str, Dict[str, Any]],
+    warnings: List[str],
+) -> str:
+    actions = []
+    if warnings:
+        actions.append(
+            (
+                "Review",
+                "Review portfolio warnings",
+                f"{len(warnings)} warning item(s) need human review.",
+                "tab-overview",
+                "Review Overview",
+            )
+        )
+    product_refs = _list(catalog, "productReferences")
+    if product_refs and len(products) < len(product_refs):
+        actions.append(
+            (
+                "Resolve",
+                "Link missing ODPS specs",
+                "Some product references do not have matching ODPS product details.",
+                "tab-products",
+                "Open Products",
+            )
+        )
+    if product_refs:
+        actions.append(
+            (
+                "Complete",
+                "Expand product evidence",
+                "Review commercial, SLA, and data quality evidence for generated products.",
+                "tab-products",
+                "Open Products",
+            )
+        )
+    if _count(graph, "nodes"):
+        actions.append(
+            (
+                "Validate",
+                "Check graph coverage",
+                "Review whether every objective and signal has a useful relationship path.",
+                "tab-graph",
+                "Open Graph",
+            )
+        )
+    if not actions:
+        actions.append(
+            (
+                "Review",
+                "Inspect generated artifacts",
+                "Open each artifact tab and confirm the generated portfolio is ready to maintain.",
+                "tab-products",
+                "Open Products",
+            )
+        )
+    cards = "".join(
+        '<article class="action-card">'
+        f'<span class="chip">{_escape(kind)}</span>'
+        f"<strong>{_escape(title)}</strong>"
+        f"<p>{_escape(description)}</p>"
+        f'<label class="action-link" for="{_escape_attr(target)}">{_escape(label)}</label>'
+        "</article>"
+        for kind, title, description, target, label in actions[:3]
+    )
+    return (
+        '<section aria-label="Recommended next actions">'
+        '<div class="section-head"><div>'
+        '<p class="eyebrow">Operational Guidance</p>'
+        "<h2>Recommended next actions</h2>"
+        "</div></div>"
+        f'<div class="actions-grid">{cards}</div>'
         "</section>"
     )
 
 
 def _render_versions(versions: List[Dict[str, str]]) -> str:
+    recent = versions[:5]
+    recent_items = [
+        '<li class="version-row"><strong>Current</strong><span>latest</span></li>'
+    ]
+    for version in recent:
+        html_path = _escape_attr(version["html"])
+        recent_items.append(
+            '<li class="version-row">'
+            f'<a href="{html_path}">{_escape(version["id"])}</a>'
+            f'<a class="version-action" href="{html_path}">Open</a>'
+            "</li>"
+        )
     if not versions:
-        return ""
-    items = "".join(
-        "<li>"
-        f'<a href="{_escape_attr(version["html"])}">{_escape(version["id"])}</a>'
-        f'<span>{_escape(version["type"])}</span>'
-        f'<span>{_escape(version["summary"])}</span>'
-        "</li>"
+        recent_items.append(
+            '<li class="version-row"><span>No snapshots yet</span></li>'
+        )
+    rows = "".join(
+        "<tr>"
+        f"<td>{_escape(version['id'])}</td>"
+        f"<td>{_escape(version['type'])}</td>"
+        f"<td>{_escape(version['summary'])}</td>"
+        f'<td><a class="version-action" href="{_escape_attr(version["html"])}">Open</a></td>'
+        "</tr>"
         for version in versions
     )
-    return f'<section class="odp-version-switcher"><h3>Versions</h3><ul>{items}</ul></section>'
-
-
-def _render_artifact_section(
-    anchor: str, title: str, items: List[Dict[str, Any]]
-) -> str:
-    cards = (
-        "".join(_render_artifact_card(item) for item in items) or "<p>No entries.</p>"
-    )
+    history = ""
+    if versions:
+        history = (
+            '<details class="version-history">'
+            f"<summary>Show all {len(versions)} versions</summary>"
+            '<table class="version-table"><thead>'
+            "<tr><th>Version</th><th>Run</th><th>Summary</th><th></th></tr>"
+            f"</thead><tbody>{rows}</tbody></table></details>"
+        )
     return (
-        f'<section id="{anchor}" class="odp-section"><h2>{title}</h2>{cards}</section>'
+        '<section class="overview-section" aria-label="Portfolio versions">'
+        '<div class="section-head"><div>'
+        '<p class="eyebrow">Version history</p>'
+        "<h2>Portfolio versions</h2>"
+        "</div></div>"
+        '<div class="overview-card-grid">'
+        '<article class="action-card overview-card versions-card">'
+        "<p>Latest page is always this index.html; previous snapshots open from "
+        "version folders.</p>"
+        f'<ul class="version-list">{"".join(recent_items)}</ul>'
+        f"{history}"
+        "</article>"
+        "</div>"
+        "</section>"
     )
 
 
-def _render_artifact_card(item: Dict[str, Any]) -> str:
+def _render_artifact_panel(
+    tab: str,
+    label: str,
+    title: str,
+    eyebrow: str,
+    description: str,
+    items: List[Dict[str, Any]],
+    *,
+    card_class: str = "",
+) -> str:
+    cards = "".join(
+        _render_artifact_card(item, card_class=card_class) for item in items
+    )
+    if not cards:
+        cards = "<p>No entries.</p>"
+    return (
+        f'<section class="tab-panel {tab}-panel" id="{tab}">'
+        '<div class="section-head"><div>'
+        f'<p class="eyebrow">{_escape(eyebrow)}</p>'
+        f"<h2>{_escape(title)}</h2>"
+        f"</div><p>{_escape(description)}</p></div>"
+        f'<div class="grid">{cards}</div>'
+        "</section>"
+    )
+
+
+def _render_artifact_card(item: Dict[str, Any], *, card_class: str = "") -> str:
     name = _text(item.get("name"), _text(item.get("id"), "(unnamed)"))
     details = [
         ("ID", item.get("id")),
@@ -298,7 +2710,8 @@ def _render_artifact_card(item: Dict[str, Any]) -> str:
         ("Type", item.get("type")),
     ]
     return (
-        '<article class="odp-card">'
+        f'<article class="card{card_class}">'
+        '<div class="chip-row"><span class="chip odpc">ODPC</span></div>'
         f"<h3>{_escape(name)}</h3>"
         f'<p>{_escape(_text(item.get("description")))}</p>'
         f"{_render_facts(details)}"
@@ -315,7 +2728,16 @@ def _render_products(
         product_info = _resolve_product(reference, products)
         cards.append(_render_product_card(reference, product_info))
     content = "".join(cards) or "<p>No entries.</p>"
-    return f'<section id="products" class="odp-section"><h2>Products</h2>{content}</section>'
+    return (
+        '<section class="tab-panel products-panel" id="products">'
+        '<div class="section-head"><div>'
+        '<p class="eyebrow">Product Reference + ODPS Detail</p>'
+        "<h2>Products</h2>"
+        "</div><p>Product cards start from ODPC references and open into "
+        "detailed ODPS product specifications.</p></div>"
+        f'<div class="grid">{content}</div>'
+        "</section>"
+    )
 
 
 def _render_product_card(
@@ -339,7 +2761,9 @@ def _render_product_card(
     if product_info is not None:
         product_detail_html = _render_product_detail(product_info)
     return (
-        '<article class="odp-card">'
+        '<article class="card product wide">'
+        '<div class="chip-row"><span class="chip odps">ODPS</span>'
+        '<span class="chip odpc">ODPC Reference</span></div>'
         f"<h3>{_escape(name)}</h3>"
         f'<p>{_escape(_text(reference.get("description")))}</p>'
         f"{_render_facts(details)}"
@@ -387,7 +2811,7 @@ def _render_product_detail(product_info: Dict[str, Any]) -> str:
     ]
     return (
         '<details class="odp-detail" open>'
-        "<summary>Open details</summary>"
+        "<summary>Product details</summary>"
         f'<p>{_escape(_text(details.get("description")))}</p>'
         f"{_render_facts(facts)}"
         f"{''.join(sections)}"
@@ -396,29 +2820,88 @@ def _render_product_detail(product_info: Dict[str, Any]) -> str:
     )
 
 
-def _render_graph(graph: Dict[str, Any]) -> str:
-    nodes = _list(graph, "nodes")
-    edges = _list(graph, "edges")
-    node_items = "".join(
-        f'<li><strong>{_escape(_text(node.get("id")))}</strong> {_escape(_text(node.get("type")))}</li>'
-        for node in nodes
-    )
-    edge_items = "".join(
-        "<li>"
-        f'{_escape(_text(edge.get("source")))} '
-        f'{_escape(_text(edge.get("type")))} '
-        f'{_escape(_text(edge.get("target")))}'
-        "</li>"
-        for edge in edges
-    )
+def _render_graph(graph: Dict[str, Any], labels: Dict[str, str]) -> str:
+    explorer_html = _portfolio_graph_explorer_html(graph, labels)
     return (
-        '<section id="graph" class="odp-section">'
-        "<h2>Graph</h2>"
-        f"<p>{len(nodes)} nodes, {len(edges)} edges.</p>"
-        f'<div class="odp-grid"><div><h3>Nodes</h3><ul>{node_items}</ul></div>'
-        f"<div><h3>Edges</h3><ul>{edge_items}</ul></div></div>"
+        '<section class="tab-panel graph-panel" id="graph">'
+        '<div class="section-head"><div>'
+        '<p class="eyebrow">ODPG Graph View</p>'
+        "<h2>Graph explorer</h2>"
+        "</div><p>This tab embeds the generated ODPG graph explorer without "
+        "the standalone explorer header and footer.</p></div>"
+        '<iframe class="graph-explorer-frame" title="ODPG graph explorer" '
+        f'srcdoc="{_escape_attr(explorer_html)}"></iframe>'
         "</section>"
     )
+
+
+def _portfolio_graph_explorer_html(
+    graph: Dict[str, Any],
+    labels: Dict[str, str],
+) -> str:
+    html_text = build_graph_explorer_html(_graph_for_explorer(graph, labels))
+    html_text = _remove_html_block(
+        html_text, '<footer class="odpg-footer">', "</footer>"
+    )
+    html_text = html_text.replace(
+        "</style>",
+        ".topbar{display:none!important;}</style>",
+        1,
+    )
+    html_text = html_text.replace("max-height: 100dvh;", "max-height: none;")
+    return html_text
+
+
+def _graph_for_explorer(
+    graph: Dict[str, Any],
+    labels: Optional[Dict[str, str]] = None,
+) -> Dict[str, Any]:
+    document = deepcopy(graph)
+    payload = document.get("graph") if isinstance(document, dict) else None
+    if not isinstance(payload, dict):
+        payload = document if isinstance(document, dict) else {}
+    label_map = labels or {}
+    for node in _list(payload, "nodes"):
+        node_id = _text(node.get("id"))
+        label = label_map.get(node_id)
+        if label:
+            node["label"] = {"en": label}
+    normalized_edges = []
+    for edge in _list(payload, "edges"):
+        item = dict(edge)
+        if "from" not in item and item.get("source"):
+            item["from"] = item["source"]
+        if "to" not in item and item.get("target"):
+            item["to"] = item["target"]
+        normalized_edges.append(item)
+    payload["edges"] = normalized_edges
+    return document
+
+
+def _catalog_label_map(catalog: Dict[str, Any]) -> Dict[str, str]:
+    labels: Dict[str, str] = {}
+    for collection in (
+        "businessObjectives",
+        "useCases",
+        "signals",
+        "productReferences",
+    ):
+        for item in _list(catalog, collection):
+            item_id = _text(item.get("id"))
+            label = _text(item.get("name"))
+            if item_id and label:
+                labels[item_id] = label
+    return labels
+
+
+def _remove_html_block(text: str, start_marker: str, end_marker: str) -> str:
+    start = text.find(start_marker)
+    if start == -1:
+        return text
+    end = text.find(end_marker, start)
+    if end == -1:
+        return text
+    return text[:start] + text[end + len(end_marker) :]
 
 
 def _render_about(data: Dict[str, Any]) -> str:
@@ -431,17 +2914,127 @@ def _render_about(data: Dict[str, Any]) -> str:
             count = value.get("count") if isinstance(value, dict) else value
             source_items.append(f"<li>{_escape(str(key))}: {_escape(str(count))}</li>")
     return (
-        '<section id="about" class="odp-section">'
-        "<h2>About</h2>"
+        '<section class="tab-panel about-panel" id="about">'
+        '<article class="about-card">'
+        '<div class="chip-row"><span class="chip">SDK '
+        f"{_escape(_text(metadata.get('sdkVersion'), __version__))}</span>"
+        '<span class="chip">ODPC</span><span class="chip">ODPS</span>'
+        '<span class="chip">ODPG</span><span class="chip">ODPV</span></div>'
+        "<h2>About this portfolio</h2>"
         "<p>This portfolio was generated with the Open Data Products SDK and "
         "is grounded in the OpenDataProducts.org standards family: ODPC for "
         "catalog objects, ODPS for product specifications, ODPG for graph "
         "relationships, and ODPV for shared vocabulary where used.</p>"
-        f"<p>SDK version: {_escape(_text(metadata.get('sdkVersion'), __version__))}</p>"
+        "<p>Generated ODPS products are drafts. They are intended to give teams "
+        "a quick start from source material such as text files, emails, briefs, "
+        "and transcripts. Human review and acceptance are required before any "
+        "generated product specification is treated as production-ready.</p>"
         f"<p>Generation timestamp: {_escape(_text(metadata.get('generatedAt'), '(not set)'))}</p>"
         f'<ul>{"".join(source_items)}</ul>'
-        "</section>"
+        "</article></section>"
     )
+
+
+def _render_footer(data: Dict[str, Any]) -> str:
+    return (
+        '<footer class="footer"><div class="wrap footer-inner">'
+        "<p>Generated with the Open Data Products SDK. This static portfolio keeps "
+        "catalog artifacts, ODPS product specs, ODPG graph data, version snapshots, "
+        "and review guidance together in one browser-openable file. Generated "
+        "product specs are drafts until reviewed and accepted by humans.</p>"
+        '<nav class="footer-links" aria-label="Portfolio artifact links">'
+        '<a href="odpc/catalog.yaml">Catalog YAML</a>'
+        '<a href="odpg/graph.yaml">Graph YAML</a>'
+        '<a href="#overview">Back to top</a>'
+        "</nav></div></footer>"
+    )
+
+
+def _load_optional_mapping(path: Path) -> Dict[str, Any]:
+    if not path.exists():
+        return {}
+    return load_mapping(path, root_name="Portfolio")
+
+
+def _empty_catalog() -> Dict[str, Any]:
+    return {"catalog": {"metadata": {"name": {"en": "Portfolio"}}}}
+
+
+def _empty_graph() -> Dict[str, Any]:
+    return {"graph": {"metadata": {}, "nodes": [], "edges": []}}
+
+
+def _load_product_specs(root: Path) -> Dict[str, Dict[str, Any]]:
+    products: Dict[str, Dict[str, Any]] = {}
+    for path in _product_spec_paths(root):
+        try:
+            document = load_mapping(path, root_name="ODPS product")
+        except ValueError:
+            continue
+        details = _product_details(document)
+        product_id = _text(details.get("productID") or details.get("id"), path.stem)
+        products[product_id] = {"path": path, "document": document}
+    return products
+
+
+def _normalize_product_spec_files(root: Path) -> List[Tuple[Path, str]]:
+    written: List[Tuple[Path, str]] = []
+    for path in _product_spec_paths(root):
+        try:
+            document = load_mapping(path, root_name="ODPS product")
+        except ValueError:
+            continue
+        _normalize_odps_product(document)
+        written.append(_write_yaml(path, document))
+    return written
+
+
+def _product_spec_paths(root: Path) -> List[Path]:
+    product_dir = root / "odps" / "products"
+    return sorted(
+        [
+            *product_dir.glob("*.yaml"),
+            *product_dir.glob("*.yml"),
+            *product_dir.glob("*.json"),
+        ]
+    )
+
+
+def _portfolio_versions(root: Path, portfolio: Dict[str, Any]) -> List[Dict[str, str]]:
+    versions = []
+    metadata_versions = portfolio.get("versions")
+    if isinstance(metadata_versions, list):
+        for item in metadata_versions:
+            if not isinstance(item, dict):
+                continue
+            version_id = str(item.get("id") or item.get("version") or "")
+            html_path = str(item.get("html") or f"versions/{version_id}/index.html")
+            if version_id:
+                versions.append(
+                    {
+                        "id": version_id,
+                        "type": str(
+                            item.get("type") or item.get("runType") or "snapshot"
+                        ),
+                        "summary": str(item.get("summary") or ""),
+                        "html": html_path,
+                    }
+                )
+    if versions:
+        return versions
+    versions_root = root / "versions"
+    if versions_root.exists():
+        for path in sorted(versions_root.glob("*/index.html")):
+            version_id = path.parent.name
+            versions.append(
+                {
+                    "id": version_id,
+                    "type": "snapshot",
+                    "summary": "",
+                    "html": path.relative_to(root).as_posix(),
+                }
+            )
+    return versions
 
 
 def _product_details(document: Dict[str, Any]) -> Dict[str, Any]:
@@ -474,6 +3067,14 @@ def _declarative_items(value: Any) -> List[Dict[str, Any]]:
     if not isinstance(value, dict):
         return []
     declarative = value.get("declarative")
+    if isinstance(declarative, dict):
+        items = []
+        for name, item in declarative.items():
+            if isinstance(item, dict):
+                named_item = dict(item)
+                named_item.setdefault("profile", name)
+                items.append(named_item)
+        return items
     if isinstance(declarative, list):
         return [item for item in declarative if isinstance(item, dict)]
     return []
@@ -529,103 +3130,421 @@ def _portfolio_css() -> str:
     return """
 :root {
   color-scheme: light;
-  --bg: #f7f8f5;
-  --panel: #ffffff;
-  --text: #18201a;
-  --muted: #5e6b60;
-  --line: #d9dfd6;
-  --accent: #006d1d;
+  --odps-violet: #6c2a8e;
+  --odpc-orange: #f28c28;
+  --odpg-green: #2f9b58;
+  --odpv-blue: #1f78d1;
+  --odp-ink: #1e0a2e;
+  --odp-soft: #f7f3fa;
+  --odp-line: #e7e1ec;
+  --odp-muted: #6d6175;
+  --odp-black: #050505;
 }
 * { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
 body {
   margin: 0;
-  background: var(--bg);
-  color: var(--text);
-  font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: var(--odp-ink);
+  background: #fff;
+  font: 16px/1.55 Poppins, Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
-main {
+a { color: inherit; text-decoration: none; }
+.topbar {
+  color: #fff;
+  background: var(--odp-black);
+  border-bottom: 4px solid var(--odps-violet);
+}
+.topbar-inner,
+.wrap {
   width: min(1180px, calc(100% - 32px));
   margin: 0 auto;
-  padding: 32px 0 56px;
 }
-a { color: var(--accent); }
-.odp-header {
-  padding: 24px 0;
-  border-bottom: 1px solid var(--line);
+.topbar-inner {
+  display: flex;
+  align-items: center;
+  min-height: 58px;
 }
-.odp-header h1 {
-  margin: 0 0 8px;
-  font-size: clamp(2rem, 5vw, 4rem);
-  line-height: 1;
+.brand {
+  font-weight: 700;
+}
+.hero {
+  color: #fff;
+  background:
+    linear-gradient(135deg, rgba(108, 42, 142, .96), rgba(30, 10, 46, .94)),
+    var(--odps-violet);
+}
+.hero .wrap {
+  padding: 46px 0 30px;
+}
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 14px;
+  color: var(--odps-violet);
+  font-size: .78rem;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.hero .eyebrow { color: rgba(255, 255, 255, .82); }
+h1 {
+  max-width: 780px;
+  margin: 0 0 14px;
+  font-size: clamp(2.25rem, 5vw, 4.55rem);
+  line-height: 1.02;
+  font-weight: 600;
   letter-spacing: 0;
 }
-.odp-tabs {
+h2 {
+  margin: 0;
+  font-size: clamp(1.35rem, 2.5vw, 2rem);
+  line-height: 1.12;
+  font-weight: 600;
+}
+h3 {
+  margin: 0 0 8px;
+  font-size: 1.08rem;
+  line-height: 1.25;
+}
+.lead {
+  max-width: 760px;
+  margin: 0;
+  color: rgba(255, 255, 255, .86);
+  font-size: clamp(1rem, 2vw, 1.18rem);
+}
+main {
+  padding: 26px 0 64px;
+}
+.tab-radio {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+}
+.tabs {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 12px 0;
+  background: rgba(255, 255, 255, .96);
+  border-top: 1px solid var(--odp-line);
+  border-bottom: 1px solid var(--odp-line);
+  backdrop-filter: blur(10px);
+}
+.tabs label {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 8px 13px;
+  border: 1px solid var(--odp-line);
+  border-radius: 8px;
+  color: var(--odp-muted);
+  background: #fff;
+  cursor: pointer;
+  font-size: .9rem;
+  font-weight: 700;
+}
+#tab-overview:checked ~ .tabs label[for="tab-overview"],
+#tab-objectives:checked ~ .tabs label[for="tab-objectives"],
+#tab-use-cases:checked ~ .tabs label[for="tab-use-cases"],
+#tab-products:checked ~ .tabs label[for="tab-products"],
+#tab-signals:checked ~ .tabs label[for="tab-signals"],
+#tab-graph:checked ~ .tabs label[for="tab-graph"],
+#tab-about:checked ~ .tabs label[for="tab-about"] {
+  color: #fff;
+  border-color: var(--odps-violet);
+  background: var(--odps-violet);
+}
+.tab-panel {
+  display: none;
+  padding-top: 28px;
+}
+#tab-overview:checked ~ .panels .overview-panel,
+#tab-objectives:checked ~ .panels .objectives-panel,
+#tab-use-cases:checked ~ .panels .use-cases-panel,
+#tab-products:checked ~ .panels .products-panel,
+#tab-signals:checked ~ .panels .signals-panel,
+#tab-graph:checked ~ .panels .graph-panel,
+#tab-about:checked ~ .panels .about-panel {
+  display: block;
+}
+.section-head {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 16px;
+}
+.section-head p {
+  max-width: 540px;
+  margin: 0;
+  color: var(--odp-muted);
+}
+.summary {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0 0 26px;
+}
+.metric,
+.card,
+.panel {
+  border: 1px solid var(--odp-line);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 12px 32px rgba(30, 10, 46, .06);
+}
+.metric {
+  min-height: 104px;
+  padding: 16px;
+}
+.metric strong {
+  display: block;
+  font-size: 2.1rem;
+  line-height: 1;
+}
+.metric span {
+  display: block;
+  margin-top: 8px;
+  color: var(--odp-muted);
+  font-size: .8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.grid,
+.actions-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+.card {
+  position: relative;
+  min-height: 216px;
+  padding: 18px;
+}
+.card::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  border-radius: 8px 0 0 8px;
+  background: var(--odpc-orange);
+}
+.card.product::before { background: var(--odps-violet); }
+.card.signal::before { background: var(--odpv-blue); }
+.wide { grid-column: span 2; }
+.chip-row {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  padding: 16px 0;
-  border-bottom: 1px solid var(--line);
+  margin-bottom: 14px;
 }
-.odp-tabs a {
-  padding: 6px 10px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--panel);
-  text-decoration: none;
+.chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: var(--odp-soft);
+  color: var(--odp-muted);
+  font-size: .74rem;
+  font-weight: 700;
+  text-transform: uppercase;
 }
-.odp-section { padding: 24px 0; }
-.odp-section h2 { margin: 0 0 12px; font-size: 1.35rem; }
-.odp-summary {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 12px;
-  padding: 0;
-  list-style: none;
+.chip.odps { color: #fff; background: var(--odps-violet); }
+.chip.odpc { color: #fff; background: var(--odpc-orange); }
+.chip.odpg { color: #fff; background: var(--odpg-green); }
+.chip.odpv { color: #fff; background: var(--odpv-blue); }
+.card p,
+.panel p,
+.action-card p {
+  margin: 0 0 14px;
+  color: var(--odp-muted);
 }
-.odp-summary li,
-.odp-card {
-  margin: 12px 0;
-  padding: 16px;
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-}
-.odp-summary strong {
-  display: block;
-  font-size: 2rem;
-  line-height: 1;
-}
-.odp-card h3 { margin: 0; font-size: 1.1rem; }
 .odp-facts {
   display: grid;
   grid-template-columns: max-content 1fr;
   gap: 6px 12px;
-  margin: 12px 0 0;
+  margin: 0;
+  font-size: .9rem;
 }
 .odp-facts dt {
-  color: var(--muted);
+  color: var(--odp-muted);
   font-weight: 700;
 }
 .odp-facts dd { margin: 0; }
-.odp-muted { color: var(--muted); }
+.odp-muted { color: var(--odp-muted); }
 .odp-detail {
-  margin-top: 12px;
+  margin-top: 14px;
   padding-top: 12px;
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--odp-line);
 }
-.odp-version-switcher ul,
-.odp-grid ul {
-  padding-left: 20px;
+.action-card,
+.overview-card {
+  border: 1px solid #ded2e8;
+  border-radius: 8px;
+  background: var(--odp-soft);
+  box-shadow: 0 14px 34px rgba(30, 10, 46, .06);
 }
-.odp-version-switcher li {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+.action-card {
+  padding: 16px;
+}
+.action-card strong {
+  display: block;
   margin: 6px 0;
 }
-.odp-grid {
+.action-link,
+.version-action {
+  color: var(--odps-violet);
+  cursor: pointer;
+  font-weight: 700;
+}
+.overview-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  grid-template-columns: minmax(0, 1fr) 340px;
   gap: 16px;
+}
+.overview-section {
+  margin-top: 28px;
+}
+.overview-card-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+}
+.panel { padding: 18px; }
+.version-list {
+  margin: 0;
+  padding: 0;
+}
+.version-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 8px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--odp-line);
+  list-style: none;
+}
+.version-history {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--odp-line);
+}
+.version-table {
+  width: 100%;
+  max-width: 100%;
+  margin-top: 12px;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: .9rem;
+}
+.version-table th,
+.version-table td {
+  padding: 9px 6px;
+  border-bottom: 1px solid var(--odp-line);
+  text-align: left;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.version-table th {
+  color: var(--odp-muted);
+  font-size: .76rem;
+  text-transform: uppercase;
+}
+.version-table th:nth-child(1),
+.version-table td:nth-child(1) {
+  width: 48%;
+}
+.version-table th:nth-child(2),
+.version-table td:nth-child(2) {
+  width: 24%;
+}
+.version-table th:nth-child(3),
+.version-table td:nth-child(3) {
+  display: none;
+}
+.version-table th:nth-child(4),
+.version-table td:nth-child(4) {
+  width: 28%;
+  text-align: right;
+}
+.version-row a:first-child,
+.version-row strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.graph-explorer-frame {
+  display: block;
+  width: 100%;
+  height: min(900px, calc(100vh - 180px));
+  min-height: 680px;
+  border: 1px solid var(--odp-line);
+  border-radius: 8px;
+  background: #eef2f7;
+  box-shadow: 0 12px 32px rgba(30, 10, 46, .06);
+}
+.about-card {
+  padding: 26px;
+  border-radius: 8px;
+  color: #fff;
+  background: var(--odp-ink);
+}
+.about-card p {
+  max-width: 820px;
+  color: rgba(255, 255, 255, .82);
+}
+.about-card .chip {
+  color: #fff;
+  background: rgba(255, 255, 255, .12);
+}
+.footer {
+  margin-top: 42px;
+  padding: 24px 0 34px;
+  color: rgba(255, 255, 255, .78);
+  background: var(--odp-black);
+  border-top: 4px solid var(--odps-violet);
+  font-size: .92rem;
+}
+.footer-inner {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 18px;
+  align-items: start;
+}
+.footer p {
+  max-width: 760px;
+  margin: 0;
+}
+.footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 12px;
+  font-weight: 700;
+}
+.footer-links a { color: #fff; }
+@media (max-width: 900px) {
+  .overview-grid,
+  .footer-inner {
+    grid-template-columns: 1fr;
+  }
+  .summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .grid,
+  .actions-grid {
+    grid-template-columns: 1fr;
+  }
+  .wide { grid-column: auto; }
+  .footer-links { justify-content: flex-start; }
 }
 """

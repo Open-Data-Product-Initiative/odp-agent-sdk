@@ -112,13 +112,7 @@ class LicenseValidator(ValidationRule):
     """Validates license requirements"""
 
     def validate(self, odp: "OpenDataProduct") -> List[str]:
-        errors = []
-
-        if odp.license:
-            if not odp.license.scope_of_use:
-                errors.append("license requires 'scopeOfUse' field")
-
-        return errors
+        return []
 
 
 class LanguageCodesValidator(ValidationRule):

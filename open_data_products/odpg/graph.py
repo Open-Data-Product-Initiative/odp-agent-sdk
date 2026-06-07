@@ -680,7 +680,7 @@ def build_html(graph: dict) -> str:
         vis_nodes.append(
             {
                 "id": node["id"],
-                "label": node["id"],
+                "label": localized_text(node.get("label")) or node["id"],
                 "title": (
                     f"ID: {node['id']}\n" f"Type: {node['type']}\n" f"Ref: {ref}"
                 ),

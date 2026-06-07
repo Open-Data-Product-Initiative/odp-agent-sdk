@@ -15,19 +15,26 @@ Output rules:
 - If the source lacks details, draft conservative review-needed values.
 - Put uncertainty in `reviewNotes` and `evidenceGaps`, not as YAML comments.
 - Do not return a full OpenDataProduct document from this step.
+- For `license`, use ODPS v4.1 `scope`, `termination`, and `governance`.
+  Do not emit legacy license fields.
+- For `productStrategy`, include schema-shaped objectives, KPIs, and status
+  only when the source evidence supports them.
+- For `dataHolder`, use contact and legal ownership fields as an object.
+- For `paymentGateways`, use named gateway mappings such as `default`.
 - For `SLA`, use only allowed SLA dimension names: `latency`, `uptime`,
   `responseTime`, `errorRate`, `endOfSupport`, `endOfLife`,
   `updateFrequency`, `timeToDetect`, `timeToNotify`, `timeToRepair`,
   `emailResponseTime`. Use `uptime` instead of availability and
   `updateFrequency` instead of data freshness. Do not invent fields such as
   `scope` or freeform nested `support.description`. Use `SLA.declarative` as
-  an array of packages; do not use `SLA.profiles`.
+  a named mapping of packages such as `default` and `premium`; do not use
+  `SLA.profiles`.
 - For `dataQuality`, use only allowed data quality dimension names:
   `accuracy`, `completeness`, `conformity`, `consistency`, `coverage`,
   `timeliness`, `validity`, `uniqueness`. Use `timeliness` instead of
   freshness. Do not invent nested `validationRules` or freeform `monitoring`
-  objects. Use `dataQuality.declarative` as an array of packages; do not use
-  `dataQuality.profiles`.
+  objects. Use `dataQuality.declarative` as a named mapping of packages such
+  as `default` and `premium`; do not use `dataQuality.profiles`.
 - For `pricingPlans`, use only ODPS pricing plan fields such as `name`,
   `priceCurrency`, `price`, `billingDuration`, `unit`, and `notes`. Do not use
   invented fields such as `planID`, `currency`, `billingCycle`, `conditions`,
@@ -44,7 +51,8 @@ Required shape:
 components:
   SLA:
     declarative:
-      - name:
+      default:
+        name:
           en: Default SLA
         dimensions:
           - dimension: uptime
@@ -62,6 +70,112 @@ Pricing plans can link to named generated packages:
 
 ```yaml
 components:
+  productStrategy:
+    status: Planned
+    objectives:
+      - en: Reduce avoidable churn in strategic customer segments.
+    contributesToKPI:
+      id: KPI-NET-REVENUE-RETENTION
+      name: Net revenue retention
+      unit: percentage
+      target: 108
+    productKPIs:
+      - id: KPI-HEALTH-SIGNAL-COVERAGE
+        name: Health signal coverage
+        unit: percentage
+        target: 95
+        calculation: accounts with current health indicators divided by active customer accounts
+  dataHolder:
+    legalName: Example Data Products Ltd
+    contactName: Data Product Owner
+    email: data-products@example.com
+    businessDomain: Revenue Operations
+  dataAccess:
+    API:
+      name:
+        en: API
+      description:
+        en: Authenticated API for account health indicators.
+      outputPortType: API
+      format: JSON
+      authenticationMethod: OAuth
+  SLA:
+    declarative:
+      default:
+        name:
+          en: The Basic SLA
+        description:
+          en: The basic SLA package.
+        dimensions:
+          - dimension: uptime
+            displaytitle:
+              en: Uptime
+            objective: 90
+            unit: percent
+            weight: 50
+          - dimension: responseTime
+            objective: 200
+            unit: milliseconds
+            weight: 30
+          - dimension: updateFrequency
+            objective: 30
+            unit: minutes
+            weight: 20
+      premium:
+        name:
+          en: The Premium SLA
+        description:
+          en: The Premium SLA package.
+        dimensions:
+          - dimension: uptime
+            displaytitle:
+              en: Uptime
+            objective: 99
+            unit: percent
+            weight: 70
+          - dimension: responseTime
+            objective: 100
+            unit: milliseconds
+            weight: 20
+          - dimension: updateFrequency
+            objective: 5
+            unit: minutes
+            weight: 10
+  dataQuality:
+    declarative:
+      default:
+        description: The basic data quality package.
+        dimensions:
+          - dimension: completeness
+            displayTitle: Completeness
+            objective: 95
+            unit: percentage
+            weight: 50
+            description: Required fields are populated.
+  paymentGateways:
+    default:
+      description:
+        en: Internal chargeback or manual billing process.
+      type: Custom
+      version: v1
+  license:
+    scope:
+      definition: Internal use for customer success, revenue operations, and renewal planning.
+      restrictions: No resale, external redistribution, or automated adverse customer decisions without review.
+      geographicalArea:
+        - EU
+      permanent: false
+      exclusive: false
+      rights:
+        - Display
+        - Distribution
+        - Adaptation
+    termination:
+      noticePeriod: 30
+      terminationConditions: Access ends when the consuming team no longer has an approved business purpose.
+    governance:
+      ownership: Revenue Operations owns commercial use; Data Platform owns technical operations.
+      audit: Access and usage are reviewed quarterly.
   pricingPlans:
     declarative:
       en:
@@ -69,10 +183,12 @@ components:
           priceCurrency: USD
           price: "0"
           unit: On-request
+          paymentGateway:
+            $ref: "#/product/paymentGateways/default"
           dataQuality:
-            $ref: "#/product/dataQuality/default"
+            $ref: "#/product/dataQuality/declarative/default"
           SLA:
-            $ref: "#/product/SLA/default"
+            $ref: "#/product/SLA/declarative/default"
           access:
             $ref: "#/product/dataAccess/API"
 ```

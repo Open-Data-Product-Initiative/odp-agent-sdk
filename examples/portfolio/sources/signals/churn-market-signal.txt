@@ -1,0 +1,13 @@
+Market signal observed on 2026-05-24:
+
+Several enterprise customers have asked for clearer renewal-risk reporting in
+quarterly business reviews. Customer success leaders also noted that usage
+drop-offs are being discovered only after support escalations happen.
+
+The signal suggests growing demand for a customer health and churn-risk data
+product that combines product usage, renewal timing, support severity, and
+account ownership.
+
+Signal type: market
+Confidence: high
+Related area: retention, customer success, renewal planning

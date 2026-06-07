@@ -5,3 +5,5 @@ dist/
 *.egg-info/
 .worktrees/
 .DS_Store
+/generated/
+/examples/portfolio/workspace/

@@ -26,9 +26,7 @@ DEFAULT_GENERATION_MODEL = "qwen2.5"
 DEFAULT_OLLAMA_GENERATE_TIMEOUT = 300
 DEFAULT_OPENAI_GENERATE_TIMEOUT = 300
 DEFAULT_OPENAI_USER_AGENT = "open-data-products-python/0.2"
-DEFAULT_GENERATION_CONFIG = (
-    Path(__file__).resolve().parent / "generation.config.yaml"
-)
+DEFAULT_GENERATION_CONFIG = Path(__file__).resolve().parent / "generation.config.yaml"
 ODPS_SLA_DIMENSIONS = {
     "latency",
     "uptime",
@@ -519,9 +517,7 @@ def openai_generate(
         message = f"OpenAI generation request failed with HTTP {exc.code}."
         if detail:
             message = f"{message} {detail}"
-        raise RuntimeError(
-            message
-        ) from exc
+        raise RuntimeError(message) from exc
     except (OSError, error.URLError) as exc:
         reason = getattr(exc, "reason", exc)
         raise RuntimeError(f"OpenAI generation request failed: {reason}") from exc
@@ -598,9 +594,7 @@ def openai_chat_generate(
         raise RuntimeError(message) from exc
     except (OSError, error.URLError) as exc:
         reason = getattr(exc, "reason", exc)
-        raise RuntimeError(
-            f"OpenAI-compatible chat request failed: {reason}"
-        ) from exc
+        raise RuntimeError(f"OpenAI-compatible chat request failed: {reason}") from exc
 
     choices = data.get("choices")
     if isinstance(choices, list):
@@ -616,7 +610,9 @@ def openai_chat_generate(
         if parts:
             return "\n".join(parts)
 
-    raise RuntimeError("OpenAI-compatible chat response did not contain generated text.")
+    raise RuntimeError(
+        "OpenAI-compatible chat response did not contain generated text."
+    )
 
 
 def anthropic_generate(
@@ -832,7 +828,11 @@ def validate_config(
         errors.append("provider is required in generation config files")
     selected_provider = provider_name or ""
     built_in_providers = {"ollama", "openai", "anthropic"}
-    if selected_provider and selected_provider not in providers and selected_provider not in built_in_providers:
+    if (
+        selected_provider
+        and selected_provider not in providers
+        and selected_provider not in built_in_providers
+    ):
         errors.append(f"providers.{selected_provider} is missing")
 
     _validate_optional_string(config, "model", "model", errors)
@@ -861,7 +861,9 @@ def validate_config(
     resolved = None
     if not errors:
         try:
-            resolved = _generation_settings_dict(resolve_generation_settings(source_path))
+            resolved = _generation_settings_dict(
+                resolve_generation_settings(source_path)
+            )
         except ValueError as exc:
             errors.append(str(exc))
 
@@ -915,9 +917,7 @@ def _validate_provider_config(
     _validate_optional_string(provider, "model", f"{path}.model", errors)
     _validate_optional_string(provider, "baseUrl", f"{path}.baseUrl", errors)
     _validate_optional_string(provider, "version", f"{path}.version", errors)
-    _validate_optional_positive_int(
-        provider, "maxTokens", f"{path}.maxTokens", errors
-    )
+    _validate_optional_positive_int(provider, "maxTokens", f"{path}.maxTokens", errors)
     api_key_env = provider.get("apiKeyEnv")
     if api_key_env is not None and (
         not isinstance(api_key_env, str) or _looks_like_secret(api_key_env)
@@ -1513,8 +1513,7 @@ def _generate_odps_product_facts(
     chunks = _chunk_text(source_documents, max_source_chars)
     for index, chunk in enumerate(chunks, start=1):
         chunk_context = (
-            f"--- Source chunk {index} of {len(chunks)} ---\n"
-            f"{chunk.strip()}"
+            f"--- Source chunk {index} of {len(chunks)} ---\n" f"{chunk.strip()}"
         )
         facts_prompt = _render_odps_prompt(
             "odps_product_facts.md",
@@ -1709,11 +1708,14 @@ def _run_generation_task(
         else render_generation_prompt(task.prompt_name, source, prompt_dir=prompt_dir)
     )
     raw_output = model_client(prompt, model)
-    yaml_output = _normalize_generated_output(
-        task,
-        _extract_yaml_document(task, _strip_markdown_fence(raw_output).strip()),
-        expected_graph_nodes=expected_graph_nodes,
-    ) + "\n"
+    yaml_output = (
+        _normalize_generated_output(
+            task,
+            _extract_yaml_document(task, _strip_markdown_fence(raw_output).strip()),
+            expected_graph_nodes=expected_graph_nodes,
+        )
+        + "\n"
+    )
     expected_graph_node_ids = (
         [str(node["id"]) for node in expected_graph_nodes]
         if expected_graph_nodes
@@ -1757,11 +1759,7 @@ def _write_generated_artifacts(
         if not isinstance(document, dict):
             return []
         product = document.get("product")
-        product_id = (
-            product.get("productID")
-            if isinstance(product, dict)
-            else None
-        )
+        product_id = product.get("productID") if isinstance(product, dict) else None
         product_id = str(product_id or "product")
         output_path = destination / _fragment_file_name("odps_product", product_id)
         output_path.write_text(
@@ -1781,7 +1779,11 @@ def _write_generated_artifacts(
     if not isinstance(document, dict):
         return []
     items = document.get(task.expected_root)
-    if not isinstance(items, list) or not task.fragment_root or not task.filename_prefix:
+    if (
+        not isinstance(items, list)
+        or not task.fragment_root
+        or not task.filename_prefix
+    ):
         return []
 
     artifacts = []
@@ -2000,7 +2002,7 @@ def _normalize_odps_sla(sla: object) -> None:
     if not isinstance(sla, dict):
         return
     profiles = _component_profiles(sla)
-    definitions = []
+    definitions: Dict[str, Dict[str, Any]] = {}
     for name, profile in profiles.items():
         if not isinstance(profile, dict):
             continue
@@ -2042,7 +2044,7 @@ def _normalize_odps_sla(sla: object) -> None:
         if support:
             definition["support"] = support
         if len(definition) > 1:
-            definitions.append(definition)
+            definitions[_component_profile_key(name, definitions)] = definition
     sla.clear()
     if definitions:
         sla["declarative"] = definitions
@@ -2052,7 +2054,7 @@ def _normalize_odps_data_quality(data_quality: object) -> None:
     if not isinstance(data_quality, dict):
         return
     profiles = _component_profiles(data_quality)
-    definitions = []
+    definitions: Dict[str, Dict[str, Any]] = {}
     for name, profile in profiles.items():
         if not isinstance(profile, dict):
             continue
@@ -2081,7 +2083,7 @@ def _normalize_odps_data_quality(data_quality: object) -> None:
         if isinstance(quality_checks, dict):
             definition["spec"] = quality_checks
         if len(definition) > 1:
-            definitions.append(definition)
+            definitions[_component_profile_key(name, definitions)] = definition
     data_quality.clear()
     if definitions:
         data_quality["declarative"] = definitions
@@ -2094,6 +2096,21 @@ def _component_definition_title(name: str, suffix: str) -> str:
     return f"{words.title()} {suffix}" if words else suffix
 
 
+def _component_profile_key(name: str, existing: Dict[str, Any]) -> str:
+    key = re.sub(r"[^A-Za-z0-9]+", "-", str(name).strip().lower()).strip("-")
+    key = key or "default"
+    if key.startswith("default"):
+        key = "default"
+    if "premium" in key:
+        key = "premium"
+    candidate = key
+    suffix = 2
+    while candidate in existing:
+        candidate = f"{key}-{suffix}"
+        suffix += 1
+    return candidate
+
+
 def _component_profiles(component: Dict[str, Any]) -> Dict[str, Any]:
     profiles = component.get("profiles")
     if isinstance(profiles, dict):
@@ -2102,6 +2119,8 @@ def _component_profiles(component: Dict[str, Any]) -> Dict[str, Any]:
     if isinstance(dimensions, list):
         return {"default": {"dimensions": dimensions}}
     declarative = component.get("declarative")
+    if isinstance(declarative, dict):
+        return declarative
     if isinstance(declarative, list):
         return {"default": {"dimensions": declarative}}
     return {}
@@ -2306,22 +2325,40 @@ def _pricing_plan_notes(plan: Dict[str, Any]) -> str:
 def _normalize_odps_data_access(product: Dict[str, Any]) -> None:
     data_access = product.get("dataAccess")
     if isinstance(data_access, dict):
-        default = data_access.get("default")
-        if isinstance(default, dict):
-            data_access["default"] = _normalize_odps_data_access_item(default)
-        for key, value in data_access.items():
-            if key in {"default", "$ref"}:
+        items = {}
+        for key, value in list(data_access.items()):
+            if key == "$ref":
                 continue
             if isinstance(value, dict):
-                data_access[key] = _normalize_odps_data_access_item(value)
-    elif isinstance(data_access, list):
-        items = [
-            _normalize_odps_data_access_item(item)
-            for item in data_access
-            if isinstance(item, dict)
-        ]
+                normalized = _normalize_odps_data_access_item(value)
+                items[_data_access_component_key(key, normalized, items)] = normalized
         if items:
-            product["dataAccess"] = {"default": items[0]}
+            product["dataAccess"] = items
+    elif isinstance(data_access, list):
+        items = {}
+        for item in data_access:
+            if not isinstance(item, dict):
+                continue
+            normalized = _normalize_odps_data_access_item(item)
+            items[_data_access_component_key("", normalized, items)] = normalized
+        if items:
+            product["dataAccess"] = items
+
+
+def _data_access_component_key(
+    key: str, item: Dict[str, Any], existing: Dict[str, Any]
+) -> str:
+    raw = str(item.get("outputPortType") or key or item.get("name") or "API")
+    if raw.lower() == "api":
+        candidate = "API"
+    else:
+        candidate = re.sub(r"[^A-Za-z0-9]+", "-", raw).strip("-") or "API"
+    suffix = 2
+    base = candidate
+    while candidate in existing:
+        candidate = f"{base}-{suffix}"
+        suffix += 1
+    return candidate
 
 
 def _normalize_odps_data_access_item(item: Dict[str, Any]) -> Dict[str, Any]:
@@ -2340,7 +2377,9 @@ def _normalize_objective_fragments(document: dict) -> None:
         objective.pop("dataProducts", None)
 
 
-def _normalize_graph_nodes(document: dict, expected_graph_nodes: Sequence[dict]) -> None:
+def _normalize_graph_nodes(
+    document: dict, expected_graph_nodes: Sequence[dict]
+) -> None:
     graph = document.get("graph")
     if not isinstance(graph, dict):
         return
@@ -2378,9 +2417,7 @@ def _normalize_signal_fragments(document: dict) -> None:
 
         for signal_field in ("strength", "confidence"):
             if signal_field in signal:
-                signal[signal_field] = _normalize_signal_enum(
-                    signal.get(signal_field)
-                )
+                signal[signal_field] = _normalize_signal_enum(signal.get(signal_field))
 
         impact = signal.get("impact")
         if isinstance(impact, dict):
@@ -2465,14 +2502,7 @@ def _artifact_errors(
 
 
 def _filter_odps_generation_validation_errors(errors: Sequence[str]) -> List[str]:
-    return [
-        error
-        for error in errors
-        if not (
-            error.startswith("/product/dataAccess:")
-            and "is not of type 'array'" in error
-        )
-    ]
+    return list(errors)
 
 
 def _graph_coverage_errors(

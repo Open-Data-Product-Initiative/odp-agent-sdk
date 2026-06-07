@@ -86,6 +86,9 @@ Product/Data Contract commands:
   product export-contract     Export through datacontract-cli
 
 Portfolio workflow commands:
+  portfolio build     Build a portfolio workspace from source lanes
+  portfolio refresh   Refresh a portfolio workspace from saved source lanes
+  portfolio sync      Sync edited YAML artifacts without calling an LLM
   portfolio render    Render one static portfolio index.html
   portfolio explain   Summarize a portfolio workspace
 
@@ -115,6 +118,8 @@ Examples:
   open-data-products odpg-agent-context graph.yaml --node DATA-PRODUCT-001
   open-data-products odpg-generate graph.yaml --output graph-explorer.html --json
   open-data-products odpg-convert --input graph.graphml --output graph.yaml --json
+  open-data-products portfolio build --objectives inputs/objectives/ --use-cases inputs/use-cases/ --signals inputs/signals/ --products inputs/products/ --output generated/portfolio/ --json
+  open-data-products portfolio sync generated/portfolio/ --json
   open-data-products portfolio render generated/portfolio/ --json
   open-data-products product contract-report product.yaml contract.yaml --json
   open-data-products serve
@@ -238,10 +243,17 @@ Examples:
 
 PORTFOLIO_HELP = """\
 Portfolio workflow commands:
+  build       Build a portfolio workspace from source lanes
+  refresh     Refresh a portfolio workspace from saved source lanes
+  sync        Sync edited YAML artifacts without calling an LLM
   render      Render one static browser-viewable portfolio page
   explain     Summarize portfolio artifacts, counts, and browser entry point
 
 Examples:
+  open-data-products portfolio build --objectives inputs/objectives/ --use-cases inputs/use-cases/ --signals inputs/signals/ --products inputs/products/ --output generated/portfolio/ --json
+  open-data-products portfolio refresh generated/portfolio/ --json
+  open-data-products portfolio refresh generated/portfolio/ --all-sources --json
+  open-data-products portfolio sync generated/portfolio/ --json
   open-data-products portfolio render generated/portfolio/ --json
   open-data-products portfolio explain generated/portfolio/ --json
 """
@@ -702,6 +714,100 @@ def main(argv: Optional[List[str]] = None) -> int:
         metavar="PORTFOLIO_COMMAND",
         required=True,
     )
+    portfolio_build_parser = portfolio_subparsers.add_parser(
+        "build",
+        help="Build a portfolio workspace from source lanes",
+    )
+    portfolio_build_parser.add_argument(
+        "workspace",
+        nargs="?",
+        help="Existing portfolio workspace path for reruns.",
+    )
+    portfolio_build_parser.add_argument(
+        "--objectives", help="Business objective source file or folder"
+    )
+    portfolio_build_parser.add_argument(
+        "--use-cases", help="Use case source file or folder"
+    )
+    portfolio_build_parser.add_argument(
+        "--signals", help="Signal source file or folder"
+    )
+    portfolio_build_parser.add_argument(
+        "--products", help="Product source file or folder"
+    )
+    portfolio_build_parser.add_argument(
+        "--output",
+        "-o",
+        help="Portfolio workspace directory to create or update.",
+    )
+    portfolio_build_parser.add_argument(
+        "--title",
+        help="Human-controlled portfolio workspace title. Overrides LLM metadata name.",
+    )
+    portfolio_build_parser.add_argument(
+        "--config",
+        help="Generation config YAML file with provider and path settings.",
+    )
+    portfolio_build_parser.add_argument("--provider", help="LLM provider override.")
+    portfolio_build_parser.add_argument("--model", help="Model override.")
+    portfolio_build_parser.add_argument(
+        "--prompts",
+        help="Reserved for portfolio prompt folder overrides.",
+    )
+    portfolio_build_parser.add_argument(
+        "--ollama-url",
+        help="Local Ollama base URL. Defaults to http://localhost:11434.",
+    )
+    portfolio_build_parser.add_argument("--json", action="store_true", help="Emit JSON")
+    portfolio_refresh_parser = portfolio_subparsers.add_parser(
+        "refresh",
+        help="Refresh a portfolio workspace from saved source lanes",
+    )
+    portfolio_refresh_parser.add_argument("workspace", help="Portfolio workspace path")
+    portfolio_refresh_parser.add_argument(
+        "--objectives", help="Optional business objective source override"
+    )
+    portfolio_refresh_parser.add_argument(
+        "--use-cases", help="Optional use case source override"
+    )
+    portfolio_refresh_parser.add_argument(
+        "--signals", help="Optional signal source override"
+    )
+    portfolio_refresh_parser.add_argument(
+        "--products", help="Optional product source override"
+    )
+    portfolio_refresh_parser.add_argument(
+        "--title",
+        help="Human-controlled portfolio workspace title. Overrides saved title.",
+    )
+    portfolio_refresh_parser.add_argument(
+        "--config",
+        help="Generation config YAML file with provider and path settings.",
+    )
+    portfolio_refresh_parser.add_argument("--provider", help="LLM provider override.")
+    portfolio_refresh_parser.add_argument("--model", help="Model override.")
+    portfolio_refresh_parser.add_argument(
+        "--all-sources",
+        action="store_true",
+        help="Process all saved source documents instead of only new or changed files.",
+    )
+    portfolio_refresh_parser.add_argument(
+        "--prompts",
+        help="Reserved for portfolio prompt folder overrides.",
+    )
+    portfolio_refresh_parser.add_argument(
+        "--ollama-url",
+        help="Local Ollama base URL. Defaults to http://localhost:11434.",
+    )
+    portfolio_refresh_parser.add_argument(
+        "--json", action="store_true", help="Emit JSON"
+    )
+    portfolio_sync_parser = portfolio_subparsers.add_parser(
+        "sync",
+        help="Sync edited YAML artifacts without calling an LLM",
+    )
+    portfolio_sync_parser.add_argument("workspace", help="Portfolio workspace path")
+    portfolio_sync_parser.add_argument("--json", action="store_true", help="Emit JSON")
     portfolio_render_parser = portfolio_subparsers.add_parser(
         "render",
         help="Render one static browser-viewable portfolio page",
@@ -1467,10 +1573,66 @@ def main(argv: Optional[List[str]] = None) -> int:
             return serve()
 
         if args.command == "portfolio":
-            from .portfolio import explain_portfolio, render_portfolio
+            from .portfolio import (
+                build_portfolio,
+                explain_portfolio,
+                refresh_portfolio,
+                render_portfolio,
+                sync_portfolio,
+            )
 
             try:
-                if args.portfolio_command == "render":
+                if args.portfolio_command == "build":
+                    from . import generation
+
+                    workspace = args.output or args.workspace
+                    if not workspace:
+                        raise ValueError(
+                            "Provide a portfolio workspace with --output or as an argument."
+                        )
+                    settings = generation.resolve_generation_settings(
+                        config_path=args.config,
+                        provider=args.provider,
+                        model=args.model,
+                        ollama_url=args.ollama_url,
+                        prompt_dir=args.prompts,
+                    )
+                    client = generation.create_generation_client(settings)
+                    payload = build_portfolio(
+                        workspace,
+                        objectives=args.objectives,
+                        use_cases=args.use_cases,
+                        signals=args.signals,
+                        products=args.products,
+                        title=args.title,
+                        client=client,
+                        model=settings.model,
+                    )
+                elif args.portfolio_command == "refresh":
+                    from . import generation
+
+                    settings = generation.resolve_generation_settings(
+                        config_path=args.config,
+                        provider=args.provider,
+                        model=args.model,
+                        ollama_url=args.ollama_url,
+                        prompt_dir=args.prompts,
+                    )
+                    client = generation.create_generation_client(settings)
+                    payload = refresh_portfolio(
+                        args.workspace,
+                        objectives=args.objectives,
+                        use_cases=args.use_cases,
+                        signals=args.signals,
+                        products=args.products,
+                        title=args.title,
+                        client=client,
+                        model=settings.model,
+                        all_sources=args.all_sources,
+                    )
+                elif args.portfolio_command == "sync":
+                    payload = sync_portfolio(args.workspace)
+                elif args.portfolio_command == "render":
                     payload = render_portfolio(args.workspace, output_path=args.output)
                 elif args.portfolio_command == "explain":
                     payload = explain_portfolio(args.workspace)

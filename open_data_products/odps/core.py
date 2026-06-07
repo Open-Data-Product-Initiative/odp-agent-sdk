@@ -298,9 +298,6 @@ class OpenDataProduct:
 
         if "dataAccess" in product_data:
             da_data = product_data["dataAccess"]
-            if "default" not in da_data:
-                raise ODPSValidationError("dataAccess requires a 'default' method")
-
             instance.data_access = parse_data_access(da_data)
 
         if "license" in product_data:

@@ -5,6 +5,7 @@ import json
 import yaml
 import tempfile
 from pathlib import Path
+from jsonschema import Draft202012Validator
 
 from open_data_products.odps import OpenDataProduct, ODPSValidationError
 from open_data_products.odps.models import ProductDetails
@@ -121,6 +122,202 @@ class TestOpenDataProduct:
             product.data_quality.profiles["declarative1"].dimensions[0].name
             == "completeness"
         )
+
+    def test_from_dict_accepts_v41_data_access_array(self):
+        """Test loading canonical ODPS v4.1 data access array shape."""
+        product = OpenDataProduct.from_dict(
+            {
+                "schema": "https://opendataproducts.org/v4.1/schema/odps.json",
+                "version": "4.1",
+                "product": {
+                    "details": {
+                        "en": {
+                            "name": "Agent Ready Product",
+                            "productID": "agent-ready-product",
+                            "visibility": "public",
+                            "status": "production",
+                            "type": "dataset",
+                        }
+                    },
+                    "dataAccess": [
+                        {
+                            "name": {"en": "API"},
+                            "description": {"en": "API access."},
+                            "outputPortType": "API",
+                            "format": "JSON",
+                        }
+                    ],
+                },
+            }
+        )
+
+        assert product.data_access is not None
+        assert product.data_access.default.output_port_type == "API"
+        assert product.data_access.default.format == "JSON"
+
+    def test_named_odps_component_maps_validate_and_parse(self):
+        """Test ODPS named components used by pricing $ref paths."""
+        document = {
+            "schema": "https://opendataproducts.org/v4.1/schema/odps.json",
+            "version": "4.1",
+            "product": {
+                "details": {
+                    "en": {
+                        "name": "Customer Health Signals",
+                        "productID": "customer-health-signals",
+                        "visibility": "organisation",
+                        "status": "draft",
+                        "type": "dataset",
+                    }
+                },
+                "SLA": {
+                    "declarative": {
+                        "default": {
+                            "name": {"en": "The Basic SLA"},
+                            "description": {"en": "The basic SLA package"},
+                            "dimensions": [
+                                {
+                                    "dimension": "uptime",
+                                    "displaytitle": {"en": "Uptime"},
+                                    "objective": 90,
+                                    "unit": "percent",
+                                    "weight": 50,
+                                }
+                            ],
+                        },
+                        "premium": {
+                            "name": {"en": "The Premium SLA"},
+                            "description": {"en": "The Premium SLA package"},
+                            "dimensions": [
+                                {
+                                    "dimension": "responseTime",
+                                    "objective": 100,
+                                    "unit": "milliseconds",
+                                    "weight": 20,
+                                }
+                            ],
+                        },
+                    }
+                },
+                "dataQuality": {
+                    "declarative": {
+                        "default": {
+                            "description": "The basic data quality package",
+                            "dimensions": [
+                                {
+                                    "dimension": "completeness",
+                                    "objective": 95,
+                                    "unit": "percentage",
+                                }
+                            ],
+                        },
+                        "premium": {
+                            "description": "The premium data quality package",
+                            "dimensions": [
+                                {
+                                    "dimension": "validity",
+                                    "objective": 98,
+                                    "unit": "percentage",
+                                }
+                            ],
+                        },
+                    }
+                },
+                "dataAccess": {
+                    "API": {
+                        "name": {"en": "API"},
+                        "description": {"en": "API access."},
+                        "outputPortType": "API",
+                        "format": "JSON",
+                    }
+                },
+                "paymentGateways": {
+                    "default": {
+                        "description": {"en": "Internal chargeback."},
+                        "type": "Custom",
+                        "version": "v1",
+                    }
+                },
+                "pricingPlans": {
+                    "declarative": {
+                        "en": [
+                            {
+                                "name": "Internal Starter",
+                                "priceCurrency": "EUR",
+                                "price": "0",
+                                "billingDuration": "month",
+                                "unit": "Open-data",
+                                "paymentGateway": {
+                                    "$ref": "#/product/paymentGateways/default"
+                                },
+                                "dataQuality": {
+                                    "$ref": "#/product/dataQuality/declarative/default"
+                                },
+                                "SLA": {"$ref": "#/product/SLA/declarative/default"},
+                                "access": {"$ref": "#/product/dataAccess/API"},
+                            }
+                        ]
+                    }
+                },
+            },
+        }
+        schema = yaml.safe_load(
+            Path("open_data_products/odps/data/schema/odps.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        errors = sorted(
+            Draft202012Validator(schema).iter_errors(document),
+            key=lambda error: list(error.path),
+        )
+        assert errors == []
+
+        product = OpenDataProduct.from_dict(document)
+
+        assert sorted(product.sla.profiles) == ["default", "premium"]
+        assert sorted(product.data_quality.profiles) == ["default", "premium"]
+        assert product.data_access.default.output_port_type == "API"
+        assert product.payment_gateways.named_gateways["default"].version == "v1"
+
+    def test_v41_license_scope_shape_does_not_require_legacy_scope_of_use(self):
+        """Test ODPS v4.1 license.scope shape is accepted by validation."""
+        document = {
+            "schema": "https://opendataproducts.org/v4.1/schema/odps.json",
+            "version": "4.1",
+            "product": {
+                "details": {
+                    "en": {
+                        "name": "Licensed Product",
+                        "productID": "licensed-product",
+                        "visibility": "organisation",
+                        "status": "draft",
+                        "type": "dataset",
+                    }
+                },
+                "license": {
+                    "scope": {
+                        "definition": "Internal use for approved business workflows.",
+                        "restrictions": "No resale or external redistribution.",
+                        "geographicalArea": ["EU"],
+                        "permanent": False,
+                        "exclusive": False,
+                        "rights": ["Display", "Distribution"],
+                    },
+                    "termination": {
+                        "noticePeriod": 30,
+                        "terminationConditions": "Access ends when business purpose ends.",
+                    },
+                    "governance": {
+                        "ownership": "Revenue Operations",
+                        "audit": "Usage reviewed quarterly.",
+                    },
+                },
+            },
+        }
+
+        product = OpenDataProduct.from_dict(document)
+
+        assert product.validate() is True
 
     def test_to_dict(self, sample_odps_product):
         """Test converting OpenDataProduct to dictionary."""
