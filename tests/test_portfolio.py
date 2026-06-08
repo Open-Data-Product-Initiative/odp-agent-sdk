@@ -11,6 +11,7 @@ from open_data_products.cli import main
 from open_data_products.portfolio import (
     build_portfolio,
     explain_portfolio,
+    parse_portfolio_plan,
     refresh_portfolio,
     render_portfolio_build_prompt,
     render_portfolio,
@@ -220,6 +221,21 @@ products:
             description:
               en: Internal API access for account teams.
             outputPortType: API
+        license:
+          scope:
+            definition: Internal product use for retention and expansion planning.
+            restrictions: No external redistribution or resale; contact-level activation view restricted to approved marketing users with consent awareness controls; user-level product behavior aggregated to account level unless clear approved use case requires contact-level detail.
+        SLA:
+          declarative:
+            default:
+              dimensions:
+                - dimension: refreshTimeliness
+                  objective: 100
+                  unit: percent
+                - dimension: dataFreshness
+                  objective: 24
+                  unit: hours
+            premium: name
 graphEdges:
   - source: UC-EXPANSION
     target: PR-EXPANSION
@@ -256,6 +272,42 @@ def write_sample_workspace(workspace: Path) -> None:
     (workspace / "versions" / "2026-06-07T12-30-00Z").mkdir(parents=True)
     (workspace / "versions" / "2026-06-07T12-30-00Z" / "index.html").write_text(
         "<!doctype html><title>Previous Portfolio</title>",
+        encoding="utf-8",
+    )
+    (workspace / "versions" / "2026-06-07T12-30-00Z" / "report.json").write_text(
+        json.dumps(
+            {
+                "kind": "PortfolioRefresh",
+                "created": ["odpc/fragments/use_case_UC-RETENTION.yaml"],
+                "updated": ["index.html", "odpg/graph.yaml"],
+                "unchanged": ["portfolio-state.yaml"],
+                "removed": ["old-source.md"],
+                "sourceChanges": {
+                    "useCases": {
+                        "created": ["new-use-case.md"],
+                        "updated": [],
+                        "removed": [],
+                    },
+                    "signals": {
+                        "created": [],
+                        "updated": ["signal.txt"],
+                        "removed": [],
+                    },
+                },
+                "artifactCounts": {
+                    "businessObjectives": 1,
+                    "useCases": 1,
+                    "signals": 1,
+                    "productReferences": 1,
+                    "odpsProducts": 1,
+                    "graphEdges": 1,
+                },
+                "warnings": ["Review generated pricing evidence."],
+                "valid": False,
+            },
+            indent=2,
+        )
+        + "\n",
         encoding="utf-8",
     )
     (workspace / "portfolio.yaml").write_text(
@@ -465,6 +517,40 @@ def full_refresh_portfolio_client(prompt: str, model: str) -> str:
     return PORTFOLIO_DRIFT_PLAN_YAML
 
 
+def collapsed_signal_portfolio_client(prompt: str, model: str) -> str:
+    """Return no new signal even though the changed signal source is present."""
+    assert model == "test-model"
+    assert "Signal: regional retention pressure is rising" in prompt
+    return """
+metadata:
+  id: generated-demo
+  name: Generated Demo Portfolio
+  description: Portfolio generated from source lanes.
+warnings:
+  - Regional source was treated as supporting evidence only.
+"""
+
+
+def renamed_signal_portfolio_client(prompt: str, model: str) -> str:
+    """Return a renamed signal derived from the changed signal source."""
+    assert model == "test-model"
+    assert "priority accounts" in prompt
+    return """
+metadata:
+  id: generated-demo
+  name: Generated Demo Portfolio
+  description: Portfolio generated from source lanes.
+signals:
+  - id: SIG-DAILY-RETENTION-BRIEFING
+    name:
+      en: Daily Retention Briefing
+    description:
+      en: Product usage is down, support tickets are up, and renewal activity has slowed for several priority accounts.
+    type: operational
+    confidence: medium
+"""
+
+
 def test_render_portfolio_creates_missing_parent_and_artifact_detail_views(
     tmp_path: Path,
 ) -> None:
@@ -491,11 +577,24 @@ def test_render_portfolio_creates_missing_parent_and_artifact_detail_views(
     assert 'class="tab-panel graph-panel"' in html
     assert "Recommended next actions" in html
     assert "Suggested follow-ups are derived from warnings" not in html
+    assert "Portfolio changes" in html
+    assert '<section class="overview-section" aria-label="Portfolio changes">' in html
+    assert "Latest change summary" in html
+    assert "PortfolioRefresh" in html
+    assert "Created" in html
+    assert "Updated" in html
+    assert "Removed" in html
+    assert "Source changes" in html
+    assert "useCases: 1 created" in html
+    assert "signals: 1 updated" in html
+    assert "Validation needs review" in html
     assert "Portfolio versions" in html
-    assert '<section class="overview-section" aria-label="Portfolio status">' in html
+    assert "Portfolio status" not in html
+    assert (
+        '<section class="overview-section" aria-label="Portfolio status">' not in html
+    )
     assert '<section class="overview-section" aria-label="Portfolio versions">' in html
     assert '<div class="overview-card-grid">' in html
-    assert 'class="action-card overview-card status-card"' in html
     assert 'class="action-card overview-card versions-card"' in html
     assert ".overview-section {" in html
     assert "margin-top: 28px;" in html
@@ -705,6 +804,16 @@ def test_build_portfolio_normalizes_generated_plan_to_schema_shapes(
     assert "description: Pilot access." in product
     assert "dataAccess:" in product
     assert "outputPortType: API" in product
+    assert "refreshTimeliness" not in product
+    assert "dataFreshness" not in product
+    assert "unit: hours" not in product
+    assert "premium: name" not in product
+    assert "dimension: updateFrequency" in product
+    assert "unit: minutes" in product
+    assert (
+        "No external redistribution or resale; contact-level activation view restricted to approved marketing users with consent awareness controls; user-level product behavior aggregated to account level unless clear approved use case requires contact-level detail."
+        not in product
+    )
     product_document = load_mapping(
         workspace / "odps" / "products" / "expansion-product.yaml"
     )
@@ -718,6 +827,8 @@ def test_build_portfolio_normalizes_generated_plan_to_schema_shapes(
     graph = (workspace / "odpg" / "graph.yaml").read_text(encoding="utf-8")
     assert "description:" in graph
     assert "$ref: ../odpc/fragments/use_case_UC-EXPANSION.yaml" in graph
+    assert "type: Signal" in graph
+    assert "type: KPI" not in graph
     assert "from: UC-EXPANSION" in graph
     assert "to: PR-EXPANSION" in graph
     assert "source: UC-EXPANSION" not in graph
@@ -787,6 +898,18 @@ def test_portfolio_build_prompt_defines_schema_and_linking_rules() -> None:
     assert "Use case: Retention Workflow" in prompt
 
 
+def test_parse_portfolio_plan_accepts_open_markdown_yaml_fence() -> None:
+    plan = parse_portfolio_plan("""```yaml
+metadata:
+  id: generated-demo
+  name: Generated Demo Portfolio
+businessObjectives: []
+""")
+
+    assert plan["metadata"]["id"] == "generated-demo"
+    assert plan["businessObjectives"] == []
+
+
 def test_portfolio_cli_build_emits_one_final_json_report(
     tmp_path: Path,
     capsys,
@@ -840,6 +963,103 @@ def test_portfolio_cli_build_emits_one_final_json_report(
     assert "CLI Controlled Portfolio" in (workspace / "index.html").read_text(
         encoding="utf-8"
     )
+
+
+def test_portfolio_cli_build_defaults_to_validation_warning_mode(
+    tmp_path: Path,
+    capsys,
+    monkeypatch,
+) -> None:
+    from open_data_products import generation, portfolio
+
+    def fake_build_portfolio(*args, **kwargs):
+        return {
+            "spec": "portfolio",
+            "kind": "PortfolioBuild",
+            "workspace": str(tmp_path / "workspace"),
+            "html": str(tmp_path / "workspace" / "index.html"),
+            "validationResults": {
+                "products": [
+                    {
+                        "valid": False,
+                        "errors": ["/product/license/scope/restrictions is too long"],
+                    }
+                ]
+            },
+            "created": [],
+            "updated": [],
+            "unchanged": [],
+            "valid": False,
+        }
+
+    monkeypatch.setattr(generation, "create_generation_client", lambda settings: None)
+    monkeypatch.setattr(portfolio, "build_portfolio", fake_build_portfolio)
+
+    assert (
+        main(
+            [
+                "portfolio",
+                "build",
+                "--output",
+                str(tmp_path / "workspace"),
+                "--json",
+            ]
+        )
+        == 0
+    )
+    payload = json.loads(capsys.readouterr().out)
+
+    assert payload["valid"] is False
+    assert payload["validationMode"] == "warn"
+
+
+def test_portfolio_cli_build_strict_validation_returns_nonzero_for_invalid_report(
+    tmp_path: Path,
+    capsys,
+    monkeypatch,
+) -> None:
+    from open_data_products import generation, portfolio
+
+    def fake_build_portfolio(*args, **kwargs):
+        return {
+            "spec": "portfolio",
+            "kind": "PortfolioBuild",
+            "workspace": str(tmp_path / "workspace"),
+            "html": str(tmp_path / "workspace" / "index.html"),
+            "validationResults": {
+                "products": [
+                    {
+                        "valid": False,
+                        "errors": ["/product/license/scope/restrictions is too long"],
+                    }
+                ]
+            },
+            "created": [],
+            "updated": [],
+            "unchanged": [],
+            "valid": False,
+        }
+
+    monkeypatch.setattr(generation, "create_generation_client", lambda settings: None)
+    monkeypatch.setattr(portfolio, "build_portfolio", fake_build_portfolio)
+
+    assert (
+        main(
+            [
+                "portfolio",
+                "build",
+                "--output",
+                str(tmp_path / "workspace"),
+                "--strict-validation",
+                "--json",
+            ]
+        )
+        == 1
+    )
+    payload = json.loads(capsys.readouterr().out)
+
+    assert payload["valid"] is False
+    assert payload["validationMode"] == "strict"
 
 
 def test_portfolio_cli_build_workspace_rerun_uses_saved_sources(
@@ -980,6 +1200,79 @@ def test_refresh_portfolio_all_sources_forces_full_source_processing(
     assert result["processedSourceCounts"]["useCases"] == 2
     assert result["processedSourceCounts"]["signals"] == 1
     assert result["processedSourceCounts"]["products"] == 1
+
+
+def test_refresh_portfolio_preserves_changed_signal_source_as_draft_signal(
+    tmp_path: Path,
+) -> None:
+    sources = tmp_path / "sources"
+    workspace = tmp_path / "generated" / "portfolio"
+    write_source_lanes(sources)
+    build_portfolio(
+        workspace,
+        objectives=sources / "objectives",
+        use_cases=sources / "use-cases",
+        signals=sources / "signals",
+        products=sources / "products",
+        client=fake_portfolio_client,
+        model="test-model",
+    )
+    (sources / "signals" / "regional.md").write_text(
+        "Signal: regional retention pressure is rising\n",
+        encoding="utf-8",
+    )
+
+    result = refresh_portfolio(
+        workspace,
+        client=collapsed_signal_portfolio_client,
+        model="test-model",
+    )
+
+    assert result["sourceChanges"]["signals"]["created"] == [
+        str(sources / "signals" / "regional.md")
+    ]
+    assert result["artifactCounts"]["signals"] == 2
+    catalog_text = (workspace / "odpc" / "catalog.yaml").read_text(encoding="utf-8")
+    graph_text = (workspace / "odpg" / "graph.yaml").read_text(encoding="utf-8")
+    html = (workspace / "index.html").read_text(encoding="utf-8")
+    assert "SIG-REGIONAL" in catalog_text
+    assert "Regional" in catalog_text
+    assert "regional retention pressure is rising" in catalog_text
+    assert "SIG-REGIONAL" in graph_text
+    assert "Regional" in html
+
+
+def test_refresh_portfolio_does_not_duplicate_renamed_signal_from_changed_source(
+    tmp_path: Path,
+) -> None:
+    sources = tmp_path / "sources"
+    workspace = tmp_path / "generated" / "portfolio"
+    write_source_lanes(sources)
+    build_portfolio(
+        workspace,
+        objectives=sources / "objectives",
+        use_cases=sources / "use-cases",
+        signals=sources / "signals",
+        products=sources / "products",
+        client=fake_portfolio_client,
+        model="test-model",
+    )
+    (sources / "signals" / "regional.md").write_text(
+        "Product usage is down, support tickets are up, and renewal activity has slowed for several priority accounts.\n",
+        encoding="utf-8",
+    )
+
+    result = refresh_portfolio(
+        workspace,
+        client=renamed_signal_portfolio_client,
+        model="test-model",
+    )
+
+    assert result["artifactCounts"]["signals"] == 2
+    catalog = load_mapping(workspace / "odpc" / "catalog.yaml")["catalog"]
+    signal_ids = [item["id"] for item in catalog["signals"]]
+    assert "SIG-DAILY-RETENTION-BRIEFING" in signal_ids
+    assert "SIG-REGIONAL" not in signal_ids
 
 
 def test_refresh_portfolio_reports_removed_sources_as_warnings(
@@ -1200,6 +1493,97 @@ def test_sync_portfolio_propagates_linked_odps_product_details(
     assert "Customer Product Curated" in catalog_text
     assert "Customer Product Curated" in html
     assert "Curated ODPS product description." in html
+
+
+def test_render_portfolio_formats_odps_component_dimensions_for_humans(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "workspace"
+    write_sample_workspace(workspace)
+    product_path = workspace / "odps" / "products" / "customer-product.yaml"
+    product = yaml.safe_load(product_path.read_text(encoding="utf-8"))
+    product["product"]["pricingPlans"] = {
+        "declarative": {
+            "en": [
+                {
+                    "name": "Internal Starter",
+                    "description": "Internal use during pilot.",
+                    "priceCurrency": "XXX",
+                    "price": "0",
+                    "billingDuration": "month",
+                    "unit": "On-request",
+                    "SLA": {"$ref": "#/product/SLA/declarative/default"},
+                    "dataQuality": {
+                        "$ref": "#/product/dataQuality/declarative/default"
+                    },
+                }
+            ]
+        }
+    }
+    product["product"]["SLA"] = {
+        "declarative": {
+            "default": {
+                "name": {"en": "The Basic SLA"},
+                "description": {"en": "Daily refresh for weekly review."},
+                "dimensions": [
+                    {
+                        "dimension": "updateFrequency",
+                        "displaytitle": {"en": "Data Freshness"},
+                        "objective": 1440,
+                        "unit": "minutes",
+                        "weight": 60,
+                    },
+                    {
+                        "dimension": "uptime",
+                        "displaytitle": {"en": "Availability"},
+                        "objective": 95,
+                        "unit": "percent",
+                        "weight": 40,
+                    },
+                ],
+            }
+        }
+    }
+    product["product"]["dataQuality"] = {
+        "declarative": {
+            "default": {
+                "description": "Required field completeness and valid score range.",
+                "dimensions": [
+                    {
+                        "dimension": "completeness",
+                        "displayTitle": "Account ID Completeness",
+                        "objective": 100,
+                        "unit": "percentage",
+                        "weight": 40,
+                        "description": "Account ID must not be null.",
+                    }
+                ],
+            }
+        }
+    }
+    product_path.write_text(
+        yaml.safe_dump(product, sort_keys=False),
+        encoding="utf-8",
+    )
+
+    render_portfolio(workspace)
+
+    html = (workspace / "index.html").read_text(encoding="utf-8")
+    assert "Internal Starter" in html
+    assert "Price Currency" in html
+    assert "Billing Duration" in html
+    assert "The Basic SLA" in html
+    assert "Data Freshness" in html
+    assert "Availability" in html
+    assert "Account ID Completeness" in html
+    assert "1440 minutes" in html
+    assert "95 percent" in html
+    assert "100 percentage" in html
+    assert "<dt>priceCurrency</dt>" not in html
+    assert "<dt>billingDuration</dt>" not in html
+    assert "&#x27;dimension&#x27;" not in html
+    assert "[{" not in html
+    assert "<dt>dimensions</dt>" not in html
 
 
 def test_sync_portfolio_repairs_odps_data_access_from_yaml(

@@ -149,6 +149,13 @@ Render existing files without LLM generation:
 open-data-products portfolio render examples/portfolio/workspace/ --json
 ```
 
+Portfolio commands default to validation warning mode. They still write valid
+YAML drafts, render the HTML portfolio, and emit one final report when ODPS
+schema validation fails. The report keeps `valid: false`, sets
+`validationMode: warn`, and includes exact validation errors so humans can
+review the drafts. Use `--strict-validation` on `build`, `refresh`, `sync`, or
+`render` when schema failures should return a non-zero exit code.
+
 All `--json` commands must emit one final JSON object, not a stream of partial
 objects. Reports should include workspace path, browser entry point, artifact
 counts, validation results, created/updated/unchanged paths, warnings, and
@@ -462,8 +469,10 @@ Validation inputs:
 - `validate_document` for ODPS product paths.
 
 ODPS products should pass both the bundled JSON Schema and SDK semantic
-validators. Do not make portfolio reports `valid: true` by masking schema
-errors. Normalize generated output instead.
+validators where possible. Do not make portfolio reports `valid: true` by
+masking schema errors. The draft workflow may allow schema-invalid ODPS YAML to
+be written in validation warning mode, but the report must keep `valid: false`
+and preserve the exact errors.
 
 The schema/parser boundary matters. When the schema changes, update:
 

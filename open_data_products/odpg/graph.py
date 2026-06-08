@@ -127,6 +127,7 @@ CORE_NODE_TYPES: FrozenSet[str] = frozenset(
         "DataProduct",
         "UseCase",
         "BusinessObjective",
+        "Signal",
         "KPI",
         "Domain",
         "Dataset",
@@ -142,7 +143,7 @@ CORE_NODE_TYPES: FrozenSet[str] = frozenset(
 ODPC_COLLECTION_NODE_TYPES: Dict[str, str] = {
     "businessObjectives": "BusinessObjective",
     "productReferences": "DataProduct",
-    "signals": "KPI",
+    "signals": "Signal",
     "useCases": "UseCase",
 }
 

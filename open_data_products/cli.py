@@ -217,6 +217,18 @@ def _print_summary_report(summary: Dict[str, object]) -> None:
     print("\n".join(lines))
 
 
+def _portfolio_validation_mode(args: argparse.Namespace) -> str:
+    """Return portfolio schema validation handling mode for a CLI invocation."""
+    return "strict" if getattr(args, "strict_validation", False) else "warn"
+
+
+def _portfolio_exit_code(payload: Dict[str, object], args: argparse.Namespace) -> int:
+    """Return portfolio command exit code for the selected validation mode."""
+    if _portfolio_validation_mode(args) == "strict" and not payload.get("valid", False):
+        return 1
+    return 0
+
+
 def _split_csv(value: Optional[str]) -> List[str]:
     """Return non-empty comma-separated values with surrounding whitespace removed."""
     if not value:
@@ -251,6 +263,7 @@ Portfolio workflow commands:
 
 Examples:
   open-data-products portfolio build --objectives inputs/objectives/ --use-cases inputs/use-cases/ --signals inputs/signals/ --products inputs/products/ --output generated/portfolio/ --json
+  open-data-products portfolio build --objectives inputs/objectives/ --products inputs/products/ --output generated/portfolio/ --strict-validation --json
   open-data-products portfolio refresh generated/portfolio/ --json
   open-data-products portfolio refresh generated/portfolio/ --all-sources --json
   open-data-products portfolio sync generated/portfolio/ --json
@@ -758,6 +771,14 @@ def main(argv: Optional[List[str]] = None) -> int:
         "--ollama-url",
         help="Local Ollama base URL. Defaults to http://localhost:11434.",
     )
+    portfolio_build_parser.add_argument(
+        "--strict-validation",
+        action="store_true",
+        help=(
+            "Return a non-zero exit code when generated artifacts fail schema "
+            "validation. By default portfolio commands warn and still complete."
+        ),
+    )
     portfolio_build_parser.add_argument("--json", action="store_true", help="Emit JSON")
     portfolio_refresh_parser = portfolio_subparsers.add_parser(
         "refresh",
@@ -800,6 +821,14 @@ def main(argv: Optional[List[str]] = None) -> int:
         help="Local Ollama base URL. Defaults to http://localhost:11434.",
     )
     portfolio_refresh_parser.add_argument(
+        "--strict-validation",
+        action="store_true",
+        help=(
+            "Return a non-zero exit code when generated artifacts fail schema "
+            "validation. By default portfolio commands warn and still complete."
+        ),
+    )
+    portfolio_refresh_parser.add_argument(
         "--json", action="store_true", help="Emit JSON"
     )
     portfolio_sync_parser = portfolio_subparsers.add_parser(
@@ -807,6 +836,14 @@ def main(argv: Optional[List[str]] = None) -> int:
         help="Sync edited YAML artifacts without calling an LLM",
     )
     portfolio_sync_parser.add_argument("workspace", help="Portfolio workspace path")
+    portfolio_sync_parser.add_argument(
+        "--strict-validation",
+        action="store_true",
+        help=(
+            "Return a non-zero exit code when synced artifacts fail schema "
+            "validation. By default portfolio commands warn and still complete."
+        ),
+    )
     portfolio_sync_parser.add_argument("--json", action="store_true", help="Emit JSON")
     portfolio_render_parser = portfolio_subparsers.add_parser(
         "render",
@@ -817,6 +854,14 @@ def main(argv: Optional[List[str]] = None) -> int:
         "--output",
         "-o",
         help="Optional HTML output path. Defaults to <workspace>/index.html.",
+    )
+    portfolio_render_parser.add_argument(
+        "--strict-validation",
+        action="store_true",
+        help=(
+            "Return a non-zero exit code when rendered artifacts fail schema "
+            "validation. By default portfolio commands warn and still complete."
+        ),
     )
     portfolio_render_parser.add_argument(
         "--json", action="store_true", help="Emit JSON"
@@ -1644,17 +1689,19 @@ def main(argv: Optional[List[str]] = None) -> int:
                 print(str(exc), file=sys.stderr)
                 return 1
 
+            payload["validationMode"] = _portfolio_validation_mode(args)
             if args.json:
                 print(json.dumps(payload, indent=2))
             else:
                 print(f"Workspace: {payload['workspace']}")
                 print(f"HTML: {payload['html']}")
+                print(f"Validation mode: {payload['validationMode']}")
                 if "productReferenceCount" in payload:
                     print(f"Product references: {payload['productReferenceCount']}")
                 if "created" in payload:
                     print(f"Created: {len(payload['created'])}")
                     print(f"Updated: {len(payload['updated'])}")
-            return 0
+            return _portfolio_exit_code(payload, args)
 
         if args.command == "product" and args.product_command == "check-contract":
             from .contracts import validate_contract

@@ -845,6 +845,7 @@ def render_explorer(
               <div class="legend-node-item"><span class="legend-node-dot" style="background:#0284c7"></span>DataProduct</div>
               <div class="legend-node-item"><span class="legend-node-dot" style="background:#7c3aed"></span>API</div>
               <div class="legend-node-item"><span class="legend-node-dot" style="background:#ea580c"></span>BusinessObjective</div>
+              <div class="legend-node-item"><span class="legend-node-dot" style="background:#0891b2"></span>Signal</div>
               <div class="legend-node-item"><span class="legend-node-dot" style="background:#0d9488"></span>KPI</div>
               <div class="legend-node-item"><span class="legend-node-dot" style="background:#db2777"></span>Policy</div>
               <div class="legend-node-item"><span class="legend-node-dot" style="background:#0e7490"></span>Agent</div>
@@ -894,6 +895,7 @@ def render_explorer(
       Agent: "#0e7490",
       API: "#7c3aed",
       Policy: "#db2777",
+      Signal: "#0891b2",
       KPI: "#0d9488"
     }};
 
@@ -964,6 +966,7 @@ def render_explorer(
         DataProduct: groupCard("#0284c7"),
         UseCase: groupCard("#16a34a"),
         BusinessObjective: groupCard("#ea580c"),
+        Signal: groupCard("#0891b2"),
         KPI: groupCard("#0d9488"),
         Policy: groupCard("#db2777"),
         API: groupCard("#7c3aed"),

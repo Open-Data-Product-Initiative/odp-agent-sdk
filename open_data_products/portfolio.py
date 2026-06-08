@@ -91,6 +91,8 @@ ODPS_SLA_UNITS = {
     "null",
 }
 ODPS_SLA_UNIT_ALIASES = {
+    "hour": "minutes",
+    "hours": "minutes",
     "day": "days",
     "daily": "days",
     "week": "weeks",
@@ -218,6 +220,8 @@ def build_portfolio(
             plan = _merge_portfolio_plans(_plan_from_workspace(root), plan)
     else:
         plan = _plan_from_workspace(root)
+    if has_previous_sources:
+        plan = _ensure_changed_signal_source_coverage(plan, lanes, source_changes)
     plan = _reconcile_plan_identity(plan, previous_state)
     plan = _normalize_portfolio_plan(plan)
     workspace_title = _resolve_workspace_title(title, previous_state)
@@ -1179,6 +1183,7 @@ def _normalize_odps_product(value: Any) -> None:
         _normalize_odps_generated_sections(product)
         _normalize_odps_pricing_plans(product)
         _normalize_odps_data_access(product)
+        _normalize_odps_license(product.get("license"))
     details = _odps_details_mapping(value)
     if details is None:
         return
@@ -1303,10 +1308,67 @@ def _normalize_odps_detail_use_cases(details: Dict[str, Any]) -> None:
         details["useCases"] = normalized
 
 
+def _normalize_odps_license(license_data: Any) -> None:
+    if not isinstance(license_data, dict):
+        return
+    scope = license_data.get("scope")
+    if isinstance(scope, dict):
+        _truncate_mapping_strings(
+            scope,
+            {
+                "definition": 512,
+                "restrictions": 255,
+            },
+        )
+    termination = license_data.get("termination")
+    if isinstance(termination, dict):
+        _truncate_mapping_strings(
+            termination,
+            {
+                "terminationConditions": 512,
+                "continuityConditions": 512,
+            },
+        )
+    governance = license_data.get("governance")
+    if isinstance(governance, dict):
+        _truncate_mapping_strings(
+            governance,
+            {
+                "ownership": 512,
+                "audit": 512,
+                "warranties": 512,
+                "damages": 512,
+                "confidentiality": 512,
+                "applicableLaws": 512,
+                "forceMajeure": 512,
+            },
+        )
+
+
+def _truncate_mapping_strings(mapping: Dict[str, Any], limits: Dict[str, int]) -> None:
+    for key, limit in limits.items():
+        value = mapping.get(key)
+        if isinstance(value, str) and len(value) > limit:
+            mapping[key] = _truncate_text(value, limit)
+
+
+def _truncate_text(value: str, limit: int) -> str:
+    if len(value) <= limit:
+        return value
+    if limit <= 3:
+        return value[:limit]
+    return value[: limit - 3].rstrip() + "..."
+
+
 def _normalize_loose_sla(sla: Dict[str, Any]) -> Dict[str, Any]:
     declarative = sla.get("declarative")
     if isinstance(declarative, dict):
-        return sla
+        normalized = {"declarative": {}}
+        for key, profile in declarative.items():
+            normalized["declarative"][_path_id(str(key)) or "default"] = (
+                _normalize_sla_profile(profile, str(key))
+            )
+        return normalized
     if isinstance(declarative, list):
         return {"declarative": _named_profiles_from_list(declarative, "default")}
     description = _text(sla.get("description"))
@@ -1328,6 +1390,30 @@ def _normalize_sla_list(items: List[Any]) -> Dict[str, Any]:
     if not profiles:
         profiles = [{"name": {"en": "Default SLA"}, "dimensions": []}]
     return {"declarative": _named_profiles_from_list(profiles, "default")}
+
+
+def _normalize_sla_profile(value: Any, fallback_name: str) -> Dict[str, Any]:
+    if not isinstance(value, dict):
+        return {
+            "name": {"en": _title_from_text(_text(value) or fallback_name or "SLA")},
+            "dimensions": [],
+        }
+    if isinstance(value.get("dimensions"), list):
+        profile = dict(value)
+        profile["dimensions"] = [
+            _normalize_sla_dimension(dimension)
+            for dimension in value["dimensions"]
+            if isinstance(dimension, dict)
+        ]
+        if not isinstance(profile.get("name"), dict):
+            profile["name"] = {
+                "en": _text(profile.get("name"), _title_from_text(fallback_name))
+            }
+        return profile
+    profile = _sla_profile_from_loose_mapping(value)
+    if profile is None:
+        return {"name": {"en": _title_from_text(fallback_name)}, "dimensions": []}
+    return profile
 
 
 def _named_profiles_from_list(
@@ -1417,14 +1503,29 @@ def _sla_dimensions_from_loose_mapping(item: Dict[str, Any]) -> List[Dict[str, A
 
 def _normalize_sla_dimension(dimension: Dict[str, Any]) -> Dict[str, Any]:
     normalized = dict(dimension)
+    raw_dimension = _text(normalized.get("dimension") or normalized.get("name"))
+    raw_unit = _text(normalized.get("unit"))
     normalized["dimension"] = _normalize_enum(
-        normalized.get("dimension") or normalized.get("name"),
+        raw_dimension,
         ODPS_SLA_DIMENSIONS,
-        {},
+        {
+            "availability": "uptime",
+            "available": "uptime",
+            "freshness": "updateFrequency",
+            "datafreshness": "updateFrequency",
+            "data-freshness": "updateFrequency",
+            "refresh": "updateFrequency",
+            "refreshtimeliness": "updateFrequency",
+            "refresh-timeliness": "updateFrequency",
+            "refreshfrequency": "updateFrequency",
+            "refresh-frequency": "updateFrequency",
+        },
         "updateFrequency",
     )
     if "objective" not in normalized:
         normalized["objective"] = _text(normalized.get("target"), "pending")
+    if raw_unit.casefold() in {"hour", "hours"}:
+        normalized["objective"] = _hours_to_minutes(normalized.get("objective"))
     if not _text(normalized.get("unit")):
         normalized["unit"] = "null"
     else:
@@ -1432,6 +1533,15 @@ def _normalize_sla_dimension(dimension: Dict[str, Any]) -> Dict[str, Any]:
             normalized.get("unit"), ODPS_SLA_UNITS, ODPS_SLA_UNIT_ALIASES, "null"
         )
     return normalized
+
+
+def _hours_to_minutes(value: Any) -> Any:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return value
+    minutes = number * 60
+    return int(minutes) if minutes.is_integer() else minutes
 
 
 def _sla_from_data_ops_update_frequency(data_ops: Dict[str, Any]) -> Dict[str, Any]:
@@ -2085,6 +2195,174 @@ def _graph_edge_key(edge: Dict[str, Any]) -> str:
     return f"{source}|{edge_type}|{target}"
 
 
+def _ensure_changed_signal_source_coverage(
+    plan: Dict[str, Any],
+    lanes: Dict[str, List[Dict[str, str]]],
+    source_changes: Dict[str, Any],
+) -> Dict[str, Any]:
+    lane_changes = source_changes.get("lanes")
+    if not isinstance(lane_changes, dict):
+        return plan
+    signal_changes = lane_changes.get("signals")
+    if not isinstance(signal_changes, dict):
+        return plan
+    changed_paths = {
+        str(path)
+        for key in ("created", "updated")
+        for path in signal_changes.get(key, [])
+    }
+    if not changed_paths:
+        return plan
+
+    covered = deepcopy(plan) if isinstance(plan, dict) else {}
+    signals = _list(covered, "signals")
+    existing_ids = {_text(item.get("id")) for item in signals}
+    for source in lanes.get("signals", []):
+        if source.get("path") not in changed_paths:
+            continue
+        if _signal_source_is_represented(signals, source):
+            continue
+        signal = _draft_signal_from_source(source, existing_ids)
+        existing_ids.add(_text(signal.get("id")))
+        signals.append(signal)
+        warnings = covered.setdefault("warnings", [])
+        if isinstance(warnings, list):
+            warnings.append(
+                f"Draft signal created from changed source {source['path']} because the model did not return a separate signal artifact."
+            )
+    if signals:
+        covered["signals"] = signals
+    return covered
+
+
+def _signal_source_is_represented(
+    signals: List[Dict[str, Any]],
+    source: Dict[str, str],
+) -> bool:
+    source_key = _normalize_identity_text(Path(source["path"]).stem.replace("-", " "))
+    source_title = _normalize_identity_text(_source_signal_title(source))
+    source_terms = _meaningful_terms(source.get("text", ""))
+    for signal in signals:
+        identity = _normalize_identity_text(
+            " ".join(
+                [
+                    _text(signal.get("id")),
+                    _text(signal.get("name")),
+                    _text(signal.get("description")),
+                ]
+            )
+        )
+        if source_key and source_key in identity:
+            return True
+        if source_title and source_title in identity:
+            return True
+        if _term_overlap(source_terms, _meaningful_terms(identity)) >= 4:
+            return True
+    return False
+
+
+def _draft_signal_from_source(
+    source: Dict[str, str],
+    existing_ids: set,
+) -> Dict[str, Any]:
+    title = _source_signal_title(source)
+    signal_id = _unique_signal_id(Path(source["path"]).stem, existing_ids)
+    return {
+        "id": signal_id,
+        "name": {"en": title},
+        "description": {"en": _source_signal_description(source)},
+        "type": "operational",
+        "confidence": "medium",
+        "source": {
+            "origin": "internal",
+            "method": "generated from changed signal source",
+        },
+    }
+
+
+def _unique_signal_id(stem: str, existing_ids: set) -> str:
+    base = f"SIG-{_path_id(stem).upper()}"
+    candidate = base
+    suffix = 2
+    while candidate in existing_ids:
+        candidate = f"{base}-{suffix}"
+        suffix += 1
+    return candidate
+
+
+def _source_signal_title(source: Dict[str, str]) -> str:
+    text = source.get("text", "")
+    for raw_line in text.splitlines():
+        line = raw_line.strip().strip("#").strip()
+        if not line:
+            continue
+        lowered = line.casefold()
+        if lowered.startswith("signal:"):
+            line = line.split(":", 1)[1].strip()
+        if line:
+            return _title_from_text(line)
+    return _title_from_text(Path(source["path"]).stem.replace("-", " "))
+
+
+def _source_signal_description(source: Dict[str, str]) -> str:
+    text = source.get("text", "")
+    lines = []
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.casefold().startswith("signal:"):
+            line = line.split(":", 1)[1].strip()
+        if line:
+            lines.append(line)
+        if len(" ".join(lines)) >= 220:
+            break
+    description = " ".join(lines).strip()
+    return description or f"Draft signal created from {source['path']}."
+
+
+def _title_from_text(value: str) -> str:
+    return " ".join(word.capitalize() for word in value.replace("_", " ").split())
+
+
+def _meaningful_terms(value: str) -> set:
+    stopwords = {
+        "and",
+        "are",
+        "for",
+        "from",
+        "has",
+        "have",
+        "inside",
+        "into",
+        "that",
+        "the",
+        "this",
+        "use",
+        "uses",
+        "with",
+    }
+    terms = set()
+    current = []
+    for char in value.casefold():
+        if char.isalnum():
+            current.append(char)
+        elif current:
+            term = "".join(current)
+            if len(term) >= 4 and term not in stopwords:
+                terms.add(term)
+            current = []
+    if current:
+        term = "".join(current)
+        if len(term) >= 4 and term not in stopwords:
+            terms.add(term)
+    return terms
+
+
+def _term_overlap(left: set, right: set) -> int:
+    return len(left & right)
+
+
 def _catalog_document(plan: Dict[str, Any]) -> Dict[str, Any]:
     metadata = plan.get("metadata") if isinstance(plan.get("metadata"), dict) else {}
     catalog: Dict[str, Any] = {
@@ -2126,7 +2404,7 @@ def _graph_document(plan: Dict[str, Any]) -> Dict[str, Any]:
         )
     )
     nodes.extend(_graph_nodes(_list(plan, "useCases"), "UseCase", "use_case"))
-    nodes.extend(_graph_nodes(_list(plan, "signals"), "KPI", "signal"))
+    nodes.extend(_graph_nodes(_list(plan, "signals"), "Signal", "signal"))
     for product in _list(plan, "products"):
         reference = product.get("productReference")
         if isinstance(reference, dict):
@@ -2208,6 +2486,12 @@ def _workspace_artifact_counts(data: Dict[str, Any]) -> Dict[str, int]:
 
 
 def _extract_yaml_text(raw_output: str) -> str:
+    stripped = raw_output.strip()
+    if stripped.startswith("```"):
+        lines = stripped.splitlines()
+        if len(lines) >= 2:
+            return "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:])
+        return ""
     if "```" not in raw_output:
         return raw_output
     parts = raw_output.split("```")
@@ -2493,7 +2777,7 @@ def _render_overview(
     catalog: Dict[str, Any],
     graph: Dict[str, Any],
     products: Dict[str, Dict[str, Any]],
-    versions: List[Dict[str, str]],
+    versions: List[Dict[str, Any]],
     warnings: List[str],
 ) -> str:
     counts = [
@@ -2517,29 +2801,89 @@ def _render_overview(
         "graph relationships, versions, and generation context.</p></div>"
         f'<section class="summary" aria-label="Portfolio summary">{metrics}</section>'
         f"{_render_recommended_actions(catalog, graph, products, warnings)}"
-        f"{_render_portfolio_status()}"
+        f"{_render_portfolio_changes(versions)}"
         f"{_render_versions(versions)}"
         "</section>"
     )
 
 
-def _render_portfolio_status() -> str:
+def _render_portfolio_changes(versions: List[Dict[str, Any]]) -> str:
+    latest = _latest_version(versions)
+    if latest is None:
+        body = (
+            '<article class="action-card overview-card changes-card">'
+            "<p>No version snapshots exist yet. Change information will appear "
+            "after the first build, refresh, or sync snapshot is created.</p>"
+            "</article>"
+        )
+    else:
+        report = latest.get("report") if isinstance(latest.get("report"), dict) else {}
+        created = _change_list_count(report.get("created"))
+        updated = _change_list_count(report.get("updated"))
+        unchanged = _change_list_count(report.get("unchanged"))
+        removed = _change_list_count(report.get("removed"))
+        source_summary = _source_change_summary(report.get("sourceChanges"))
+        validation = _change_validation_label(report)
+        body = (
+            '<article class="action-card overview-card changes-card">'
+            '<div class="chip-row"><span class="chip">Latest change summary</span></div>'
+            f"<p>{_escape(_text(latest.get('summary'), 'Latest portfolio snapshot.'))}</p>"
+            f"{_render_facts([('Version', latest.get('id')), ('Run', report.get('kind') or latest.get('type')), ('Validation', validation)])}"
+            '<div class="change-metrics">'
+            f"<span><strong>{created}</strong> Created</span>"
+            f"<span><strong>{updated}</strong> Updated</span>"
+            f"<span><strong>{unchanged}</strong> Unchanged</span>"
+            f"<span><strong>{removed}</strong> Removed</span>"
+            "</div>"
+            f"{source_summary}"
+            "</article>"
+        )
     return (
-        '<section class="overview-section" aria-label="Portfolio status">'
+        '<section class="overview-section" aria-label="Portfolio changes">'
         '<div class="section-head"><div>'
-        '<p class="eyebrow">Workspace</p>'
-        "<h2>Portfolio status</h2>"
+        '<p class="eyebrow">Change history</p>'
+        "<h2>Portfolio changes</h2>"
         "</div></div>"
-        '<div class="overview-card-grid">'
-        '<article class="action-card overview-card status-card">'
-        '<div class="chip-row"><span class="chip odpc">ODPC</span>'
-        '<span class="chip odps">ODPS</span><span class="chip odpg">ODPG</span></div>'
-        "<p>The workspace links business demand, product references, detailed "
-        "ODPS products, and graph relationships generated from source lanes.</p>"
-        f'{_render_facts([("HTML", "index.html"), ("Catalog", "odpc/catalog.yaml"), ("Graph", "odpg/graph.yaml")])}'
-        "</article>"
-        "</div>"
+        f'<div class="overview-card-grid">{body}</div>'
         "</section>"
+    )
+
+
+def _latest_version(versions: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    if not versions:
+        return None
+    return max(versions, key=lambda version: _text(version.get("id")))
+
+
+def _change_list_count(value: Any) -> int:
+    return len(value) if isinstance(value, list) else 0
+
+
+def _change_validation_label(report: Dict[str, Any]) -> str:
+    if "valid" not in report:
+        return "Not recorded"
+    return "Valid" if bool(report.get("valid")) else "Validation needs review"
+
+
+def _source_change_summary(value: Any) -> str:
+    if not isinstance(value, dict):
+        return ""
+    lines = []
+    for lane, changes in sorted(value.items()):
+        if not isinstance(changes, dict):
+            continue
+        parts = []
+        for key in ("created", "updated", "removed"):
+            count = _change_list_count(changes.get(key))
+            if count:
+                parts.append(f"{count} {key}")
+        if parts:
+            lines.append(f"<li>{_escape(str(lane))}: {_escape(', '.join(parts))}</li>")
+    if not lines:
+        return ""
+    return (
+        '<div class="source-change-list"><strong>Source changes</strong>'
+        f"<ul>{''.join(lines)}</ul></div>"
     )
 
 
@@ -2621,7 +2965,7 @@ def _render_recommended_actions(
     )
 
 
-def _render_versions(versions: List[Dict[str, str]]) -> str:
+def _render_versions(versions: List[Dict[str, Any]]) -> str:
     recent = versions[:5]
     recent_items = [
         '<li class="version-row"><strong>Current</strong><span>latest</span></li>'
@@ -2803,9 +3147,9 @@ def _render_product_detail(product_info: Dict[str, Any]) -> str:
         ("Type", details.get("type")),
     ]
     sections = [
-        _render_named_collection("Pricing", _pricing_items(product)),
-        _render_named_collection("SLA", _declarative_items(product.get("SLA"))),
-        _render_named_collection(
+        _render_pricing_section(_pricing_items(product)),
+        _render_declarative_section("SLA", _declarative_items(product.get("SLA"))),
+        _render_declarative_section(
             "Data Quality", _declarative_items(product.get("dataQuality"))
         ),
     ]
@@ -3000,8 +3344,8 @@ def _product_spec_paths(root: Path) -> List[Path]:
     )
 
 
-def _portfolio_versions(root: Path, portfolio: Dict[str, Any]) -> List[Dict[str, str]]:
-    versions = []
+def _portfolio_versions(root: Path, portfolio: Dict[str, Any]) -> List[Dict[str, Any]]:
+    versions: List[Dict[str, Any]] = []
     metadata_versions = portfolio.get("versions")
     if isinstance(metadata_versions, list):
         for item in metadata_versions:
@@ -3010,14 +3354,21 @@ def _portfolio_versions(root: Path, portfolio: Dict[str, Any]) -> List[Dict[str,
             version_id = str(item.get("id") or item.get("version") or "")
             html_path = str(item.get("html") or f"versions/{version_id}/index.html")
             if version_id:
+                report = _version_report_for_html(root, html_path)
                 versions.append(
                     {
                         "id": version_id,
                         "type": str(
-                            item.get("type") or item.get("runType") or "snapshot"
+                            item.get("type")
+                            or item.get("runType")
+                            or report.get("kind")
+                            or "snapshot"
                         ),
-                        "summary": str(item.get("summary") or ""),
+                        "summary": str(
+                            item.get("summary") or _version_report_summary(report) or ""
+                        ),
                         "html": html_path,
+                        "report": report,
                     }
                 )
     if versions:
@@ -3026,15 +3377,47 @@ def _portfolio_versions(root: Path, portfolio: Dict[str, Any]) -> List[Dict[str,
     if versions_root.exists():
         for path in sorted(versions_root.glob("*/index.html")):
             version_id = path.parent.name
+            report = _load_version_report(path.parent / "report.json")
             versions.append(
                 {
                     "id": version_id,
-                    "type": "snapshot",
-                    "summary": "",
+                    "type": str(report.get("kind") or "snapshot"),
+                    "summary": _version_report_summary(report),
                     "html": path.relative_to(root).as_posix(),
+                    "report": report,
                 }
             )
     return versions
+
+
+def _version_report_for_html(root: Path, html_path: str) -> Dict[str, Any]:
+    path = root / html_path
+    return _load_version_report(path.parent / "report.json")
+
+
+def _load_version_report(path: Path) -> Dict[str, Any]:
+    if not path.exists():
+        return {}
+    try:
+        return load_mapping(path, root_name="Portfolio version report")
+    except ValueError:
+        return {}
+
+
+def _version_report_summary(report: Dict[str, Any]) -> str:
+    if not report:
+        return ""
+    created = _change_list_count(report.get("created"))
+    updated = _change_list_count(report.get("updated"))
+    removed = _change_list_count(report.get("removed"))
+    changes = []
+    if created:
+        changes.append(f"{created} created")
+    if updated:
+        changes.append(f"{updated} updated")
+    if removed:
+        changes.append(f"{removed} removed")
+    return ", ".join(changes)
 
 
 def _product_details(document: Dict[str, Any]) -> Dict[str, Any]:
@@ -3080,14 +3463,130 @@ def _declarative_items(value: Any) -> List[Dict[str, Any]]:
     return []
 
 
-def _render_named_collection(title: str, items: List[Dict[str, Any]]) -> str:
+def _render_pricing_section(items: List[Dict[str, Any]]) -> str:
     if not items:
         return ""
     rendered = []
     for item in items:
-        facts = [(str(key), value) for key, value in item.items()]
-        rendered.append(f"<li>{_render_facts(facts)}</li>")
-    return f"<h4>{_escape(title)}</h4><ul>{''.join(rendered)}</ul>"
+        name = _text(item.get("name"), "Pricing plan")
+        description = _text(item.get("description"))
+        facts = [
+            (str(key), value)
+            for key, value in item.items()
+            if key not in {"name", "description"}
+            and not isinstance(value, (dict, list))
+        ]
+        description_html = f"<p>{_escape(description)}</p>" if description else ""
+        rendered.append(
+            '<li class="component-card">'
+            f"<h5>{_escape(name)}</h5>"
+            f"{description_html}"
+            f"{_render_facts(facts)}"
+            f"{_render_component_refs(item)}"
+            "</li>"
+        )
+    return (
+        '<section class="component-section">'
+        "<h4>Pricing</h4>"
+        f'<ul class="component-list">{"".join(rendered)}</ul>'
+        "</section>"
+    )
+
+
+def _render_declarative_section(title: str, items: List[Dict[str, Any]]) -> str:
+    if not items:
+        return ""
+    rendered = []
+    for item in items:
+        profile = _text(item.get("profile"), "default")
+        name = _text(item.get("name"), _title_from_text(profile))
+        description = _text(item.get("description"))
+        facts = [
+            (str(key), value)
+            for key, value in item.items()
+            if key not in {"name", "description", "dimensions", "profile"}
+            and not isinstance(value, (dict, list))
+        ]
+        description_html = f"<p>{_escape(description)}</p>" if description else ""
+        rendered.append(
+            '<li class="component-card">'
+            f"<h5>{_escape(name)}</h5>"
+            f'<span class="profile-chip">{_escape(profile)}</span>'
+            f"{description_html}"
+            f"{_render_facts(facts)}"
+            f"{_render_dimensions(item.get('dimensions'))}"
+            "</li>"
+        )
+    return (
+        '<section class="component-section">'
+        f"<h4>{_escape(title)}</h4>"
+        f'<ul class="component-list">{"".join(rendered)}</ul>'
+        "</section>"
+    )
+
+
+def _render_component_refs(item: Dict[str, Any]) -> str:
+    refs = []
+    for label, key in (
+        ("Payment", "paymentGateway"),
+        ("Data Quality", "dataQuality"),
+        ("SLA", "SLA"),
+        ("Access", "access"),
+    ):
+        value = item.get(key)
+        if isinstance(value, dict):
+            ref = _text(value.get("$ref") or value.get("ref"))
+            if ref:
+                refs.append(
+                    f"<li><strong>{_escape(label)}</strong> {_escape(ref)}</li>"
+                )
+    if not refs:
+        return ""
+    return f'<ul class="component-refs">{"".join(refs)}</ul>'
+
+
+def _render_dimensions(value: Any) -> str:
+    if not isinstance(value, list):
+        return ""
+    rows = []
+    for item in value:
+        if not isinstance(item, dict):
+            continue
+        label = _dimension_label(item)
+        objective = _text(item.get("objective"))
+        unit = _text(item.get("unit"))
+        metric = " ".join(part for part in (objective, unit) if part and part != "null")
+        weight = _text(item.get("weight"))
+        description = _text(item.get("description"))
+        meta = []
+        if metric:
+            meta.append(f'<span class="dimension-metric">{_escape(metric)}</span>')
+        if weight:
+            meta.append(
+                f'<span class="dimension-weight">{_escape(weight)} weight</span>'
+            )
+        description_html = (
+            f'<p class="dimension-description">{_escape(description)}</p>'
+            if description
+            else ""
+        )
+        rows.append(
+            '<li class="dimension-row">'
+            f"<div><strong>{_escape(label)}</strong>{description_html}</div>"
+            f'<div class="dimension-meta">{"".join(meta)}</div>'
+            "</li>"
+        )
+    if not rows:
+        return ""
+    return f'<ul class="dimension-list">{"".join(rows)}</ul>'
+
+
+def _dimension_label(item: Dict[str, Any]) -> str:
+    for key in ("displayTitle", "displaytitle", "name", "dimension"):
+        value = _text(item.get(key))
+        if value:
+            return value
+    return "Dimension"
 
 
 def _render_facts(facts: Iterable[Tuple[str, Any]]) -> str:
@@ -3095,10 +3594,41 @@ def _render_facts(facts: Iterable[Tuple[str, Any]]) -> str:
     for label, value in facts:
         text = _text(value)
         if text:
-            pairs.append(f"<dt>{_escape(label)}</dt><dd>{_escape(text)}</dd>")
+            pairs.append(
+                f"<dt>{_escape(_display_label(label))}</dt><dd>{_escape(text)}</dd>"
+            )
     if not pairs:
         return ""
     return f'<dl class="odp-facts">{"".join(pairs)}</dl>'
+
+
+def _display_label(value: str) -> str:
+    if value == "$ref":
+        return "Reference"
+    if " " in value:
+        return value
+    words: List[str] = []
+    current = []
+    for index, char in enumerate(value):
+        previous = value[index - 1] if index else ""
+        next_char = value[index + 1] if index + 1 < len(value) else ""
+        boundary = (
+            index > 0
+            and char.isupper()
+            and (
+                previous.islower()
+                or previous.isdigit()
+                or (previous.isupper() and next_char.islower())
+            )
+        )
+        if boundary and current:
+            words.append("".join(current))
+            current = [char]
+        else:
+            current.append(char)
+    if current:
+        words.append("".join(current))
+    return " ".join(word[:1].upper() + word[1:] for word in words)
 
 
 def _list(mapping: Any, key: str) -> List[Dict[str, Any]]:
@@ -3380,6 +3910,88 @@ main {
   font-weight: 700;
 }
 .odp-facts dd { margin: 0; }
+.component-section {
+  margin-top: 18px;
+}
+.component-section h4 {
+  margin: 0 0 10px;
+}
+.component-list,
+.dimension-list,
+.component-refs {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.component-list {
+  display: grid;
+  gap: 12px;
+}
+.component-card {
+  border: 1px solid var(--odp-line);
+  border-radius: 8px;
+  background: #fff;
+  padding: 14px;
+}
+.component-card h5 {
+  margin: 0 0 8px;
+  font-size: 1rem;
+}
+.profile-chip {
+  display: inline-flex;
+  margin-bottom: 10px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--odp-soft);
+  color: var(--odp-muted);
+  font-size: .72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+.dimension-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+.dimension-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+  padding: 10px;
+  border: 1px solid var(--odp-line);
+  border-radius: 8px;
+  background: var(--odp-soft);
+}
+.dimension-description {
+  margin: 4px 0 0;
+  font-size: .86rem;
+}
+.dimension-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+.dimension-metric,
+.dimension-weight {
+  display: inline-flex;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #fff;
+  color: var(--odp-ink);
+  font-size: .78rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.component-refs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  color: var(--odp-muted);
+  font-size: .82rem;
+}
 .odp-muted { color: var(--odp-muted); }
 .odp-detail {
   margin-top: 14px;
@@ -3418,6 +4030,37 @@ main {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 16px;
+}
+.change-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin: 14px 0;
+}
+.change-metrics span {
+  display: block;
+  padding: 10px;
+  border: 1px solid var(--odp-line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--odp-muted);
+  font-size: .78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.change-metrics strong {
+  display: block;
+  color: var(--odp-ink);
+  font-size: 1.45rem;
+  line-height: 1;
+}
+.source-change-list {
+  margin-top: 12px;
+  color: var(--odp-muted);
+}
+.source-change-list ul {
+  margin: 8px 0 0;
+  padding-left: 18px;
 }
 .panel { padding: 18px; }
 .version-list {

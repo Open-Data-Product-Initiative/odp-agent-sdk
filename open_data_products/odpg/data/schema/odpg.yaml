@@ -141,6 +141,7 @@ $defs:
           - DataProduct
           - UseCase
           - BusinessObjective
+          - Signal
           - KPI
           - Domain
           - Dataset

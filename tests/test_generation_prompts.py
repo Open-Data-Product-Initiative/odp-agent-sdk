@@ -1521,6 +1521,75 @@ product:
     assert document["product"]["license"]["scopeOfUse"] == "internal partner use only"
 
 
+def test_generate_odps_product_truncates_overlong_license_restrictions(tmp_path):
+    """Test generated license text is shortened to ODPS schema limits."""
+    source = tmp_path / "license-notes.md"
+    source.write_text(
+        "Customer health product with internal restrictions.", encoding="utf-8"
+    )
+    long_restrictions = (
+        "No external redistribution or resale; contact-level activation view "
+        "restricted to approved marketing users with consent awareness controls; "
+        "user-level product behavior aggregated to account level unless clear "
+        "approved use case requires contact-level detail."
+    )
+
+    def fake_client(prompt, model):
+        if prompt.startswith("# Extract ODPS Product Facts"):
+            return "product:\n  productID: customer-health\n  name: Customer Health\n"
+        if prompt.startswith("# Generate Minimal ODPS Product YAML"):
+            return """schema: https://opendataproducts.org/v4.1/schema/odps.json
+version: "4.1"
+product:
+  productID: customer-health
+  name: Customer Health
+  visibility: public
+  status: draft
+  type: dataset
+"""
+        if prompt.startswith("# Draft ODPS Product Components"):
+            return f"""components:
+  license:
+    scope:
+      definition: Internal use for customer retention workflows.
+      restrictions: {long_restrictions}
+draftedComponents:
+  - license
+reviewNotes:
+  - License drafted from transcript context.
+"""
+        if prompt.startswith("# Assemble ODPS Product YAML"):
+            return f"""schema: https://opendataproducts.org/v4.1/schema/odps.json
+version: "4.1"
+product:
+  productID: customer-health
+  name: Customer Health
+  visibility: public
+  status: draft
+  type: dataset
+  license:
+    scope:
+      definition: Internal use for customer retention workflows.
+      restrictions: {long_restrictions}
+"""
+        raise AssertionError(f"unexpected prompt: {prompt[:80]}")
+
+    artifact = generate_local_artifacts_for_kind(
+        "odps-product",
+        source,
+        tmp_path / "products",
+        client=fake_client,
+        include_components=["license"],
+    )[0]
+
+    assert artifact.valid_yaml is True
+    assert artifact.errors == []
+    document = yaml.safe_load(artifact.output_path.read_text(encoding="utf-8"))
+    restrictions = document["product"]["license"]["scope"]["restrictions"]
+    assert len(restrictions) <= 255
+    assert restrictions != long_restrictions
+
+
 def test_generate_odps_product_drops_unsupported_pricing_plan_fields(tmp_path):
     """Test generated pricing plans keep only supported conservative ODPS fields."""
     source = tmp_path / "pricing-notes.md"
@@ -1762,6 +1831,10 @@ product:
             objective: 5
             unit: minutes
             description: Target refresh interval
+          - name: refreshTimeliness
+            objective: 2
+            unit: hours
+            description: Maximum refresh delay
         support:
           description: Support hours not specified
 draftedComponents:
@@ -1795,6 +1868,10 @@ product:
             objective: 5
             unit: minutes
             description: Target refresh interval
+          - name: refreshTimeliness
+            objective: 2
+            unit: hours
+            description: Maximum refresh delay
         support:
           description: Support hours not specified
 """
@@ -1824,6 +1901,11 @@ product:
                     {
                         "dimension": "updateFrequency",
                         "objective": "5",
+                        "unit": "minutes",
+                    },
+                    {
+                        "dimension": "updateFrequency",
+                        "objective": "120",
                         "unit": "minutes",
                     },
                 ],

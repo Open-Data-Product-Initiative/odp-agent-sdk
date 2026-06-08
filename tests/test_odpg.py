@@ -282,7 +282,7 @@ edges:
             "type": "BusinessObjective",
             "$ref": "objective.yaml",
         },
-        {"id": "churn-risk-score", "type": "KPI", "$ref": "signal.yaml"},
+        {"id": "churn-risk-score", "type": "Signal", "$ref": "signal.yaml"},
     ]
     assert graph["graph"]["edges"][0]["type"] == "dependsOn"
 

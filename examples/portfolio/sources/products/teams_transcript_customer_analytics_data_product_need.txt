@@ -1,0 +1,644 @@
+Hypothetical AI Assistant Transcript
+Teams Meeting: Customer Analytics Data Product Need
+Date: 8 June 2026
+Duration: 58 minutes
+Meeting type: Customer discovery and requirements discussion
+Recorded by: AI meeting assistant
+
+Participants:
+- Maya Nair, Head of Retention Analytics
+- Daniel Brooks, Director of Customer Success
+- Sofia Martinez, Lifecycle Marketing Lead
+- Priya Shah, Data Product Manager
+- Omar Haddad, Enterprise Data Architect
+- Lena Fischer, Data Governance Lead
+- Amir Khan, Support Operations Manager
+- Nina Patel, BI Analyst
+- Thomas Reed, Commercial Director
+
+Transcript begins
+
+Priya Shah: Thanks everyone for joining. The purpose of this session is to understand the need for a customer analytics data product focused on churn prevention. We are not designing the full solution today. We are trying to capture the business need, main users, required data, expected outputs, and constraints. Maya, could you start with the problem statement?
+
+Maya Nair: Sure. The core problem is that our churn prevention work is too reactive. We often find out that a customer is at risk only after they have already reduced usage, raised multiple support tickets, or ignored renewal conversations. Different teams have pieces of the picture, but no one has the full picture in one place.
+
+Daniel Brooks: I agree. From Customer Success, we have account managers building their own spreadsheets. Some of those are based on CRM notes. Some use support ticket counts. Some use product usage exports. The logic changes from team to team. That makes weekly churn review difficult because everyone comes with a different version of risk.
+
+Sofia Martinez: Marketing has the same issue. We run lifecycle campaigns, but segmentation is not precise enough. We can see whether someone opened an email or joined a campaign, but we do not always know whether the customer is showing real product adoption risk. So campaigns become generic.
+
+Priya Shah: So the need is a reusable data product that combines customer profile, usage, purchase, support, campaign, and risk signals. Is that correct?
+
+Maya Nair: Yes. I would phrase it as a reusable customer analytics data product for churn prevention. It should help retention managers and lifecycle marketing analysts identify accounts at risk, understand why they are at risk, and decide what action to take next.
+
+Thomas Reed: I want to add the commercial angle. Churn has direct revenue impact. We need this not only for operational reporting, but also for protecting renewal revenue. If the product helps us act earlier, even a small reduction in churn has value.
+
+Priya Shah: Good. Let us discuss who the primary users are. Maya mentioned retention managers and lifecycle marketing analysts. Daniel, do account managers also use this directly?
+
+Daniel Brooks: Yes, but I see account managers as action owners rather than the primary analytics users. The retention managers need to prepare weekly review lists. They then assign actions to account managers or customer success managers. Account managers need a simple view, not a complex analytics interface.
+
+Nina Patel: For BI, we will likely build dashboards on top of the data product. So analysts are consumers too, but maybe not the main business users.
+
+Sofia Martinez: Lifecycle marketing analysts are primary users because we need to build segments. For example, customers with high risk, low engagement, high contract value, and no recent campaign contact. That is a perfect target group for a win-back or adoption campaign.
+
+Maya Nair: Exactly. We also need weekly churn review. Every Monday, the retention team reviews priority accounts. Today that list is manually prepared. We want the data product to generate a consistent risk view before that meeting.
+
+Priya Shah: Let me capture expected business processes. First, weekly churn review. Second, next-best-action campaign planning. Third, account manager follow-up prioritization. Anything else?
+
+Thomas Reed: Renewal planning. We should connect this to upcoming renewal dates. If a high-value account has renewal in 90 days and risk is increasing, that is urgent.
+
+Daniel Brooks: Yes. We also need customer health review. Churn risk is one part of health, but we need to know what is driving it.
+
+Omar Haddad: Before going into data sources, I want to clarify whether we are talking about account-level churn or user-level churn. Those are different models.
+
+Maya Nair: Good question. The first version should be account-level. Our commercial contracts are at account level. User-level signals still matter because usage behavior comes from users, but the product should provide account-level outputs.
+
+Sofia Martinez: Campaigns sometimes target users inside accounts, but prioritization should start at account level. Then we drill down to contacts or user groups.
+
+Priya Shah: So the core grain is customer account. We may include user-level aggregated metrics. Is that right?
+
+Omar Haddad: That makes sense. We need to define the main entity as customer account ID. Then we can attach product usage metrics, purchase history, support metrics, campaign engagement, and churn risk scores.
+
+Lena Fischer: We also need to decide which identifiers are approved for joining. Some systems use account ID, some use customer number, some use billing ID, and marketing uses contact IDs. Identity resolution will be a major requirement.
+
+Nina Patel: That is one of our current issues. I spend too much time matching account names manually. Sometimes the same customer appears under different names in CRM and billing.
+
+Priya Shah: Let us list the data sources. I heard account profile, product usage, purchase history, support tickets, campaign contacts, and churn risk signals. Maya, could you explain what account profile should include?
+
+Maya Nair: Account profile should include account ID, account name, segment, industry, region, account owner, customer success manager, onboarding date, contract start date, contract end date, renewal date, current plan, annual recurring revenue, and customer status.
+
+Thomas Reed: Add strategic account flag and contract value band. Some customers deserve special treatment because of strategic importance even if current revenue is not high.
+
+Daniel Brooks: Also customer lifecycle stage. New, onboarding, adopted, expansion, renewal, at risk, inactive. That helps interpret the signals.
+
+Priya Shah: Good. Omar, where does account profile come from?
+
+Omar Haddad: Mostly CRM. Contract and billing fields come from the finance system. Some owner information comes from CRM, but it is not always complete. We may need CRM as the system of record for account profile and billing as the system of record for revenue fields.
+
+Priya Shah: Product usage data next. Sofia, what usage metrics matter?
+
+Sofia Martinez: Active users, login frequency, feature usage, number of sessions, days since last active user, number of active seats compared to purchased seats, and usage trend over the last four to eight weeks.
+
+Maya Nair: I would add depth of usage. A customer logging in is not enough. We need to know whether they use key value features. If a customer only logs in to export reports once a month, that tells a different story than regular workflow usage.
+
+Daniel Brooks: Adoption milestones matter too. Some customers should complete onboarding steps. If they have not connected integrations or invited users within 30 days, risk increases.
+
+Nina Patel: We can calculate rolling averages. For example, weekly active users, usage growth or decline, feature breadth, and last activity date.
+
+Omar Haddad: Usage data comes from product telemetry. We have event logs, but they are large. We should avoid exposing raw events in the first data product. The first version should publish curated account-level usage metrics.
+
+Priya Shah: So product usage should be aggregated, not raw event logs.
+
+Omar Haddad: Correct. Raw events can stay in the source platform or analytical lake. The data product should provide trusted derived metrics.
+
+Priya Shah: Purchase history. Thomas, what do we need?
+
+Thomas Reed: We need current subscription, previous purchases, add-ons, expansion history, invoice status, renewal date, discount level, and contract duration. We should also include whether the customer has reduced seats or downgraded plan in the past.
+
+Maya Nair: Downgrade history is a strong signal. Customers often downgrade before they churn.
+
+Daniel Brooks: Failed payments or delayed payments also matter. Not always churn risk, but often a sign of relationship or budget issues.
+
+Lena Fischer: Payment details might contain sensitive finance information. We should include derived status fields, not unnecessary transactional details. For example, payment status category, not full invoice line details.
+
+Priya Shah: Noted. Support tickets. Amir, what should be included?
+
+Amir Khan: We should include number of open tickets, ticket volume over time, severity, average resolution time, reopened tickets, escalations, sentiment if available, and unresolved critical issues. Also the topic category matters. Billing tickets have different meaning than product defect tickets.
+
+Daniel Brooks: Ticket trend matters. A customer with one critical ticket might be fine if it is resolved quickly. But if ticket count grows for three weeks, that is a warning.
+
+Maya Nair: I also want support friction indicators. Reopened tickets, SLA breaches, and unresolved high-priority tickets should increase risk.
+
+Amir Khan: We have SLA breach data in the support tool. Sentiment is not fully reliable yet, but we have customer satisfaction scores after ticket closure.
+
+Sofia Martinez: Could campaign planning use support topic? For example, customers with low adoption and many how-to tickets might need education campaigns.
+
+Amir Khan: Yes. Ticket categories can support next-best-action recommendations.
+
+Priya Shah: Campaign contacts and engagement. Sofia, please explain.
+
+Sofia Martinez: We need to know which customers and contacts received campaigns, which contacts opened or clicked, which accounts attended webinars, and whether they responded to retention or adoption campaigns. We need recency and frequency. Too many campaigns can create fatigue.
+
+Maya Nair: For churn review, I want to see whether a customer has been contacted recently. If they are high risk and no one has contacted them in 30 days, that should be highlighted.
+
+Daniel Brooks: But we need to avoid conflicting actions. If Customer Success is already handling an escalation, marketing should not send a generic campaign.
+
+Sofia Martinez: Agreed. That is why the data product should show current action status or recommended action owner.
+
+Omar Haddad: Campaign data comes from the marketing automation platform. Contact-level engagement must be aggregated carefully. We need consent and communication preference handling.
+
+Lena Fischer: Yes. Marketing consent and opt-out status cannot be ignored. If this data product drives campaigns, it must include allowed-to-contact indicators or at least make them available downstream.
+
+Priya Shah: Churn risk signals. Maya, do we already have a model?
+
+Maya Nair: We have an early risk score built by analytics, but it is not production-grade. It uses usage decline, support issues, renewal proximity, and account health inputs. The score exists in a notebook and a Power BI dataset. It is not governed as a product.
+
+Nina Patel: The score is useful, but business users do not trust it fully because they cannot see the drivers. A score without explanation becomes a black box.
+
+Thomas Reed: Commercial teams will ask why an account is marked high risk. We need risk reason codes, not only a number.
+
+Daniel Brooks: We should include risk drivers such as usage drop, low adoption, unresolved critical support ticket, upcoming renewal, payment issue, no recent engagement, or downgrade pattern.
+
+Maya Nair: Yes. The product should expose both score and reason codes. It should also show change from previous week. An account moving from medium to high risk is often more important than an account that has been high risk for months.
+
+Priya Shah: Good point. We need current risk score, risk category, risk trend, and reason codes.
+
+Omar Haddad: From a data product design point of view, we need to decide whether the risk model is part of this data product or a separate downstream analytical product.
+
+Maya Nair: I would prefer the data product to include the current approved risk score and risk drivers. The model itself can be managed separately, but the output must be part of the product because users need one place to consume it.
+
+Lena Fischer: That means the score needs governance. We need owner, calculation logic, refresh schedule, version, and validation rules. If a score affects customer treatment, we need traceability.
+
+Priya Shah: Let us move to expected outputs. What should the product produce?
+
+Maya Nair: First, an account risk table. One row per account, refreshed weekly. It should include account profile, risk category, risk score, risk drivers, key usage metrics, support friction, renewal timing, campaign engagement, and recommended next action.
+
+Daniel Brooks: Second, a priority list for weekly churn review. It should rank accounts by risk and commercial impact.
+
+Thomas Reed: Prioritization should combine churn risk and revenue at risk. A small customer with high risk is important, but a large customer with medium risk might need priority.
+
+Sofia Martinez: Third, campaign segments. Lifecycle marketing should be able to pull target groups, such as high-risk accounts with low feature adoption and no recent campaign contact.
+
+Nina Patel: Fourth, dashboard-ready metrics. We need aggregated KPIs for churn risk distribution, number of accounts by risk band, revenue at risk, top risk drivers, and trend over time.
+
+Amir Khan: Support operations would benefit from a view of high-risk accounts with support escalations. That helps us prioritize escalated tickets.
+
+Priya Shah: So outputs include account-level dataset, priority list, segment definitions, aggregated metrics, and maybe support escalation view.
+
+Omar Haddad: We should define consumers. Dashboards, CRM integration, campaign platform, and maybe data science notebooks.
+
+Maya Nair: Yes. The first version can feed dashboards and analytics. Later we can push flags back to CRM.
+
+Daniel Brooks: I would like CRM integration early. Account managers live in CRM. If the churn risk sits only in a dashboard, adoption will be limited.
+
+Omar Haddad: We can separate phases. Version 1 publishes the trusted data product and dashboard. Version 2 pushes risk summary and next action to CRM.
+
+Sofia Martinez: For marketing, we need export or integration to the campaign platform. Manual CSV exports are okay for the pilot, but not long term.
+
+Priya Shah: Let us discuss refresh frequency. Maya said weekly. Is that enough?
+
+Maya Nair: For weekly churn review, weekly is enough. But some signals should update daily if possible, especially support escalations and product usage drop.
+
+Daniel Brooks: If a major account raises three critical tickets in two days, we should not wait a week.
+
+Amir Khan: Support data can update daily. Real time is not needed for the first version.
+
+Sofia Martinez: Campaign data daily is enough. Weekly segments are okay.
+
+Thomas Reed: Renewal information changes slowly. Weekly is fine.
+
+Omar Haddad: Technically, I suggest daily refresh for the data product with weekly snapshot logic for trend reporting. That gives flexibility without making users wait.
+
+Maya Nair: I support that. Daily refreshed data product, weekly churn review snapshot.
+
+Priya Shah: What service level should we expect?
+
+Nina Patel: The Monday churn review starts at 10 AM. The data should be ready by 8 AM every Monday.
+
+Maya Nair: Yes. If the refresh fails, we need to know before the meeting.
+
+Lena Fischer: We need monitoring and data quality checks. Missing account IDs, duplicate accounts, stale usage metrics, impossible renewal dates, and missing risk scores should be checked.
+
+Omar Haddad: We can define data quality rules. For example, account ID must not be null, one account row per active customer, renewal date must be valid for active contracts, risk score must be between 0 and 100, and customer segment must be from an approved list.
+
+Priya Shah: Are there privacy or governance concerns?
+
+Lena Fischer: Yes. Contact-level campaign engagement and user-level product behavior require care. The account-level product is safer. We should aggregate user behavior to account level unless a clear use case needs contact-level details. Also, opt-out and consent flags must be respected if campaign activation is supported.
+
+Sofia Martinez: Marketing needs contact-level export for some campaigns eventually.
+
+Lena Fischer: Then we need role-based access. Analysts may see contact details if they have approved access. General churn review users should see account-level data only.
+
+Omar Haddad: We can design two layers. A core account-level product and a restricted contact activation view.
+
+Maya Nair: That works. The core product should not be blocked because of contact-level complexity.
+
+Daniel Brooks: Account managers need contact names sometimes, but we can start with account-level risk and link to CRM for contact details.
+
+Priya Shah: Let us define success criteria. What would make this data product successful?
+
+Maya Nair: Weekly churn review becomes based on one trusted list. No more manual preparation from five different systems.
+
+Daniel Brooks: Account managers receive clear priority accounts and reason codes.
+
+Sofia Martinez: Marketing can build more precise retention and adoption segments.
+
+Thomas Reed: We reduce revenue at risk by acting earlier. We should track churn rate, saved accounts, renewal success, and campaign conversion.
+
+Nina Patel: Analysts spend less time joining data and more time interpreting drivers.
+
+Amir Khan: Support can prioritize tickets linked to high-risk accounts.
+
+Lena Fischer: Governance success means clear ownership, documented definitions, approved access, and monitored quality.
+
+Priya Shah: Any metrics for the first 90 days?
+
+Maya Nair: I would track adoption of the weekly churn review list, number of priority accounts reviewed, number of actions created, and percentage of high-risk accounts with follow-up action.
+
+Daniel Brooks: Also time saved. Today preparing the Monday list takes Nina and the team several hours every week.
+
+Nina Patel: More like one full day when data issues happen.
+
+Thomas Reed: Revenue at risk covered by action is important. It tells us whether teams act on the right accounts.
+
+Sofia Martinez: For campaigns, segment usage and campaign response rate.
+
+Priya Shah: Let us talk about next-best-action. What does that mean in practical terms?
+
+Maya Nair: It does not need to be AI-generated in the first version. It can be rule-based. For example, if usage is dropping and no training completed, recommend adoption workshop. If renewal is within 90 days and risk is high, recommend executive outreach. If critical tickets are open, recommend support escalation.
+
+Daniel Brooks: That is practical. Account managers trust simple rules more than mysterious recommendations.
+
+Sofia Martinez: For marketing, next-best-action could mean send education campaign, invite to webinar, assign customer success follow-up, or suppress marketing because there is an active escalation.
+
+Amir Khan: If the driver is unresolved support issue, the next action should not be marketing. It should be support resolution.
+
+Thomas Reed: If the driver is pricing or downgrade, commercial team should own it.
+
+Priya Shah: So recommended action should include action type and action owner.
+
+Maya Nair: Yes. Action owner should be customer success, support, marketing, or commercial. We also need the main reason.
+
+Omar Haddad: We can implement rules as part of the transformation logic, but we should document them. If we put this in a data product, the rules become business logic that users rely on.
+
+Lena Fischer: And rules need ownership. Retention Analytics should own risk logic. Business teams should agree on next-best-action rules.
+
+Priya Shah: What are the main pain points today?
+
+Nina Patel: Manual joining. Different account IDs. Missing fields. Multiple definitions of active customer. Manual exports. No trusted risk score. No reason codes. No consistent history.
+
+Maya Nair: I would add lack of trend. We often see current state, but not whether the risk is getting better or worse.
+
+Daniel Brooks: And lack of accountability. We identify risk, but actions are not always tracked.
+
+Sofia Martinez: Campaign conflict. We sometimes send campaigns to customers who are already in escalation or renewal negotiation.
+
+Amir Khan: Support does not always know commercial importance. A ticket queue treats customers mostly by SLA and severity, not revenue at risk.
+
+Thomas Reed: Commercial teams lack early warning. By the time renewal risk is obvious, options are limited.
+
+Priya Shah: What should be excluded from version 1?
+
+Omar Haddad: Real-time streaming should be excluded. Contact-level activation can be phase 2. Full predictive model rebuild should be separate. CRM writeback can be phase 2 unless we have capacity.
+
+Lena Fischer: Sensitive personal data should be excluded unless there is explicit approval and access control. We do not need raw user events in version 1.
+
+Maya Nair: I agree. I want a useful product quickly. We do not need a perfect AI model on day one.
+
+Daniel Brooks: Please do not make it another dashboard-only project. The data product should support action.
+
+Priya Shah: Understood. The product must serve downstream use, not only visualization.
+
+Nina Patel: Can we keep historical snapshots? Without snapshots, trend reporting will be weak.
+
+Omar Haddad: Yes. We should store weekly snapshots at least. Daily history might be useful, but weekly snapshots align with the review process.
+
+Maya Nair: Weekly snapshots are fine for the first version.
+
+Thomas Reed: How far back should we go?
+
+Nina Patel: Ideally 12 months, but we may not have consistent data. We can start capturing history from launch and backfill what is reliable.
+
+Priya Shah: Data quality expectations. Lena and Omar, what must be checked before publishing?
+
+Lena Fischer: Completeness of account ID, account name, segment, owner, renewal date for active contract customers, risk score, and risk category. Validity of risk score range. Consistency of account status. Timeliness of refresh. Uniqueness of account row. Access control validation.
+
+Omar Haddad: Also reconciliation with CRM active account count and billing active subscription count. We need thresholds. For example, if active accounts differ by more than agreed tolerance, the refresh should be flagged.
+
+Maya Nair: If the data product has quality warnings, should users still access it?
+
+Lena Fischer: Depends on severity. Minor warnings can be shown. Critical failures should block publication or show stale-data warning.
+
+Daniel Brooks: The worst case is users making calls based on bad data without knowing it.
+
+Priya Shah: Should the product include metadata explaining definitions?
+
+Nina Patel: Absolutely. Every field needs definition. Risk category definitions must be clear.
+
+Sofia Martinez: Segment definitions too. Marketing terms differ from sales terms.
+
+Thomas Reed: Commercial users will ask what revenue at risk means. Is it full annual value, renewal value, or expected loss? Define it.
+
+Maya Nair: For first version, revenue at risk should be current annual recurring revenue for accounts in medium or high risk. We can refine later.
+
+Priya Shah: What access roles do we need?
+
+Lena Fischer: Retention Analytics full account-level access. Customer Success account-level access for assigned accounts or all accounts depending on policy. Lifecycle Marketing access to account-level segmentation fields and restricted contact activation view if approved. Support Operations access to account-level risk and support metrics. Executives access to aggregated dashboards.
+
+Omar Haddad: Data science and BI teams need governed read access through the analytics platform.
+
+Daniel Brooks: Account managers need easy consumption through CRM or dashboard. They should not query tables.
+
+Priya Shah: Let us capture consumers as dashboard, analytics workspace, CRM, campaign platform, and support prioritization.
+
+Amir Khan: For support prioritization, even a daily export with account risk and revenue band helps.
+
+Sofia Martinez: For campaign platform, we need a clear suppression indicator. Do not contact if active escalation, opted out, recent sales outreach, or unresolved complaint.
+
+Maya Nair: That becomes part of next-best-action logic.
+
+Priya Shah: Are there any dependencies?
+
+Omar Haddad: Identity resolution is the biggest one. We need a customer account master or matching logic. We also need access to product telemetry aggregates. Billing data access approval might take time. Marketing consent fields need review.
+
+Lena Fischer: Data sharing agreements between internal systems may be needed. The data product owner must document purpose and permitted use.
+
+Nina Patel: Existing risk score logic needs to be moved out of the notebook into a repeatable pipeline.
+
+Maya Nair: Retention Analytics can provide the current logic and help validate outputs.
+
+Daniel Brooks: Customer Success can validate the first high-risk list. We should review a sample of 50 accounts and see whether the output makes sense.
+
+Thomas Reed: Commercial can validate revenue fields and renewal dates.
+
+Priya Shah: What should the minimum viable data product include?
+
+Maya Nair: Account profile, renewal date, ARR, lifecycle stage, weekly usage metrics, support ticket metrics, campaign contact recency, current risk score, risk category, risk drivers, revenue at risk, and recommended next action.
+
+Sofia Martinez: Include campaign suppression indicator.
+
+Daniel Brooks: Include account owner and customer success manager.
+
+Amir Khan: Include open critical tickets and SLA breach indicator.
+
+Nina Patel: Include snapshot date and data freshness timestamp.
+
+Lena Fischer: Include data quality status and definitions.
+
+Omar Haddad: Include stable account ID and source system references.
+
+Priya Shah: That is a strong MVP. What is the first use case we should support?
+
+Maya Nair: Weekly churn review.
+
+Daniel Brooks: Yes. Focus on Monday review first. If that works, other use cases become easier.
+
+Sofia Martinez: I agree, but campaign planning should be a close second. The same data supports it.
+
+Thomas Reed: Prioritize weekly review because it aligns teams around action.
+
+Priya Shah: Let us define the first business objective: reduce preventable churn by giving retention teams a trusted weekly view of risk, drivers, and next actions.
+
+Maya Nair: That is accurate.
+
+Priya Shah: What questions should this data product answer?
+
+Nina Patel: Which accounts are at highest churn risk this week?
+
+Daniel Brooks: Why is each account at risk?
+
+Sofia Martinez: Which accounts should receive a campaign, and which should be suppressed?
+
+Thomas Reed: What revenue is at risk?
+
+Amir Khan: Which high-risk accounts have unresolved support issues?
+
+Maya Nair: Which accounts became riskier since last week?
+
+Lena Fischer: Can users trust the data, and when was it refreshed?
+
+Omar Haddad: Which source systems contributed to each metric?
+
+Priya Shah: Good. Now let us discuss ownership. Who owns the data product?
+
+Maya Nair: Retention Analytics can be business owner.
+
+Omar Haddad: Data platform team can own technical pipeline, but business definitions must come from Retention Analytics and Customer Success.
+
+Lena Fischer: Governance ownership should be shared. Retention Analytics owns purpose and definitions. Data platform owns operational reliability. Governance team approves access and policy.
+
+Daniel Brooks: Customer Success should be part of the steering group because we act on the outputs.
+
+Sofia Martinez: Marketing should be included for campaign activation rules.
+
+Priya Shah: So business owner is Retention Analytics. Technical owner is Data Platform. Key stakeholders are Customer Success, Lifecycle Marketing, Support Operations, Commercial, and Governance.
+
+Maya Nair: Yes.
+
+Priya Shah: What does the first validation workshop need to show?
+
+Maya Nair: A sample account risk table with real data for a limited group. We need to inspect whether the risk drivers are sensible.
+
+Daniel Brooks: Show top 25 high-risk accounts and compare with what CSMs know.
+
+Sofia Martinez: Show two or three campaign segments.
+
+Thomas Reed: Show revenue at risk by segment and renewal period.
+
+Amir Khan: Show support escalations linked to risk.
+
+Nina Patel: Show data quality report. Missing IDs, missing renewal dates, refresh timestamp.
+
+Lena Fischer: Show access model and field classification.
+
+Omar Haddad: Show lineage at a high level. CRM, billing, product telemetry, support, marketing automation, risk model output.
+
+Priya Shah: Are there open disagreements?
+
+Sofia Martinez: I still worry that if contact-level data is not included, marketing activation will remain manual.
+
+Lena Fischer: I understand. My concern is governance. We can define a restricted activation view as phase 1.5 if we have consent checks.
+
+Omar Haddad: That is reasonable. The core product can be account-level. The restricted activation view can include contact IDs and allowed-to-contact flags for approved marketing users.
+
+Maya Nair: I do not want phase 1 delayed because of contact-level access. Let us start account-level and design for extension.
+
+Sofia Martinez: Accepted, as long as campaign planning fields are included.
+
+Daniel Brooks: My concern is CRM adoption. If account managers do not see this in their workflow, impact will be limited.
+
+Priya Shah: We can make CRM writeback a phase 2 requirement and include it in the roadmap.
+
+Thomas Reed: I support that. Start with weekly review, then operational integration.
+
+Priya Shah: Final round. Please state your must-have for MVP.
+
+Maya Nair: Trusted account-level churn risk with reason codes and weekly trend.
+
+Daniel Brooks: Priority account list for weekly review with clear action owner.
+
+Sofia Martinez: Segmentation fields for lifecycle campaigns and suppression logic.
+
+Omar Haddad: Stable account identity and curated source metrics, not raw data dumps.
+
+Lena Fischer: Access control, consent awareness, field definitions, and data quality checks.
+
+Amir Khan: Support friction indicators, especially open critical tickets and SLA breaches.
+
+Nina Patel: Snapshot history, refresh timestamp, and dashboard-ready structure.
+
+Thomas Reed: Revenue at risk and renewal proximity.
+
+Priya Shah: I will summarize the requirement. We need a reusable customer analytics data product for churn prevention. The core grain is customer account. The first use case is weekly churn review, supported by daily refresh and weekly snapshots. Primary users are retention managers and lifecycle marketing analysts, with downstream use by customer success, support, commercial, BI, and executives. The product combines account profile, product usage, purchase history, support tickets, campaign engagement, and churn risk outputs. It must provide risk score, risk category, risk drivers, revenue at risk, renewal proximity, campaign suppression indicator, and recommended next action. Governance requirements include approved definitions, access control, consent awareness, data quality checks, refresh monitoring, and ownership.
+
+Maya Nair: That summary is accurate.
+
+Daniel Brooks: Yes, and please keep the action orientation visible. We do not need another passive report.
+
+Sofia Martinez: Include campaign planning explicitly.
+
+Lena Fischer: Include restricted activation view as a future extension, with consent and access rules.
+
+Omar Haddad: Include identity resolution as a dependency.
+
+Priya Shah: Noted. Next steps: I will convert this transcript into a data product need brief. Then we will define the MVP fields, data sources, quality rules, and consumer interfaces. We will schedule a validation workshop with sample accounts.
+
+Maya Nair: Good. Retention Analytics will provide current risk scoring logic and examples of past churn cases.
+
+Daniel Brooks: Customer Success will provide a list of accounts for validation.
+
+Sofia Martinez: Marketing will provide campaign segment examples and suppression requirements.
+
+Amir Khan: Support Operations will provide ticket metrics and escalation categories.
+
+Thomas Reed: Commercial will validate ARR and renewal fields.
+
+Lena Fischer: Governance will review field classification and access requirements.
+
+Omar Haddad: Data Architecture will assess source readiness and identity matching.
+
+Priya Shah: Thanks everyone. This gives us enough detail to start defining the data product.
+
+Transcript ends
+
+AI assistant extracted summary
+
+Business need:
+A reusable customer analytics data product for churn prevention. It should help teams identify at-risk customer accounts earlier, understand risk drivers, prioritize follow-up, and plan next-best-action campaigns.
+
+Primary users:
+- Retention managers
+- Lifecycle marketing analysts
+
+Secondary users:
+- Customer success managers
+- Account managers
+- Support operations managers
+- Commercial leaders
+- BI analysts
+- Data scientists
+- Executives
+
+Primary use case:
+Weekly churn review.
+
+Secondary use cases:
+- Next-best-action campaign planning
+- Account manager follow-up prioritization
+- Renewal planning
+- Customer health review
+- Support escalation prioritization
+- Executive revenue-at-risk reporting
+
+Core grain:
+One row per customer account.
+
+Required data source groups:
+- Account profile from CRM
+- Contract and revenue data from billing or finance systems
+- Product usage metrics from product telemetry
+- Support ticket metrics from support platform
+- Campaign engagement and consent indicators from marketing automation platform
+- Churn risk score and risk drivers from analytics model output
+
+Key required fields:
+- Account ID
+- Account name
+- Segment
+- Industry
+- Region
+- Account owner
+- Customer success manager
+- Lifecycle stage
+- Contract start date
+- Contract end date
+- Renewal date
+- Annual recurring revenue
+- Product plan
+- Active users
+- Purchased seats
+- Usage trend
+- Key feature adoption
+- Days since last activity
+- Open support tickets
+- Critical support tickets
+- SLA breach indicator
+- Reopened ticket count
+- Campaign contact recency
+- Campaign engagement summary
+- Contact suppression indicator
+- Churn risk score
+- Risk category
+- Risk trend
+- Risk reason codes
+- Revenue at risk
+- Recommended next action
+- Recommended action owner
+- Snapshot date
+- Data freshness timestamp
+- Data quality status
+
+MVP requirements:
+- Account-level churn risk table
+- Weekly priority list for churn review
+- Risk drivers and reason codes
+- Revenue at risk calculation
+- Renewal proximity indicator
+- Campaign suppression indicator
+- Recommended next action and owner
+- Weekly snapshot history
+- Daily refresh
+- Data quality monitoring
+- Field definitions and ownership
+- Role-based access control
+
+Governance requirements:
+- Business owner: Retention Analytics
+- Technical owner: Data Platform
+- Access approval: Data Governance
+- Approved business definitions
+- Field classification
+- Consent awareness for campaign activation
+- Aggregation of user-level usage data to account level
+- Restricted contact activation view as future extension
+- Lineage from source systems to product outputs
+
+Data quality rules discussed:
+- Account ID must not be null
+- One row per active customer account
+- Renewal date must be valid for active contract customers
+- Risk score must be between 0 and 100
+- Risk category must use approved values
+- Customer segment must use approved values
+- Data freshness must be visible
+- Active account count should reconcile with CRM and billing within agreed tolerance
+- Critical refresh failure should trigger warning or block publication
+
+Expected value:
+- Less manual preparation for weekly churn review
+- One trusted view of customer churn risk
+- Earlier identification of risk
+- Better prioritization by revenue impact
+- More precise lifecycle campaigns
+- Reduced campaign conflicts
+- Better support prioritization for high-risk accounts
+- Improved renewal planning
+- Stronger governance and traceability
+
+Open dependencies:
+- Customer account identity resolution
+- Access to curated product usage metrics
+- Billing data approval
+- Marketing consent and opt-out handling
+- Productionizing current churn risk logic
+- Agreement on next-best-action rules
+- CRM writeback in later phase
+- Restricted contact activation view in later phase
+
+Recommended first validation workshop:
+- Review top 25 high-risk accounts
+- Validate risk reason codes with Customer Success
+- Compare revenue fields with Commercial team
+- Review sample campaign segments with Marketing
+- Review support escalation signals with Support Operations
+- Review data quality report with Governance and BI
+- Confirm source lineage and refresh readiness with Data Architecture

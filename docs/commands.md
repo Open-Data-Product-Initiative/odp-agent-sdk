@@ -240,13 +240,18 @@ before writing. The final JSON report includes source counts, artifact counts,
 created/updated/unchanged files, warnings, link findings, and the browser entry
 point.
 The report also includes validation results for the ODPC catalog, ODPG graph,
-and linked ODPS product specs.
+and linked ODPS product specs. Portfolio commands default to validation warning
+mode: they complete when generated ODPS drafts are valid YAML but fail schema
+validation, while the JSON report keeps `valid: false` and includes the exact
+schema errors.
 The LLM prompt asks for one structured YAML portfolio plan with explicit
 ProductReference-to-ODPS product linking rules, graph edge endpoint rules, and
 warnings for weak evidence.
 Use `--title` to set the human-controlled workspace title. The SDK persists
 that title in `portfolio-state.yaml` and reuses it on reruns so the page title,
 catalog name, and graph name do not drift with LLM output.
+Use `--strict-validation` when a failing schema check should make the command
+return a non-zero exit code, for example in CI.
 
 After the first build, the workspace can be rerun without repeating the source
 folder flags:
@@ -270,6 +275,8 @@ directly and the portfolio should be refreshed from those files. The command
 rebuilds `odpc/catalog.yaml` from `odpc/fragments/*.yaml`, keeps source lane
 state, updates the identity registry, snapshots the previous `index.html`, and
 renders a new browser view with one final JSON report.
+Use `--strict-validation` to make schema-invalid synced drafts return a
+non-zero exit code.
 
 ```bash
 open-data-products portfolio render generated/portfolio/ --json
@@ -280,6 +287,8 @@ combines ODPC catalog objects, linked ODPS product specs, ODPG graph data,
 artifact detail views, version links, and About information into one
 browser-openable file. Missing output parent directories are created before
 writing.
+Use `--strict-validation` to make schema-invalid rendered workspaces return a
+non-zero exit code.
 
 ```bash
 open-data-products portfolio explain generated/portfolio/ --json
@@ -311,6 +320,7 @@ switcher so previous HTML snapshots can be opened from the browser. The final
 JSON report includes `sourceCounts` for all current sources,
 `processedSourceCounts` for the files sent to the LLM, and validation results
 for the refreshed catalog, graph, and linked product specs.
+Use `--strict-validation` when refresh should fail on schema-invalid drafts.
 
 ## Product-Level Data Contract Inspection
 

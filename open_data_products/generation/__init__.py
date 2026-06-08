@@ -47,6 +47,8 @@ ODPS_SLA_DIMENSION_ALIASES = {
     "datafreshness": "updateFrequency",
     "data-freshness": "updateFrequency",
     "refresh": "updateFrequency",
+    "refreshtimeliness": "updateFrequency",
+    "refresh-timeliness": "updateFrequency",
     "refreshfrequency": "updateFrequency",
     "refresh-frequency": "updateFrequency",
 }
@@ -1946,6 +1948,7 @@ def _normalize_odps_product_document(document: dict) -> None:
     _normalize_odps_data_quality(product.get("dataQuality"))
     _normalize_odps_pricing_plans(product.get("pricingPlans"))
     _normalize_odps_data_access(product)
+    _normalize_odps_license(product.get("license"))
 
 
 def _normalize_odps_v41_details(product: Dict[str, Any]) -> None:
@@ -2050,6 +2053,52 @@ def _normalize_odps_sla(sla: object) -> None:
         sla["declarative"] = definitions
 
 
+def _normalize_odps_license(license_data: object) -> None:
+    if not isinstance(license_data, dict):
+        return
+    scope = license_data.get("scope")
+    if isinstance(scope, dict):
+        _truncate_odps_strings(scope, {"definition": 512, "restrictions": 255})
+    termination = license_data.get("termination")
+    if isinstance(termination, dict):
+        _truncate_odps_strings(
+            termination,
+            {
+                "terminationConditions": 512,
+                "continuityConditions": 512,
+            },
+        )
+    governance = license_data.get("governance")
+    if isinstance(governance, dict):
+        _truncate_odps_strings(
+            governance,
+            {
+                "ownership": 512,
+                "audit": 512,
+                "warranties": 512,
+                "damages": 512,
+                "confidentiality": 512,
+                "applicableLaws": 512,
+                "forceMajeure": 512,
+            },
+        )
+
+
+def _truncate_odps_strings(mapping: Dict[str, Any], limits: Dict[str, int]) -> None:
+    for key, limit in limits.items():
+        value = mapping.get(key)
+        if isinstance(value, str) and len(value) > limit:
+            mapping[key] = _truncate_odps_text(value, limit)
+
+
+def _truncate_odps_text(value: str, limit: int) -> str:
+    if len(value) <= limit:
+        return value
+    if limit <= 3:
+        return value[:limit]
+    return value[: limit - 3].rstrip() + "..."
+
+
 def _normalize_odps_data_quality(data_quality: object) -> None:
     if not isinstance(data_quality, dict):
         return
@@ -2146,8 +2195,12 @@ def _normalize_odps_dimension(
     normalized: Dict[str, Any] = {"dimension": name}
     if "objective" in dimension:
         objective = dimension["objective"]
+        if _is_hour_unit(dimension.get("unit")) and "minutes" in allowed_units:
+            objective = _hours_to_minutes(objective)
         normalized["objective"] = str(objective) if stringify_objective else objective
     unit = _normalize_odps_unit(dimension.get("unit"), allowed_units)
+    if not unit and _is_hour_unit(dimension.get("unit")) and "minutes" in allowed_units:
+        unit = "minutes"
     if unit:
         normalized["unit"] = unit
     display_title = dimension.get("displayTitle") or dimension.get("display_title")
@@ -2181,6 +2234,19 @@ def _normalize_odps_unit(value: object, allowed_units: set) -> Optional[str]:
         return None
     stripped = value.strip()
     return stripped if stripped in allowed_units else None
+
+
+def _is_hour_unit(value: object) -> bool:
+    return isinstance(value, str) and value.strip().casefold() in {"hour", "hours"}
+
+
+def _hours_to_minutes(value: object) -> object:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return value
+    minutes = number * 60
+    return int(minutes) if minutes.is_integer() else minutes
 
 
 def _normalize_odps_pricing_plans(pricing_plans: object) -> None:
