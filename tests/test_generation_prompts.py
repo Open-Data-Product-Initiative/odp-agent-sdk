@@ -516,7 +516,7 @@ def test_resolve_generation_settings_supports_claude_without_config():
     assert settings.base_url == "https://api.anthropic.com/v1"
     assert settings.api_key_env == "ANTHROPIC_API_KEY"
     assert settings.api_version == "2023-06-01"
-    assert settings.max_tokens == 4096
+    assert settings.max_tokens == 8192
 
 
 @pytest.mark.parametrize(

@@ -89,6 +89,7 @@ Portfolio workflow commands:
   portfolio build     Build a portfolio workspace from source lanes
   portfolio refresh   Refresh a portfolio workspace from saved source lanes
   portfolio sync      Sync edited YAML artifacts without calling an LLM
+  portfolio localize  Localize portfolio HTML without changing YAML artifacts
   portfolio render    Render one static portfolio index.html
   portfolio explain   Summarize a portfolio workspace
 
@@ -120,6 +121,7 @@ Examples:
   open-data-products odpg-convert --input graph.graphml --output graph.yaml --json
   open-data-products portfolio build --objectives inputs/objectives/ --use-cases inputs/use-cases/ --signals inputs/signals/ --products inputs/products/ --output generated/portfolio/ --json
   open-data-products portfolio sync generated/portfolio/ --json
+  open-data-products portfolio localize generated/portfolio/ --languages "fi,sv" --provider claude --model claude-sonnet-4-5 --json
   open-data-products portfolio render generated/portfolio/ --json
   open-data-products product contract-report product.yaml contract.yaml --json
   open-data-products serve
@@ -258,6 +260,7 @@ Portfolio workflow commands:
   build       Build a portfolio workspace from source lanes
   refresh     Refresh a portfolio workspace from saved source lanes
   sync        Sync edited YAML artifacts without calling an LLM
+  localize    Localize portfolio HTML without changing YAML artifacts
   render      Render one static browser-viewable portfolio page
   explain     Summarize portfolio artifacts, counts, and browser entry point
 
@@ -267,6 +270,7 @@ Examples:
   open-data-products portfolio refresh generated/portfolio/ --json
   open-data-products portfolio refresh generated/portfolio/ --all-sources --json
   open-data-products portfolio sync generated/portfolio/ --json
+  open-data-products portfolio localize generated/portfolio/ --languages "fi,sv" --provider claude --model claude-sonnet-4-5 --json
   open-data-products portfolio render generated/portfolio/ --json
   open-data-products portfolio explain generated/portfolio/ --json
 """
@@ -845,6 +849,47 @@ def main(argv: Optional[List[str]] = None) -> int:
         ),
     )
     portfolio_sync_parser.add_argument("--json", action="store_true", help="Emit JSON")
+    portfolio_localize_parser = portfolio_subparsers.add_parser(
+        "localize",
+        help="Localize portfolio HTML pages without changing YAML artifacts",
+    )
+    portfolio_localize_parser.add_argument("workspace", help="Portfolio workspace path")
+    portfolio_localize_parser.add_argument(
+        "--languages",
+        required=True,
+        action="append",
+        help='BCP 47 language tags to render, for example "fi,sv".',
+    )
+    portfolio_localize_parser.add_argument(
+        "--default-language",
+        default="en",
+        help="Default portfolio language. Defaults to en.",
+    )
+    portfolio_localize_parser.add_argument(
+        "--config",
+        help="Generation config YAML file with provider and path settings.",
+    )
+    portfolio_localize_parser.add_argument("--provider", help="LLM provider override.")
+    portfolio_localize_parser.add_argument("--model", help="Model override.")
+    portfolio_localize_parser.add_argument(
+        "--prompts",
+        help="Reserved for portfolio prompt folder overrides.",
+    )
+    portfolio_localize_parser.add_argument(
+        "--ollama-url",
+        help="Local Ollama base URL. Defaults to http://localhost:11434.",
+    )
+    portfolio_localize_parser.add_argument(
+        "--strict-validation",
+        action="store_true",
+        help=(
+            "Return a non-zero exit code when localized artifacts fail schema "
+            "validation. By default portfolio commands warn and still complete."
+        ),
+    )
+    portfolio_localize_parser.add_argument(
+        "--json", action="store_true", help="Emit JSON"
+    )
     portfolio_render_parser = portfolio_subparsers.add_parser(
         "render",
         help="Render one static browser-viewable portfolio page",
@@ -1621,6 +1666,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             from .portfolio import (
                 build_portfolio,
                 explain_portfolio,
+                localize_portfolio,
                 refresh_portfolio,
                 render_portfolio,
                 sync_portfolio,
@@ -1677,6 +1723,24 @@ def main(argv: Optional[List[str]] = None) -> int:
                     )
                 elif args.portfolio_command == "sync":
                     payload = sync_portfolio(args.workspace)
+                elif args.portfolio_command == "localize":
+                    from . import generation
+
+                    settings = generation.resolve_generation_settings(
+                        config_path=args.config,
+                        provider=args.provider,
+                        model=args.model,
+                        ollama_url=args.ollama_url,
+                        prompt_dir=args.prompts,
+                    )
+                    client = generation.create_generation_client(settings)
+                    payload = localize_portfolio(
+                        args.workspace,
+                        languages=args.languages,
+                        default_language=args.default_language,
+                        client=client,
+                        model=settings.model,
+                    )
                 elif args.portfolio_command == "render":
                     payload = render_portfolio(args.workspace, output_path=args.output)
                 elif args.portfolio_command == "explain":

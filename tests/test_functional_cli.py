@@ -720,7 +720,7 @@ def test_unified_cli_generation_uses_claude_without_config(
         api_key_env: str = "ANTHROPIC_API_KEY",
         base_url: str = "https://api.anthropic.com/v1",
         version: str = "2023-06-01",
-        max_tokens: int = 4096,
+        max_tokens: int = 8192,
     ) -> str:
         observed.update(
             {
@@ -779,7 +779,7 @@ def test_unified_cli_generation_uses_claude_without_config(
     assert observed["api_key_env"] == "ANTHROPIC_API_KEY"
     assert observed["base_url"] == "https://api.anthropic.com/v1"
     assert observed["version"] == "2023-06-01"
-    assert observed["max_tokens"] == 4096
+    assert observed["max_tokens"] == 8192
 
 
 def test_unified_cli_odps_generation_passes_profile_and_components(

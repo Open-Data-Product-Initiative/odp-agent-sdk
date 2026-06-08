@@ -51,7 +51,7 @@ providers:
     baseUrl: https://api.anthropic.com/v1
     apiKeyEnv: ANTHROPIC_API_KEY
     version: "2023-06-01"
-    maxTokens: 4096
+    maxTokens: 8192
 ```
 
 The `type: openai` profile means the provider is called through an

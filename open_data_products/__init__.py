@@ -11,7 +11,7 @@ family. Each standard lives in its own namespace:
 
 # flake8: noqa: E402
 
-__version__ = "0.2.0"
+__version__ = "0.2.1"
 version = __version__
 
 from . import odpc
@@ -96,6 +96,7 @@ from .pricing import pricing_to_402
 from .portfolio import (
     build_portfolio,
     explain_portfolio,
+    localize_portfolio,
     refresh_portfolio,
     render_portfolio,
     sync_portfolio,
@@ -150,6 +151,7 @@ __all__ = [
     "explain_vocabulary",
     "get_resource",
     "list_resources",
+    "localize_portfolio",
     "load_document",
     "load_contract",
     "load_summary",

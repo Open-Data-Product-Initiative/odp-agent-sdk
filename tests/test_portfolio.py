@@ -3,14 +3,17 @@
 import json
 from pathlib import Path
 
+import pytest
 import yaml
 from jsonschema import Draft202012Validator
 
 from open_data_products._io import load_mapping
 from open_data_products.cli import main
 from open_data_products.portfolio import (
+    _chunk_localization_strings,
     build_portfolio,
     explain_portfolio,
+    localize_portfolio,
     parse_portfolio_plan,
     refresh_portfolio,
     render_portfolio_build_prompt,
@@ -236,6 +239,17 @@ products:
                   objective: 24
                   unit: hours
             premium: name
+        dataQuality:
+          declarative:
+            premium:
+              description: Enhanced checks include CRM and billing reconciliation.
+              dimensions:
+                - dimension: reconciliation
+                  displayTitle: Source Reconciliation
+                  objective: 98
+                  unit: percentage
+                  weight: 20
+                  description: Active account count reconciles with CRM and billing within agreed tolerance.
 graphEdges:
   - source: UC-EXPANSION
     target: PR-EXPANSION
@@ -495,6 +509,29 @@ def schema_drift_portfolio_client(prompt: str, model: str) -> str:
     return PORTFOLIO_SCHEMA_DRIFT_PLAN_YAML
 
 
+def repairable_portfolio_client(prompt: str, model: str) -> str:
+    """Return malformed YAML first, then a repaired portfolio plan."""
+    assert model == "test-model"
+    if prompt.startswith("# Repair Portfolio Plan YAML"):
+        assert "expected <block end>" in prompt
+        assert "e:" in prompt
+        return PORTFOLIO_PLAN_YAML
+    return """
+metadata:
+  id: generated-demo
+  name: Generated Demo Portfolio
+businessObjectives:
+  - id: OBJ-REDUCE-CHURN
+    name:
+      en: Reduce Churn
+    description:
+      en: Reduce customer churn.
+    status: active
+  e:
+    en: malformed key
+"""
+
+
 def delta_portfolio_client(prompt: str, model: str) -> str:
     """Return only artifacts derived from a new source document."""
     assert model == "test-model"
@@ -551,6 +588,92 @@ signals:
 """
 
 
+def fake_localization_client(prompt: str, model: str) -> str:
+    """Return deterministic localized HTML string bundles."""
+    assert model == "test-model"
+    assert prompt.startswith("# Localize Portfolio HTML")
+    assert (
+        "Do not translate IDs, file paths, URLs, YAML keys, or enum values." in prompt
+    )
+    if "Target language: fi" in prompt:
+        return """
+language: fi
+translations:
+  Open Data Products Portfolio: Avoimen datan tuotteiden portfolio
+  Generated workspace summary: Luodun työtilan yhteenveto
+  Overview: Yleiskatsaus
+  Products: Tuotteet
+  Customer Product: Asiakastuote
+  Full product details from product discussions.: Tuotekeskusteluista johdetut täydet tuotetiedot.
+"""
+    if "Target language: sv" in prompt:
+        return """
+language: sv
+translations:
+  Open Data Products Portfolio: Portfölj för öppna dataprodukter
+  Generated workspace summary: Sammanfattning av skapad arbetsyta
+  Overview: Översikt
+  Products: Produkter
+  Customer Product: Kundprodukt
+  Full product details from product discussions.: Fullständiga produktdetaljer från produktdiskussioner.
+"""
+    if "Target language: ar" in prompt:
+        return """
+language: ar
+translations:
+  Open Data Products Portfolio: محفظة منتجات البيانات المفتوحة
+  Generated workspace summary: ملخص مساحة العمل المنشأة
+  Overview: نظرة عامة
+  Products: المنتجات
+  Customer Product: منتج العملاء
+  Full product details from product discussions.: تفاصيل المنتج الكاملة المستخلصة من مناقشات المنتج.
+"""
+    raise AssertionError(prompt)
+
+
+def repairable_localization_client(prompt: str, model: str) -> str:
+    """Return malformed localization YAML first, then repaired translations."""
+    assert model == "test-model"
+    if prompt.startswith("# Repair Portfolio Localization YAML"):
+        assert "mapping values are not allowed here" in prompt
+        return """
+language: fi
+translations:
+  Open Data Products Portfolio: Avoimen datan tuotteiden portfolio
+  Products: Tuotteet
+  Customer Product: Asiakastuote
+  "This portfolio was generated with the Open Data Products SDK and is grounded in the OpenDataProducts.org standards family: ODPC for catalog objects, ODPS for product specifications, ODPG for graph relationships, and ODPV for shared vocabulary where used.": "Tämä portfolio luotiin Open Data Products SDK:lla ja perustuu OpenDataProducts.org-standardiperheeseen: ODPC luettelokohteille, ODPS tuotemäärityksille, ODPG graafisuhteille ja ODPV sanastolle, kun sitä käytetään."
+"""
+    assert prompt.startswith("# Localize Portfolio HTML")
+    return """
+language: fi
+translations:
+  Open Data Products Portfolio: Avoimen datan tuotteiden portfolio
+  Products: Tuotteet
+  Customer Product: Asiakastuote
+  This portfolio was generated with the Open Data Products SDK and is grounded in the OpenDataProducts.org standards family: ODPC for catalog objects, ODPS for product specifications, ODPG for graph relationships, and ODPV for shared vocabulary where used.: Tämä portfolio luotiin Open Data Products SDK:lla ja perustuu OpenDataProducts.org-standardiperheeseen: ODPC luettelokohteille, ODPS tuotemäärityksille, ODPG graafisuhteille ja ODPV sanastolle, kun sitä käytetään.
+"""
+
+
+def test_chunk_localization_strings_keeps_translation_batches_small() -> None:
+    chunks = _chunk_localization_strings(
+        [
+            "Short one",
+            "Short two",
+            "Long translated text should start a new batch",
+            "Short three",
+        ],
+        max_chars=32,
+        max_items=2,
+    )
+
+    assert chunks == [
+        ["Short one", "Short two"],
+        ["Long translated text should start a new batch"],
+        ["Short three"],
+    ]
+
+
 def test_render_portfolio_creates_missing_parent_and_artifact_detail_views(
     tmp_path: Path,
 ) -> None:
@@ -577,16 +700,19 @@ def test_render_portfolio_creates_missing_parent_and_artifact_detail_views(
     assert 'class="tab-panel graph-panel"' in html
     assert "Recommended next actions" in html
     assert "Suggested follow-ups are derived from warnings" not in html
-    assert "Portfolio changes" in html
-    assert '<section class="overview-section" aria-label="Portfolio changes">' in html
-    assert "Latest change summary" in html
+    assert "What changed since last version" in html
+    assert "Portfolio changes" not in html
+    assert (
+        '<section class="overview-section" aria-label="What changed since last version">'
+        in html
+    )
+    assert "Latest portfolio snapshot" in html
     assert "PortfolioRefresh" in html
-    assert "Created" in html
-    assert "Updated" in html
-    assert "Removed" in html
-    assert "Source changes" in html
-    assert "useCases: 1 created" in html
-    assert "signals: 1 updated" in html
+    assert "1 artifact was created." in html
+    assert "2 artifacts were updated." in html
+    assert "1 artifact was removed." in html
+    assert "New use case source evidence was added." in html
+    assert "Signal source evidence was updated." in html
     assert "Validation needs review" in html
     assert "Portfolio versions" in html
     assert "Portfolio status" not in html
@@ -602,6 +728,7 @@ def test_render_portfolio_creates_missing_parent_and_artifact_detail_views(
     assert "table-layout: fixed" in html
     assert "overflow-wrap: anywhere" in html
     assert 'class="graph-explorer-frame"' in html
+    assert "This tab embeds the generated ODPG graph explorer" not in html
     assert "vis-network@9.1.9" in html
     assert "new vis.Network" in html
     assert "workspace-main" in html
@@ -806,9 +933,13 @@ def test_build_portfolio_normalizes_generated_plan_to_schema_shapes(
     assert "outputPortType: API" in product
     assert "refreshTimeliness" not in product
     assert "dataFreshness" not in product
+    assert "dimension: reconciliation" not in product
+    assert "Source Reconciliation" in product
+    assert "Active account count reconciles with CRM and billing" in product
     assert "unit: hours" not in product
     assert "premium: name" not in product
     assert "dimension: updateFrequency" in product
+    assert "dimension: consistency" in product
     assert "unit: minutes" in product
     assert (
         "No external redistribution or resale; contact-level activation view restricted to approved marketing users with consent awareness controls; user-level product behavior aggregated to account level unless clear approved use case requires contact-level detail."
@@ -880,6 +1011,8 @@ def test_portfolio_build_prompt_defines_schema_and_linking_rules() -> None:
     assert "scope:" in prompt
     assert "SLA must be an object, never a list" in prompt
     assert "dataQuality must be an object, never a list" in prompt
+    assert "Allowed dataQuality dimension names are" in prompt
+    assert "Map reconciliation checks to consistency" in prompt
     assert "dataAccess must be a named mapping of access method objects" in prompt
     assert (
         "pricingPlans.declarative.en must be a list of pricing plan objects" in prompt
@@ -908,6 +1041,42 @@ businessObjectives: []
 
     assert plan["metadata"]["id"] == "generated-demo"
     assert plan["businessObjectives"] == []
+
+
+def test_parse_portfolio_plan_reports_truncated_yaml() -> None:
+    with pytest.raises(ValueError) as exc_info:
+        parse_portfolio_plan("""
+metadata:
+  id: generated-demo
+products:
+  - productReference:
+      productModel:
+        $ref: "#
+""")
+
+    assert "Portfolio plan YAML could not be parsed" in str(exc_info.value)
+    assert "truncated" in str(exc_info.value)
+
+
+def test_build_portfolio_repairs_malformed_plan_yaml(tmp_path: Path) -> None:
+    sources = tmp_path / "sources"
+    workspace = tmp_path / "generated" / "portfolio"
+    write_source_lanes(sources)
+
+    result = build_portfolio(
+        workspace,
+        objectives=sources / "objectives",
+        use_cases=sources / "use-cases",
+        signals=sources / "signals",
+        products=sources / "products",
+        client=repairable_portfolio_client,
+        model="test-model",
+    )
+
+    assert result["valid"] is True
+    assert "Portfolio plan YAML required syntax repair." in result["warnings"]
+    assert (workspace / "portfolio.yaml").exists()
+    assert "Customer Product" in (workspace / "index.html").read_text(encoding="utf-8")
 
 
 def test_portfolio_cli_build_emits_one_final_json_report(
@@ -963,6 +1132,158 @@ def test_portfolio_cli_build_emits_one_final_json_report(
     assert "CLI Controlled Portfolio" in (workspace / "index.html").read_text(
         encoding="utf-8"
     )
+
+
+def test_localize_portfolio_writes_i18n_and_localized_html_without_touching_yaml(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "workspace"
+    write_sample_workspace(workspace)
+    (workspace / "portfolio-i18n.yaml").write_text(
+        """
+defaultLanguage: en
+languages:
+  - en
+  - fi
+translations:
+  fi:
+    html:
+      This tab embeds the generated ODPG graph explorer without the standalone explorer header and footer.: Vanha teksti
+""",
+        encoding="utf-8",
+    )
+    product_path = workspace / "odps" / "products" / "customer-product.yaml"
+    original_product_yaml = product_path.read_text(encoding="utf-8")
+
+    result = localize_portfolio(
+        workspace,
+        languages=["fi", "sv"],
+        client=fake_localization_client,
+        model="test-model",
+    )
+
+    assert result["kind"] == "PortfolioLocalize"
+    assert result["languages"] == ["fi", "sv"]
+    assert result["defaultLanguage"] == "en"
+    assert result["html"] == {
+        "en": str(workspace / "index.html"),
+        "fi": str(workspace / "index.fi.html"),
+        "sv": str(workspace / "index.sv.html"),
+    }
+    assert "validationResults" in result
+    assert product_path.read_text(encoding="utf-8") == original_product_yaml
+
+    i18n = load_mapping(workspace / "portfolio-i18n.yaml")
+    assert i18n["defaultLanguage"] == "en"
+    assert i18n["languages"] == ["en", "fi", "sv"]
+    assert i18n["translations"]["fi"]["html"]["Products"] == "Tuotteet"
+    assert (
+        "This tab embeds the generated ODPG graph explorer without the standalone explorer header and footer."
+        not in i18n["translations"]["fi"]["html"]
+    )
+
+    english_html = (workspace / "index.html").read_text(encoding="utf-8")
+    finnish_html = (workspace / "index.fi.html").read_text(encoding="utf-8")
+    swedish_html = (workspace / "index.sv.html").read_text(encoding="utf-8")
+    assert '<html lang="en"' in english_html
+    assert '<html lang="fi"' in finnish_html
+    assert '<html lang="sv"' in swedish_html
+    assert 'class="language-selector"' in english_html
+    assert 'href="index.fi.html"' in english_html
+    assert 'href="index.html"' in finnish_html
+    assert "Tuotteet" in finnish_html
+    assert "Asiakastuote" in finnish_html
+    assert "Kundprodukt" in swedish_html
+
+    english_style = english_html.split("<style>", 1)[1].split("</style>", 1)[0]
+    finnish_style = finnish_html.split("<style>", 1)[1].split("</style>", 1)[0]
+    assert finnish_style == english_style
+
+    english_script = english_html.split("<script>", 1)[1].split("</script>", 1)[0]
+    finnish_script = finnish_html.split("<script>", 1)[1].split("</script>", 1)[0]
+    assert finnish_script == english_script
+
+
+def test_localize_portfolio_marks_rtl_language_pages(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    write_sample_workspace(workspace)
+
+    result = localize_portfolio(
+        workspace,
+        languages=["ar-AE"],
+        client=fake_localization_client,
+        model="test-model",
+    )
+
+    assert result["html"]["ar-AE"] == str(workspace / "index.ar-AE.html")
+    english_html = (workspace / "index.html").read_text(encoding="utf-8")
+    arabic_html = (workspace / "index.ar-AE.html").read_text(encoding="utf-8")
+
+    assert '<html lang="en" dir="ltr">' in english_html
+    assert '<html lang="ar-AE" dir="rtl">' in arabic_html
+    assert "محفظة منتجات البيانات المفتوحة" in arabic_html
+    assert 'html[dir="rtl"]' in arabic_html
+
+
+def test_portfolio_cli_localize_emits_one_final_json_report(
+    tmp_path: Path,
+    capsys,
+    monkeypatch,
+) -> None:
+    workspace = tmp_path / "workspace"
+    write_sample_workspace(workspace)
+
+    from open_data_products import generation
+
+    monkeypatch.setattr(
+        generation,
+        "create_generation_client",
+        lambda settings: fake_localization_client,
+    )
+
+    assert (
+        main(
+            [
+                "portfolio",
+                "localize",
+                str(workspace),
+                "--languages",
+                "fi,sv",
+                "--model",
+                "test-model",
+                "--json",
+            ]
+        )
+        == 0
+    )
+    payload = json.loads(capsys.readouterr().out)
+
+    assert payload["kind"] == "PortfolioLocalize"
+    assert payload["languages"] == ["fi", "sv"]
+    assert payload["html"]["fi"] == str(workspace / "index.fi.html")
+    assert (workspace / "index.fi.html").exists()
+
+
+def test_localize_portfolio_repairs_malformed_translation_yaml(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    write_sample_workspace(workspace)
+
+    result = localize_portfolio(
+        workspace,
+        languages=["fi"],
+        client=repairable_localization_client,
+        model="test-model",
+    )
+
+    assert result["kind"] == "PortfolioLocalize"
+    assert (
+        "Portfolio localization YAML required syntax repair for fi."
+        in result["warnings"]
+    )
+    i18n = load_mapping(workspace / "portfolio-i18n.yaml")
+    assert i18n["translations"]["fi"]["html"]["Products"] == "Tuotteet"
+    html = (workspace / "index.fi.html").read_text(encoding="utf-8")
+    assert "Asiakastuote" in html
 
 
 def test_portfolio_cli_build_defaults_to_validation_warning_mode(
@@ -1512,6 +1833,7 @@ def test_render_portfolio_formats_odps_component_dimensions_for_humans(
                     "price": "0",
                     "billingDuration": "month",
                     "unit": "On-request",
+                    "access": {"$ref": "#/product/dataAccess/API"},
                     "SLA": {"$ref": "#/product/SLA/declarative/default"},
                     "dataQuality": {
                         "$ref": "#/product/dataQuality/declarative/default"
@@ -1544,6 +1866,12 @@ def test_render_portfolio_formats_odps_component_dimensions_for_humans(
             }
         }
     }
+    product["product"]["dataAccess"] = {
+        "API": {
+            "description": {"en": "Internal API access during pilot."},
+            "outputPortType": "API",
+        }
+    }
     product["product"]["dataQuality"] = {
         "declarative": {
             "default": {
@@ -1570,12 +1898,20 @@ def test_render_portfolio_formats_odps_component_dimensions_for_humans(
 
     html = (workspace / "index.html").read_text(encoding="utf-8")
     assert "Internal Starter" in html
-    assert "Price Currency" in html
+    assert 'class="pricing-table"' in html
+    assert "<th>Plan</th>" in html
+    assert "<th>Price</th>" in html
     assert "Billing Duration" in html
     assert "The Basic SLA" in html
     assert "Data Freshness" in html
     assert "Availability" in html
     assert "Account ID Completeness" in html
+    assert "Internal API access during pilot." in html
+    assert "Included SLA" in html
+    assert "Included Data Quality" in html
+    assert "Included Access" in html
+    assert '<section class="component-section"><h4>SLA</h4>' not in html
+    assert '<section class="component-section"><h4>Data Quality</h4>' not in html
     assert "1440 minutes" in html
     assert "95 percent" in html
     assert "100 percentage" in html
@@ -1584,6 +1920,28 @@ def test_render_portfolio_formats_odps_component_dimensions_for_humans(
     assert "&#x27;dimension&#x27;" not in html
     assert "[{" not in html
     assert "<dt>dimensions</dt>" not in html
+
+
+def test_render_portfolio_uses_product_cards_with_detail_modals(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "workspace"
+    write_sample_workspace(workspace)
+
+    render_portfolio(workspace)
+
+    html = (workspace / "index.html").read_text(encoding="utf-8")
+    assert '<div class="product-grid">' in html
+    assert 'class="card product product-card"' in html
+    assert 'class="product-detail-button"' in html
+    assert 'data-modal-target="product-modal-customer-product"' in html
+    assert 'id="product-modal-customer-product"' in html
+    assert 'class="product-modal"' in html
+    assert "product-modal-panel" in html
+    assert "product-card-counters" in html
+    assert "document.addEventListener" in html
+    assert "data-modal-close" in html
+    assert '<details class="odp-detail" open>' not in html
 
 
 def test_sync_portfolio_repairs_odps_data_access_from_yaml(
@@ -1705,11 +2063,13 @@ def test_portfolio_cli_sync_emits_one_final_json_report(
 def test_portfolio_helpers_are_public_exports() -> None:
     from open_data_products import build_portfolio as public_build_portfolio
     from open_data_products import explain_portfolio as public_explain_portfolio
+    from open_data_products import localize_portfolio as public_localize_portfolio
     from open_data_products import refresh_portfolio as public_refresh_portfolio
     from open_data_products import render_portfolio as public_render_portfolio
     from open_data_products import sync_portfolio as public_sync_portfolio
 
     assert public_build_portfolio is build_portfolio
+    assert public_localize_portfolio is localize_portfolio
     assert public_refresh_portfolio is refresh_portfolio
     assert public_render_portfolio is render_portfolio
     assert public_sync_portfolio is sync_portfolio

@@ -1,8 +1,9 @@
-# Release Summary: 0.2.0
+# Release Summary: 0.2.1
 
-Release 0.2.0 expands LLM-assisted generation from ODPC fragments into full
-ODPS product drafts built from source material such as transcripts, emails, and
-briefs.
+Release 0.2.1 expands LLM-assisted generation from isolated ODPC fragments into
+full ODPS product drafts and connected portfolio workspaces built from source
+material such as business objectives, use cases, market signals, transcripts,
+emails, and briefs.
 
 ## Highlights
 
@@ -26,6 +27,30 @@ briefs.
   gaps, validation status, and repair warnings in `--json` output.
 - ODPS document validation now supports schema-shaped YAML mappings directly,
   including declarative SLA and data quality sections.
+- New `open-data-products portfolio` commands can build, refresh, sync, render,
+  explain, and localize a portfolio workspace that connects ODPC catalog
+  objects, linked ODPS product specs, and ODPG graph relationships.
+- `portfolio build` accepts separate source lanes for objectives, use cases,
+  signals, and products, creates all required workspace folders, writes a final
+  JSON report, and preserves a user-supplied portfolio title across reruns.
+- Portfolio refresh defaults to processing changed and new source documents,
+  while `--all-sources` forces full reprocessing and `portfolio sync` rebuilds
+  from edited YAML artifacts without calling an LLM.
+- Portfolio HTML now renders one browser-openable `index.html` with tabs for
+  overview, artifact types, products, graph, and about content. Product cards
+  open detailed modal views with pricing plans, linked access, SLA, data quality,
+  payment, licensing, and raw artifact references.
+- The Graph tab embeds the generated ODPG graph explorer in the same page, and
+  successful builds or refreshes create version snapshots that can be opened
+  from the portfolio page.
+- Portfolio validation defaults to warning mode so schema-invalid ODPS drafts do
+  not block users from reviewing generated browser output; `--strict-validation`
+  is available when automation should fail on schema errors.
+- `portfolio localize` translates human-facing HTML strings into static
+  localized pages such as `index.fi.html`, `index.sv.html`, `index.ar.html`, and
+  `index.vi.html` without changing canonical YAML artifacts. Localized pages
+  include language switching, batched LLM translation, stale translation pruning,
+  and deterministic RTL support for languages such as Arabic.
 - New development documentation explains generation internals, ODPS validation,
   data contracts, ODPC catalog building, ODPG graph building, MCP tools, and the
   cross-spec agent surface.

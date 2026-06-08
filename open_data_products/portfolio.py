@@ -5,11 +5,13 @@ from __future__ import annotations
 import hashlib
 import html
 import json
+import re
 import shutil
 from copy import deepcopy
 from datetime import datetime, timezone
+from html.parser import HTMLParser
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, Iterable, List, Optional, Set, Tuple, Union
 
 import yaml
 
@@ -21,7 +23,10 @@ from .odpg import build_graph_explorer_html, load_graph
 
 DEFAULT_PORTFOLIO_HTML = "index.html"
 PORTFOLIO_SOURCE_SUFFIXES = (".md", ".txt", ".yaml", ".yml", ".json")
+PORTFOLIO_LOCALIZATION_BATCH_CHARS = 3500
+PORTFOLIO_LOCALIZATION_BATCH_ITEMS = 50
 PortfolioBuildClient = Callable[[str, str], str]
+PortfolioLocalizationClient = Callable[[str, str], str]
 ODPC_STATUSES = {"draft", "active", "paused", "completed", "retired"}
 ODPC_STATUS_ALIASES = {
     "proposed": "draft",
@@ -103,6 +108,34 @@ ODPS_SLA_UNIT_ALIASES = {
     "yearly": "years",
     "percentage": "percent",
 }
+ODPS_DATA_QUALITY_DIMENSIONS = {
+    "accuracy",
+    "completeness",
+    "conformity",
+    "consistency",
+    "coverage",
+    "timeliness",
+    "validity",
+    "uniqueness",
+}
+ODPS_DATA_QUALITY_DIMENSION_ALIASES = {
+    "freshness": "timeliness",
+    "datafreshness": "timeliness",
+    "data-freshness": "timeliness",
+    "reconcile": "consistency",
+    "reconciliation": "consistency",
+    "source-reconciliation": "consistency",
+    "source-count-reconciliation": "consistency",
+    "crm-reconciliation": "consistency",
+    "billing-reconciliation": "consistency",
+}
+ODPS_DATA_QUALITY_UNITS = {"percentage", "number"}
+ODPS_DATA_QUALITY_UNIT_ALIASES = {
+    "percent": "percentage",
+    "percentage": "percentage",
+    "%": "percentage",
+    "count": "number",
+}
 ODPC_SIGNAL_TYPES = {
     "demand",
     "competitive",
@@ -114,6 +147,17 @@ ODPC_SIGNAL_TYPES = {
     "usage",
     "risk",
     "gap",
+}
+RTL_LANGUAGE_SUBTAGS = {
+    "ar",
+    "ckb",
+    "dv",
+    "fa",
+    "he",
+    "ps",
+    "sd",
+    "ur",
+    "yi",
 }
 ODPC_SIGNAL_TYPE_ALIASES = {
     "portfolio": "operational",
@@ -214,7 +258,8 @@ def build_portfolio(
         if client is None:
             raise ValueError("A model client is required to build a portfolio.")
         prompt = render_portfolio_build_prompt(process_lanes)
-        plan = parse_portfolio_plan(client(prompt, model))
+        raw_plan = client(prompt, model)
+        plan = _parse_portfolio_plan_with_repair(raw_plan, client, model)
         plan = _reconcile_plan_identity(plan, previous_state)
         if not process_all_sources and has_previous_sources:
             plan = _merge_portfolio_plans(_plan_from_workspace(root), plan)
@@ -362,6 +407,106 @@ def sync_portfolio(workspace: Union[str, Path]) -> Dict[str, object]:
         _write_json_report(snapshot / "report.json", result)
         _refresh_portfolio_versions(root)
     return result
+
+
+def localize_portfolio(
+    workspace: Union[str, Path],
+    *,
+    languages: Union[str, Iterable[str]],
+    client: PortfolioLocalizationClient,
+    model: str,
+    default_language: str = "en",
+) -> Dict[str, object]:
+    """Localize portfolio HTML without changing canonical YAML artifacts."""
+    root = Path(workspace)
+    target_languages = _parse_language_tags(languages)
+    default_language = _normalize_language_tag(default_language)
+    target_languages = [
+        language for language in target_languages if language != default_language
+    ]
+    if not target_languages:
+        raise ValueError("Provide at least one non-default language to localize.")
+
+    i18n = _load_portfolio_i18n(root)
+    i18n["defaultLanguage"] = default_language
+    i18n["languages"] = _merge_languages(
+        [default_language],
+        _string_list(i18n.get("languages")),
+        target_languages,
+    )
+    translations = i18n.setdefault("translations", {})
+    if not isinstance(translations, dict):
+        translations = {}
+        i18n["translations"] = translations
+
+    data = load_portfolio_workspace(root)
+    data["i18n"] = i18n
+    data["language"] = default_language
+    source_strings = _html_text_items(render_portfolio_html(data))
+    _prune_i18n_html_translations(i18n, set(source_strings))
+    warnings: List[str] = list(data["warnings"])
+
+    for language in target_languages:
+        language_translations = translations.setdefault(language, {})
+        if not isinstance(language_translations, dict):
+            language_translations = {}
+            translations[language] = language_translations
+        html_translations = language_translations.setdefault("html", {})
+        if not isinstance(html_translations, dict):
+            html_translations = {}
+            language_translations["html"] = html_translations
+        for chunk in _chunk_localization_strings(source_strings):
+            prompt = _render_portfolio_localization_prompt(language, chunk)
+            localized, repaired = _parse_portfolio_localization_with_repair(
+                client(prompt, model), client, model, language
+            )
+            if repaired:
+                warnings.append(
+                    f"Portfolio localization YAML required syntax repair for {language}."
+                )
+            chunk_strings = set(chunk)
+            html_translations.update(
+                {
+                    key: value
+                    for key, value in localized.get("translations", {}).items()
+                    if key in chunk_strings
+                }
+            )
+
+    i18n_path, i18n_state = _write_i18n(root / "portfolio-i18n.yaml", i18n)
+    data = load_portfolio_workspace(root)
+    html_paths: Dict[str, str] = {}
+    written: List[Tuple[Path, str]] = [(i18n_path, i18n_state)]
+
+    for language in [default_language] + target_languages:
+        localized_data = dict(data)
+        localized_data["language"] = language
+        html_text = render_portfolio_html(localized_data)
+        if language != default_language:
+            html_text = _translate_html_text(
+                html_text, _i18n_html_translations(data.get("i18n"), language)
+            )
+        output = root / _localized_html_filename(language, default_language)
+        written.append(_write_text(output, html_text))
+        html_paths[language] = str(output)
+
+    created, updated, unchanged = _group_written_paths(written)
+    validation_results = _portfolio_validation_results(data)
+    return {
+        "spec": "portfolio",
+        "kind": "PortfolioLocalize",
+        "workspace": str(root),
+        "defaultLanguage": default_language,
+        "languages": target_languages,
+        "html": html_paths,
+        "i18n": str(root / "portfolio-i18n.yaml"),
+        "created": created,
+        "updated": updated,
+        "unchanged": unchanged,
+        "warnings": warnings,
+        "validationResults": validation_results,
+        "valid": _valid_portfolio(validation_results),
+    }
 
 
 def render_portfolio_build_prompt(lanes: Dict[str, List[Dict[str, str]]]) -> str:
@@ -599,6 +744,8 @@ def render_portfolio_build_prompt(lanes: Dict[str, List[Dict[str, str]]]) -> str
         "- SLA must be an object, never a list. Use SLA.declarative as a named mapping such as default and premium.",
         "- Each SLA declarative profile must contain dimensions with dimension, objective, and unit.",
         "- dataQuality must be an object, never a list. Use dataQuality.declarative as a named mapping such as default and premium.",
+        "- Allowed dataQuality dimension names are accuracy, completeness, conformity, consistency, coverage, timeliness, validity, and uniqueness.",
+        "- Map reconciliation checks to consistency. Keep the reconciliation detail in displayTitle or description, not as dimension: reconciliation.",
         "- Pricing plan references must use named paths such as #/product/SLA/declarative/default, #/product/dataQuality/declarative/default, and #/product/dataAccess/API.",
         "- paymentGateway refs must use named paths such as #/product/paymentGateways/default.",
         "- Never use array-index reference paths such as #/product/SLA/0 or #/product/dataQuality/declarative/0.",
@@ -619,13 +766,189 @@ def render_portfolio_build_prompt(lanes: Dict[str, List[Dict[str, str]]]) -> str
     return "\n".join(sections)
 
 
+def _parse_portfolio_plan_with_repair(
+    raw_output: str,
+    client: PortfolioBuildClient,
+    model: str,
+) -> Dict[str, Any]:
+    try:
+        return parse_portfolio_plan(raw_output)
+    except ValueError as original_error:
+        repair_prompt = _render_portfolio_plan_repair_prompt(
+            raw_output, str(original_error)
+        )
+        repaired_output = client(repair_prompt, model)
+        try:
+            plan = parse_portfolio_plan(repaired_output)
+        except ValueError as repair_error:
+            raise ValueError(
+                f"{original_error}\nRepair attempt also failed: {repair_error}"
+            ) from repair_error
+        warnings = plan.setdefault("warnings", [])
+        if isinstance(warnings, list):
+            warnings.append("Portfolio plan YAML required syntax repair.")
+        return plan
+
+
+def _render_portfolio_plan_repair_prompt(raw_output: str, parser_error: str) -> str:
+    return "\n".join(
+        [
+            "# Repair Portfolio Plan YAML",
+            "Repair one Open Data Products portfolio plan YAML document.",
+            "Return only YAML. Do not include markdown fences, prose, or comments.",
+            "Preserve the generated facts, IDs, links, warnings, and artifact lists.",
+            "Fix only YAML syntax, indentation, incomplete keys, and malformed mappings.",
+            "Do not add new unsupported facts. If a broken value cannot be recovered,",
+            "drop that broken field and preserve the rest of the artifact.",
+            "",
+            "Parser error:",
+            parser_error,
+            "",
+            "Malformed portfolio plan YAML:",
+            raw_output,
+        ]
+    )
+
+
 def parse_portfolio_plan(raw_output: str) -> Dict[str, Any]:
     """Parse a model-generated portfolio plan YAML mapping."""
     text = _extract_yaml_text(raw_output)
-    data = yaml.safe_load(text)
+    try:
+        data = yaml.safe_load(text)
+    except yaml.YAMLError as exc:
+        raise ValueError(
+            "Portfolio plan YAML could not be parsed. The model response may "
+            "have been truncated; increase provider maxTokens or rerun the "
+            f"command. Parser error: {exc}"
+        ) from exc
     if not isinstance(data, dict):
         raise ValueError("Portfolio plan must contain a YAML object at the root")
     return data
+
+
+def parse_portfolio_localization(raw_output: str) -> Dict[str, Any]:
+    """Parse a model-generated portfolio localization YAML mapping."""
+    text = _extract_yaml_text(raw_output)
+    try:
+        data = yaml.safe_load(text)
+    except yaml.YAMLError as exc:
+        raise ValueError(
+            f"Portfolio localization YAML could not be parsed: {exc}"
+        ) from exc
+    if not isinstance(data, dict):
+        raise ValueError(
+            "Portfolio localization must contain a YAML object at the root"
+        )
+    translations = data.get("translations")
+    if not isinstance(translations, dict):
+        data["translations"] = {}
+        return data
+    data["translations"] = {
+        str(key): _text(value)
+        for key, value in translations.items()
+        if isinstance(key, str) and _text(value)
+    }
+    return data
+
+
+def _parse_portfolio_localization_with_repair(
+    raw_output: str,
+    client: PortfolioLocalizationClient,
+    model: str,
+    language: str,
+) -> Tuple[Dict[str, Any], bool]:
+    try:
+        return parse_portfolio_localization(raw_output), False
+    except ValueError as original_error:
+        repair_prompt = _render_portfolio_localization_repair_prompt(
+            language, raw_output, str(original_error)
+        )
+        repaired_output = client(repair_prompt, model)
+        try:
+            return parse_portfolio_localization(repaired_output), True
+        except ValueError as repair_error:
+            raise ValueError(
+                f"{original_error}\nRepair attempt also failed: {repair_error}"
+            ) from repair_error
+
+
+def _render_portfolio_localization_repair_prompt(
+    language: str,
+    raw_output: str,
+    parser_error: str,
+) -> str:
+    return "\n".join(
+        [
+            "# Repair Portfolio Localization YAML",
+            f"Target language: {language}",
+            "Repair one portfolio localization YAML document.",
+            "Return only YAML. Do not include markdown fences, prose, or comments.",
+            "Preserve the translation keys and translated values.",
+            "Fix only YAML syntax, quoting, block scalars, indentation, and malformed mappings.",
+            "Use this shape:",
+            f"language: {language}",
+            "translations:",
+            "  Source text: Translated text",
+            "",
+            "Parser error:",
+            parser_error,
+            "",
+            "Malformed localization YAML:",
+            raw_output,
+        ]
+    )
+
+
+def _render_portfolio_localization_prompt(
+    language: str, source_strings: List[str]
+) -> str:
+    lines = [
+        "# Localize Portfolio HTML",
+        f"Target language: {language}",
+        "Translate the human-facing strings from one static portfolio HTML page.",
+        "Return only YAML. Do not include markdown fences, prose, or comments.",
+        "Use this exact shape:",
+        f"language: {language}",
+        "translations:",
+        '  "Source text": "Translated text"',
+        "",
+        "Rules:",
+        "- Do not translate IDs, file paths, URLs, YAML keys, or enum values.",
+        "- Keep product IDs, graph node IDs, version IDs, and artifact paths unchanged.",
+        "- Preserve numbers and units unless the target language requires normal spacing.",
+        "- Keep translations concise enough for the existing static HTML layout.",
+        "- Quote translation keys and values, or use block scalars for long values.",
+        "- Translation values often contain colons; never emit an unquoted value with a colon.",
+        "",
+        "Strings:",
+    ]
+    for text in source_strings:
+        lines.append(f"- {yaml.safe_dump(text, allow_unicode=True).strip()}")
+    return "\n".join(lines)
+
+
+def _chunk_localization_strings(
+    source_strings: List[str],
+    *,
+    max_chars: int = PORTFOLIO_LOCALIZATION_BATCH_CHARS,
+    max_items: int = PORTFOLIO_LOCALIZATION_BATCH_ITEMS,
+) -> List[List[str]]:
+    chunks: List[List[str]] = []
+    current: List[str] = []
+    current_chars = 0
+    for text in source_strings:
+        item_chars = len(text)
+        if current and (
+            len(current) >= max_items or current_chars + item_chars > max_chars
+        ):
+            chunks.append(current)
+            current = []
+            current_chars = 0
+        current.append(text)
+        current_chars += item_chars
+    if current:
+        chunks.append(current)
+    return chunks
 
 
 def _collect_source_lanes(
@@ -880,6 +1203,25 @@ def _write_portfolio_artifacts(
 def _write_yaml(path: Path, document: Dict[str, Any]) -> Tuple[Path, str]:
     path.parent.mkdir(parents=True, exist_ok=True)
     content = yaml.safe_dump(document, sort_keys=False, allow_unicode=False)
+    existed = path.exists()
+    previous = path.read_text(encoding="utf-8") if existed else None
+    path.write_text(content, encoding="utf-8")
+    state = "unchanged" if previous == content else "updated" if existed else "created"
+    return path, state
+
+
+def _write_i18n(path: Path, document: Dict[str, Any]) -> Tuple[Path, str]:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    content = yaml.safe_dump(document, sort_keys=False, allow_unicode=True)
+    existed = path.exists()
+    previous = path.read_text(encoding="utf-8") if existed else None
+    path.write_text(content, encoding="utf-8")
+    state = "unchanged" if previous == content else "updated" if existed else "created"
+    return path, state
+
+
+def _write_text(path: Path, content: str) -> Tuple[Path, str]:
+    path.parent.mkdir(parents=True, exist_ok=True)
     existed = path.exists()
     previous = path.read_text(encoding="utf-8") if existed else None
     path.write_text(content, encoding="utf-8")
@@ -1608,9 +1950,20 @@ def _first_named_profile(value: Any) -> Optional[Dict[str, Any]]:
 def _normalize_loose_data_quality(data_quality: Dict[str, Any]) -> Dict[str, Any]:
     declarative = data_quality.get("declarative")
     if isinstance(declarative, dict):
-        return data_quality
+        normalized = {"declarative": {}}
+        for key, profile in declarative.items():
+            if isinstance(profile, dict):
+                normalized["declarative"][_path_id(str(key)) or "default"] = (
+                    _normalize_data_quality_profile(profile)
+                )
+        return normalized
     if isinstance(declarative, list):
-        return {"declarative": _named_profiles_from_list(declarative, "default")}
+        return {
+            "declarative": _named_profiles_from_list(
+                [_normalize_data_quality_profile(item) for item in declarative],
+                "default",
+            )
+        }
     description = _text(data_quality.get("policyDescription"))
     if not description:
         description = _text(data_quality.get("description"))
@@ -1657,6 +2010,55 @@ def _normalize_data_quality_list(items: List[Any]) -> Dict[str, Any]:
             _named_profiles_from_list(profiles, "default") if profiles else {}
         )
     }
+
+
+def _normalize_data_quality_profile(profile: Dict[str, Any]) -> Dict[str, Any]:
+    normalized = dict(profile)
+    dimensions = normalized.get("dimensions")
+    if isinstance(dimensions, list):
+        normalized["dimensions"] = [
+            dimension
+            for dimension in (
+                _normalize_data_quality_dimension(dimension)
+                for dimension in dimensions
+                if isinstance(dimension, dict)
+            )
+            if dimension
+        ]
+    return normalized
+
+
+def _normalize_data_quality_dimension(dimension: Dict[str, Any]) -> Dict[str, Any]:
+    normalized = dict(dimension)
+    normalized["dimension"] = _normalize_enum(
+        normalized.get("dimension") or normalized.get("name"),
+        ODPS_DATA_QUALITY_DIMENSIONS,
+        ODPS_DATA_QUALITY_DIMENSION_ALIASES,
+        "validity",
+    )
+    if "objective" in normalized:
+        normalized["objective"] = _normalize_integer_value(normalized["objective"])
+    if "unit" in normalized:
+        normalized["unit"] = _normalize_enum(
+            normalized.get("unit"),
+            ODPS_DATA_QUALITY_UNITS,
+            ODPS_DATA_QUALITY_UNIT_ALIASES,
+            "percentage",
+        )
+    return normalized
+
+
+def _normalize_integer_value(value: Any) -> Any:
+    if isinstance(value, bool) or value is None:
+        return value
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value) if value.is_integer() else value
+    text = _text(value)
+    if text.isdigit():
+        return int(text)
+    return value
 
 
 def _sla_from_loose_details(sla: Dict[str, Any]) -> Dict[str, Any]:
@@ -2582,6 +2984,7 @@ def load_portfolio_workspace(workspace: Union[str, Path]) -> Dict[str, Any]:
     catalog_path = root / "odpc" / "catalog.yaml"
     graph_path = root / "odpg" / "graph.yaml"
     portfolio_path = root / "portfolio.yaml"
+    i18n = _load_portfolio_i18n(root)
     warnings: List[str] = []
     portfolio = _load_optional_mapping(portfolio_path)
     catalog = load_catalog(catalog_path) if catalog_path.exists() else _empty_catalog()
@@ -2597,6 +3000,8 @@ def load_portfolio_workspace(workspace: Union[str, Path]) -> Dict[str, Any]:
         "graph_path": graph_path,
         "products": products,
         "versions": versions,
+        "i18n": i18n,
+        "language": _text(i18n.get("defaultLanguage"), "en"),
         "warnings": warnings,
     }
 
@@ -2646,9 +3051,219 @@ def _valid_portfolio(validation_results: Dict[str, Any]) -> bool:
     )
 
 
+def _load_portfolio_i18n(root: Path) -> Dict[str, Any]:
+    i18n = _load_optional_mapping(root / "portfolio-i18n.yaml")
+    if not isinstance(i18n, dict):
+        return {}
+    default_language = _normalize_language_tag(_text(i18n.get("defaultLanguage"), "en"))
+    languages = _merge_languages(
+        [default_language], _string_list(i18n.get("languages"))
+    )
+    i18n["defaultLanguage"] = default_language
+    i18n["languages"] = languages
+    translations = i18n.get("translations")
+    if not isinstance(translations, dict):
+        i18n["translations"] = {}
+    return i18n
+
+
+def _parse_language_tags(value: Union[str, Iterable[str]]) -> List[str]:
+    raw_values: List[str] = []
+    if isinstance(value, str):
+        raw_values = [value]
+    else:
+        raw_values = [str(item) for item in value]
+    languages = []
+    for raw in raw_values:
+        for part in raw.split(","):
+            language = _normalize_language_tag(part)
+            if language and language not in languages:
+                languages.append(language)
+    return languages
+
+
+def _prune_i18n_html_translations(
+    i18n: Dict[str, Any], source_strings: Set[str]
+) -> None:
+    translations = i18n.get("translations")
+    if not isinstance(translations, dict):
+        return
+    for language_translations in translations.values():
+        if not isinstance(language_translations, dict):
+            continue
+        html_translations = language_translations.get("html")
+        if not isinstance(html_translations, dict):
+            continue
+        for key in list(html_translations):
+            if str(key) not in source_strings:
+                del html_translations[key]
+
+
+def _normalize_language_tag(value: str) -> str:
+    language = value.strip()
+    if not language:
+        return ""
+    if not re.fullmatch(r"[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*", language):
+        raise ValueError(f"Invalid BCP 47 language tag: {value}")
+    parts = language.split("-")
+    normalized = [parts[0].lower()]
+    normalized.extend(part.upper() if len(part) == 2 else part for part in parts[1:])
+    return "-".join(normalized)
+
+
+def _merge_languages(*groups: Iterable[str]) -> List[str]:
+    languages = []
+    for group in groups:
+        for item in group:
+            language = _normalize_language_tag(str(item))
+            if language and language not in languages:
+                languages.append(language)
+    return languages
+
+
+def _localized_html_filename(language: str, default_language: str) -> str:
+    return (
+        DEFAULT_PORTFOLIO_HTML
+        if language == default_language
+        else f"index.{language}.html"
+    )
+
+
+def _html_direction(language: str) -> str:
+    primary = language.split("-", 1)[0].lower()
+    return "rtl" if primary in RTL_LANGUAGE_SUBTAGS else "ltr"
+
+
+def _i18n_html_translations(i18n: Any, language: str) -> Dict[str, str]:
+    if not isinstance(i18n, dict):
+        return {}
+    translations = i18n.get("translations")
+    if not isinstance(translations, dict):
+        return {}
+    language_map = translations.get(language)
+    if not isinstance(language_map, dict):
+        return {}
+    html_map = language_map.get("html")
+    if not isinstance(html_map, dict):
+        return {}
+    return {str(key): _text(value) for key, value in html_map.items()}
+
+
+def _html_text_items(html_text: str) -> List[str]:
+    parser = _HTMLTextCollector()
+    parser.feed(html_text)
+    parser.close()
+    return parser.items
+
+
+def _translate_html_text(html_text: str, translations: Dict[str, str]) -> str:
+    parser = _HTMLTextTranslator(translations)
+    parser.feed(html_text)
+    parser.close()
+    return parser.html
+
+
+class _HTMLTextCollector(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.items: List[str] = []
+
+    def handle_data(self, data: str) -> None:
+        text = data.strip()
+        if not _translatable_html_text(text):
+            return
+        if text not in self.items:
+            self.items.append(text)
+
+
+class _HTMLTextTranslator(HTMLParser):
+    _RAW_TEXT_TAGS = {"script", "style"}
+
+    def __init__(self, translations: Dict[str, str]) -> None:
+        super().__init__(convert_charrefs=True)
+        self.translations = translations
+        self.parts: List[str] = []
+        self._raw_text_tag: Optional[str] = None
+
+    @property
+    def html(self) -> str:
+        return "".join(self.parts)
+
+    def handle_decl(self, decl: str) -> None:
+        self.parts.append(f"<!{decl}>")
+
+    def handle_starttag(self, tag: str, attrs: List[Tuple[str, Optional[str]]]) -> None:
+        self.parts.append(self._tag(tag, attrs))
+        normalized_tag = tag.lower()
+        if normalized_tag in self._RAW_TEXT_TAGS:
+            self._raw_text_tag = normalized_tag
+
+    def handle_startendtag(
+        self, tag: str, attrs: List[Tuple[str, Optional[str]]]
+    ) -> None:
+        self.parts.append(self._tag(tag, attrs, closed=True))
+
+    def handle_endtag(self, tag: str) -> None:
+        self.parts.append(f"</{tag}>")
+        if self._raw_text_tag == tag.lower():
+            self._raw_text_tag = None
+
+    def handle_data(self, data: str) -> None:
+        if self._raw_text_tag:
+            self.parts.append(data)
+            return
+        text = data.strip()
+        if text and text in self.translations:
+            leading = data[: len(data) - len(data.lstrip())]
+            trailing = data[len(data.rstrip()) :]
+            self.parts.append(
+                f"{leading}{html.escape(self.translations[text])}{trailing}"
+            )
+            return
+        self.parts.append(html.escape(data))
+
+    def handle_comment(self, data: str) -> None:
+        self.parts.append(f"<!--{data}-->")
+
+    def handle_entityref(self, name: str) -> None:
+        self.parts.append(f"&{name};")
+
+    def handle_charref(self, name: str) -> None:
+        self.parts.append(f"&#{name};")
+
+    def _tag(
+        self,
+        tag: str,
+        attrs: List[Tuple[str, Optional[str]]],
+        *,
+        closed: bool = False,
+    ) -> str:
+        rendered = [tag]
+        for key, value in attrs:
+            if value is None:
+                rendered.append(key)
+            else:
+                rendered.append(f'{key}="{html.escape(value, quote=True)}"')
+        suffix = " /" if closed else ""
+        return f"<{' '.join(rendered)}{suffix}>"
+
+
+def _translatable_html_text(text: str) -> bool:
+    if not text or len(text) > 900:
+        return False
+    if not re.search(r"[A-Za-zÀ-ÖØ-öø-ÿ]", text):
+        return False
+    if "/" in text and re.search(r"\.(yaml|yml|json|html)\b", text):
+        return False
+    if re.fullmatch(r"\d{4}-\d{2}-\d{2}T[\d:-]+Z", text):
+        return False
+    return True
+
+
 def render_portfolio_html(data: Dict[str, Any]) -> str:
     """Render portfolio workspace data to static HTML."""
     portfolio = data["portfolio"]
+    language = _text(data.get("language"), "en")
     catalog_root = data["catalog"].get("catalog", {})
     metadata = (
         catalog_root.get("metadata", {}) if isinstance(catalog_root, dict) else {}
@@ -2665,10 +3280,11 @@ def render_portfolio_html(data: Dict[str, Any]) -> str:
     description = _text(
         metadata.get("description"), "Generated Open Data Products portfolio."
     )
+    direction = _html_direction(language)
 
     html_parts = [
         "<!doctype html>",
-        '<html lang="en">',
+        f'<html lang="{_escape_attr(language)}" dir="{direction}">',
         "<head>",
         '<meta charset="utf-8">',
         '<meta name="viewport" content="width=device-width, initial-scale=1">',
@@ -2681,6 +3297,7 @@ def render_portfolio_html(data: Dict[str, Any]) -> str:
         '<header class="topbar">',
         '<div class="topbar-inner">',
         '<a class="brand" href="#overview" aria-label="Open Data Products portfolio">Open Data Products Portfolio</a>',
+        _render_language_selector(data, language),
         "</div>",
         "</header>",
         '<section class="hero">',
@@ -2732,6 +3349,7 @@ def render_portfolio_html(data: Dict[str, Any]) -> str:
         "</div>",
         "</main>",
         _render_footer(data),
+        _portfolio_js(),
         "</body>",
         "</html>",
     ]
@@ -2755,6 +3373,27 @@ def _render_tab_inputs() -> str:
             f'<input class="tab-radio" type="radio" name="portfolio-tab" id="tab-{tab}"{checked}>'
         )
     return "".join(inputs)
+
+
+def _render_language_selector(data: Dict[str, Any], current_language: str) -> str:
+    i18n = data.get("i18n")
+    if not isinstance(i18n, dict):
+        return ""
+    default_language = _text(i18n.get("defaultLanguage"), "en")
+    languages = _string_list(i18n.get("languages"))
+    if len(languages) < 2:
+        return ""
+    links = []
+    for language in languages:
+        href = _localized_html_filename(language, default_language)
+        current = ' aria-current="true"' if language == current_language else ""
+        links.append(f'<a href="{_escape_attr(href)}"{current}>{_escape(language)}</a>')
+    return (
+        '<nav class="language-selector" aria-label="Portfolio language selector">'
+        f"<span>{_escape(current_language)}</span>"
+        f'<div>{"".join(links)}</div>'
+        "</nav>"
+    )
 
 
 def _render_tab_nav() -> str:
@@ -2797,8 +3436,7 @@ def _render_overview(
         '<div class="section-head"><div>'
         '<p class="eyebrow">Portfolio Overview</p>'
         "<h2>Generated workspace summary</h2>"
-        "</div><p>One page for the portfolio catalog, ODPS product details, "
-        "graph relationships, versions, and generation context.</p></div>"
+        "</div></div>"
         f'<section class="summary" aria-label="Portfolio summary">{metrics}</section>'
         f"{_render_recommended_actions(catalog, graph, products, warnings)}"
         f"{_render_portfolio_changes(versions)}"
@@ -2812,37 +3450,28 @@ def _render_portfolio_changes(versions: List[Dict[str, Any]]) -> str:
     if latest is None:
         body = (
             '<article class="action-card overview-card changes-card">'
-            "<p>No version snapshots exist yet. Change information will appear "
+            "<p>No version snapshots exist yet. A change summary will appear "
             "after the first build, refresh, or sync snapshot is created.</p>"
             "</article>"
         )
     else:
         report = latest.get("report") if isinstance(latest.get("report"), dict) else {}
-        created = _change_list_count(report.get("created"))
-        updated = _change_list_count(report.get("updated"))
-        unchanged = _change_list_count(report.get("unchanged"))
-        removed = _change_list_count(report.get("removed"))
-        source_summary = _source_change_summary(report.get("sourceChanges"))
+        change_items = _latest_change_items(report)
         validation = _change_validation_label(report)
+        list_html = "".join(f"<li>{_escape(item)}</li>" for item in change_items)
         body = (
             '<article class="action-card overview-card changes-card">'
-            '<div class="chip-row"><span class="chip">Latest change summary</span></div>'
+            '<div class="chip-row"><span class="chip">Latest portfolio snapshot</span></div>'
             f"<p>{_escape(_text(latest.get('summary'), 'Latest portfolio snapshot.'))}</p>"
             f"{_render_facts([('Version', latest.get('id')), ('Run', report.get('kind') or latest.get('type')), ('Validation', validation)])}"
-            '<div class="change-metrics">'
-            f"<span><strong>{created}</strong> Created</span>"
-            f"<span><strong>{updated}</strong> Updated</span>"
-            f"<span><strong>{unchanged}</strong> Unchanged</span>"
-            f"<span><strong>{removed}</strong> Removed</span>"
-            "</div>"
-            f"{source_summary}"
+            f'<ul class="change-story-list">{list_html}</ul>'
             "</article>"
         )
     return (
-        '<section class="overview-section" aria-label="Portfolio changes">'
+        '<section class="overview-section" aria-label="What changed since last version">'
         '<div class="section-head"><div>'
-        '<p class="eyebrow">Change history</p>'
-        "<h2>Portfolio changes</h2>"
+        '<p class="eyebrow">Latest delta</p>'
+        "<h2>What changed since last version</h2>"
         "</div></div>"
         f'<div class="overview-card-grid">{body}</div>'
         "</section>"
@@ -2865,26 +3494,53 @@ def _change_validation_label(report: Dict[str, Any]) -> str:
     return "Valid" if bool(report.get("valid")) else "Validation needs review"
 
 
-def _source_change_summary(value: Any) -> str:
+def _latest_change_items(report: Dict[str, Any]) -> List[str]:
+    items = []
+    for label, key in (
+        ("artifact was created", "created"),
+        ("artifact was updated", "updated"),
+        ("artifact was removed", "removed"),
+    ):
+        count = _change_list_count(report.get(key))
+        if count:
+            items.append(_plural_sentence(count, label))
+    items.extend(_source_change_items(report.get("sourceChanges")))
+    if report.get("valid") is True:
+        items.append("Generated artifacts validated successfully.")
+    elif report.get("valid") is False:
+        items.append("Validation needs review before production use.")
+    if not items:
+        items.append("No material portfolio changes were recorded.")
+    return items
+
+
+def _plural_sentence(count: int, singular: str) -> str:
+    if count == 1:
+        return f"1 {singular}."
+    return f"{count} {singular.replace(' was ', 's were ')}."
+
+
+def _source_change_items(value: Any) -> List[str]:
     if not isinstance(value, dict):
-        return ""
-    lines = []
+        return []
+    items = []
+    lane_labels = {
+        "objectives": "Business objective",
+        "useCases": "Use case",
+        "signals": "Signal",
+        "products": "Product",
+    }
     for lane, changes in sorted(value.items()):
         if not isinstance(changes, dict):
             continue
-        parts = []
-        for key in ("created", "updated", "removed"):
-            count = _change_list_count(changes.get(key))
-            if count:
-                parts.append(f"{count} {key}")
-        if parts:
-            lines.append(f"<li>{_escape(str(lane))}: {_escape(', '.join(parts))}</li>")
-    if not lines:
-        return ""
-    return (
-        '<div class="source-change-list"><strong>Source changes</strong>'
-        f"<ul>{''.join(lines)}</ul></div>"
-    )
+        label = lane_labels.get(str(lane), _title_from_text(str(lane)))
+        if _change_list_count(changes.get("created")):
+            items.append(f"New {label.lower()} source evidence was added.")
+        if _change_list_count(changes.get("updated")):
+            items.append(f"{label} source evidence was updated.")
+        if _change_list_count(changes.get("removed")):
+            items.append(f"{label} source evidence was removed.")
+    return items
 
 
 def _render_recommended_actions(
@@ -3068,9 +3724,13 @@ def _render_products(
     products: Dict[str, Dict[str, Any]],
 ) -> str:
     cards = []
+    modals = []
     for reference in references:
         product_info = _resolve_product(reference, products)
-        cards.append(_render_product_card(reference, product_info))
+        modal_id = _product_modal_id(reference, product_info)
+        cards.append(_render_product_card(reference, product_info, modal_id))
+        if product_info is not None:
+            modals.append(_render_product_modal(reference, product_info, modal_id))
     content = "".join(cards) or "<p>No entries.</p>"
     return (
         '<section class="tab-panel products-panel" id="products">'
@@ -3079,7 +3739,8 @@ def _render_products(
         "<h2>Products</h2>"
         "</div><p>Product cards start from ODPC references and open into "
         "detailed ODPS product specifications.</p></div>"
-        f'<div class="grid">{content}</div>'
+        f'<div class="product-grid">{content}</div>'
+        f"{''.join(modals)}"
         "</section>"
     )
 
@@ -3087,33 +3748,87 @@ def _render_products(
 def _render_product_card(
     reference: Dict[str, Any],
     product_info: Optional[Dict[str, Any]],
+    modal_id: str,
 ) -> str:
     product_id = _text(reference.get("productID") or reference.get("id"))
     name = _text(reference.get("name"), product_id or "(unnamed)")
+    product = (
+        product_info.get("document", {}).get("product", {})
+        if isinstance(product_info, dict)
+        else {}
+    )
+    pricing_count = len(_pricing_items(product))
+    sla_count = len(_declarative_items(product.get("SLA")))
+    quality_count = len(_declarative_items(product.get("dataQuality")))
     details = [
         ("Product ID", product_id),
-        ("Version", reference.get("productVersion")),
         ("Status", reference.get("status")),
         ("Visibility", reference.get("visibility")),
         ("Type", reference.get("type")),
     ]
-    product_model = reference.get("productModel")
-    raw_ref = ""
-    if isinstance(product_model, dict):
-        raw_ref = _text(product_model.get("$ref") or product_model.get("ref"))
-    product_detail_html = ""
-    if product_info is not None:
-        product_detail_html = _render_product_detail(product_info)
+    counters = [
+        ("Pricing", pricing_count),
+        ("SLA", sla_count),
+        ("DQ", quality_count),
+    ]
+    counter_html = "".join(
+        f"<span><strong>{count}</strong>{_escape(label)}</span>"
+        for label, count in counters
+        if count
+    )
+    button = (
+        '<button class="product-detail-button" type="button" '
+        f'data-modal-target="{_escape_attr(modal_id)}">Details</button>'
+        if product_info is not None
+        else '<span class="odp-muted">No linked ODPS detail</span>'
+    )
     return (
-        '<article class="card product wide">'
+        '<article class="card product product-card">'
         '<div class="chip-row"><span class="chip odps">ODPS</span>'
         '<span class="chip odpc">ODPC Reference</span></div>'
         f"<h3>{_escape(name)}</h3>"
-        f'<p>{_escape(_text(reference.get("description")))}</p>'
+        f'<p class="product-card-description">{_escape(_text(reference.get("description")))}</p>'
         f"{_render_facts(details)}"
-        f'<p class="odp-muted">Raw ODPS YAML: {_escape(raw_ref)}</p>'
-        f"{product_detail_html}"
+        f'<div class="product-card-counters">{counter_html}</div>'
+        f'<div class="product-card-actions">{button}</div>'
         "</article>"
+    )
+
+
+def _product_modal_id(
+    reference: Dict[str, Any],
+    product_info: Optional[Dict[str, Any]],
+) -> str:
+    if product_info is not None:
+        details = _product_details(product_info["document"])
+        product_id = _text(details.get("productID"))
+        if product_id:
+            return f"product-modal-{_path_id(product_id)}"
+    product_id = _text(reference.get("productID") or reference.get("id"), "product")
+    return f"product-modal-{_path_id(product_id)}"
+
+
+def _render_product_modal(
+    reference: Dict[str, Any],
+    product_info: Dict[str, Any],
+    modal_id: str,
+) -> str:
+    details = _product_details(product_info["document"])
+    name = _text(details.get("name"), _text(reference.get("name"), "Product"))
+    return (
+        f'<div class="product-modal" id="{_escape_attr(modal_id)}" '
+        'aria-hidden="true" role="dialog" aria-modal="true" '
+        f'aria-label="{_escape_attr(name)} details">'
+        '<div class="product-modal-backdrop" data-modal-close></div>'
+        '<div class="product-modal-panel" role="document">'
+        '<div class="product-modal-header">'
+        f'<div><p class="eyebrow">ODPS Product Detail</p><h3>{_escape(name)}</h3></div>'
+        '<button class="product-modal-close" type="button" '
+        'data-modal-close aria-label="Close product details">Close</button>'
+        "</div>"
+        f"{_render_product_detail(product_info)}"
+        "</div>"
+        "</div>"
     )
 
 
@@ -3146,21 +3861,45 @@ def _render_product_detail(product_info: Dict[str, Any]) -> str:
         ("Visibility", details.get("visibility")),
         ("Type", details.get("type")),
     ]
-    sections = [
-        _render_pricing_section(_pricing_items(product)),
-        _render_declarative_section("SLA", _declarative_items(product.get("SLA"))),
-        _render_declarative_section(
-            "Data Quality", _declarative_items(product.get("dataQuality"))
-        ),
-    ]
+    pricing_items = _pricing_items(product)
+    referenced_profiles = _referenced_pricing_profiles(pricing_items)
+    sections = [_render_pricing_section(pricing_items, product)]
+    if not pricing_items:
+        sections.extend(
+            [
+                _render_declarative_section(
+                    "SLA", _declarative_items(product.get("SLA"))
+                ),
+                _render_declarative_section(
+                    "Data Quality", _declarative_items(product.get("dataQuality"))
+                ),
+            ]
+        )
+    else:
+        sections.extend(
+            [
+                _render_declarative_section(
+                    "Unlinked SLA profiles",
+                    _unreferenced_declarative_items(
+                        product.get("SLA"), referenced_profiles["SLA"]
+                    ),
+                ),
+                _render_declarative_section(
+                    "Unlinked Data Quality profiles",
+                    _unreferenced_declarative_items(
+                        product.get("dataQuality"), referenced_profiles["dataQuality"]
+                    ),
+                ),
+            ]
+        )
+    product_model_path = _escape(str(path))
     return (
-        '<details class="odp-detail" open>'
-        "<summary>Product details</summary>"
+        '<div class="odp-detail product-detail-layout">'
         f'<p>{_escape(_text(details.get("description")))}</p>'
         f"{_render_facts(facts)}"
         f"{''.join(sections)}"
-        f'<p class="odp-muted">Raw artifact: {_escape(str(path))}</p>'
-        "</details>"
+        f'<p class="odp-muted">Raw artifact: {product_model_path}</p>'
+        "</div>"
     )
 
 
@@ -3171,8 +3910,7 @@ def _render_graph(graph: Dict[str, Any], labels: Dict[str, str]) -> str:
         '<div class="section-head"><div>'
         '<p class="eyebrow">ODPG Graph View</p>'
         "<h2>Graph explorer</h2>"
-        "</div><p>This tab embeds the generated ODPG graph explorer without "
-        "the standalone explorer header and footer.</p></div>"
+        "</div></div>"
         '<iframe class="graph-explorer-frame" title="ODPG graph explorer" '
         f'srcdoc="{_escape_attr(explorer_html)}"></iframe>'
         "</section>"
@@ -3292,6 +4030,43 @@ def _render_footer(data: Dict[str, Any]) -> str:
         '<a href="#overview">Back to top</a>'
         "</nav></div></footer>"
     )
+
+
+def _portfolio_js() -> str:
+    return """<script>
+(function () {
+  var activeModal = null;
+  function closeModal() {
+    if (!activeModal) return;
+    activeModal.setAttribute("aria-hidden", "true");
+    document.body.classList.remove("modal-open");
+    activeModal = null;
+  }
+  function openModal(id) {
+    var modal = document.getElementById(id);
+    if (!modal) return;
+    closeModal();
+    modal.setAttribute("aria-hidden", "false");
+    document.body.classList.add("modal-open");
+    activeModal = modal;
+    var closeButton = modal.querySelector("[data-modal-close]");
+    if (closeButton) closeButton.focus();
+  }
+  document.addEventListener("click", function (event) {
+    var trigger = event.target.closest("[data-modal-target]");
+    if (trigger) {
+      openModal(trigger.getAttribute("data-modal-target"));
+      return;
+    }
+    if (event.target.closest("[data-modal-close]")) {
+      closeModal();
+    }
+  });
+  document.addEventListener("keydown", function (event) {
+    if (event.key === "Escape") closeModal();
+  });
+}());
+</script>"""
 
 
 def _load_optional_mapping(path: Path) -> Dict[str, Any]:
@@ -3463,34 +4238,189 @@ def _declarative_items(value: Any) -> List[Dict[str, Any]]:
     return []
 
 
-def _render_pricing_section(items: List[Dict[str, Any]]) -> str:
+def _render_pricing_section(
+    items: List[Dict[str, Any]], product: Dict[str, Any]
+) -> str:
     if not items:
         return ""
-    rendered = []
+    rows = []
     for item in items:
         name = _text(item.get("name"), "Pricing plan")
         description = _text(item.get("description"))
-        facts = [
-            (str(key), value)
-            for key, value in item.items()
-            if key not in {"name", "description"}
-            and not isinstance(value, (dict, list))
-        ]
-        description_html = f"<p>{_escape(description)}</p>" if description else ""
-        rendered.append(
-            '<li class="component-card">'
-            f"<h5>{_escape(name)}</h5>"
-            f"{description_html}"
-            f"{_render_facts(facts)}"
-            f"{_render_component_refs(item)}"
-            "</li>"
+        price = _text(item.get("price"), "0")
+        currency = _text(item.get("priceCurrency"))
+        amount = " ".join(part for part in (price, currency) if part)
+        rows.append(
+            '<tr class="pricing-plan-row">'
+            f"<td><strong>{_escape(name)}</strong>"
+            f"{f'<p>{_escape(description)}</p>' if description else ''}</td>"
+            f"<td>{_escape(amount)}</td>"
+            f"<td>{_escape(_text(item.get('billingDuration')))}</td>"
+            f"<td>{_escape(_text(item.get('unit')))}</td>"
+            f"<td>{_render_component_refs(item)}</td>"
+            "</tr>"
         )
+        linked_components = _render_pricing_linked_components(item, product)
+        if linked_components:
+            rows.append(
+                '<tr class="pricing-linked-row">'
+                f'<td colspan="5">{linked_components}</td>'
+                "</tr>"
+            )
     return (
         '<section class="component-section">'
         "<h4>Pricing</h4>"
-        f'<ul class="component-list">{"".join(rendered)}</ul>'
+        '<div class="table-scroll"><table class="pricing-table">'
+        "<thead><tr><th>Plan</th><th>Price</th><th>Billing Duration</th>"
+        "<th>Unit</th><th>References</th></tr></thead>"
+        f"<tbody>{''.join(rows)}</tbody>"
+        "</table></div>"
         "</section>"
     )
+
+
+def _referenced_pricing_profiles(items: List[Dict[str, Any]]) -> Dict[str, Set[str]]:
+    references = {"SLA": set(), "dataQuality": set()}
+    for item in items:
+        for key in references:
+            profile = _profile_key_from_ref(_component_ref(item.get(key)))
+            if profile:
+                references[key].add(profile)
+    return references
+
+
+def _unreferenced_declarative_items(
+    value: Any, referenced: Set[str]
+) -> List[Dict[str, Any]]:
+    return [
+        item
+        for item in _declarative_items(value)
+        if _text(item.get("profile"), "default") not in referenced
+    ]
+
+
+def _render_pricing_linked_components(
+    item: Dict[str, Any], product: Dict[str, Any]
+) -> str:
+    components = [
+        _render_pricing_linked_profile(
+            "Included SLA", item.get("SLA"), product.get("SLA")
+        ),
+        _render_pricing_linked_profile(
+            "Included Data Quality",
+            item.get("dataQuality"),
+            product.get("dataQuality"),
+        ),
+        _render_pricing_linked_access(item.get("access"), product.get("dataAccess")),
+        _render_pricing_linked_gateway(
+            item.get("paymentGateway"), product.get("paymentGateways")
+        ),
+    ]
+    rendered = [component for component in components if component]
+    if not rendered:
+        return ""
+    return f'<div class="pricing-linked-components">{"".join(rendered)}</div>'
+
+
+def _render_pricing_linked_profile(title: str, reference: Any, value: Any) -> str:
+    profile = _resolve_declarative_ref(reference, value)
+    if profile is None:
+        return ""
+    name = _text(profile.get("name"), _title_from_text(_text(profile.get("profile"))))
+    description = _text(profile.get("description"))
+    description_html = f"<p>{_escape(description)}</p>" if description else ""
+    return (
+        '<article class="linked-component-card">'
+        f'<p class="linked-component-title">{_escape(title)}</p>'
+        f"<h5>{_escape(name)}</h5>"
+        f'<span class="profile-chip">{_escape(_text(profile.get("profile"), "default"))}</span>'
+        f"{description_html}"
+        f"{_render_dimensions(profile.get('dimensions'))}"
+        "</article>"
+    )
+
+
+def _render_pricing_linked_access(reference: Any, value: Any) -> str:
+    access = _resolve_named_ref(reference, value)
+    if access is None:
+        return ""
+    facts = [
+        ("Description", access.get("description")),
+        (
+            "Output Port Type",
+            access.get("outputPortType") or access.get("outputPorttype"),
+        ),
+        ("Format", access.get("format")),
+        ("Authentication", access.get("authenticationMethod")),
+    ]
+    return (
+        '<article class="linked-component-card">'
+        '<p class="linked-component-title">Included Access</p>'
+        f"<h5>{_escape(_title_from_text(_profile_key_from_ref(_component_ref(reference)) or 'access'))}</h5>"
+        f"{_render_facts(facts)}"
+        "</article>"
+    )
+
+
+def _render_pricing_linked_gateway(reference: Any, value: Any) -> str:
+    gateway = _resolve_named_ref(reference, value)
+    if gateway is None:
+        return ""
+    facts = [
+        ("Name", gateway.get("name")),
+        ("Type", gateway.get("type")),
+        ("Provider", gateway.get("provider")),
+        ("Description", gateway.get("description")),
+    ]
+    return (
+        '<article class="linked-component-card">'
+        '<p class="linked-component-title">Included Payment</p>'
+        f"<h5>{_escape(_title_from_text(_profile_key_from_ref(_component_ref(reference)) or 'payment'))}</h5>"
+        f"{_render_facts(facts)}"
+        "</article>"
+    )
+
+
+def _resolve_declarative_ref(reference: Any, value: Any) -> Optional[Dict[str, Any]]:
+    profile_key = _profile_key_from_ref(_component_ref(reference))
+    if not profile_key:
+        return None
+    for item in _declarative_items(value):
+        if _text(item.get("profile"), "default") == profile_key:
+            return item
+    return None
+
+
+def _resolve_named_ref(reference: Any, value: Any) -> Optional[Dict[str, Any]]:
+    profile_key = _profile_key_from_ref(_component_ref(reference))
+    if not profile_key:
+        return None
+    if isinstance(value, dict):
+        named = value.get(profile_key)
+        if isinstance(named, dict):
+            return named
+        for key, item in value.items():
+            if _path_id(str(key)) == _path_id(profile_key) and isinstance(item, dict):
+                return item
+    if isinstance(value, list):
+        for item in value:
+            if isinstance(item, dict) and _path_id(_text(item.get("name"))) == _path_id(
+                profile_key
+            ):
+                return item
+    return None
+
+
+def _component_ref(value: Any) -> str:
+    if isinstance(value, dict):
+        return _text(value.get("$ref") or value.get("ref"))
+    return _text(value)
+
+
+def _profile_key_from_ref(ref: str) -> str:
+    if not ref:
+        return ""
+    return ref.rstrip("/").split("/")[-1]
 
 
 def _render_declarative_section(title: str, items: List[Dict[str, Any]]) -> str:
@@ -3678,6 +4608,10 @@ body {
   background: #fff;
   font: 16px/1.55 Poppins, Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
+html[dir="rtl"] body {
+  direction: rtl;
+  text-align: right;
+}
 a { color: inherit; text-decoration: none; }
 .topbar {
   color: #fff;
@@ -3692,10 +4626,45 @@ a { color: inherit; text-decoration: none; }
 .topbar-inner {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: 16px;
   min-height: 58px;
 }
 .brand {
   font-weight: 700;
+}
+.language-selector {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: .82rem;
+}
+.language-selector span {
+  padding: 4px 8px;
+  border: 1px solid rgba(255,255,255,.35);
+  border-radius: 8px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+.language-selector div {
+  display: flex;
+  gap: 8px;
+}
+.language-selector a {
+  color: rgba(255,255,255,.76);
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.language-selector a[aria-current="true"] {
+  color: #fff;
+}
+html[dir="rtl"] .topbar-inner,
+html[dir="rtl"] .section-head,
+html[dir="rtl"] .product-modal-header {
+  direction: rtl;
+}
+html[dir="rtl"] .language-selector div {
+  flex-direction: row-reverse;
 }
 .hero {
   color: #fff;
@@ -3854,6 +4823,11 @@ main {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
 }
+.product-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
 .card {
   position: relative;
   min-height: 216px;
@@ -3870,6 +4844,60 @@ main {
 .card.product::before { background: var(--odps-violet); }
 .card.signal::before { background: var(--odpv-blue); }
 .wide { grid-column: span 2; }
+.product-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 280px;
+}
+.product-card-description {
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.product-card-counters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 14px 0;
+}
+.product-card-counters span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 8px;
+  border-radius: 999px;
+  background: var(--odp-soft);
+  color: var(--odp-muted);
+  font-size: .78rem;
+  font-weight: 800;
+}
+.product-card-counters strong {
+  color: var(--odp-ink);
+}
+.product-card-actions {
+  margin-top: auto;
+}
+.product-detail-button,
+.product-modal-close {
+  min-height: 36px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--odps-violet);
+  color: #fff;
+  cursor: pointer;
+  font-weight: 800;
+}
+.product-detail-button {
+  width: 100%;
+}
+.product-modal-close {
+  padding: 0 14px;
+}
+.product-detail-button:hover,
+.product-modal-close:hover {
+  background: #4f1f68;
+}
 .chip-row {
   display: flex;
   flex-wrap: wrap;
@@ -3905,6 +4933,9 @@ main {
   margin: 0;
   font-size: .9rem;
 }
+html[dir="rtl"] .odp-facts {
+  grid-template-columns: 1fr max-content;
+}
 .odp-facts dt {
   color: var(--odp-muted);
   font-weight: 700;
@@ -3915,6 +4946,69 @@ main {
 }
 .component-section h4 {
   margin: 0 0 10px;
+}
+.table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+}
+.pricing-table {
+  width: 100%;
+  border-collapse: collapse;
+  border: 1px solid var(--odp-line);
+  border-radius: 8px;
+  background: #fff;
+  font-size: .88rem;
+}
+.pricing-table th,
+.pricing-table td {
+  padding: 10px;
+  border-bottom: 1px solid var(--odp-line);
+  text-align: left;
+  vertical-align: top;
+}
+.pricing-table th {
+  background: var(--odp-soft);
+  color: var(--odp-muted);
+  font-size: .76rem;
+  text-transform: uppercase;
+}
+.pricing-table tr:last-child td {
+  border-bottom: 0;
+}
+.pricing-table p {
+  margin: 4px 0 0;
+  font-size: .84rem;
+}
+.pricing-linked-row td {
+  padding: 12px;
+  background: #fbf9fc;
+}
+.pricing-linked-components {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.linked-component-card {
+  min-width: 0;
+  border: 1px solid var(--odp-line);
+  border-radius: 8px;
+  background: #fff;
+  padding: 12px;
+}
+.linked-component-title {
+  margin: 0 0 6px;
+  color: var(--odps-violet);
+  font-size: .72rem;
+  font-weight: 900;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+.linked-component-card h5 {
+  margin: 0 0 8px;
+  font-size: .98rem;
+}
+.linked-component-card .odp-facts {
+  grid-template-columns: max-content minmax(0, 1fr);
 }
 .component-list,
 .dimension-list,
@@ -3992,6 +5086,55 @@ main {
   color: var(--odp-muted);
   font-size: .82rem;
 }
+.modal-open {
+  overflow: hidden;
+}
+.product-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: none;
+  padding: 28px;
+}
+.product-modal[aria-hidden="false"] {
+  display: block;
+}
+.product-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(5, 5, 5, .64);
+}
+.product-modal-panel {
+  position: relative;
+  width: min(1120px, calc(100vw - 56px));
+  max-height: calc(100vh - 56px);
+  margin: 0 auto;
+  overflow: auto;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, .28);
+}
+.product-modal-header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 22px;
+  border-bottom: 1px solid var(--odp-line);
+  background: #fff;
+}
+.product-modal-header h3 {
+  margin: 0;
+  font-size: 1.45rem;
+}
+.product-detail-layout {
+  margin: 0;
+  padding: 22px;
+  border-top: 0;
+}
 .odp-muted { color: var(--odp-muted); }
 .odp-detail {
   margin-top: 14px;
@@ -4031,36 +5174,12 @@ main {
   grid-template-columns: minmax(0, 1fr);
   gap: 16px;
 }
-.change-metrics {
+.change-story-list {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
-  margin: 14px 0;
-}
-.change-metrics span {
-  display: block;
-  padding: 10px;
-  border: 1px solid var(--odp-line);
-  border-radius: 8px;
-  background: #fff;
-  color: var(--odp-muted);
-  font-size: .78rem;
-  font-weight: 700;
-  text-transform: uppercase;
-}
-.change-metrics strong {
-  display: block;
-  color: var(--odp-ink);
-  font-size: 1.45rem;
-  line-height: 1;
-}
-.source-change-list {
-  margin-top: 12px;
-  color: var(--odp-muted);
-}
-.source-change-list ul {
-  margin: 8px 0 0;
+  gap: 8px;
+  margin: 14px 0 0;
   padding-left: 18px;
+  color: var(--odp-muted);
 }
 .panel { padding: 18px; }
 .version-list {
@@ -4184,8 +5303,25 @@ main {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .grid,
-  .actions-grid {
+  .actions-grid,
+  .product-grid {
     grid-template-columns: 1fr;
+  }
+  .product-modal {
+    padding: 12px;
+  }
+  .product-modal-panel {
+    width: calc(100vw - 24px);
+    max-height: calc(100vh - 24px);
+  }
+  .product-modal-header {
+    align-items: start;
+  }
+  .dimension-row {
+    grid-template-columns: 1fr;
+  }
+  .dimension-meta {
+    justify-content: flex-start;
   }
   .wide { grid-column: auto; }
   .footer-links { justify-content: flex-start; }

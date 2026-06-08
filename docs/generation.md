@@ -250,7 +250,7 @@ providers:
     baseUrl: https://api.anthropic.com/v1
     apiKeyEnv: ANTHROPIC_API_KEY
     version: "2023-06-01"
-    maxTokens: 4096
+    maxTokens: 8192
 
   # Providers with different auth or request formats should get a dedicated
   # SDK client before being enabled here, for example Azure OpenAI, Google

@@ -221,6 +221,9 @@ GraphML, GraphSON, RDF/Turtle, OpenCypher, GQL, and Gremlin.
 
 ## Portfolio Workspaces
 
+Developer implementation notes for this workflow live in
+[`portfolio-development.md`](portfolio-development.md).
+
 ```bash
 open-data-products portfolio build \
   --objectives inputs/objectives/ \
@@ -289,6 +292,21 @@ browser-openable file. Missing output parent directories are created before
 writing.
 Use `--strict-validation` to make schema-invalid rendered workspaces return a
 non-zero exit code.
+
+```bash
+open-data-products portfolio localize generated/portfolio/ \
+  --languages "fi,sv" \
+  --provider claude \
+  --model claude-sonnet-4-5 \
+  --json
+```
+
+Localizes the browser experience without changing canonical ODPC, ODPS, or
+ODPG YAML artifacts. The command translates human-facing HTML strings with the
+configured LLM provider, writes `portfolio-i18n.yaml`, renders localized static
+pages such as `index.fi.html` and `index.sv.html`, and updates `index.html`
+with a language selector in the top bar. Language values use BCP 47 language
+tags such as `fi`, `sv`, `en-GB`, or `pt-BR`.
 
 ```bash
 open-data-products portfolio explain generated/portfolio/ --json
