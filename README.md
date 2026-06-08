@@ -147,6 +147,7 @@ Use `open_data_products.<spec>` namespaces for every standard:
 | ODPG | Validate graphs, summarize nodes and edges, traverse relationships, analyze governance/strategy signals, and extract agent context |
 | ODPV | Load, validate, search, generate vocabulary artifacts, resolve terms and aliases, explain canonical term packets, check relationships, and produce agent context for shared ODP terminology |
 | Data Contracts | Resolve ODPS contract references, validate external contracts through optional `datacontract-cli`, extract schemas, check static alignment, and generate product-level reports |
+| Portfolio workspaces | Build, refresh, sync, render, localize, and explain connected ODPC/ODPS/ODPG portfolio workspaces from objectives, use cases, signals, and product source lanes |
 | Bundled resources | Discover schemas, examples, vocabulary records, catalog object records, and graph object records through the resource registry |
 
 ODPS support is scoped to the 4.x generation of the specification. The SDK
@@ -167,6 +168,7 @@ below for implementation details:
 - [Command guide](docs/commands.md): what each common CLI command does, what it reads, and what it writes.
 - [LLM generation](docs/generation.md): Ollama or configured external LLM source-doc to ODPC fragment and ODPG graph workflow.
 - [Generation development notes](docs/generation-development.md): contributor-facing prompt pipeline, ODPS normalization, validation, repair, and testing guidance.
+- [Portfolio development notes](docs/portfolio-development.md): contributor-facing portfolio workspace orchestration, renderer, localization, validation, and testing guidance.
 - [Development notes index](docs/development.md): contributor-facing internals notes for complex SDK surfaces.
 - [Data Contract workflows](docs/data-contracts.md): ODPS contract resolution, optional `datacontract-cli`, alignment, and reports.
 - [Capability drift reports](docs/capability-drift/README.md): dated SDK alignment reports against upstream specification tooling.
@@ -319,6 +321,22 @@ open-data-products odpg-analyze open_data_products/odpg/data/graph/graph.yaml
 open-data-products odpg-agent-context open_data_products/odpg/data/graph/graph.yaml --node AGENT-AVIATION-001 --depth 2
 open-data-products odpg-convert --input examples/graph.graphml --output /tmp/odp-converted-graph.yaml --json
 open-data-products odpg-generate open_data_products/odpg/data/graph/graph.yaml --output /tmp/odp-graph-explorer.html --json
+
+# Portfolio workspace orchestration
+open-data-products portfolio build \
+  --objectives source_docs/objectives/ \
+  --use-cases source_docs/use-cases/ \
+  --signals source_docs/signals/ \
+  --products source_docs/products/ \
+  --output generated/portfolio/ \
+  --json
+open-data-products portfolio refresh generated/portfolio/ --json
+open-data-products portfolio sync generated/portfolio/ --json
+open-data-products portfolio localize generated/portfolio/ \
+  --languages "fi,sv,ar,vi" \
+  --provider claude \
+  --model claude-sonnet-4-5 \
+  --json
 
 # Product-level Data Contract inspection
 open-data-products product resolve-contracts examples/product.yaml --json
