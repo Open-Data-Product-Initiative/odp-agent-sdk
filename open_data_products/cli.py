@@ -45,8 +45,8 @@ Common workflows:
     open-data-products generate --input product.md --kind odps-product --output products/
 
   Build catalog and graph review artifacts:
-    open-data-products odpc-build fragments/ --output catalog.yaml --html catalog.html
-    open-data-products odpg-build fragments/ --output graph.yaml
+    open-data-products odpc-build fragments/ --output catalog.yaml --html catalog.html --toon catalog.toon
+    open-data-products odpg-build fragments/ --output graph.yaml --toon graph.toon
     open-data-products odpg-generate graph.yaml --output graph-explorer.html
 
   Build a portfolio workspace:
@@ -118,6 +118,7 @@ Examples:
   open-data-products explain catalog.yaml
   open-data-products odpc-build fragments/ --output catalog.yaml
   open-data-products odpc-build fragments/ --output catalog.yaml --html catalog.html
+  open-data-products odpc-build fragments/ --output catalog.yaml --toon catalog.toon
   open-data-products odpc-summary catalog.yaml
   open-data-products odpc-search "catalog data" --limit 3
   open-data-products odpc-artifacts open_data_products/generation/fragments/ --check
@@ -135,7 +136,7 @@ Examples:
   open-data-products generate --input use-case.md --kind use-case --output generated/
   open-data-products generate --config my-generation.config.yaml --provider groq --model openai/gpt-oss-120b --input source_docs/ --kind signal --output generated/
   open-data-products generate --config my-generation.config.yaml --prompts prompts/ --input source_docs/ --kind graph --output generated/
-  open-data-products odpg-build fragments/ --output graph.yaml
+  open-data-products odpg-build fragments/ --output graph.yaml --toon graph.toon
   open-data-products odpg-agent-context graph.yaml --node DATA-PRODUCT-001
   open-data-products odpg-generate graph.yaml --output graph-explorer.html
   open-data-products odpg-convert --input graph.graphml --output graph.yaml
@@ -561,6 +562,10 @@ def main(argv: Optional[List[str]] = None) -> int:
         help="Optional output path for a standalone browser-viewable HTML catalog",
     )
     odpc_build_parser.add_argument(
+        "--toon",
+        help="Optional output path for a TOON catalog context file",
+    )
+    odpc_build_parser.add_argument(
         "--id", help="Catalog metadata id to use or override"
     )
     odpc_build_parser.add_argument(
@@ -679,6 +684,10 @@ def main(argv: Optional[List[str]] = None) -> int:
         "-o",
         required=True,
         help="Output graph YAML path",
+    )
+    odpg_build_parser.add_argument(
+        "--toon",
+        help="Optional output path for a TOON graph context file",
     )
     odpg_build_parser.add_argument("--id", help="Graph metadata id to use or override")
     odpg_build_parser.add_argument(
@@ -1351,10 +1360,12 @@ def main(argv: Optional[List[str]] = None) -> int:
                 validate_catalog,
                 write_catalog,
                 write_catalog_html,
+                write_catalog_toon,
             )
 
             output = Path(args.output)
             html_output = Path(args.html) if args.html else None
+            toon_output = Path(args.toon) if args.toon else None
             document = build_catalog(
                 args.input_dir,
                 recursive=not args.no_recursive,
@@ -1387,12 +1398,15 @@ def main(argv: Optional[List[str]] = None) -> int:
             write_catalog(output, document)
             if html_output:
                 write_catalog_html(html_output, document)
+            if toon_output:
+                write_catalog_toon(toon_output, document)
             catalog = document.get("catalog", {})
             payload = {
                 "spec": "odpc",
                 "kind": "Catalog",
                 "output": str(output),
                 "html": str(html_output) if html_output else None,
+                "toon": str(toon_output) if toon_output else None,
                 "valid": True if build_result is not None else None,
                 "productReferenceCount": count_items(catalog, "productReferences"),
                 "useCaseCount": count_items(catalog, "useCases"),
@@ -1558,9 +1572,16 @@ def main(argv: Optional[List[str]] = None) -> int:
 
         if args.command == "odpg-build":
             from . import generation
-            from .odpg import build_graph, summarize_graph, validate_graph, write_graph
+            from .odpg import (
+                build_graph,
+                summarize_graph,
+                validate_graph,
+                write_graph,
+                write_graph_toon,
+            )
 
             output = Path(args.output)
+            toon_output = Path(args.toon) if args.toon else None
             try:
                 settings = generation.resolve_generation_settings(
                     config_path=args.config,
@@ -1625,11 +1646,14 @@ def main(argv: Optional[List[str]] = None) -> int:
                 return 1
 
             write_graph(output, document)
+            if toon_output:
+                write_graph_toon(toon_output, document)
             summary = summarize_graph(document)
             payload = {
                 "spec": "odpg",
                 "kind": "Graph",
                 "output": str(output),
+                "toon": str(toon_output) if toon_output else None,
                 "valid": True if build_result is not None else None,
                 "nodeCount": summary["nodeCount"],
                 "edgeCount": summary["edgeCount"],

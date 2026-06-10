@@ -12,6 +12,12 @@ import yaml
 
 from open_data_products._io import load_jsonl_records, load_mapping
 from open_data_products._search import search_records, searchable_record_text
+from open_data_products._toon import (
+    JsonPrimitive,
+    render_fields,
+    render_table,
+    write_toon,
+)
 
 
 class NoDatesSafeLoader(yaml.SafeLoader):
@@ -81,6 +87,42 @@ HTML_SECTION_TITLES = {
     "useCases": "Use Cases",
     "businessObjectives": "Business Objectives",
     "signals": "Signals",
+}
+TOON_FIELDS = {
+    "productReferences": (
+        "id",
+        "productID",
+        "productVersion",
+        "name",
+        "description",
+        "status",
+        "visibility",
+    ),
+    "useCases": (
+        "id",
+        "name",
+        "description",
+        "status",
+        "priority",
+        "decision",
+        "expectedOutcome",
+    ),
+    "businessObjectives": (
+        "id",
+        "name",
+        "description",
+        "status",
+        "priority",
+    ),
+    "signals": (
+        "id",
+        "name",
+        "description",
+        "type",
+        "strength",
+        "confidence",
+        "status",
+    ),
 }
 
 
@@ -492,6 +534,64 @@ def write_catalog_html(
     output = Path(path)
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(render_catalog_html(document), encoding="utf-8")
+
+
+def render_catalog_toon(document: Dict[str, Any]) -> str:
+    """Render an ODPC catalog as TOON for LLM prompt context."""
+    catalog = document.get("catalog", {})
+    metadata = catalog.get("metadata", {}) if isinstance(catalog, dict) else {}
+    lines = render_fields(
+        {
+            "schema": _primitive_or_text(document.get("schema")),
+            "version": _primitive_or_text(document.get("version")),
+            "kind": _primitive_or_text(document.get("kind")),
+        }
+    )
+    lines.append("catalog:")
+    lines.extend(
+        render_fields(
+            {
+                "id": _primitive_or_text(metadata.get("id")),
+                "name": text_value(metadata.get("name")),
+                "description": text_value(metadata.get("description")),
+            },
+            depth=1,
+        )
+    )
+    for collection, fields in TOON_FIELDS.items():
+        items = catalog.get(collection, []) if isinstance(catalog, dict) else []
+        rows = [_catalog_toon_row(item, fields) for item in _mapping_items(items)]
+        lines.extend(render_table(collection, fields, rows, depth=1))
+    return "\n".join(lines) + "\n"
+
+
+def write_catalog_toon(path: Union[str, Path], document: Dict[str, Any]) -> None:
+    """Write an ODPC catalog as TOON."""
+    write_toon(path, render_catalog_toon(document))
+
+
+def _catalog_toon_row(
+    item: Dict[str, Any],
+    fields: Tuple[str, ...],
+) -> Dict[str, JsonPrimitive]:
+    row: Dict[str, JsonPrimitive] = {}
+    for field in fields:
+        row[field] = _primitive_or_text(item.get(field))
+    return row
+
+
+def _mapping_items(items: Any) -> List[Dict[str, Any]]:
+    if not isinstance(items, list):
+        return []
+    return [item for item in items if isinstance(item, dict)]
+
+
+def _primitive_or_text(value: Any) -> JsonPrimitive:
+    if isinstance(value, (str, int, float, bool)) or value is None:
+        return value
+    if isinstance(value, dict):
+        return text_value(value)
+    return str(value)
 
 
 def load_schema(path: Optional[Union[str, Path]] = None) -> Dict[str, Any]:

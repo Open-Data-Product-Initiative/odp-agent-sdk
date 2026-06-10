@@ -26,6 +26,12 @@ import yaml
 
 from open_data_products._io import load_jsonl_records, load_mapping
 from open_data_products._search import search_records, searchable_record_text
+from open_data_products._toon import (
+    JsonPrimitive,
+    render_fields,
+    render_table,
+    write_toon,
+)
 from open_data_products.odpc.catalog import (
     CATALOG_COLLECTIONS,
     collect_catalog_document,
@@ -239,6 +245,51 @@ def write_graph(path: Union[str, Path], document: Dict[str, Any]) -> None:
     )
 
 
+def render_graph_toon(document: Dict[str, Any]) -> str:
+    """Render an ODPG graph as TOON for LLM prompt context."""
+    metadata = graph_metadata(document)
+    lines = render_fields(
+        {
+            "schema": _primitive_or_text(document.get("schema")),
+            "version": _primitive_or_text(document.get("version")),
+            "kind": _primitive_or_text(document.get("kind")),
+        }
+    )
+    lines.append("graph:")
+    lines.extend(
+        render_fields(
+            {
+                "id": _primitive_or_text(metadata.get("id")),
+                "name": localized_text(metadata.get("name")),
+                "description": localized_text(metadata.get("description")),
+            },
+            depth=1,
+        )
+    )
+    lines.extend(
+        render_table(
+            "nodes",
+            ("id", "type", "$ref"),
+            [_node_toon_row(node) for node in _graph_nodes(document)],
+            depth=1,
+        )
+    )
+    lines.extend(
+        render_table(
+            "edges",
+            ("from", "to", "type", "confidence"),
+            [_edge_toon_row(edge) for edge in _graph_edges(document)],
+            depth=1,
+        )
+    )
+    return "\n".join(lines) + "\n"
+
+
+def write_graph_toon(path: Union[str, Path], document: Dict[str, Any]) -> None:
+    """Write an ODPG graph as TOON."""
+    write_toon(path, render_graph_toon(document))
+
+
 def collect_odpc_graph_nodes(
     input_dir: Union[str, Path],
     *,
@@ -290,6 +341,31 @@ def collect_odpc_graph_nodes(
                 }
             )
     return nodes, "\n\n".join(context_blocks)
+
+
+def _node_toon_row(node: Dict[str, Any]) -> Dict[str, JsonPrimitive]:
+    return {
+        "id": _primitive_or_text(node.get("id")),
+        "type": _primitive_or_text(node.get("type")),
+        "$ref": _primitive_or_text(_node_ref(node)),
+    }
+
+
+def _edge_toon_row(edge: Dict[str, Any]) -> Dict[str, JsonPrimitive]:
+    return {
+        "from": _primitive_or_text(edge.get("from")),
+        "to": _primitive_or_text(edge.get("to")),
+        "type": _primitive_or_text(edge.get("type")),
+        "confidence": _primitive_or_text(edge.get("confidence")),
+    }
+
+
+def _primitive_or_text(value: Any) -> JsonPrimitive:
+    if isinstance(value, (str, int, float, bool)) or value is None:
+        return value
+    if isinstance(value, dict):
+        return localized_text(value)
+    return str(value)
 
 
 def render_edge_prompt(

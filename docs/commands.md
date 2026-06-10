@@ -12,8 +12,8 @@ result is consumed by CI, scripts, MCP clients, or other agents.
 ```bash
 open-data-products validate product.yaml
 open-data-products generate --input source_docs/ --kind product-reference --output generated/
-open-data-products odpc-build fragments/ --output catalog.yaml --html catalog.html
-open-data-products odpg-build fragments/ --output graph.yaml
+open-data-products odpc-build fragments/ --output catalog.yaml --html catalog.html --toon catalog.toon
+open-data-products odpg-build fragments/ --output graph.yaml --toon graph.toon
 open-data-products portfolio build --objectives inputs/objectives/ --use-cases inputs/use-cases/ --signals inputs/signals/ --products inputs/products/ --output portfolio/
 ```
 
@@ -140,6 +140,13 @@ open-data-products odpc-build examples/odpc_catalog_fragments/ --output /tmp/odp
 Builds the ODPC catalog YAML and a standalone HTML catalog page in one run.
 
 ```bash
+open-data-products odpc-build examples/odpc_catalog_fragments/ --output /tmp/odp-catalog.yaml --toon /tmp/odp-catalog.toon
+```
+
+Builds the ODPC catalog YAML and an optional TOON sidecar for LLM prompt
+context. YAML remains the source of truth.
+
+```bash
 open-data-products odpc-summary /tmp/odp-catalog.yaml
 ```
 
@@ -217,6 +224,13 @@ open-data-products odpg-agent-context open_data_products/odpg/data/graph/graph.y
 
 Extracts the graph neighborhood around one node in a compact format suitable
 for agents.
+
+```bash
+open-data-products odpg-build examples/odpc_catalog_fragments/ --output /tmp/odp-graph.yaml --toon /tmp/odp-graph.toon
+```
+
+Builds the ODPG graph YAML and an optional TOON sidecar for LLM prompt context.
+YAML remains the source of truth.
 
 ```bash
 open-data-products odpg-generate open_data_products/odpg/data/graph/graph.yaml --output /tmp/odp-graph-explorer.html

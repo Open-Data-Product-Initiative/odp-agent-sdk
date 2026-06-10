@@ -1063,6 +1063,7 @@ def test_unified_cli_builds_odpc_catalog_from_fragments(
     fragments.mkdir()
     output = tmp_path / "catalog.yaml"
     html_output = tmp_path / "catalog.html"
+    toon_output = tmp_path / "catalog.toon"
     (fragments / "product.yaml").write_text(
         """
 schema: https://opendataproducts.org/v4.1/schema/odps.json
@@ -1086,6 +1087,8 @@ product:
                 str(output),
                 "--html",
                 str(html_output),
+                "--toon",
+                str(toon_output),
                 "--id",
                 "CAT-CLI",
                 "--json",
@@ -1098,6 +1101,7 @@ product:
     assert payload["kind"] == "Catalog"
     assert payload["output"] == str(output)
     assert payload["html"] == str(html_output)
+    assert payload["toon"] == str(toon_output)
     assert payload["productReferenceCount"] == 1
 
     assert output.read_text(encoding="utf-8").startswith(
@@ -1106,6 +1110,7 @@ product:
     html = html_output.read_text(encoding="utf-8")
     assert html.startswith("<!doctype html>")
     assert "Agent Ready Product" in html
+    assert "productReferences[1]" in toon_output.read_text(encoding="utf-8")
 
 
 def test_unified_cli_builds_odpg_graph_from_odpc_fragments(
@@ -1118,6 +1123,7 @@ def test_unified_cli_builds_odpg_graph_from_odpc_fragments(
     fragments = tmp_path / "fragments"
     fragments.mkdir()
     output = tmp_path / "graph.yaml"
+    toon_output = tmp_path / "graph.toon"
     (fragments / "product.yaml").write_text(
         """
 productReference:
@@ -1167,6 +1173,8 @@ edges:
                 str(fragments),
                 "--output",
                 str(output),
+                "--toon",
+                str(toon_output),
                 "--id",
                 "customer-graph",
                 "--model",
@@ -1180,6 +1188,7 @@ edges:
     assert payload["spec"] == "odpg"
     assert payload["kind"] == "Graph"
     assert payload["output"] == str(output)
+    assert payload["toon"] == str(toon_output)
     assert payload["valid"] is True
     assert payload["nodeCount"] == 2
     assert payload["edgeCount"] == 1
@@ -1187,6 +1196,9 @@ edges:
     graph = __import__("yaml").safe_load(output.read_text(encoding="utf-8"))
     assert graph["graph"]["metadata"]["id"] == "customer-graph"
     assert graph["graph"]["edges"][0]["type"] == "dependsOn"
+    assert "edges[1]{from,to,type,confidence}:" in toon_output.read_text(
+        encoding="utf-8"
+    )
 
 
 def test_unified_cli_odpv_commands(capsys: pytest.CaptureFixture[str]) -> None:

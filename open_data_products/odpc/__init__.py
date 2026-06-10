@@ -12,12 +12,14 @@ from .catalog import (
     load_object_records,
     load_schema,
     render_catalog_html,
+    render_catalog_toon,
     render_catalog_schema_json,
     render_object_records,
     search_objects,
     validate_catalog,
     write_catalog,
     write_catalog_html,
+    write_catalog_toon,
     write_catalog_artifacts,
 )
 
@@ -38,11 +40,13 @@ __all__ = [
     "load_object_records",
     "load_schema",
     "render_catalog_html",
+    "render_catalog_toon",
     "render_catalog_schema_json",
     "render_object_records",
     "search_objects",
     "validate_catalog",
     "write_catalog",
     "write_catalog_html",
+    "write_catalog_toon",
     "write_catalog_artifacts",
 ]

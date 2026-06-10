@@ -80,12 +80,22 @@ from .odpc import (
     build_catalog,
     build_catalog_artifacts,
     render_catalog_html,
+    render_catalog_toon,
     render_catalog_schema_json,
     write_catalog,
     write_catalog_html,
+    write_catalog_toon,
     write_catalog_artifacts,
 )
-from .odpg import build_graph, convert_file, convert_graph, dump_graph_yaml, write_graph
+from .odpg import (
+    build_graph,
+    convert_file,
+    convert_graph,
+    dump_graph_yaml,
+    render_graph_toon,
+    write_graph,
+    write_graph_toon,
+)
 from .odpv import (
     agent_vocabulary_context,
     check_vocabulary_relationship,
@@ -175,6 +185,7 @@ __all__ = [
     "openai_generate",
     "print_config",
     "render_catalog_html",
+    "render_catalog_toon",
     "render_catalog_schema_json",
     "render_generation_prompt",
     "refresh_portfolio",
@@ -183,6 +194,7 @@ __all__ = [
     "sync_portfolio",
     "validate_config",
     "write_graph",
+    "render_graph_toon",
     "resolve_references",
     "resolve_vocabulary_term",
     "resolve_product_contracts",
@@ -192,5 +204,7 @@ __all__ = [
     "validate_document",
     "write_catalog",
     "write_catalog_html",
+    "write_catalog_toon",
     "write_catalog_artifacts",
+    "write_graph_toon",
 ]

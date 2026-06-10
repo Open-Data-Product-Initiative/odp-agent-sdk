@@ -9,11 +9,13 @@ from open_data_products.odpc import (
     explain_catalog,
     load_object_records,
     render_catalog_html,
+    render_catalog_toon,
     render_catalog_schema_json,
     search_objects,
     validate_catalog,
     write_catalog,
     write_catalog_html,
+    write_catalog_toon,
     write_catalog_artifacts,
 )
 
@@ -164,6 +166,61 @@ def test_render_and_write_catalog_html(tmp_path):
     write_catalog_html(output, VALID_CATALOG)
 
     assert output.read_text(encoding="utf-8") == html
+
+
+def test_render_and_write_catalog_toon(tmp_path):
+    catalog = {
+        **VALID_CATALOG,
+        "catalog": {
+            **VALID_CATALOG["catalog"],
+            "productReferences": [
+                {
+                    "id": "PR-001",
+                    "productID": "customer-product",
+                    "productVersion": "1.0.0",
+                    "name": {"en": "Customer Product"},
+                    "description": {"en": "Trusted customer analytics."},
+                    "status": "production",
+                    "visibility": "internal",
+                }
+            ],
+            "useCases": [
+                {
+                    "id": "UC-001",
+                    "name": {"en": "Customer Retention"},
+                    "description": {"en": "Improve retention decisions."},
+                    "priority": "high",
+                }
+            ],
+        },
+    }
+
+    toon = render_catalog_toon(catalog)
+
+    assert toon.startswith(
+        'schema: "https://opendataproducts.org/odpc-v1.0/schema/odpc.yaml"\n'
+    )
+    assert (
+        "productReferences[1]{id,productID,productVersion,name,description,status,visibility}:"
+        in toon
+    )
+    assert (
+        "PR-001,customer-product,1.0.0,Customer Product,Trusted customer analytics.,production,internal"
+        in toon
+    )
+    assert (
+        "useCases[1]{id,name,description,status,priority,decision,expectedOutcome}:"
+        in toon
+    )
+    assert (
+        "UC-001,Customer Retention,Improve retention decisions.,null,high,null,null"
+        in toon
+    )
+
+    output = tmp_path / "deep" / "toon" / "catalog.toon"
+    write_catalog_toon(output, catalog)
+
+    assert output.read_text(encoding="utf-8") == toon
 
 
 def test_explain_catalog_renders_summary_for_catalog_document():

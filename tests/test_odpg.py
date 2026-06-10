@@ -13,10 +13,12 @@ from open_data_products.odpg import (
     generate_graph_explorer,
     load_graph,
     search_graph_objects,
+    render_graph_toon,
     summarize_graph,
     traverse_graph,
     validate_graph,
     write_graph,
+    write_graph_toon,
 )
 from open_data_products.odpg.cli import (
     convert_main,
@@ -84,6 +86,58 @@ def test_generate_graph_explorer_creates_output_parent_directory(tmp_path):
 
     assert output.exists()
     assert "ODPG Graph Explorer" in output.read_text(encoding="utf-8")
+
+
+def test_render_and_write_graph_toon(tmp_path):
+    graph = {
+        "schema": "https://opendataproducts.org/odpg-v1.0/schema/odpg.yaml",
+        "version": "1.0",
+        "kind": "Graph",
+        "graph": {
+            "metadata": {
+                "id": "GRAPH-001",
+                "name": {"en": "Customer Graph"},
+                "description": {"en": "Customer graph for agent context."},
+            },
+            "nodes": [
+                {
+                    "id": "customer-product",
+                    "type": "DataProduct",
+                    "$ref": "product_reference_customer-product.yaml",
+                },
+                {
+                    "id": "customer-retention",
+                    "type": "UseCase",
+                    "$ref": "use_case_customer-retention.yaml",
+                },
+            ],
+            "edges": [
+                {
+                    "from": "customer-retention",
+                    "to": "customer-product",
+                    "type": "dependsOn",
+                    "confidence": "high",
+                }
+            ],
+        },
+    }
+
+    toon = render_graph_toon(graph)
+
+    assert toon.startswith(
+        'schema: "https://opendataproducts.org/odpg-v1.0/schema/odpg.yaml"\n'
+    )
+    assert 'nodes[2]{id,type,"$ref"}:' in toon
+    assert (
+        "customer-product,DataProduct,product_reference_customer-product.yaml" in toon
+    )
+    assert "edges[1]{from,to,type,confidence}:" in toon
+    assert "customer-retention,customer-product,dependsOn,high" in toon
+
+    output = tmp_path / "deep" / "toon" / "graph.toon"
+    write_graph_toon(output, graph)
+
+    assert output.read_text(encoding="utf-8") == toon
 
 
 def test_build_graph_explorer_html_returns_document():

@@ -19,6 +19,7 @@ Important helpers:
 - `traverse_graph()`
 - `analyze_graph()`
 - `agent_context()`
+- `render_graph_toon()`
 - `generate_graph_explorer()`
 
 CLI wrappers live in `open_data_products/odpg/cli.py` and the unified CLI.
@@ -96,6 +97,15 @@ workflows.
 `generate_graph_explorer()` renders a standalone HTML explorer from graph YAML.
 The explorer is a generated artifact, not an MCP-safe read-only operation.
 
+## TOON Rendering
+
+`render_graph_toon()` creates an optional LLM-context view of a graph. It keeps
+YAML as the source of truth and renders `nodes` and `edges` as TOON tables. Use
+`write_graph_toon()` or `odpg-build --toon` when a workflow needs a compact
+prompt artifact.
+
+See [`toon-development.md`](toon-development.md) for the shared renderer rules.
+
 ## Tests
 
 Use these files when changing ODPG behavior:
@@ -105,4 +115,3 @@ Use these files when changing ODPG behavior:
 - `tests/test_generation_prompts.py` for generated graph repair and reference
   behavior.
 - `tests/test_examples.py` for bundled example graph/catalog consistency.
-

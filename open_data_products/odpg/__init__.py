@@ -19,12 +19,14 @@ from .graph import (
     load_graph,
     load_graph_object_records,
     load_schema,
+    render_graph_toon,
     render_graph_object_records,
     search_graph_objects,
     summarize_graph,
     traverse_graph,
     validate_graph,
     write_graph,
+    write_graph_toon,
 )
 
 SPEC_ID = "odpg"
@@ -49,10 +51,12 @@ __all__ = [
     "load_graph_object_records",
     "load_schema",
     "normalize_format",
+    "render_graph_toon",
     "render_graph_object_records",
     "search_graph_objects",
     "summarize_graph",
     "traverse_graph",
     "validate_graph",
     "write_graph",
+    "write_graph_toon",
 ]

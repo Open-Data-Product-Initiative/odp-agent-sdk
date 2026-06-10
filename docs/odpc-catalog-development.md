@@ -14,6 +14,7 @@ Important helpers:
 - `validate_catalog()`
 - `explain_catalog()`
 - `render_catalog_html()`
+- `render_catalog_toon()`
 - `build_catalog_artifacts()`
 - `search_objects()`
 
@@ -89,6 +90,15 @@ catalog. Avoid validation behavior that only works for one file layout.
 HTML output should be deterministic and escaped. Do not embed unescaped source
 values.
 
+## TOON Rendering
+
+`render_catalog_toon()` creates an optional LLM-context view of a catalog.
+It keeps YAML as the source of truth and renders repeated ODPC collections as
+TOON tables. Use `write_catalog_toon()` or `odpc-build --toon` when a workflow
+needs a compact prompt artifact.
+
+See [`toon-development.md`](toon-development.md) for the shared renderer rules.
+
 ## Object Guidance Search
 
 ODPC object guidance records live in bundled JSONL resources. Search uses the
@@ -103,4 +113,3 @@ Use these files when changing ODPC catalog behavior:
 - `tests/test_functional_cli.py`
 - `tests/test_generation_prompts.py` when generated fragments depend on ODPC
   validation.
-
