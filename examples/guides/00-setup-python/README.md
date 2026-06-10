@@ -1,4 +1,4 @@
-# Guide 0: Set Up Python
+# Guide 00: Set Up Python
 
 This guide is for learners who have never used Python before. It helps you
 install Python, understand `pip` and PyPI, create a project folder, install the
@@ -192,7 +192,7 @@ virtual environment is active.
 Keep the virtual environment active. Your terminal prompt usually shows
 `(.venv)` when activation worked.
 
-Now open [Guide 1: Validate an ODPS Product](01-validate-product.md).
+Now open [Lecture 6: What the Open Data Products SDK is](../06-what-the-sdk-is/).
 
 ## What You Learned
 

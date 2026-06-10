@@ -1,14 +1,15 @@
-# Guide 6: Generate One Artifact with an Online Provider
+# Lecture 11: Working with Online LLM Providers
 
-This guide shows how to use an online LLM provider through a config file. The
-same pattern works for OpenAI-compatible providers and Claude when configured.
+The SDK supports multiple online providers through config. API keys stay in
+environment variables, and the selected provider can change without rewriting
+the whole workflow.
 
 ## 1. Create a lesson folder
 
 ```bash
-mkdir -p odps-sdk-guides/06-online-provider/source_docs
-mkdir -p odps-sdk-guides/06-online-provider/fragments
-cd odps-sdk-guides/06-online-provider
+mkdir -p odps-sdk-guides/11-online-provider/source_docs
+mkdir -p odps-sdk-guides/11-online-provider/fragments
+cd odps-sdk-guides/11-online-provider
 ```
 
 ## 2. Create a generation config
@@ -79,7 +80,15 @@ open-data-products generate \
 
 - Provider settings belong in `generation.config.yaml`.
 - Secrets stay in environment variables.
+- Provider defaults can be changed without rewriting the commands.
+- You can add more vendor options to the config when they use a supported
+  provider type.
 - `--kind product-reference` generates one ODPC product reference fragment.
 - `--kind odps-product` generates one full ODPS product YAML document.
 - `--profile complete-draft` and `--include-components` can draft optional
   ODPS product components for review.
+
+## Next Lesson
+
+Continue to
+[Lecture 12: Generating ODPS data products from business requirements](../12-generating-odps-data-products/).

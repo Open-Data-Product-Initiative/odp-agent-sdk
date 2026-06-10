@@ -1,0 +1,8 @@
+useCase:
+  id: UC-RETENTION-RISK-WORKFLOW
+  name:
+    en: Retention Risk Workflow
+  description:
+    en: Daily view of accounts that may churn before next renewal, helping customer success managers prioritize interventions.
+  status: active
+  priority: high

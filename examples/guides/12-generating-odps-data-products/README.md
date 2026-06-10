@@ -1,38 +1,22 @@
-# Guide 10: Generate ODPS Products from Transcripts and Email
+# Lecture 12: Generating ODPS Data Products from Business Requirements
 
-This guide turns unstructured source files into full ODPS product YAML. Each
-Markdown or text file becomes one data product.
+This lesson turns business requirement text, transcripts, emails, and briefs
+into full ODPS product YAML drafts. This is full data product generation, not
+fragment generation yet.
 
 ## 1. Prepare folders
 
 ```bash
-mkdir -p odps-sdk-guides/10-odps-products/source_docs
-mkdir -p odps-sdk-guides/10-odps-products/products
-cd odps-sdk-guides/10-odps-products
+mkdir -p odps-sdk-guides/12-odps-products/source_docs
+mkdir -p odps-sdk-guides/12-odps-products/products
+cd odps-sdk-guides/12-odps-products
 ```
 
-## 2. Add source documents
+## 2. Add Source Documents
 
-```bash
-cat > source_docs/customer-retention-meeting.txt <<'TXT'
-Meeting transcript:
-
-Maya from retention analytics says the team needs a reusable customer analytics
-data product for churn prevention. It should combine account profile, product
-usage, purchase history, support tickets, campaign contacts, and churn risk
-signals. The primary users are retention managers and lifecycle marketing
-analysts. The product should support weekly churn review and next-best-action
-campaign planning.
-TXT
-
-cat > source_docs/support-operations-email.md <<'MD'
-# Support operations data product email
-
-The service operations team wants a data product for support ticket backlog,
-response time, escalation pressure, sentiment, and team capacity. The product is
-used by support leads to prioritize escalations and improve response quality.
-MD
-```
+Copy the files from this lesson folder's `source_docs/` directory, or write
+your own business requirement notes into the same shape. Each Markdown or text
+file becomes one ODPS product draft.
 
 ## 3. Generate minimal ODPS products
 
@@ -112,3 +96,10 @@ open-data-products validate products/odps_product_customer-retention.yaml --json
 - `--include-components` forces specific ODPS product components.
 - `--max-source-chars` chunks long transcript or email files before ODPS
   generation.
+- Generated ODPS YAML should be reviewed by a human and validated after
+  generation.
+
+## Next Lesson
+
+Continue to
+[Lecture 13: Working with generation and fragments](../13-working-with-generation-and-fragments/).

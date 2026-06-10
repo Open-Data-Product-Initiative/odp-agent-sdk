@@ -1,0 +1,10 @@
+provider: ollama
+model: qwen2.5
+input: source_docs/
+output: fragments/
+
+providers:
+  ollama:
+    type: ollama
+    model: qwen2.5
+    baseUrl: http://localhost:11434

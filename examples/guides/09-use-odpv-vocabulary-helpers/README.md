@@ -1,7 +1,8 @@
-# Guide 3: Use the ODPV Vocabulary Helpers
+# Lecture 9: Use the ODPV Vocabulary Helpers
 
-The SDK includes Open Data Product Vocabulary helpers. These are useful when
-you want to use standard terms consistently.
+The SDK includes ODPV vocabulary helpers for working with controlled terms.
+They reduce manual mistakes when people need consistent language across ODPS
+products, ODPC catalogs, and ODPG graphs.
 
 ## 1. Summarize the vocabulary
 
@@ -50,3 +51,7 @@ target types.
 - ODPV commands help humans use shared terminology.
 - Search and resolve are good starting points.
 - Relationship checks help avoid inconsistent graph language.
+
+## Next Lesson
+
+Continue to [Lecture 10: Working with local LLMs](../10-working-with-local-llms/).

@@ -1,0 +1,8 @@
+businessObjective:
+  id: OBJ-REDUCE-CHURN
+  name:
+    en: Reduce Preventable Churn
+  description:
+    en: Help customer success teams identify renewal risks earlier and coordinate interventions before account health drops.
+  status: draft
+  priority: high

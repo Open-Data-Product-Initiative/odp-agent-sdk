@@ -1,0 +1,9 @@
+schema: https://opendataproducts.org/v4.0/schema/odps.json
+version: "4.0"
+product:
+  name: Missing Product ID Example
+  visibility: public
+  status: draft
+  type: dataset
+  description: This YAML is syntactically valid but is missing a required productID.
+  valueProposition: Shows how validation catches missing standards fields.

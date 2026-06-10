@@ -1,34 +1,38 @@
 # SDK Guides
 
-These short guides are designed for learners who want to install the SDK from
-PyPI and try practical Open Data Products workflows.
+These course-aligned guides follow the Udemy lecture structure for the Open
+Data Products SDK section and final portfolio section. The only extra guide is
+`00`, which gives new learners a Python and SDK setup path before Lecture 6.
 
 ```bash
 pip install open-data-products
 ```
 
 Start with the setup guide if you have never worked with Python, `pip`, PyPI,
-or virtual environments before.
+or virtual environments before. Then follow the Udemy lecture numbers.
 
-The first four workflow guides do not use an LLM. They cover validation,
-explanation, vocabulary lookup, and graph conversion.
+## Getting Started
 
-The last six guides use the SDK generation command. They require Ollama with
-Qwen 2.5 or a configured online provider.
+0. [Set up Python, pip, PyPI, and the SDK](00-setup-python/)
 
-## Non-LLM Guides
+## Section 3: Introduction to the SDK
 
-0. [Set up Python, pip, PyPI, and the SDK](00-setup-python.md)
-1. [Validate an ODPS product](01-validate-product.md)
-2. [Explain and summarize a product](02-explain-and-summarize.md)
-3. [Use the ODPV vocabulary helpers](03-use-vocabulary-helpers.md)
-4. [Convert GraphML to ODPG and open an explorer](04-convert-graph-to-odpg.md)
+6. [What the Open Data Products SDK is](06-what-the-sdk-is/)
+7. [Installing and running the SDK](07-installing-and-running-sdk/)
+8. [Validating and explaining standards files](08-validating-and-explaining-standards-files/)
+9. [Use the ODPV vocabulary helpers](09-use-odpv-vocabulary-helpers/)
+10. [Working with local LLMs](10-working-with-local-llms/)
+11. [Working with online LLM providers](11-working-with-online-llm-providers/)
+12. [Generating ODPS data products from business requirements](12-generating-odps-data-products/)
+13. [Working with generation and fragments](13-working-with-generation-and-fragments/)
+14. [Working with ODPG graphs](14-working-with-odpg-graphs/)
+15. [Working with ODPC catalogs](15-working-with-odpc-catalogs/)
 
-## LLM Generation Guides
+## Section 4: Final Stage: Build the Portfolio
 
-1. [Generate one signal fragment with Ollama](05-llm-generate-one-signal.md)
-2. [Generate one artifact with an online provider](06-llm-use-online-provider.md)
-3. [Generate a full fragment set from source documents](07-llm-generate-fragment-set.md)
-4. [Full cycle: source docs to catalog HTML and graph explorer](08-llm-full-cycle-catalog-and-graph.md)
-5. [Build catalog and graph from the same fragments](09-build-catalog-and-graph-from-fragments.md)
-6. [Generate ODPS products from transcripts and email](10-generate-odps-products-from-transcripts.md)
+16. [From commands to portfolio builder](16-from-commands-to-portfolio-builder/)
+17. [What the portfolio builder creates](17-what-the-portfolio-builder-creates/)
+18. [Build the first portfolio in Colab](18-build-first-portfolio-in-colab/)
+19. [Update the portfolio and review version history](19-update-portfolio-and-review-version-history/)
+20. [Final review: human view and agent-ready YAML](20-final-review-human-view-and-agent-ready-yaml/)
+21. [Wrap-up and next steps](21-wrap-up-and-next-steps/)

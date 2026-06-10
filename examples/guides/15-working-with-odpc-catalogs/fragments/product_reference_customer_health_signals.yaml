@@ -1,0 +1,16 @@
+productReference:
+  id: PR-CUSTOMER-HEALTH-SIGNALS
+  productID: customer-health-signals
+  productVersion: "4.1"
+  name:
+    en: Customer Health Signals
+  description:
+    en: Account-level health indicators combining customer profile, product usage, support friction, renewal timing, and campaign engagement.
+  status: draft
+  visibility: internal
+  type: dataset
+  productModel:
+    standard: ODPS
+    version: "4.1"
+    format: yaml
+    $ref: ../odps/products/customer-health-signals.yaml

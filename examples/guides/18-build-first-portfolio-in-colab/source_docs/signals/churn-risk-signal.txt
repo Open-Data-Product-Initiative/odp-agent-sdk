@@ -1,0 +1,5 @@
+Daily customer health note from April 18, 2026 at 09:30.
+
+Product usage is down for several priority accounts, unresolved support tickets
+are increasing, and renewal conversations have slowed. The signal should help
+retention teams detect preventable churn earlier.

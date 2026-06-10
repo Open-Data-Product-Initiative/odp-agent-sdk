@@ -175,7 +175,7 @@ below for implementation details:
 - [Tooling development model](docs/tooling-development-model.md): human-facing explanation of how spec-level scripts mature into consolidated SDK capabilities.
 - [Functional test report](docs/functional-test-report.md): public API, CLI, and MCP functional coverage matrix.
 - [Example scripts](examples/): runnable ODPS examples, including v4.1 strategy and MCP access examples.
-- [Course-style guides](examples/guides/README.md): beginner Python setup, simple human SDK workflows, and LLM generation lessons.
+- [Course-style guides](examples/guides/README.md): Udemy-aligned SDK and portfolio lessons, with a beginner Python setup guide.
 - [Sample apps](examples/apps/README.md): independent CLIs built on top of the SDK.
 - [Agent handoff](llms.txt): compact machine-readable routing for AI agents.
 

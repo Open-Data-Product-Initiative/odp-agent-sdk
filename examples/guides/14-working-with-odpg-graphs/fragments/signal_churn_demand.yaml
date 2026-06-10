@@ -1,0 +1,12 @@
+signal:
+  id: SIG-CHURN-DEMAND
+  name:
+    en: Customer health and churn-risk reporting demand
+  description:
+    en: Enterprise customers request clearer renewal-risk reporting and more integrated account health data.
+  type: market
+  confidence: high
+  source:
+    origin: internal
+    method: course sample
+  observedAt: 2026-04-18T09:30:00Z

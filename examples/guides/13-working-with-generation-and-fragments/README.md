@@ -1,17 +1,29 @@
-# Guide 7: Generate a Full Fragment Set from Source Documents
+# Lecture 13: Working with Generation and Fragments
 
-This guide uses local Ollama/Qwen 2.5 to generate multiple ODPC fragments from
-type-specific source folders.
+A fragment is a small, valid, standalone YAML document that describes one
+portfolio object or one narrow object set. It is intended to be collected into a
+larger ODPC catalog or used as node input for an ODPG graph.
+
+Examples:
+
+- `product_reference_<id>.yaml` contains one ODPC product reference
+- `use_case_<id>.yaml` contains one ODPC use case
+- `business_objective_<id>.yaml` contains one ODPC business objective
+- `signal_<id>.yaml` contains one ODPC signal
+
+Fragments are intermediate authoring units. They are not the final catalog, and
+they are usually not full ODPS product specs. This lesson generates multiple
+ODPC fragments from type-specific source folders.
 
 ## 1. Prepare folders
 
 ```bash
-mkdir -p odps-sdk-guides/07-fragment-set/source_docs/products
-mkdir -p odps-sdk-guides/07-fragment-set/source_docs/use_cases
-mkdir -p odps-sdk-guides/07-fragment-set/source_docs/objectives
-mkdir -p odps-sdk-guides/07-fragment-set/source_docs/signals
-mkdir -p odps-sdk-guides/07-fragment-set/fragments
-cd odps-sdk-guides/07-fragment-set
+mkdir -p odps-sdk-guides/13-fragments/source_docs/products
+mkdir -p odps-sdk-guides/13-fragments/source_docs/use_cases
+mkdir -p odps-sdk-guides/13-fragments/source_docs/objectives
+mkdir -p odps-sdk-guides/13-fragments/source_docs/signals
+mkdir -p odps-sdk-guides/13-fragments/fragments
+cd odps-sdk-guides/13-fragments
 ```
 
 ## 2. Add Markdown and text source files
@@ -102,3 +114,9 @@ open-data-products validate catalog.yaml --json
 - Type-specific folder input keeps each selected prompt focused.
 - Generated fragments are separate YAML files.
 - The generated ODPC fragments can be collected into a catalog.
+- Fragments make portfolio building easier because each object can be reviewed
+  independently before catalog and graph assembly.
+
+## Next Lesson
+
+Continue to [Lecture 14: Working with ODPG graphs](../14-working-with-odpg-graphs/).
