@@ -188,9 +188,9 @@ produces.
 
 ```bash
 # Cross-spec validation and summaries
-open-data-products validate examples/product.yaml --json
-open-data-products explain examples/odpc_catalog.yaml --json
-open-data-products refs open_data_products/odpg/data/graph/graph.yaml --json
+open-data-products validate examples/product.yaml
+open-data-products explain examples/odpc_catalog.yaml
+open-data-products refs open_data_products/odpg/data/graph/graph.yaml
 open-data-products summary examples/product.yaml
 
 # Bundled agent resources
@@ -211,14 +211,12 @@ Use the bundled default config and bundled prompts as-is:
 open-data-products generate \
   --input source_docs/products/ \
   --kind product-reference \
-  --output generated/ \
-  --json
+  --output generated/
 
 open-data-products generate \
   --input source_docs/turnaround-delay-signal.txt \
   --kind signal \
-  --output generated/ \
-  --json
+  --output generated/
 ```
 
 Customize provider, model, or paths with a project-owned config:
@@ -232,8 +230,7 @@ open-data-products generate \
   --config my-generation.config.yaml \
   --input source_docs/products/ \
   --kind product-reference \
-  --output generated/ \
-  --json
+  --output generated/
 ```
 
 The config check verifies required provider/model settings, catches common key
@@ -257,8 +254,7 @@ open-data-products generate \
   --model any-local-model-loaded-in-the-server \
   --input source_docs/products/ \
   --kind product-reference \
-  --output generated/ \
-  --json
+  --output generated/
 
 open-data-products generate \
   --config my-generation.config.yaml \
@@ -266,8 +262,7 @@ open-data-products generate \
   --model openai/gpt-oss-120b \
   --input source_docs/products/ \
   --kind product-reference \
-  --output generated/ \
-  --json
+  --output generated/
 
 open-data-products generate \
   --config my-generation.config.yaml \
@@ -275,8 +270,7 @@ open-data-products generate \
   --model claude-sonnet-4-5 \
   --input source_docs/turnaround-delay-signal.txt \
   --kind signal \
-  --output generated/ \
-  --json
+  --output generated/
 ```
 
 Generation uses bundled prompt templates by default. If you want to customize
@@ -291,36 +285,35 @@ open-data-products generate \
   --prompts prompts/ \
   --input source_docs/signals/ \
   --kind signal \
-  --output generated/ \
-  --json
+  --output generated/
 ```
 
 ```bash
 # Generated fragment artifacts
-open-data-products validate open_data_products/generation/fragments/odpg_graph.yaml --json
-open-data-products odpg-generate open_data_products/generation/fragments/odpg_graph.yaml --output /tmp/odp-generation-graph.html --json
+open-data-products validate open_data_products/generation/fragments/odpg_graph.yaml
+open-data-products odpg-generate open_data_products/generation/fragments/odpg_graph.yaml --output /tmp/odp-generation-graph.html
 
 # ODPC catalog helpers
-open-data-products odpc-build examples/odpc_catalog_fragments/ --output /tmp/odp-catalog.yaml --json
-open-data-products odpc-build examples/odpc_catalog_fragments/ --output /tmp/odp-catalog.yaml --html /tmp/odp-catalog.html --json
-open-data-products odpc-summary /tmp/odp-catalog.yaml --json
-open-data-products odpc-search "catalog data" --limit 3 --json
+open-data-products odpc-build examples/odpc_catalog_fragments/ --output /tmp/odp-catalog.yaml
+open-data-products odpc-build examples/odpc_catalog_fragments/ --output /tmp/odp-catalog.yaml --html /tmp/odp-catalog.html
+open-data-products odpc-summary /tmp/odp-catalog.yaml
+open-data-products odpc-search "catalog data" --limit 3
 
 # ODPV vocabulary helpers
-open-data-products odpv-summary --json
-open-data-products odpv-search "governance policy risk" --limit 3 --json
-open-data-products odpv-resolve "reusable data asset" --json
-open-data-products odpv-explain DataProduct --json
-open-data-products odpv-relationship DataProduct supports UseCase --json
-open-data-products odpv-context DataProduct --json
+open-data-products odpv-summary
+open-data-products odpv-search "governance policy risk" --limit 3
+open-data-products odpv-resolve "reusable data asset"
+open-data-products odpv-explain DataProduct
+open-data-products odpv-relationship DataProduct supports UseCase
+open-data-products odpv-context DataProduct
 
 # ODPG graph reasoning
 open-data-products odpg-summary open_data_products/odpg/data/graph/graph.yaml
 open-data-products odpg-traverse open_data_products/odpg/data/graph/graph.yaml --start AGENT-AVIATION-001 --depth 2
 open-data-products odpg-analyze open_data_products/odpg/data/graph/graph.yaml
 open-data-products odpg-agent-context open_data_products/odpg/data/graph/graph.yaml --node AGENT-AVIATION-001 --depth 2
-open-data-products odpg-convert --input examples/graph.graphml --output /tmp/odp-converted-graph.yaml --json
-open-data-products odpg-generate open_data_products/odpg/data/graph/graph.yaml --output /tmp/odp-graph-explorer.html --json
+open-data-products odpg-convert --input examples/graph.graphml --output /tmp/odp-converted-graph.yaml
+open-data-products odpg-generate open_data_products/odpg/data/graph/graph.yaml --output /tmp/odp-graph-explorer.html
 
 # Portfolio workspace orchestration
 open-data-products portfolio build \
@@ -328,15 +321,13 @@ open-data-products portfolio build \
   --use-cases source_docs/use-cases/ \
   --signals source_docs/signals/ \
   --products source_docs/products/ \
-  --output generated/portfolio/ \
-  --json
-open-data-products portfolio refresh generated/portfolio/ --json
-open-data-products portfolio sync generated/portfolio/ --json
+  --output generated/portfolio/
+open-data-products portfolio refresh generated/portfolio/
+open-data-products portfolio sync generated/portfolio/
 open-data-products portfolio localize generated/portfolio/ \
   --languages "fi,sv,ar,vi" \
   --provider claude \
-  --model claude-sonnet-4-5 \
-  --json
+  --model claude-sonnet-4-5
 
 # Product-level Data Contract inspection
 open-data-products product resolve-contracts examples/product.yaml --json

@@ -50,8 +50,7 @@ Expected fragment types:
 ```bash
 open-data-products odpc-build fragments/ \
   --output output/catalog.yaml \
-  --html output/catalog.html \
-  --json
+  --html output/catalog.html
 ```
 
 The command collects the fragment folder into one ODPC catalog document and can
@@ -62,19 +61,18 @@ Open `output/catalog.html` in a browser to review the catalog visually.
 ## 4. Validate And Summarize The Catalog
 
 ```bash
-open-data-products validate output/catalog.yaml --json
-open-data-products odpc-summary output/catalog.yaml --json
+open-data-products validate output/catalog.yaml
+open-data-products odpc-summary output/catalog.yaml
 ```
 
 Validation checks that the catalog is standards-shaped. Summary output gives a
-quick machine-readable view of the catalog contents.
+quick terminal view of the catalog contents.
 
 ## 5. Search ODPC Guidance
 
 ```bash
 open-data-products odpc-search "business operational analytical policy user needs" \
-  --limit 5 \
-  --json
+  --limit 5
 ```
 
 This searches bundled ODPC object guidance, not the generated catalog file. It

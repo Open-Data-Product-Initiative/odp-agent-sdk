@@ -36,6 +36,29 @@ FIELD_WEIGHTS = {
     "section": 1,
 }
 WORD_RE = re.compile(r"[a-z0-9]+")
+SEARCH_STOPWORDS = {
+    "a",
+    "an",
+    "and",
+    "are",
+    "be",
+    "for",
+    "from",
+    "in",
+    "is",
+    "it",
+    "match",
+    "not",
+    "of",
+    "or",
+    "should",
+    "that",
+    "term",
+    "the",
+    "to",
+    "use",
+    "with",
+}
 
 
 @dataclass(frozen=True)
@@ -241,6 +264,11 @@ def tokenize(value: str) -> List[str]:
     return WORD_RE.findall(value.lower())
 
 
+def search_query_tokens(value: str) -> List[str]:
+    """Return meaningful query tokens for ODPV search."""
+    return [token for token in tokenize(value) if token not in SEARCH_STOPWORDS]
+
+
 def flatten_language_value(value: Any) -> str:
     """Flatten multilingual strings, lists, and dictionaries into search text."""
     if isinstance(value, str):
@@ -292,7 +320,9 @@ def search_vocabulary(
 ) -> List[Dict[str, Any]]:
     """Search ODPV vocabulary terms."""
     vocabulary = data or load_vocabulary()
-    query_tokens = tokenize(query)
+    query_tokens = search_query_tokens(query)
+    if not query_tokens:
+        return []
     results = []
     for section, term in iter_terms(vocabulary):
         fields = searchable_fields(section, term)

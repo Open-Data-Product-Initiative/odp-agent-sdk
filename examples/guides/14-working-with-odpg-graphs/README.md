@@ -51,8 +51,7 @@ The folder should contain files shaped like:
 open-data-products odpg-build fragments/ \
   --output output/graph.yaml \
   --id customer-retention-graph \
-  --name "Customer Retention Graph" \
-  --json
+  --name "Customer Retention Graph"
 ```
 
 `odpg-build` turns the fragment objects into graph nodes and infers
@@ -61,11 +60,12 @@ relationships between them.
 ## 4. Validate And Render The Graph
 
 ```bash
-open-data-products validate output/graph.yaml --json
+open-data-products validate output/graph.yaml
+
+open-data-products odpg-summary output/graph.yaml
 
 open-data-products odpg-generate output/graph.yaml \
-  --output output/graph-explorer.html \
-  --json
+  --output output/graph-explorer.html
 ```
 
 Open `output/graph-explorer.html` in a browser to inspect the graph visually.

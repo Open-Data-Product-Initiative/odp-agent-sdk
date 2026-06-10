@@ -33,8 +33,7 @@ open-data-products generate \
   --input source_docs/ \
   --kind odps-product \
   --profile minimal \
-  --output products/ \
-  --json
+  --output products/
 ```
 
 The default `minimal` profile is evidence-only. It creates valid ODPS product
@@ -48,13 +47,13 @@ open-data-products generate \
   --input source_docs/ \
   --kind odps-product \
   --profile complete-draft \
-  --output products/ \
-  --json
+  --output products/
 ```
 
 The `complete-draft` profile drafts `SLA`, `dataQuality`, and `pricingPlans`
-when the source does not provide enough detail. Review the JSON response for
-`review_notes`, `drafted_components`, and `evidence_gaps`.
+when the source does not provide enough detail. Add `--json` when you want a
+structured report with `review_notes`, `drafted_components`, and
+`evidence_gaps`.
 
 ## 5. Force specific ODPS components
 
@@ -65,8 +64,7 @@ open-data-products generate \
   --kind odps-product \
   --profile minimal \
   --include-components SLA,dataQuality,pricingPlans,dataAccess,license \
-  --output products/ \
-  --json
+  --output products/
 ```
 
 Supported component names are `contract`, `SLA`, `dataQuality`,
@@ -82,8 +80,7 @@ open-data-products generate \
   --kind odps-product \
   --profile minimal \
   --max-source-chars 40000 \
-  --output products/ \
-  --json
+  --output products/
 ```
 
 When a source file is longer than `--max-source-chars`, the SDK extracts facts
@@ -95,7 +92,7 @@ from chunks, merges those facts, and then generates ODPS from the merged facts.
 ls products/
 
 for product_file in products/*.yaml; do
-  open-data-products validate "$product_file" --json
+  open-data-products validate "$product_file"
 done
 ```
 

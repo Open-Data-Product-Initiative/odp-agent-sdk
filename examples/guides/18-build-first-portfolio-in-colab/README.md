@@ -80,8 +80,7 @@ signals, and products.
   --title "Customer Intelligence Portfolio" \
   --output portfolio/ \
   --provider claude \
-  --model claude-sonnet-4-5 \
-  --json
+  --model claude-sonnet-4-5
 ```
 
 ## 4. Inspect Generated Folders
@@ -107,9 +106,9 @@ contains tabs for overview, artifact types, products, graph, and about content.
 ## 6. Review Catalog And Graph Files
 
 ```python
-!open-data-products portfolio explain portfolio/ --json
-!open-data-products validate portfolio/odpc/catalog.yaml --json
-!open-data-products validate portfolio/odpg/graph.yaml --json
+!open-data-products portfolio explain portfolio/
+!open-data-products validate portfolio/odpc/catalog.yaml
+!open-data-products validate portfolio/odpg/graph.yaml
 ```
 
 ## What You Learned

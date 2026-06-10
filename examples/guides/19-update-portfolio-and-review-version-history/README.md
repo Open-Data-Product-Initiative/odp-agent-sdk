@@ -22,8 +22,7 @@ TXT
 ```bash
 open-data-products portfolio refresh portfolio/ \
   --provider claude \
-  --model claude-sonnet-4-5 \
-  --json
+  --model claude-sonnet-4-5
 ```
 
 Refresh scans saved source lanes and sends changed or new source files to the
@@ -35,8 +34,7 @@ LLM. Existing unchanged artifacts are preserved where possible.
 open-data-products portfolio refresh portfolio/ \
   --all-sources \
   --provider claude \
-  --model claude-sonnet-4-5 \
-  --json
+  --model claude-sonnet-4-5
 ```
 
 Use `--all-sources` when the full evidence set should be reprocessed.
@@ -44,7 +42,7 @@ Use `--all-sources` when the full evidence set should be reprocessed.
 ## 4. Sync Edited YAML Without An LLM
 
 ```bash
-open-data-products portfolio sync portfolio/ --json
+open-data-products portfolio sync portfolio/
 ```
 
 Use sync after directly editing ODPC fragments, ODPS products, or graph YAML.
@@ -68,8 +66,7 @@ from the latest workspace:
 open-data-products portfolio localize portfolio/ \
   --languages "fi,sv,ar,vi" \
   --provider claude \
-  --model claude-sonnet-4-5 \
-  --json
+  --model claude-sonnet-4-5
 ```
 
 Localization translates human-facing HTML strings without changing the

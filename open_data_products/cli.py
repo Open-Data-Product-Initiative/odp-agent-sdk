@@ -34,6 +34,26 @@ if TYPE_CHECKING:
 
 
 TOP_LEVEL_HELP = """\
+Common workflows:
+  Validate one artifact:
+    open-data-products validate product.yaml
+
+  Generate ODPC fragments from source notes:
+    open-data-products generate --input source_docs/ --kind product-reference --output generated/
+
+  Generate a full ODPS product draft:
+    open-data-products generate --input product.md --kind odps-product --output products/
+
+  Build catalog and graph review artifacts:
+    open-data-products odpc-build fragments/ --output catalog.yaml --html catalog.html
+    open-data-products odpg-build fragments/ --output graph.yaml
+    open-data-products odpg-generate graph.yaml --output graph-explorer.html
+
+  Build a portfolio workspace:
+    open-data-products portfolio build --objectives inputs/objectives/ --use-cases inputs/use-cases/ --signals inputs/signals/ --products inputs/products/ --output portfolio/
+
+  Use --json when scripting or handing command output to agents.
+
 Core document commands:
   validate     Validate ODPS, ODPC, ODPG, or ODPV documents
   explain      Print an agent-readable document summary
@@ -64,7 +84,7 @@ Discovery and agent commands:
   manifest     Emit the MCP/agent manifest
   serve        Run the MCP server over stdio
 
-Local generation commands:
+LLM generation commands:
   generate     Use configured LLM prompts to create selected YAML artifacts
 
 ODPG graph commands:
@@ -94,35 +114,35 @@ Portfolio workflow commands:
   portfolio explain   Summarize a portfolio workspace
 
 Examples:
-  open-data-products validate product.yaml --json
+  open-data-products validate product.yaml
   open-data-products explain catalog.yaml
-  open-data-products odpc-build fragments/ --output catalog.yaml --json
-  open-data-products odpc-build fragments/ --output catalog.yaml --html catalog.html --json
-  open-data-products odpc-summary catalog.yaml --json
-  open-data-products odpc-search "catalog data" --limit 3 --json
-  open-data-products odpc-artifacts open_data_products/generation/fragments/ --check --json
-  open-data-products odpv-summary --json
-  open-data-products odpv-search "governance policy risk" --limit 3 --json
-  open-data-products odpv-context DataProduct --json
+  open-data-products odpc-build fragments/ --output catalog.yaml
+  open-data-products odpc-build fragments/ --output catalog.yaml --html catalog.html
+  open-data-products odpc-summary catalog.yaml
+  open-data-products odpc-search "catalog data" --limit 3
+  open-data-products odpc-artifacts open_data_products/generation/fragments/ --check
+  open-data-products odpv-summary
+  open-data-products odpv-search "governance policy risk" --limit 3
+  open-data-products odpv-context DataProduct
   open-data-products resources --id odpc.objects --json
   open-data-products resources --id odpv.terms --json
   open-data-products config generation --copy-to my-generation.config.yaml
   open-data-products config generation --copy-prompts-to prompts/
   open-data-products resources --json
-  open-data-products generate --input source_docs/ --kind product-reference --output generated/ --json
-  open-data-products generate --input product.md --kind odps-product --output generated/ --json
-  open-data-products generate --input transcripts/ --kind odps-product --profile complete-draft --include-components SLA,dataQuality,pricingPlans --output products/ --json
-  open-data-products generate --input use-case.md --kind use-case --output generated/ --json
-  open-data-products generate --config my-generation.config.yaml --provider groq --model openai/gpt-oss-120b --input source_docs/ --kind signal --output generated/ --json
-  open-data-products generate --config my-generation.config.yaml --prompts prompts/ --input source_docs/ --kind graph --output generated/ --json
-  open-data-products odpg-build fragments/ --output graph.yaml --json
+  open-data-products generate --input source_docs/ --kind product-reference --output generated/
+  open-data-products generate --input product.md --kind odps-product --output generated/
+  open-data-products generate --input transcripts/ --kind odps-product --profile complete-draft --include-components SLA,dataQuality,pricingPlans --output products/
+  open-data-products generate --input use-case.md --kind use-case --output generated/
+  open-data-products generate --config my-generation.config.yaml --provider groq --model openai/gpt-oss-120b --input source_docs/ --kind signal --output generated/
+  open-data-products generate --config my-generation.config.yaml --prompts prompts/ --input source_docs/ --kind graph --output generated/
+  open-data-products odpg-build fragments/ --output graph.yaml
   open-data-products odpg-agent-context graph.yaml --node DATA-PRODUCT-001
-  open-data-products odpg-generate graph.yaml --output graph-explorer.html --json
-  open-data-products odpg-convert --input graph.graphml --output graph.yaml --json
-  open-data-products portfolio build --objectives inputs/objectives/ --use-cases inputs/use-cases/ --signals inputs/signals/ --products inputs/products/ --output generated/portfolio/ --json
-  open-data-products portfolio sync generated/portfolio/ --json
-  open-data-products portfolio localize generated/portfolio/ --languages "fi,sv" --provider claude --model claude-sonnet-4-5 --json
-  open-data-products portfolio render generated/portfolio/ --json
+  open-data-products odpg-generate graph.yaml --output graph-explorer.html
+  open-data-products odpg-convert --input graph.graphml --output graph.yaml
+  open-data-products portfolio build --objectives inputs/objectives/ --use-cases inputs/use-cases/ --signals inputs/signals/ --products inputs/products/ --output generated/portfolio/
+  open-data-products portfolio sync generated/portfolio/
+  open-data-products portfolio localize generated/portfolio/ --languages "fi,sv" --provider claude --model claude-sonnet-4-5
+  open-data-products portfolio render generated/portfolio/
   open-data-products product contract-report product.yaml contract.yaml --json
   open-data-products serve
 """
@@ -238,6 +258,64 @@ def _split_csv(value: Optional[str]) -> List[str]:
     return [item.strip() for item in value.split(",") if item.strip()]
 
 
+def _print_error_payload(
+    error: object,
+    *,
+    as_json: bool,
+    spec: str = "cli",
+    kind: str = "Error",
+) -> None:
+    """Print an error in JSON or stderr form."""
+    message = str(error)
+    if as_json:
+        print(
+            json.dumps(
+                {
+                    "spec": spec,
+                    "kind": kind,
+                    "valid": False,
+                    "error": message,
+                },
+                indent=2,
+            )
+        )
+        return
+    print(message, file=sys.stderr)
+
+
+def _print_odpg_summary(summary: Dict[str, object]) -> None:
+    """Print an ODPG summary for humans."""
+    print(f"ODPG Graph: {summary.get('name') or summary.get('id') or '(unnamed)'}")
+    print(f"ID: {summary.get('id', '(missing)')}")
+    print(f"Nodes: {summary.get('nodeCount', 0)}")
+    print(f"Edges: {summary.get('edgeCount', 0)}")
+    node_types = summary.get("nodeTypes")
+    if isinstance(node_types, dict) and node_types:
+        rendered = ", ".join(
+            f"{key}={value}" for key, value in sorted(node_types.items())
+        )
+        print(f"Node types: {rendered}")
+    edge_types = summary.get("edgeTypes")
+    if isinstance(edge_types, dict) and edge_types:
+        rendered = ", ".join(
+            f"{key}={value}" for key, value in sorted(edge_types.items())
+        )
+        print(f"Edge types: {rendered}")
+
+
+def _print_odpg_paths(start: str, paths: List[Dict[str, object]]) -> None:
+    """Print ODPG traversal paths for humans."""
+    print(f"Start: {start}")
+    print(f"Paths: {len(paths)}")
+    for path in paths:
+        nodes = path.get("nodes") if isinstance(path, dict) else None
+        relationships = path.get("relationships") if isinstance(path, dict) else None
+        if isinstance(nodes, list) and nodes:
+            print(f"- {' -> '.join(str(node) for node in nodes)}")
+        elif isinstance(relationships, list) and relationships:
+            print(f"- {len(relationships)} relationship(s)")
+
+
 PRODUCT_HELP = """\
 Data Contract workflow commands:
   resolve-contracts   Find Data Contract references in an ODPS product
@@ -265,14 +343,14 @@ Portfolio workflow commands:
   explain     Summarize portfolio artifacts, counts, and browser entry point
 
 Examples:
-  open-data-products portfolio build --objectives inputs/objectives/ --use-cases inputs/use-cases/ --signals inputs/signals/ --products inputs/products/ --output generated/portfolio/ --json
-  open-data-products portfolio build --objectives inputs/objectives/ --products inputs/products/ --output generated/portfolio/ --strict-validation --json
-  open-data-products portfolio refresh generated/portfolio/ --json
-  open-data-products portfolio refresh generated/portfolio/ --all-sources --json
-  open-data-products portfolio sync generated/portfolio/ --json
-  open-data-products portfolio localize generated/portfolio/ --languages "fi,sv" --provider claude --model claude-sonnet-4-5 --json
-  open-data-products portfolio render generated/portfolio/ --json
-  open-data-products portfolio explain generated/portfolio/ --json
+  open-data-products portfolio build --objectives inputs/objectives/ --use-cases inputs/use-cases/ --signals inputs/signals/ --products inputs/products/ --output generated/portfolio/
+  open-data-products portfolio build --objectives inputs/objectives/ --products inputs/products/ --output generated/portfolio/ --strict-validation
+  open-data-products portfolio refresh generated/portfolio/
+  open-data-products portfolio refresh generated/portfolio/ --all-sources
+  open-data-products portfolio sync generated/portfolio/
+  open-data-products portfolio localize generated/portfolio/ --languages "fi,sv" --provider claude --model claude-sonnet-4-5
+  open-data-products portfolio render generated/portfolio/
+  open-data-products portfolio explain generated/portfolio/
 """
 
 
@@ -371,7 +449,8 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     generate_parser = subparsers.add_parser(
         "generate",
-        help="Generate selected YAML artifacts with a local LLM",
+        help="Generate selected YAML artifacts with configured LLMs",
+        description="Generate selected YAML artifacts with configured LLMs.",
     )
     generate_parser.add_argument(
         "source_dir",
@@ -586,6 +665,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         "odpg-summary", help="Summarize an ODPG graph"
     )
     odpg_summary_parser.add_argument("graph", help="Path to an ODPG graph file")
+    odpg_summary_parser.add_argument("--json", action="store_true", help="Emit JSON")
 
     odpg_build_parser = subparsers.add_parser(
         "odpg-build", help="Build an ODPG graph from ODPC fragments"
@@ -654,11 +734,13 @@ def main(argv: Optional[List[str]] = None) -> int:
     odpg_traverse_parser.add_argument(
         "--reverse", action="store_true", help="Traverse incoming relationships"
     )
+    odpg_traverse_parser.add_argument("--json", action="store_true", help="Emit JSON")
 
     odpg_analyze_parser = subparsers.add_parser(
         "odpg-analyze", help="Run ODPG strategic and governance checks"
     )
     odpg_analyze_parser.add_argument("graph", help="Path to an ODPG graph file")
+    odpg_analyze_parser.add_argument("--json", action="store_true", help="Emit JSON")
 
     odpg_context_parser = subparsers.add_parser(
         "odpg-agent-context", help="Extract ODPG context around a focus node"
@@ -668,6 +750,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     odpg_context_parser.add_argument(
         "--depth", type=int, default=2, help="Context traversal depth"
     )
+    odpg_context_parser.add_argument("--json", action="store_true", help="Emit JSON")
 
     odpg_generate_parser = subparsers.add_parser(
         "odpg-generate", help="Generate a standalone ODPG graph explorer"
@@ -1466,7 +1549,11 @@ def main(argv: Optional[List[str]] = None) -> int:
         if args.command == "odpg-summary":
             from .odpg import load_graph, summarize_graph
 
-            print(json.dumps(summarize_graph(load_graph(args.graph)), indent=2))
+            summary = summarize_graph(load_graph(args.graph))
+            if args.json:
+                print(json.dumps(summary, indent=2))
+            else:
+                _print_odpg_summary(summary)
             return 0
 
         if args.command == "odpg-build":
@@ -1562,7 +1649,10 @@ def main(argv: Optional[List[str]] = None) -> int:
             graph = load_graph(args.graph)
             graph_result = validate_graph(graph)
             if not graph_result.valid:
-                print(json.dumps(graph_result.to_dict(), indent=2))
+                if args.json:
+                    print(json.dumps(graph_result.to_dict(), indent=2))
+                else:
+                    _print_validation_report(args.graph, graph_result)
                 return 1
             paths = traverse_graph(
                 graph,
@@ -1571,7 +1661,10 @@ def main(argv: Optional[List[str]] = None) -> int:
                 relationship=args.relationship,
                 reverse=args.reverse,
             )
-            print(json.dumps({"start": args.start, "paths": paths}, indent=2))
+            if args.json:
+                print(json.dumps({"start": args.start, "paths": paths}, indent=2))
+            else:
+                _print_odpg_paths(args.start, paths)
             return 0
 
         if args.command == "odpg-analyze":
@@ -1580,17 +1673,28 @@ def main(argv: Optional[List[str]] = None) -> int:
             graph = load_graph(args.graph)
             graph_result = validate_graph(graph)
             if not graph_result.valid:
-                print(json.dumps(graph_result.to_dict(), indent=2))
+                if args.json:
+                    print(json.dumps(graph_result.to_dict(), indent=2))
+                else:
+                    _print_validation_report(args.graph, graph_result)
                 return 1
-            print(
-                json.dumps(
-                    {
-                        "warnings": graph_result.warnings,
-                        "analysis": analyze_graph(graph),
-                    },
-                    indent=2,
+            analysis = analyze_graph(graph)
+            if args.json:
+                print(
+                    json.dumps(
+                        {
+                            "warnings": graph_result.warnings,
+                            "analysis": analysis,
+                        },
+                        indent=2,
+                    )
                 )
-            )
+            else:
+                print("ODPG Analysis:")
+                for warning in graph_result.warnings:
+                    print(f"- Warning: {warning}")
+                for item in analysis:
+                    print(f"- {item}")
             return 0
 
         if args.command == "odpg-agent-context":
@@ -1599,11 +1703,25 @@ def main(argv: Optional[List[str]] = None) -> int:
             graph = load_graph(args.graph)
             graph_result = validate_graph(graph)
             if not graph_result.valid:
-                print(json.dumps(graph_result.to_dict(), indent=2))
+                if args.json:
+                    print(json.dumps(graph_result.to_dict(), indent=2))
+                else:
+                    _print_validation_report(args.graph, graph_result)
                 return 1
             payload = agent_context(graph, args.node, args.depth)
             payload["warnings"] = graph_result.warnings
-            print(json.dumps(payload, indent=2))
+            if args.json:
+                print(json.dumps(payload, indent=2))
+            else:
+                focus = payload.get("focusNode")
+                focus_id = (
+                    focus.get("id", args.node) if isinstance(focus, dict) else args.node
+                )
+                print(f"Focus node: {focus_id}")
+                print(f"Depth: {args.depth}")
+                related = payload.get("relatedNodes", [])
+                if isinstance(related, list):
+                    print(f"Related nodes: {len(related)}")
             return 0
 
         if args.command == "odpg-generate":
@@ -1750,7 +1868,11 @@ def main(argv: Optional[List[str]] = None) -> int:
                         f"Unknown portfolio command: {args.portfolio_command}"
                     )
             except (FileNotFoundError, ValueError) as exc:
-                print(str(exc), file=sys.stderr)
+                _print_error_payload(
+                    exc,
+                    as_json=args.json,
+                    spec="portfolio",
+                )
                 return 1
 
             payload["validationMode"] = _portfolio_validation_mode(args)
@@ -1897,7 +2019,9 @@ def main(argv: Optional[List[str]] = None) -> int:
                     print("- LIVE_TESTS_NOT_IMPLEMENTED: live tests not run")
             return 0 if report.passed else 1
     except Exception as exc:
-        print(str(exc), file=sys.stderr)
+        args_for_error = locals().get("args")
+        as_json = bool(getattr(args_for_error, "json", False))
+        _print_error_payload(exc, as_json=as_json)
         return 1
 
     return 1

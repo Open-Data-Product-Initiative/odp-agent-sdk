@@ -7,10 +7,23 @@ workflow.
 Most commands print human-readable output by default. Add `--json` when the
 result is consumed by CI, scripts, MCP clients, or other agents.
 
+## Common Workflows
+
+```bash
+open-data-products validate product.yaml
+open-data-products generate --input source_docs/ --kind product-reference --output generated/
+open-data-products odpc-build fragments/ --output catalog.yaml --html catalog.html
+open-data-products odpg-build fragments/ --output graph.yaml
+open-data-products portfolio build --objectives inputs/objectives/ --use-cases inputs/use-cases/ --signals inputs/signals/ --products inputs/products/ --output portfolio/
+```
+
+Use the command-specific sections below when you need more control or
+machine-readable output.
+
 ## Cross-Spec Documents
 
 ```bash
-open-data-products validate examples/product.yaml --json
+open-data-products validate examples/product.yaml
 ```
 
 Detects the document family, validates the file against the bundled schema and
@@ -18,7 +31,7 @@ SDK rules, and returns the validation result. For ODPS files, the SDK currently
 supports the ODPS 4.x line.
 
 ```bash
-open-data-products explain examples/odpc_catalog.yaml --json
+open-data-products explain examples/odpc_catalog.yaml
 ```
 
 Loads an ODPS, ODPC, ODPG, or ODPV document and returns a compact explanation
@@ -26,7 +39,7 @@ for humans and agents. Use this when you need a quick summary without reading
 the whole YAML file.
 
 ```bash
-open-data-products refs open_data_products/odpg/data/graph/graph.yaml --json
+open-data-products refs open_data_products/odpg/data/graph/graph.yaml
 ```
 
 Lists `$ref` and `ref` pointers found in a document. This is useful when an
@@ -65,7 +78,7 @@ These commands require local Ollama or configured provider credentials. See
 [LLM generation](generation.md#llm-setup) for setup details.
 
 ```bash
-open-data-products generate --kind signal --json
+open-data-products generate --kind signal
 ```
 
 Runs signal generation with default paths. By default, it reads source documents from
@@ -73,7 +86,7 @@ Runs signal generation with default paths. By default, it reads source documents
 and writes generated fragments to `open_data_products/generation/fragments/`.
 
 ```bash
-open-data-products generate --config open_data_products/generation/generation.config.yaml --kind signal --json
+open-data-products generate --config open_data_products/generation/generation.config.yaml --kind signal
 ```
 
 Runs generation using a config file. The config can define provider, model,
@@ -81,15 +94,15 @@ input folder, output folder, base URL, and the environment variable name that
 contains the API key.
 
 ```bash
-open-data-products generate --config open_data_products/generation/generation.config.yaml --provider groq --kind signal --json
-open-data-products generate --config open_data_products/generation/generation.config.yaml --provider claude --kind signal --json
+open-data-products generate --config open_data_products/generation/generation.config.yaml --provider groq --kind signal
+open-data-products generate --config open_data_products/generation/generation.config.yaml --provider claude --kind signal
 ```
 
 Overrides the provider selected by the config. This lets you test the same
 source documents with another configured backend without editing the file.
 
 ```bash
-open-data-products generate --config open_data_products/generation/generation.config.yaml --kind signal --json
+open-data-products generate --config open_data_products/generation/generation.config.yaml --kind signal
 ```
 
 Generates the selected artifact type. Supported kinds include
@@ -99,14 +112,14 @@ Generates the selected artifact type. Supported kinds include
 ## Generated Fragment Artifacts
 
 ```bash
-open-data-products validate open_data_products/generation/fragments/odpg_graph.yaml --json
+open-data-products validate open_data_products/generation/fragments/odpg_graph.yaml
 ```
 
 Validates the generated ODPG graph YAML. Run this after LLM generation to catch
 invalid graph structure before opening the graph explorer.
 
 ```bash
-open-data-products odpg-generate open_data_products/generation/fragments/odpg_graph.yaml --output /tmp/odp-generation-graph.html --json
+open-data-products odpg-generate open_data_products/generation/fragments/odpg_graph.yaml --output /tmp/odp-generation-graph.html
 ```
 
 Builds a standalone HTML graph explorer from the generated ODPG graph file.
@@ -115,25 +128,25 @@ The `/tmp` output path keeps generated browser artifacts out of the repository.
 ## ODPC Catalog Helpers
 
 ```bash
-open-data-products odpc-build examples/odpc_catalog_fragments/ --output /tmp/odp-catalog.yaml --json
+open-data-products odpc-build examples/odpc_catalog_fragments/ --output /tmp/odp-catalog.yaml
 ```
 
 Builds one ODPC catalog YAML file from fragment files in a folder.
 
 ```bash
-open-data-products odpc-build examples/odpc_catalog_fragments/ --output /tmp/odp-catalog.yaml --html /tmp/odp-catalog.html --json
+open-data-products odpc-build examples/odpc_catalog_fragments/ --output /tmp/odp-catalog.yaml --html /tmp/odp-catalog.html
 ```
 
 Builds the ODPC catalog YAML and a standalone HTML catalog page in one run.
 
 ```bash
-open-data-products odpc-summary /tmp/odp-catalog.yaml --json
+open-data-products odpc-summary /tmp/odp-catalog.yaml
 ```
 
 Summarizes catalog metadata and object counts from a built ODPC catalog.
 
 ```bash
-open-data-products odpc-search "catalog data" --limit 3 --json
+open-data-products odpc-search "catalog data" --limit 3
 ```
 
 Searches the bundled ODPC object guidance index. Use this when you need help
@@ -142,38 +155,38 @@ choosing or explaining catalog object types.
 ## ODPV Vocabulary Helpers
 
 ```bash
-open-data-products odpv-summary --json
+open-data-products odpv-summary
 ```
 
 Summarizes the bundled ODPV vocabulary, including sections and term counts.
 
 ```bash
-open-data-products odpv-search "governance policy risk" --limit 3 --json
+open-data-products odpv-search "governance policy risk" --limit 3
 ```
 
 Searches vocabulary terms by keyword.
 
 ```bash
-open-data-products odpv-resolve "reusable data asset" --json
+open-data-products odpv-resolve "reusable data asset"
 ```
 
 Resolves free text or aliases to a canonical ODPV term.
 
 ```bash
-open-data-products odpv-explain DataProduct --json
+open-data-products odpv-explain DataProduct
 ```
 
 Returns the canonical vocabulary packet for one term.
 
 ```bash
-open-data-products odpv-relationship DataProduct supports UseCase --json
+open-data-products odpv-relationship DataProduct supports UseCase
 ```
 
 Checks whether an ODPV relationship is valid for the given source and target
 types.
 
 ```bash
-open-data-products odpv-context DataProduct --json
+open-data-products odpv-context DataProduct
 ```
 
 Returns an agent-ready context packet for one vocabulary term.
@@ -206,14 +219,14 @@ Extracts the graph neighborhood around one node in a compact format suitable
 for agents.
 
 ```bash
-open-data-products odpg-generate open_data_products/odpg/data/graph/graph.yaml --output /tmp/odp-graph-explorer.html --json
+open-data-products odpg-generate open_data_products/odpg/data/graph/graph.yaml --output /tmp/odp-graph-explorer.html
 ```
 
 Generates a standalone HTML graph explorer for a bundled or user-supplied ODPG
 graph.
 
 ```bash
-open-data-products odpg-convert --input examples/graph.graphml --output /tmp/odp-converted-graph.yaml --json
+open-data-products odpg-convert --input examples/graph.graphml --output /tmp/odp-converted-graph.yaml
 ```
 
 Converts external graph formats to ODPG YAML. Supported inputs include JSON-LD,
@@ -231,22 +244,21 @@ open-data-products portfolio build \
   --signals inputs/signals/ \
   --products inputs/products/ \
   --title "Customer Intelligence Portfolio" \
-  --output generated/portfolio/ \
-  --json
+  --output generated/portfolio/
 ```
 
 Builds a portfolio workspace from source lanes. The command uses the configured
 LLM provider to create an internal portfolio plan, writes ODPC fragments and
 catalog YAML, linked ODPS product specs, ODPG graph YAML, and then renders the
 static `index.html` browser experience. Missing output folders are created
-before writing. The final JSON report includes source counts, artifact counts,
-created/updated/unchanged files, warnings, link findings, and the browser entry
-point.
-The report also includes validation results for the ODPC catalog, ODPG graph,
-and linked ODPS product specs. Portfolio commands default to validation warning
-mode: they complete when generated ODPS drafts are valid YAML but fail schema
-validation, while the JSON report keeps `valid: false` and includes the exact
-schema errors.
+before writing. Add `--json` when you want a structured report with source
+counts, artifact counts, created/updated/unchanged files, warnings, link
+findings, and the browser entry point.
+The structured report also includes validation results for the ODPC catalog,
+ODPG graph, and linked ODPS product specs. Portfolio commands default to
+validation warning mode: they complete when generated ODPS drafts are valid
+YAML but fail schema validation, while the JSON report keeps `valid: false` and
+includes the exact schema errors.
 The LLM prompt asks for one structured YAML portfolio plan with explicit
 ProductReference-to-ODPS product linking rules, graph edge endpoint rules, and
 warnings for weak evidence.
@@ -260,16 +272,16 @@ After the first build, the workspace can be rerun without repeating the source
 folder flags:
 
 ```bash
-open-data-products portfolio build generated/portfolio/ --json
+open-data-products portfolio build generated/portfolio/
 ```
 
 The command reuses source lane paths saved in `portfolio-state.yaml`, compares
 current source hashes with the previous run, preserves stable artifact IDs for
 unchanged concepts, snapshots the previous `index.html`, and reports source
-changes plus removed source files in the final JSON output.
+changes plus removed source files in the command output.
 
 ```bash
-open-data-products portfolio sync generated/portfolio/ --json
+open-data-products portfolio sync generated/portfolio/
 ```
 
 Synchronizes a portfolio from edited YAML artifacts without calling an LLM. Use
@@ -277,12 +289,12 @@ this when ODPC fragment YAML, ODPS product YAML, or graph YAML has been updated
 directly and the portfolio should be refreshed from those files. The command
 rebuilds `odpc/catalog.yaml` from `odpc/fragments/*.yaml`, keeps source lane
 state, updates the identity registry, snapshots the previous `index.html`, and
-renders a new browser view with one final JSON report.
+renders a new browser view.
 Use `--strict-validation` to make schema-invalid synced drafts return a
 non-zero exit code.
 
 ```bash
-open-data-products portfolio render generated/portfolio/ --json
+open-data-products portfolio render generated/portfolio/
 ```
 
 Renders one static `index.html` from an existing portfolio workspace. The page
@@ -297,8 +309,7 @@ non-zero exit code.
 open-data-products portfolio localize generated/portfolio/ \
   --languages "fi,sv" \
   --provider claude \
-  --model claude-sonnet-4-5 \
-  --json
+  --model claude-sonnet-4-5
 ```
 
 Localizes the browser experience without changing canonical ODPC, ODPS, or
@@ -309,7 +320,7 @@ with a language selector in the top bar. Language values use BCP 47 language
 tags such as `fi`, `sv`, `en-GB`, or `pt-BR`.
 
 ```bash
-open-data-products portfolio explain generated/portfolio/ --json
+open-data-products portfolio explain generated/portfolio/
 ```
 
 Summarizes a portfolio workspace, including the browser entry point and counts
@@ -317,7 +328,7 @@ for objectives, use cases, signals, product references, ODPS product specs,
 graph nodes, graph edges, and available versions.
 
 ```bash
-open-data-products portfolio refresh generated/portfolio/ --json
+open-data-products portfolio refresh generated/portfolio/
 ```
 
 Refreshes an existing portfolio workspace using source lane paths saved in
@@ -328,7 +339,7 @@ merged into the existing portfolio so unchanged artifacts are preserved.
 Use `--all-sources` when the full evidence set should be reprocessed:
 
 ```bash
-open-data-products portfolio refresh generated/portfolio/ --all-sources --json
+open-data-products portfolio refresh generated/portfolio/ --all-sources
 ```
 
 Before writing the refreshed latest files, the command snapshots the previous

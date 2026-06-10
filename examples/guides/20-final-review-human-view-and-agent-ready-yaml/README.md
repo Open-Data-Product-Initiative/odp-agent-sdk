@@ -35,9 +35,9 @@ The important files are:
 ## 3. Validate The Artifacts
 
 ```bash
-open-data-products validate portfolio/odpc/catalog.yaml --json
-open-data-products validate portfolio/odpg/graph.yaml --json
-open-data-products portfolio explain portfolio/ --json
+open-data-products validate portfolio/odpc/catalog.yaml
+open-data-products validate portfolio/odpg/graph.yaml
+open-data-products portfolio explain portfolio/
 ```
 
 Portfolio commands default to warning mode for schema-invalid generated ODPS

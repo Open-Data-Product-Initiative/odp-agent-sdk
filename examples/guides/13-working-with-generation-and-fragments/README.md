@@ -64,26 +64,22 @@ TXT
 open-data-products generate \
   --input source_docs/products/ \
   --kind product-reference \
-  --output fragments/ \
-  --json
+  --output fragments/
 
 open-data-products generate \
   --input source_docs/use-cases/ \
   --kind use-case \
-  --output fragments/ \
-  --json
+  --output fragments/
 
 open-data-products generate \
   --input source_docs/objectives/ \
   --kind objective \
-  --output fragments/ \
-  --json
+  --output fragments/
 
 open-data-products generate \
   --input source_docs/signals/ \
   --kind signal \
-  --output fragments/ \
-  --json
+  --output fragments/
 ```
 
 ## 4. Inspect generated artifacts
@@ -103,10 +99,9 @@ Expected artifact types:
 
 ```bash
 open-data-products odpc-build fragments/ \
-  --output catalog.yaml \
-  --json
+  --output catalog.yaml
 
-open-data-products validate catalog.yaml --json
+open-data-products validate catalog.yaml
 ```
 
 ## What You Learned

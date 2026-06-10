@@ -59,9 +59,11 @@ TXT
 open-data-products generate \
   --config generation.config.yaml \
   --input source_docs/turnaround-delay-signal.txt \
-  --kind signal \
-  --json
+  --kind signal
 ```
+
+The command prints a short human-readable generation summary. Add `--json`
+when you want machine-readable output for automation.
 
 ## 6. Inspect The Result
 

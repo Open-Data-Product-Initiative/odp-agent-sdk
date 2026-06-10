@@ -72,9 +72,11 @@ MD
 ```bash
 open-data-products generate \
   --config generation.config.yaml \
-  --kind product-reference \
-  --json
+  --kind product-reference
 ```
+
+The default output is meant for humans. Add `--json` when a script or agent
+needs a structured generation report.
 
 ## What You Learned
 

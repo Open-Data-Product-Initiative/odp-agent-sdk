@@ -34,6 +34,12 @@ def test_unified_cli_help_uses_compact_command_metavar(
     help_text = capsys.readouterr().out
     assert "usage: open-data-products [-h] [-V] COMMAND ..." in help_text
     assert "{validate,explain,refs" not in help_text
+    assert "Common workflows:" in help_text
+    assert "Validate one artifact:" in help_text
+    assert "Generate ODPC fragments from source notes:" in help_text
+    assert "Build catalog and graph review artifacts:" in help_text
+    assert "Build a portfolio workspace:" in help_text
+    assert "Use --json when scripting" in help_text
     assert "Core document commands:" in help_text
     assert "ODPC catalog commands:" in help_text
     assert "resources --id odpc.objects" in help_text
@@ -54,9 +60,10 @@ def test_unified_cli_help_uses_compact_command_metavar(
     assert "odpg-generate" in help_text
     assert "odpg-convert" in help_text
     assert "Product/Data Contract commands:" in help_text
-    assert "Local generation commands:" in help_text
+    assert "LLM generation commands:" in help_text
+    assert "generate     Use configured LLM prompts" in help_text
     assert "Examples:" in help_text
-    assert "open-data-products validate product.yaml --json" in help_text
+    assert "open-data-products validate product.yaml" in help_text
     assert (
         "open-data-products product contract-report product.yaml contract.yaml --json"
         in help_text
@@ -64,35 +71,62 @@ def test_unified_cli_help_uses_compact_command_metavar(
     assert "open-data-products resources --id odpc.objects --json" in help_text
     assert "open-data-products resources --id odpv.terms --json" in help_text
     assert (
-        "open-data-products odpg-generate graph.yaml --output graph-explorer.html --json"
+        "open-data-products odpg-generate graph.yaml --output graph-explorer.html"
         in help_text
     )
     assert (
-        "open-data-products odpg-convert --input graph.graphml --output graph.yaml --json"
+        "open-data-products odpg-convert --input graph.graphml --output graph.yaml"
         in help_text
     )
     assert (
-        "open-data-products generate --input source_docs/ --kind product-reference --output generated/ --json"
+        "open-data-products generate --input source_docs/ --kind product-reference --output generated/"
         in help_text
     )
     assert (
-        "open-data-products generate --input product.md --kind odps-product --output generated/ --json"
+        "open-data-products generate --input product.md --kind odps-product --output generated/"
         in help_text
     )
     assert (
         "open-data-products config generation --copy-prompts-to prompts/" in help_text
     )
     assert (
-        "open-data-products generate --config my-generation.config.yaml --prompts prompts/ --input source_docs/ --kind graph --output generated/ --json"
+        "open-data-products generate --config my-generation.config.yaml --prompts prompts/ --input source_docs/ --kind graph --output generated/"
         in help_text
     )
-    assert (
-        "open-data-products odpg-build fragments/ --output graph.yaml --json"
-        in help_text
-    )
+    assert "open-data-products odpg-build fragments/ --output graph.yaml" in help_text
     assert "generation.config.yaml --json" not in help_text
     assert "validate" in help_text
     assert "product" in help_text
+
+
+def test_unified_cli_generate_help_is_provider_neutral(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    with pytest.raises(SystemExit) as exc_info:
+        main(["generate", "--help"])
+
+    assert exc_info.value.code == 0
+    help_text = capsys.readouterr().out
+    assert "Generate selected YAML artifacts with configured LLMs" in help_text
+    assert "local LLM" not in help_text
+
+
+def test_unified_cli_json_errors_are_structured(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    assert main(["portfolio", "build", "--json"]) == 1
+    payload = _json_output(capsys)
+    assert payload["spec"] == "portfolio"
+    assert payload["kind"] == "Error"
+    assert payload["valid"] is False
+    assert "Provide a portfolio workspace" in payload["error"]
+
+    assert main(["resources", "--id", "missing.resource", "--json"]) == 1
+    payload = _json_output(capsys)
+    assert payload["spec"] == "cli"
+    assert payload["kind"] == "Error"
+    assert payload["valid"] is False
+    assert "missing.resource" in payload["error"]
 
 
 @pytest.mark.parametrize("flag", ["--version", "-V"])
@@ -125,6 +159,32 @@ def test_product_cli_help_uses_compact_command_metavar_and_examples(
     assert (
         "open-data-products product audit product.yaml --contract contract.yaml --json"
         in help_text
+    )
+
+
+def test_portfolio_cli_help_uses_human_first_examples(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    with pytest.raises(SystemExit) as exc_info:
+        main(["portfolio", "--help"])
+
+    assert exc_info.value.code == 0
+    help_text = capsys.readouterr().out
+    assert "usage: open-data-products portfolio [-h] PORTFOLIO_COMMAND ..." in help_text
+    assert "Portfolio workflow commands:" in help_text
+    assert (
+        "open-data-products portfolio build --objectives inputs/objectives/ --use-cases inputs/use-cases/ --signals inputs/signals/ --products inputs/products/ --output generated/portfolio/"
+        in help_text
+    )
+    assert "open-data-products portfolio refresh generated/portfolio/" in help_text
+    assert "open-data-products portfolio sync generated/portfolio/" in help_text
+    assert (
+        'open-data-products portfolio localize generated/portfolio/ --languages "fi,sv" --provider claude --model claude-sonnet-4-5'
+        in help_text
+    )
+    assert (
+        "portfolio build --objectives inputs/objectives/ --use-cases inputs/use-cases/ --signals inputs/signals/ --products inputs/products/ --output generated/portfolio/ --json"
+        not in help_text
     )
 
 
@@ -1143,6 +1203,19 @@ def test_unified_cli_odpv_commands(capsys: pytest.CaptureFixture[str]) -> None:
     assert search_payload["spec"] == "odpv"
     assert len(search_payload["matches"]) == 2
 
+    assert (
+        main(
+            [
+                "odpv-search",
+                "nonsense term that should not match",
+                "--json",
+            ]
+        )
+        == 1
+    )
+    search_payload = _json_output(capsys)
+    assert search_payload["matches"] == []
+
     assert main(["odpv-resolve", "reusable data asset", "--json"]) == 0
     resolve_payload = _json_output(capsys)
     assert resolve_payload["match"]["id"] == "DataProduct"
@@ -1173,15 +1246,24 @@ def test_unified_cli_odpg_reasoning_commands(
     capsys: pytest.CaptureFixture[str],
     tmp_path: Path,
 ) -> None:
-    assert main(["odpg-summary", str(ODPG_GRAPH)]) == 0
+    assert main(["odpg-summary", str(ODPG_GRAPH), "--json"]) == 0
     assert _json_output(capsys)["nodeCount"] == 9
 
     assert (
-        main(["odpg-traverse", str(ODPG_GRAPH), "--start", "AGENT-AVIATION-001"]) == 0
+        main(
+            [
+                "odpg-traverse",
+                str(ODPG_GRAPH),
+                "--start",
+                "AGENT-AVIATION-001",
+                "--json",
+            ]
+        )
+        == 0
     )
     assert _json_output(capsys)["start"] == "AGENT-AVIATION-001"
 
-    assert main(["odpg-analyze", str(ODPG_GRAPH)]) == 0
+    assert main(["odpg-analyze", str(ODPG_GRAPH), "--json"]) == 0
     assert "analysis" in _json_output(capsys)
 
     assert (
@@ -1191,6 +1273,7 @@ def test_unified_cli_odpg_reasoning_commands(
                 str(ODPG_GRAPH),
                 "--node",
                 "AGENT-AVIATION-001",
+                "--json",
             ]
         )
         == 0
@@ -1248,6 +1331,22 @@ def test_unified_cli_odpg_reasoning_commands(
     assert convert_payload["spec"] == "odpg"
     assert convert_payload["converted"] is True
     assert graph_yaml.exists()
+
+
+def test_unified_cli_odpg_reasoning_human_output(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    assert main(["odpg-summary", str(ODPG_GRAPH)]) == 0
+    output = capsys.readouterr().out
+    assert "ODPG Graph:" in output
+    assert "Nodes: 9" in output
+
+    assert (
+        main(["odpg-traverse", str(ODPG_GRAPH), "--start", "AGENT-AVIATION-001"]) == 0
+    )
+    output = capsys.readouterr().out
+    assert "Start: AGENT-AVIATION-001" in output
+    assert "Paths:" in output
 
 
 def test_unified_cli_contract_workflow(
