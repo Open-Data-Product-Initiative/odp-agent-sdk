@@ -19,7 +19,7 @@ ODPC fragments from type-specific source folders.
 
 ```bash
 mkdir -p odps-sdk-guides/13-fragments/source_docs/products
-mkdir -p odps-sdk-guides/13-fragments/source_docs/use_cases
+mkdir -p odps-sdk-guides/13-fragments/source_docs/use-cases
 mkdir -p odps-sdk-guides/13-fragments/source_docs/objectives
 mkdir -p odps-sdk-guides/13-fragments/source_docs/signals
 mkdir -p odps-sdk-guides/13-fragments/fragments
@@ -37,7 +37,7 @@ crew readiness, and departure delay information. It supports operational
 decision making in the airport operations control center.
 MD
 
-cat > source_docs/use_cases/delay-risk-use-case.md <<'MD'
+cat > source_docs/use-cases/delay-risk-use-case.md <<'MD'
 # Delay Risk Monitoring Use Case
 
 Operations controllers need to identify flights at risk of delayed departure
@@ -68,7 +68,7 @@ open-data-products generate \
   --json
 
 open-data-products generate \
-  --input source_docs/use_cases/ \
+  --input source_docs/use-cases/ \
   --kind use-case \
   --output fragments/ \
   --json

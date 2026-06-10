@@ -22,13 +22,21 @@ reviewing catalog structure.
 ```bash
 mkdir -p odps-sdk-guides/15-odpc-catalog/fragments
 mkdir -p odps-sdk-guides/15-odpc-catalog/output
-cd odps-sdk-guides/15-odpc-catalog
 ```
 
 ## 2. Add Fragment Files
 
-Copy the sample files from this lesson folder's `fragments/` directory, or use
-the fragments generated in Lecture 13.
+From the repository root, copy the sample fragment files from this lesson
+folder:
+
+```bash
+cp examples/guides/15-working-with-odpc-catalogs/fragments/*.yaml \
+  odps-sdk-guides/15-odpc-catalog/fragments/
+
+cd odps-sdk-guides/15-odpc-catalog
+```
+
+You can also use the fragments generated in Lecture 13.
 
 Expected fragment types:
 

@@ -70,13 +70,12 @@ Use these references when you want to go deeper:
 - [ODPG graph specification](https://opendataproducts.org/odpg-v1.0/)
 - [ODPV vocabulary specification](https://opendataproducts.org/odpv-v1.0/)
 
-
 ## Thank You
 
 Thank you for taking the course. If you apply these ideas in your own work,
 consider sharing your experience, lessons learned, and examples in a blog post
 or on LinkedIn. Your notes can help other data, analytics, and AI practitioners
-understand how open data product standards can work in real projects. 
+understand how open data product standards can work in real projects.
 
 You can also connect with me on
 [LinkedIn](https://ae.linkedin.com/in/jarkkomoilanen) for further discussion.

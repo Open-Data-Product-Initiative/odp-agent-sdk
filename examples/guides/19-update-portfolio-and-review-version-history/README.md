@@ -77,15 +77,15 @@ canonical ODPC, ODPS, or ODPG YAML artifacts. The command writes localized pages
 such as `index.fi.html`, `index.sv.html`, `index.ar.html`, and `index.vi.html`
 beside the main `index.html`.
 
-Open one localized page after the command finishes:
+Confirm that one localized page was written:
 
 ```bash
-open portfolio/index.fi.html
+ls portfolio/index.fi.html
 ```
 
-Use the localized HTML files for review with regional stakeholders. Keep the
-canonical YAML files as the source of truth for agents, validation, and
-automation.
+Download or open the localized HTML files for review with regional stakeholders.
+Keep the canonical YAML files as the source of truth for agents, validation,
+and automation.
 
 ## What You Learned
 

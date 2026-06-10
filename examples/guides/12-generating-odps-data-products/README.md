@@ -9,14 +9,21 @@ fragment generation yet.
 ```bash
 mkdir -p odps-sdk-guides/12-odps-products/source_docs
 mkdir -p odps-sdk-guides/12-odps-products/products
-cd odps-sdk-guides/12-odps-products
 ```
 
 ## 2. Add Source Documents
 
-Copy the files from this lesson folder's `source_docs/` directory, or write
-your own business requirement notes into the same shape. Each Markdown or text
-file becomes one ODPS product draft.
+From the repository root, copy the sample files from this lesson folder:
+
+```bash
+cp examples/guides/12-generating-odps-data-products/source_docs/* \
+  odps-sdk-guides/12-odps-products/source_docs/
+
+cd odps-sdk-guides/12-odps-products
+```
+
+You can also write your own business requirement notes into the same shape.
+Each Markdown or text file becomes one ODPS product draft.
 
 ## 3. Generate minimal ODPS products
 
@@ -85,7 +92,11 @@ from chunks, merges those facts, and then generates ODPS from the merged facts.
 ## 7. Validate generated products
 
 ```bash
-open-data-products validate products/odps_product_customer-retention.yaml --json
+ls products/
+
+for product_file in products/*.yaml; do
+  open-data-products validate "$product_file" --json
+done
 ```
 
 ## What You Learned

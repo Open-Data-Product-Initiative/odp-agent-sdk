@@ -22,13 +22,21 @@ getting agent-ready context from the graph.
 ```bash
 mkdir -p odps-sdk-guides/14-odpg-graph/fragments
 mkdir -p odps-sdk-guides/14-odpg-graph/output
-cd odps-sdk-guides/14-odpg-graph
 ```
 
 ## 2. Add Fragment Files
 
-Copy the sample files from this lesson folder's `fragments/` directory, or use
-the fragments generated in Lecture 13.
+From the repository root, copy the sample fragment files from this lesson
+folder:
+
+```bash
+cp examples/guides/14-working-with-odpg-graphs/fragments/*.yaml \
+  odps-sdk-guides/14-odpg-graph/fragments/
+
+cd odps-sdk-guides/14-odpg-graph
+```
+
+You can also use the fragments generated in Lecture 13.
 
 The folder should contain files shaped like:
 
