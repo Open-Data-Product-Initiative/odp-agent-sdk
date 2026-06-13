@@ -10,6 +10,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 import yaml
 
+from open_data_products._gcf import GcfPrimitive, primitive_token, write_gcf
 from open_data_products._io import load_jsonl_records, load_mapping
 from open_data_products._search import search_records, searchable_record_text
 from open_data_products._toon import (
@@ -570,6 +571,33 @@ def write_catalog_toon(path: Union[str, Path], document: Dict[str, Any]) -> None
     write_toon(path, render_catalog_toon(document))
 
 
+def render_catalog_gcf(document: Dict[str, Any]) -> str:
+    """Render an ODPC catalog as GCF for LLM prompt context."""
+    catalog = document.get("catalog", {})
+    metadata = catalog.get("metadata", {}) if isinstance(catalog, dict) else {}
+    lines = [
+        "GCF profile=generic tool=open-data-products kind=odpc-catalog",
+        f"schema={_gcf_token(document.get('schema'))}",
+        f"version={_gcf_token(document.get('version'))}",
+        f"kind={_gcf_token(document.get('kind'))}",
+        f"id={_gcf_token(metadata.get('id'))}",
+        f"name={_gcf_token(text_value(metadata.get('name')))}",
+        f"description={_gcf_token(text_value(metadata.get('description')))}",
+    ]
+    for collection, fields in TOON_FIELDS.items():
+        items = catalog.get(collection, []) if isinstance(catalog, dict) else []
+        rows = [_catalog_gcf_row(item, fields) for item in _mapping_items(items)]
+        lines.append(f"## {collection} [{len(rows)}]{{{','.join(fields)}}}")
+        for row in rows:
+            lines.append("|".join(_gcf_token(row.get(field)) for field in fields))
+    return "\n".join(lines) + "\n"
+
+
+def write_catalog_gcf(path: Union[str, Path], document: Dict[str, Any]) -> None:
+    """Write an ODPC catalog as GCF."""
+    write_gcf(path, render_catalog_gcf(document))
+
+
 def _catalog_toon_row(
     item: Dict[str, Any],
     fields: Tuple[str, ...],
@@ -578,6 +606,13 @@ def _catalog_toon_row(
     for field in fields:
         row[field] = _primitive_or_text(item.get(field))
     return row
+
+
+def _catalog_gcf_row(
+    item: Dict[str, Any],
+    fields: Tuple[str, ...],
+) -> Dict[str, Any]:
+    return {field: _primitive_or_text(item.get(field)) for field in fields}
 
 
 def _mapping_items(items: Any) -> List[Dict[str, Any]]:
@@ -592,6 +627,17 @@ def _primitive_or_text(value: Any) -> JsonPrimitive:
     if isinstance(value, dict):
         return text_value(value)
     return str(value)
+
+
+def _gcf_token(value: Any) -> str:
+    primitive: GcfPrimitive
+    if isinstance(value, (str, int, float, bool)) or value is None:
+        primitive = value
+    elif isinstance(value, dict):
+        primitive = text_value(value)
+    else:
+        primitive = str(value)
+    return primitive_token(primitive)
 
 
 def load_schema(path: Optional[Union[str, Path]] = None) -> Dict[str, Any]:

@@ -6,6 +6,7 @@ implementation is judged by their pass/fail status, not by code reading.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import tomllib
 from pathlib import Path
@@ -325,9 +326,11 @@ class TestLoadSummary:
 
         path = tmp_path / "p.yaml"
         path.write_text("schema: odpg\nkind: Graph\n", encoding="utf-8")
+        path.with_suffix(".gcf").write_text("gcf body", encoding="utf-8")
         summary = load_summary(path)
         assert "document" not in summary
         assert "body" not in summary
+        assert "content" not in json.dumps(summary)
 
     def test_load_summary_counts_empty_file_as_zero_lines(self, tmp_path):
         from open_data_products import load_summary
@@ -336,6 +339,37 @@ class TestLoadSummary:
         path.write_text("", encoding="utf-8")
 
         assert load_summary(path)["line_count"] == 0
+
+    def test_load_summary_references_compact_context_sidecars(self, tmp_path):
+        from open_data_products import load_summary
+
+        path = tmp_path / "graph.yaml"
+        path.write_text("schema: odpg\nkind: Graph\n", encoding="utf-8")
+        gcf = path.with_suffix(".gcf")
+        toon = path.with_suffix(".toon")
+        gcf.write_text("gcf body", encoding="utf-8")
+        toon.write_text("toon body\nline two", encoding="utf-8")
+
+        summary = load_summary(path)
+
+        assert summary["context_artifacts"] == [
+            {
+                "format": "gcf",
+                "path": str(gcf),
+                "byte_size": 8,
+                "line_count": 1,
+                "sha256": hashlib.sha256(b"gcf body").hexdigest(),
+                "preferred": True,
+            },
+            {
+                "format": "toon",
+                "path": str(toon),
+                "byte_size": 18,
+                "line_count": 2,
+                "sha256": hashlib.sha256(b"toon body\nline two").hexdigest(),
+                "preferred": False,
+            },
+        ]
 
 
 # --- Agent Payments (HTTP 402) ----------------------------------------------

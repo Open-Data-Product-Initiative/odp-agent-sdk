@@ -15,6 +15,7 @@ Important helpers:
 - `explain_catalog()`
 - `render_catalog_html()`
 - `render_catalog_toon()`
+- `render_catalog_gcf()`
 - `build_catalog_artifacts()`
 - `search_objects()`
 
@@ -90,14 +91,20 @@ catalog. Avoid validation behavior that only works for one file layout.
 HTML output should be deterministic and escaped. Do not embed unescaped source
 values.
 
-## TOON Rendering
+## TOON And GCF Rendering
 
 `render_catalog_toon()` creates an optional LLM-context view of a catalog.
 It keeps YAML as the source of truth and renders repeated ODPC collections as
 TOON tables. Use `write_catalog_toon()` or `odpc-build --toon` when a workflow
 needs a compact prompt artifact.
 
+`render_catalog_gcf()` creates an optional GCF context view of the same catalog.
+It keeps YAML as the source of truth and renders repeated ODPC collections as
+pipe-delimited rows. Use `write_catalog_gcf()` or `odpc-build --gcf` when a
+workflow wants to compare TOON and GCF sidecars with the target model tokenizer.
+
 See [`toon-development.md`](toon-development.md) for the shared renderer rules.
+See [`gcf-development.md`](gcf-development.md) for GCF measurement notes.
 
 ## Object Guidance Search
 

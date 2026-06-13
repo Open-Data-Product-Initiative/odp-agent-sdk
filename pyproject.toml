@@ -77,6 +77,9 @@ contracts = [
 contracts-all = [
     "datacontract-cli[all]>=0.12.3; python_version < '3.13'",
 ]
+measurements = [
+    "tiktoken>=0.13.0; python_version >= '3.9'",
+]
 dev = [
     "pytest>=6.0",
     "pytest-cov>=3.0.0",

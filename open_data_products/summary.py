@@ -11,6 +11,7 @@ import hashlib
 from pathlib import Path
 from typing import Any, Dict, Union
 
+from ._context_artifacts import list_context_artifacts
 from ._io import load_mapping
 from .agent import detect_document
 
@@ -44,6 +45,7 @@ def load_summary(path: Union[str, Path]) -> Dict[str, Any]:
         "spec": spec,
         "kind": kind,
         "id": doc_id,
+        "context_artifacts": list_context_artifacts(p),
     }
 
 

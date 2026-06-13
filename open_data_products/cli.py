@@ -45,8 +45,8 @@ Common workflows:
     open-data-products generate --input product.md --kind odps-product --output products/
 
   Build catalog and graph review artifacts:
-    open-data-products odpc-build fragments/ --output catalog.yaml --html catalog.html --toon catalog.toon
-    open-data-products odpg-build fragments/ --output graph.yaml --toon graph.toon
+    open-data-products odpc-build fragments/ --output catalog.yaml --html catalog.html --toon catalog.toon --gcf catalog.gcf
+    open-data-products odpg-build fragments/ --output graph.yaml --toon graph.toon --gcf graph.gcf
     open-data-products odpg-generate graph.yaml --output graph-explorer.html
 
   Build a portfolio workspace:
@@ -118,7 +118,7 @@ Examples:
   open-data-products explain catalog.yaml
   open-data-products odpc-build fragments/ --output catalog.yaml
   open-data-products odpc-build fragments/ --output catalog.yaml --html catalog.html
-  open-data-products odpc-build fragments/ --output catalog.yaml --toon catalog.toon
+  open-data-products odpc-build fragments/ --output catalog.yaml --toon catalog.toon --gcf catalog.gcf
   open-data-products odpc-summary catalog.yaml
   open-data-products odpc-search "catalog data" --limit 3
   open-data-products odpc-artifacts open_data_products/generation/fragments/ --check
@@ -136,7 +136,7 @@ Examples:
   open-data-products generate --input use-case.md --kind use-case --output generated/
   open-data-products generate --config my-generation.config.yaml --provider groq --model openai/gpt-oss-120b --input source_docs/ --kind signal --output generated/
   open-data-products generate --config my-generation.config.yaml --prompts prompts/ --input source_docs/ --kind graph --output generated/
-  open-data-products odpg-build fragments/ --output graph.yaml --toon graph.toon
+  open-data-products odpg-build fragments/ --output graph.yaml --toon graph.toon --gcf graph.gcf
   open-data-products odpg-agent-context graph.yaml --node DATA-PRODUCT-001
   open-data-products odpg-generate graph.yaml --output graph-explorer.html
   open-data-products odpg-convert --input graph.graphml --output graph.yaml
@@ -566,6 +566,10 @@ def main(argv: Optional[List[str]] = None) -> int:
         help="Optional output path for a TOON catalog context file",
     )
     odpc_build_parser.add_argument(
+        "--gcf",
+        help="Optional output path for a GCF catalog context file",
+    )
+    odpc_build_parser.add_argument(
         "--id", help="Catalog metadata id to use or override"
     )
     odpc_build_parser.add_argument(
@@ -689,6 +693,14 @@ def main(argv: Optional[List[str]] = None) -> int:
         "--toon",
         help="Optional output path for a TOON graph context file",
     )
+    odpg_build_parser.add_argument(
+        "--gcf",
+        help="Optional output path for a GCF graph context file",
+    )
+    odpg_build_parser.add_argument(
+        "--context-graph",
+        help="Existing graph YAML to include as prior edge-inference context; prefers sibling .gcf/.toon",
+    )
     odpg_build_parser.add_argument("--id", help="Graph metadata id to use or override")
     odpg_build_parser.add_argument(
         "--name", help="Graph metadata name.en to use or override"
@@ -758,6 +770,11 @@ def main(argv: Optional[List[str]] = None) -> int:
     odpg_context_parser.add_argument("--node", required=True, help="Focus node id")
     odpg_context_parser.add_argument(
         "--depth", type=int, default=2, help="Context traversal depth"
+    )
+    odpg_context_parser.add_argument(
+        "--context-format",
+        choices=("auto", "gcf", "toon", "yaml"),
+        help="Include compact context artifact content in JSON output",
     )
     odpg_context_parser.add_argument("--json", action="store_true", help="Emit JSON")
 
@@ -1359,6 +1376,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                 count_items,
                 validate_catalog,
                 write_catalog,
+                write_catalog_gcf,
                 write_catalog_html,
                 write_catalog_toon,
             )
@@ -1366,6 +1384,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             output = Path(args.output)
             html_output = Path(args.html) if args.html else None
             toon_output = Path(args.toon) if args.toon else None
+            gcf_output = Path(args.gcf) if args.gcf else None
             document = build_catalog(
                 args.input_dir,
                 recursive=not args.no_recursive,
@@ -1400,6 +1419,8 @@ def main(argv: Optional[List[str]] = None) -> int:
                 write_catalog_html(html_output, document)
             if toon_output:
                 write_catalog_toon(toon_output, document)
+            if gcf_output:
+                write_catalog_gcf(gcf_output, document)
             catalog = document.get("catalog", {})
             payload = {
                 "spec": "odpc",
@@ -1407,6 +1428,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                 "output": str(output),
                 "html": str(html_output) if html_output else None,
                 "toon": str(toon_output) if toon_output else None,
+                "gcf": str(gcf_output) if gcf_output else None,
                 "valid": True if build_result is not None else None,
                 "productReferenceCount": count_items(catalog, "productReferences"),
                 "useCaseCount": count_items(catalog, "useCases"),
@@ -1577,11 +1599,13 @@ def main(argv: Optional[List[str]] = None) -> int:
                 summarize_graph,
                 validate_graph,
                 write_graph,
+                write_graph_gcf,
                 write_graph_toon,
             )
 
             output = Path(args.output)
             toon_output = Path(args.toon) if args.toon else None
+            gcf_output = Path(args.gcf) if args.gcf else None
             try:
                 settings = generation.resolve_generation_settings(
                     config_path=args.config,
@@ -1603,6 +1627,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                     client=model_client,
                     model=settings.model,
                     prompt_dir=settings.prompt_path,
+                    context_graph=args.context_graph,
                 )
                 build_result = (
                     validate_graph(document) if not args.no_validate else None
@@ -1648,12 +1673,15 @@ def main(argv: Optional[List[str]] = None) -> int:
             write_graph(output, document)
             if toon_output:
                 write_graph_toon(toon_output, document)
+            if gcf_output:
+                write_graph_gcf(gcf_output, document)
             summary = summarize_graph(document)
             payload = {
                 "spec": "odpg",
                 "kind": "Graph",
                 "output": str(output),
                 "toon": str(toon_output) if toon_output else None,
+                "gcf": str(gcf_output) if gcf_output else None,
                 "valid": True if build_result is not None else None,
                 "nodeCount": summary["nodeCount"],
                 "edgeCount": summary["edgeCount"],
@@ -1722,6 +1750,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             return 0
 
         if args.command == "odpg-agent-context":
+            from ._context_artifacts import select_context_artifact
             from .odpg import agent_context, load_graph, validate_graph
 
             graph = load_graph(args.graph)
@@ -1734,6 +1763,18 @@ def main(argv: Optional[List[str]] = None) -> int:
                 return 1
             payload = agent_context(graph, args.node, args.depth)
             payload["warnings"] = graph_result.warnings
+            if args.context_format:
+                preferred = (
+                    ("gcf", "toon", "yaml")
+                    if args.context_format == "auto"
+                    else (args.context_format,)
+                )
+                artifact = select_context_artifact(args.graph, preferred=preferred)
+                payload["contextArtifact"] = {
+                    "format": artifact.format,
+                    "path": str(artifact.path),
+                    "content": artifact.content,
+                }
             if args.json:
                 print(json.dumps(payload, indent=2))
             else:

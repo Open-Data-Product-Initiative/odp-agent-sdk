@@ -14,10 +14,12 @@ from open_data_products.odpg import (
     load_graph,
     search_graph_objects,
     render_graph_toon,
+    render_graph_gcf,
     summarize_graph,
     traverse_graph,
     validate_graph,
     write_graph,
+    write_graph_gcf,
     write_graph_toon,
 )
 from open_data_products.odpg.cli import (
@@ -138,6 +140,63 @@ def test_render_and_write_graph_toon(tmp_path):
     write_graph_toon(output, graph)
 
     assert output.read_text(encoding="utf-8") == toon
+
+
+def test_render_and_write_graph_gcf(tmp_path):
+    graph = {
+        "schema": "https://opendataproducts.org/odpg-v1.0/schema/odpg.yaml",
+        "version": "1.0",
+        "kind": "Graph",
+        "graph": {
+            "metadata": {
+                "id": "GRAPH-001",
+                "name": {"en": "Customer Graph"},
+                "description": {"en": "Customer graph for agent context."},
+            },
+            "nodes": [
+                {
+                    "id": "customer-product",
+                    "type": "DataProduct",
+                    "$ref": "product_reference_customer-product.yaml",
+                },
+                {
+                    "id": "customer-retention",
+                    "type": "UseCase",
+                    "$ref": "use_case_customer-retention.yaml",
+                },
+            ],
+            "edges": [
+                {
+                    "from": "customer-retention",
+                    "to": "customer-product",
+                    "type": "dependsOn",
+                    "confidence": "high",
+                }
+            ],
+        },
+    }
+
+    gcf = render_graph_gcf(graph)
+
+    assert gcf.startswith(
+        "GCF profile=generic tool=open-data-products kind=odpg-graph "
+        "nodes=2 edges=1\n"
+    )
+    assert "schema=https://opendataproducts.org/odpg-v1.0/schema/odpg.yaml\n" in gcf
+    assert "id=GRAPH-001\n" in gcf
+    assert "name=Customer Graph\n" in gcf
+    assert "## nodes [2]{id,type,ref}\n" in gcf
+    assert (
+        "@0 customer-product|DataProduct|product_reference_customer-product.yaml" in gcf
+    )
+    assert "@1 customer-retention|UseCase|use_case_customer-retention.yaml" in gcf
+    assert "## edges [1]\n" in gcf
+    assert "@0<@1 dependsOn high\n" in gcf
+
+    output = tmp_path / "deep" / "gcf" / "graph.gcf"
+    write_graph_gcf(output, graph)
+
+    assert output.read_text(encoding="utf-8") == gcf
 
 
 def test_build_graph_explorer_html_returns_document():
@@ -339,6 +398,53 @@ edges:
         {"id": "churn-risk-score", "type": "Signal", "$ref": "signal.yaml"},
     ]
     assert graph["graph"]["edges"][0]["type"] == "dependsOn"
+
+
+def test_build_graph_uses_compact_prior_graph_context(tmp_path):
+    fragments = tmp_path / "fragments"
+    fragments.mkdir()
+    (fragments / "product.yaml").write_text(
+        """
+productReference:
+  id: customer-analytics-product
+  name:
+    en: Customer Analytics Product
+""",
+        encoding="utf-8",
+    )
+    (fragments / "use-case.yaml").write_text(
+        """
+useCase:
+  id: customer-retention
+  name:
+    en: Customer Retention
+""",
+        encoding="utf-8",
+    )
+    context_graph = tmp_path / "graph.yaml"
+    context_graph.write_text("full yaml graph context", encoding="utf-8")
+    context_graph.with_suffix(".gcf").write_text(
+        "compact prior graph context", encoding="utf-8"
+    )
+    prompts = []
+
+    def fake_client(prompt, model):
+        prompts.append(prompt)
+        return """
+edges:
+  - from: customer-retention
+    to: customer-analytics-product
+    type: dependsOn
+    confidence: high
+"""
+
+    build_graph(fragments, client=fake_client, context_graph=context_graph)
+
+    assert (
+        "--- Existing graph context: graph.yaml (context: graph.gcf) ---" in prompts[0]
+    )
+    assert "compact prior graph context" in prompts[0]
+    assert "full yaml graph context" not in prompts[0]
 
 
 def test_build_graph_rejects_llm_edges_for_unknown_nodes(tmp_path):

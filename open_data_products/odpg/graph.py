@@ -24,6 +24,8 @@ from typing import (
 
 import yaml
 
+from open_data_products._context_artifacts import select_context_artifact
+from open_data_products._gcf import GcfPrimitive, primitive_token, write_gcf
 from open_data_products._io import load_jsonl_records, load_mapping
 from open_data_products._search import search_records, searchable_record_text
 from open_data_products._toon import (
@@ -199,6 +201,7 @@ def build_graph(
     client: Optional[GraphBuildClient] = None,
     model: str = DEFAULT_GRAPH_BUILD_MODEL,
     prompt_dir: Optional[Union[str, Path]] = None,
+    context_graph: Optional[Union[str, Path]] = None,
 ) -> Dict[str, Any]:
     """Build one ODPG graph from ODPC fragments in a folder."""
     if client is None:
@@ -212,7 +215,12 @@ def build_graph(
     if not nodes:
         raise ValueError(f"No ODPC fragments found for graph nodes at {input_dir}")
 
-    prompt = render_edge_prompt(nodes, context, prompt_dir=prompt_dir)
+    prompt = render_edge_prompt(
+        nodes,
+        context,
+        prompt_dir=prompt_dir,
+        context_graph=context_graph,
+    )
     raw_output = client(prompt, model)
     edges = parse_generated_edges(raw_output, nodes)
     document = {
@@ -288,6 +296,59 @@ def render_graph_toon(document: Dict[str, Any]) -> str:
 def write_graph_toon(path: Union[str, Path], document: Dict[str, Any]) -> None:
     """Write an ODPG graph as TOON."""
     write_toon(path, render_graph_toon(document))
+
+
+def render_graph_gcf(document: Dict[str, Any]) -> str:
+    """Render an ODPG graph as GCF for LLM prompt context."""
+    metadata = graph_metadata(document)
+    nodes = _graph_nodes(document)
+    edges = _graph_edges(document)
+    node_ids = {
+        str(node.get("id")): index
+        for index, node in enumerate(nodes)
+        if isinstance(node, dict) and node.get("id") is not None
+    }
+    lines = [
+        "GCF profile=generic tool=open-data-products kind=odpg-graph "
+        f"nodes={len(nodes)} edges={len(edges)}",
+        f"schema={_gcf_token(document.get('schema'))}",
+        f"version={_gcf_token(document.get('version'))}",
+        f"kind={_gcf_token(document.get('kind'))}",
+        f"id={_gcf_token(metadata.get('id'))}",
+        f"name={_gcf_token(localized_text(metadata.get('name')))}",
+        f"description={_gcf_token(localized_text(metadata.get('description')))}",
+        f"## nodes [{len(nodes)}]{{id,type,ref}}",
+    ]
+    for index, node in enumerate(nodes):
+        lines.append(
+            f"@{index} "
+            f"{_gcf_token(node.get('id'))}|"
+            f"{_gcf_token(node.get('type'))}|"
+            f"{_gcf_token(_node_ref(node))}"
+        )
+    lines.append(f"## edges [{len(edges)}]")
+    for edge in edges:
+        source_index = node_ids.get(str(edge.get("from")))
+        target_index = node_ids.get(str(edge.get("to")))
+        if source_index is None or target_index is None:
+            lines.append(
+                f"{_gcf_token(edge.get('from'))}|"
+                f"{_gcf_token(edge.get('to'))}|"
+                f"{_gcf_token(edge.get('type'))}|"
+                f"{_gcf_token(edge.get('confidence'))}"
+            )
+            continue
+        lines.append(
+            f"@{target_index}<@{source_index} "
+            f"{_gcf_token(edge.get('type'))} "
+            f"{_gcf_token(edge.get('confidence'))}"
+        )
+    return "\n".join(lines) + "\n"
+
+
+def write_graph_gcf(path: Union[str, Path], document: Dict[str, Any]) -> None:
+    """Write an ODPG graph as GCF."""
+    write_gcf(path, render_graph_gcf(document))
 
 
 def collect_odpc_graph_nodes(
@@ -368,11 +429,23 @@ def _primitive_or_text(value: Any) -> JsonPrimitive:
     return str(value)
 
 
+def _gcf_token(value: Any) -> str:
+    primitive: GcfPrimitive
+    if isinstance(value, (str, int, float, bool)) or value is None:
+        primitive = value
+    elif isinstance(value, dict):
+        primitive = localized_text(value)
+    else:
+        primitive = str(value)
+    return primitive_token(primitive)
+
+
 def render_edge_prompt(
     nodes: List[Dict[str, Any]],
     fragment_context: str,
     *,
     prompt_dir: Optional[Union[str, Path]] = None,
+    context_graph: Optional[Union[str, Path]] = None,
 ) -> str:
     """Render the LLM prompt for ODPG edge inference."""
     from open_data_products.generation import load_generation_prompt
@@ -381,10 +454,37 @@ def render_edge_prompt(
         f"- id: {node['id']}\n  type: {node['type']}\n  ref: {node['$ref']}"
         for node in nodes
     ]
+    prompt_context = _edge_prompt_context(fragment_context, context_graph)
     return (
         load_generation_prompt(DEFAULT_EDGE_PROMPT, prompt_dir=prompt_dir)
         .replace("{nodes}", "\n".join(node_lines))
-        .replace("{odpc_fragments}", fragment_context)
+        .replace("{odpc_fragments}", prompt_context)
+    )
+
+
+def _edge_prompt_context(
+    fragment_context: str,
+    context_graph: Optional[Union[str, Path]],
+) -> str:
+    if context_graph is None:
+        return fragment_context
+    path = Path(context_graph)
+    artifact = select_context_artifact(path)
+    return "\n\n".join(
+        part
+        for part in (
+            fragment_context,
+            "\n".join(
+                [
+                    (
+                        f"--- Existing graph context: {path.name} "
+                        f"(context: {artifact.path.name}) ---"
+                    ),
+                    artifact.content.strip(),
+                ]
+            ),
+        )
+        if part
     )
 
 

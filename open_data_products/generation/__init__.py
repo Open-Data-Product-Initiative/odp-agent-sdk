@@ -15,6 +15,8 @@ from urllib import error, request
 import certifi
 import yaml
 
+from .._context_artifacts import select_context_artifact
+
 _PROMPT_DIR = Path(__file__).resolve().parent / "data" / "prompts"
 DEFAULT_OLLAMA_URL = "http://localhost:11434"
 DEFAULT_OPENAI_URL = "https://api.openai.com/v1"
@@ -366,23 +368,38 @@ PathLike = Union[str, Path]
 
 
 def load_source_documents(source_dir: PathLike) -> str:
-    """Load Markdown and text source documents as one prompt context."""
+    """Load source documents as one prompt context."""
     paths = _source_document_paths(source_dir)
 
     if not paths:
-        raise ValueError(f"No Markdown or text source documents found at {source_dir}")
+        raise ValueError(f"No supported source documents found at {source_dir}")
 
     sections = []
     for path in paths:
+        heading, content = _source_document_context(path)
         sections.append(
             "\n".join(
                 [
-                    f"--- Source file: {path.name} ---",
-                    path.read_text(encoding="utf-8").strip(),
+                    heading,
+                    content,
                 ]
             )
         )
     return "\n\n".join(sections)
+
+
+def _source_document_context(path: Path) -> tuple[str, str]:
+    if path.suffix.lower() in {".yaml", ".yml"}:
+        try:
+            artifact = select_context_artifact(path, preferred=("gcf", "toon"))
+        except FileNotFoundError:
+            pass
+        else:
+            return (
+                f"--- Source file: {path.name} (context: {artifact.path.name}) ---",
+                artifact.content.strip(),
+            )
+    return f"--- Source file: {path.name} ---", path.read_text(encoding="utf-8").strip()
 
 
 def _source_document_paths(source: PathLike) -> List[Path]:
@@ -393,9 +410,16 @@ def _source_document_paths(source: PathLike) -> List[Path]:
         return sorted(
             path
             for path in root.iterdir()
-            if path.is_file() and path.suffix.lower() in {".md", ".txt"}
+            if path.is_file()
+            and (path.suffix.lower() in {".md", ".txt"} or _has_context_sidecar(path))
         )
     raise FileNotFoundError(f"Source document path not found: {root}")
+
+
+def _has_context_sidecar(path: Path) -> bool:
+    if path.suffix.lower() not in {".yaml", ".yml"}:
+        return False
+    return path.with_suffix(".gcf").is_file() or path.with_suffix(".toon").is_file()
 
 
 def render_generation_prompt(

@@ -51,7 +51,7 @@ Generation assets live together under `open_data_products/generation/`:
 ```text
 open_data_products/generation/
   data/prompts/        # editable prompt templates
-  source_docs/         # plain Markdown/text input files
+  source_docs/         # prompt source files and optional compact context sidecars
   fragments/           # generated ODPC fragments, ODPG graph, HTML explorer
 ```
 
@@ -63,7 +63,10 @@ open-data-products config generation --copy-prompts-to prompts/
 ```
 
 The `source_docs/` folder is generic. Replace the bundled sample files with
-source documents for any domain. The generator reads `.md` and `.txt` files.
+source documents for any domain. The generator reads `.md` and `.txt` files. It
+can also include YAML catalog or graph context when the YAML file has a sibling
+`.gcf` or `.toon` sidecar; in that case the compact sidecar text is inlined into
+the prompt instead of the full YAML body.
 
 Filenames are included in prompts as source boundaries, for example:
 
@@ -121,10 +124,10 @@ open-data-products generate \
   --json
 ```
 
-For selected-kind folder generation, each `.md` or `.txt` source document is
-processed separately with the selected prompt. Put only matching source files in
-that folder. The output folder contains one or more matching artifacts,
-depending on what the model can extract:
+For selected-kind folder generation, each `.md`, `.txt`, or sidecar-backed YAML
+source document is processed separately with the selected prompt. Put only
+matching source files in that folder. The output folder contains one or more
+matching artifacts, depending on what the model can extract:
 
 - `productReference:` files such as `product_reference_<id>.yaml`
 - `OpenDataProduct` files such as `odps_product_<id>.yaml`

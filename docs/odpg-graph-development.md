@@ -71,6 +71,11 @@ Flow:
 
 The model client is required. Do not hide live LLM calls inside this helper.
 
+`build_graph(..., context_graph=...)` can include an existing graph as prior
+edge-inference context. The helper still builds the new graph from ODPC
+fragments, but the prompt prefers a sibling `.gcf`, then `.toon`, then YAML
+text for the context graph.
+
 ## Generated Edge Parsing
 
 `parse_generated_edges()` strips Markdown fences, loads YAML, and accepts only
@@ -92,6 +97,11 @@ depth limits enforced because graph payloads can grow quickly.
 `agent_context()` extracts nearby graph context around a focus node for agent
 workflows.
 
+The unified CLI can also attach compact sidecar text to the JSON context packet
+with `odpg-agent-context --context-format auto`. That option selects sibling
+`.gcf`, `.toon`, or `.yaml` files for agent prompt input while still loading and
+validating the canonical graph YAML.
+
 ## Graph Explorer
 
 `generate_graph_explorer()` renders a standalone HTML explorer from graph YAML.
@@ -105,6 +115,17 @@ YAML as the source of truth and renders `nodes` and `edges` as TOON tables. Use
 prompt artifact.
 
 See [`toon-development.md`](toon-development.md) for the shared renderer rules.
+
+## GCF Rendering
+
+`render_graph_gcf()` creates an experimental GCF sidecar for graph context. It
+keeps YAML as the source of truth, declares nodes once, assigns deterministic
+local IDs, and renders edges as compact local-ID references. Use
+`write_graph_gcf()` or `odpg-build --gcf` when an agent workflow sends graph
+context repeatedly or when edge identifiers dominate the prompt payload.
+
+See [`gcf-development.md`](gcf-development.md) for the local measurement notes
+and scope boundary.
 
 ## Tests
 

@@ -1064,6 +1064,7 @@ def test_unified_cli_builds_odpc_catalog_from_fragments(
     output = tmp_path / "catalog.yaml"
     html_output = tmp_path / "catalog.html"
     toon_output = tmp_path / "catalog.toon"
+    gcf_output = tmp_path / "catalog.gcf"
     (fragments / "product.yaml").write_text(
         """
 schema: https://opendataproducts.org/v4.1/schema/odps.json
@@ -1089,6 +1090,8 @@ product:
                 str(html_output),
                 "--toon",
                 str(toon_output),
+                "--gcf",
+                str(gcf_output),
                 "--id",
                 "CAT-CLI",
                 "--json",
@@ -1102,6 +1105,7 @@ product:
     assert payload["output"] == str(output)
     assert payload["html"] == str(html_output)
     assert payload["toon"] == str(toon_output)
+    assert payload["gcf"] == str(gcf_output)
     assert payload["productReferenceCount"] == 1
 
     assert output.read_text(encoding="utf-8").startswith(
@@ -1111,6 +1115,9 @@ product:
     assert html.startswith("<!doctype html>")
     assert "Agent Ready Product" in html
     assert "productReferences[1]" in toon_output.read_text(encoding="utf-8")
+    gcf = gcf_output.read_text(encoding="utf-8")
+    assert "GCF profile=generic tool=open-data-products kind=odpc-catalog" in gcf
+    assert "## productReferences [1]" in gcf
 
 
 def test_unified_cli_builds_odpg_graph_from_odpc_fragments(
@@ -1124,6 +1131,12 @@ def test_unified_cli_builds_odpg_graph_from_odpc_fragments(
     fragments.mkdir()
     output = tmp_path / "graph.yaml"
     toon_output = tmp_path / "graph.toon"
+    gcf_output = tmp_path / "graph.gcf"
+    context_graph = tmp_path / "previous-graph.yaml"
+    context_graph.write_text("full previous graph yaml", encoding="utf-8")
+    context_graph.with_suffix(".gcf").write_text(
+        "compact previous graph context", encoding="utf-8"
+    )
     (fragments / "product.yaml").write_text(
         """
 productReference:
@@ -1150,6 +1163,8 @@ useCase:
     def fake_create_generation_client(settings):
         def fake_client(prompt: str, model: str) -> str:
             assert "customer-retention" in prompt
+            assert "compact previous graph context" in prompt
+            assert "full previous graph yaml" not in prompt
             return """
 edges:
   - from: customer-retention
@@ -1175,6 +1190,10 @@ edges:
                 str(output),
                 "--toon",
                 str(toon_output),
+                "--gcf",
+                str(gcf_output),
+                "--context-graph",
+                str(context_graph),
                 "--id",
                 "customer-graph",
                 "--model",
@@ -1189,6 +1208,7 @@ edges:
     assert payload["kind"] == "Graph"
     assert payload["output"] == str(output)
     assert payload["toon"] == str(toon_output)
+    assert payload["gcf"] == str(gcf_output)
     assert payload["valid"] is True
     assert payload["nodeCount"] == 2
     assert payload["edgeCount"] == 1
@@ -1199,6 +1219,10 @@ edges:
     assert "edges[1]{from,to,type,confidence}:" in toon_output.read_text(
         encoding="utf-8"
     )
+    gcf = gcf_output.read_text(encoding="utf-8")
+    assert "GCF profile=generic tool=open-data-products kind=odpg-graph" in gcf
+    assert "## edges [1]" in gcf
+    assert "@0<@1 dependsOn high" in gcf
 
 
 def test_unified_cli_odpv_commands(capsys: pytest.CaptureFixture[str]) -> None:
@@ -1309,6 +1333,38 @@ def test_unified_cli_odpg_reasoning_commands(
     assert payload["spec"] == "odpg"
     assert payload["generated"] is True
     assert output.exists()
+
+
+def test_odpg_agent_context_can_include_compact_context_artifact(
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+) -> None:
+    graph = tmp_path / "graph.yaml"
+    graph.write_text(ODPG_GRAPH.read_text(encoding="utf-8"), encoding="utf-8")
+    graph.with_suffix(".gcf").write_text("compact graph context", encoding="utf-8")
+
+    assert (
+        main(
+            [
+                "odpg-agent-context",
+                str(graph),
+                "--node",
+                "AGENT-AVIATION-001",
+                "--context-format",
+                "auto",
+                "--json",
+            ]
+        )
+        == 0
+    )
+
+    payload = _json_output(capsys)
+    assert payload["focusNode"]["id"] == "AGENT-AVIATION-001"
+    assert payload["contextArtifact"] == {
+        "format": "gcf",
+        "path": str(graph.with_suffix(".gcf")),
+        "content": "compact graph context",
+    }
 
     graph_source = tmp_path / "graph.graphson"
     graph_yaml = tmp_path / "converted-graph.yaml"

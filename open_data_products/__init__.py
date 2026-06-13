@@ -11,7 +11,7 @@ family. Each standard lives in its own namespace:
 
 # flake8: noqa: E402
 
-__version__ = "0.2.1"
+__version__ = "0.2.2"
 version = __version__
 
 from . import odpc
@@ -79,10 +79,12 @@ from .generation import (
 from .odpc import (
     build_catalog,
     build_catalog_artifacts,
+    render_catalog_gcf,
     render_catalog_html,
     render_catalog_toon,
     render_catalog_schema_json,
     write_catalog,
+    write_catalog_gcf,
     write_catalog_html,
     write_catalog_toon,
     write_catalog_artifacts,
@@ -92,8 +94,10 @@ from .odpg import (
     convert_file,
     convert_graph,
     dump_graph_yaml,
+    render_graph_gcf,
     render_graph_toon,
     write_graph,
+    write_graph_gcf,
     write_graph_toon,
 )
 from .odpv import (
@@ -184,6 +188,7 @@ __all__ = [
     "openai_chat_generate",
     "openai_generate",
     "print_config",
+    "render_catalog_gcf",
     "render_catalog_html",
     "render_catalog_toon",
     "render_catalog_schema_json",
@@ -194,6 +199,7 @@ __all__ = [
     "sync_portfolio",
     "validate_config",
     "write_graph",
+    "render_graph_gcf",
     "render_graph_toon",
     "resolve_references",
     "resolve_vocabulary_term",
@@ -203,8 +209,10 @@ __all__ = [
     "validate_contract",
     "validate_document",
     "write_catalog",
+    "write_catalog_gcf",
     "write_catalog_html",
     "write_catalog_toon",
     "write_catalog_artifacts",
+    "write_graph_gcf",
     "write_graph_toon",
 ]

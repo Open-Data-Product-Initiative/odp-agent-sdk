@@ -12,8 +12,8 @@ result is consumed by CI, scripts, MCP clients, or other agents.
 ```bash
 open-data-products validate product.yaml
 open-data-products generate --input source_docs/ --kind product-reference --output generated/
-open-data-products odpc-build fragments/ --output catalog.yaml --html catalog.html --toon catalog.toon
-open-data-products odpg-build fragments/ --output graph.yaml --toon graph.toon
+open-data-products odpc-build fragments/ --output catalog.yaml --html catalog.html --toon catalog.toon --gcf catalog.gcf
+open-data-products odpg-build fragments/ --output graph.yaml --toon graph.toon --gcf graph.gcf
 open-data-products portfolio build --objectives inputs/objectives/ --use-cases inputs/use-cases/ --signals inputs/signals/ --products inputs/products/ --output portfolio/
 ```
 
@@ -50,7 +50,10 @@ open-data-products summary examples/product.yaml
 ```
 
 Returns lightweight file metadata such as detected spec, size, and hash. This
-is intentionally a reference summary, not the full document body.
+is intentionally a reference summary, not the full document body. When sibling
+`.gcf` or `.toon` context sidecars exist, JSON output includes
+`context_artifacts` metadata so agents can discover compact context files before
+reading them.
 
 ## Bundled Resources
 
@@ -84,6 +87,10 @@ open-data-products generate --kind signal
 Runs signal generation with default paths. By default, it reads source documents from
 `open_data_products/generation/source_docs/`, uses local Ollama with Qwen 2.5,
 and writes generated fragments to `open_data_products/generation/fragments/`.
+When source material includes a YAML catalog or graph with a sibling `.gcf` or
+`.toon` sidecar, generation prompts inline the compact sidecar text instead of
+the full YAML body. Source folders include YAML files only when those compact
+sidecars exist.
 
 ```bash
 open-data-products generate --config open_data_products/generation/generation.config.yaml --kind signal
@@ -140,11 +147,12 @@ open-data-products odpc-build examples/odpc_catalog_fragments/ --output /tmp/odp
 Builds the ODPC catalog YAML and a standalone HTML catalog page in one run.
 
 ```bash
-open-data-products odpc-build examples/odpc_catalog_fragments/ --output /tmp/odp-catalog.yaml --toon /tmp/odp-catalog.toon
+open-data-products odpc-build examples/odpc_catalog_fragments/ --output /tmp/odp-catalog.yaml --toon /tmp/odp-catalog.toon --gcf /tmp/odp-catalog.gcf
 ```
 
-Builds the ODPC catalog YAML and an optional TOON sidecar for LLM prompt
-context. YAML remains the source of truth.
+Builds the ODPC catalog YAML and optional compact sidecars for LLM prompt
+context. TOON uses compact tables; GCF uses pipe-delimited rows. YAML remains
+the source of truth.
 
 ```bash
 open-data-products odpc-summary /tmp/odp-catalog.yaml
@@ -226,11 +234,26 @@ Extracts the graph neighborhood around one node in a compact format suitable
 for agents.
 
 ```bash
-open-data-products odpg-build examples/odpc_catalog_fragments/ --output /tmp/odp-graph.yaml --toon /tmp/odp-graph.toon
+open-data-products odpg-agent-context open_data_products/odpg/data/graph/graph.yaml \
+  --node AGENT-AVIATION-001 \
+  --context-format auto \
+  --json
 ```
 
-Builds the ODPG graph YAML and an optional TOON sidecar for LLM prompt context.
-YAML remains the source of truth.
+Adds a `contextArtifact` object to the JSON payload. `auto` prefers a sibling
+`.gcf` file, then `.toon`, then the original YAML text. The graph YAML remains
+the canonical file used for loading and validation.
+
+```bash
+open-data-products odpg-build examples/odpc_catalog_fragments/ --output /tmp/odp-graph.yaml --toon /tmp/odp-graph.toon --gcf /tmp/odp-graph.gcf
+```
+
+Builds the ODPG graph YAML and optional compact sidecars for LLM prompt
+context. TOON keeps nodes and edges as tables. GCF uses local node IDs so graph
+edges do not repeat full endpoint identifiers. YAML remains the source of truth.
+Add `--context-graph previous-graph.yaml` when edge inference should see an
+existing graph as prompt context; the command prefers `previous-graph.gcf`, then
+`.toon`, then YAML text.
 
 ```bash
 open-data-products odpg-generate open_data_products/odpg/data/graph/graph.yaml --output /tmp/odp-graph-explorer.html

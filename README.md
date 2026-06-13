@@ -296,7 +296,7 @@ open-data-products odpg-generate open_data_products/generation/fragments/odpg_gr
 # ODPC catalog helpers
 open-data-products odpc-build examples/odpc_catalog_fragments/ --output /tmp/odp-catalog.yaml
 open-data-products odpc-build examples/odpc_catalog_fragments/ --output /tmp/odp-catalog.yaml --html /tmp/odp-catalog.html
-open-data-products odpc-build examples/odpc_catalog_fragments/ --output /tmp/odp-catalog.yaml --toon /tmp/odp-catalog.toon
+open-data-products odpc-build examples/odpc_catalog_fragments/ --output /tmp/odp-catalog.yaml --toon /tmp/odp-catalog.toon --gcf /tmp/odp-catalog.gcf
 open-data-products odpc-summary /tmp/odp-catalog.yaml
 open-data-products odpc-search "catalog data" --limit 3
 
@@ -313,7 +313,7 @@ open-data-products odpg-summary open_data_products/odpg/data/graph/graph.yaml
 open-data-products odpg-traverse open_data_products/odpg/data/graph/graph.yaml --start AGENT-AVIATION-001 --depth 2
 open-data-products odpg-analyze open_data_products/odpg/data/graph/graph.yaml
 open-data-products odpg-agent-context open_data_products/odpg/data/graph/graph.yaml --node AGENT-AVIATION-001 --depth 2
-open-data-products odpg-build examples/odpc_catalog_fragments/ --output /tmp/odp-graph.yaml --toon /tmp/odp-graph.toon
+open-data-products odpg-build examples/odpc_catalog_fragments/ --output /tmp/odp-graph.yaml --toon /tmp/odp-graph.toon --gcf /tmp/odp-graph.gcf
 open-data-products odpg-convert --input examples/graph.graphml --output /tmp/odp-converted-graph.yaml
 open-data-products odpg-generate open_data_products/odpg/data/graph/graph.yaml --output /tmp/odp-graph-explorer.html
 

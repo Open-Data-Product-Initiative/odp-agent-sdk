@@ -1,5 +1,6 @@
 """Functional tests for the stdio MCP JSON-RPC handler surface."""
 
+import json
 from pathlib import Path
 from typing import Any, Dict
 
@@ -10,7 +11,9 @@ from open_data_products.mcp.server import handle
 pytestmark = pytest.mark.functional
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-ODPS_PRODUCT = REPO_ROOT / "examples" / "apps" / "pricing_402_builder" / "priced_product.yaml"
+ODPS_PRODUCT = (
+    REPO_ROOT / "examples" / "apps" / "pricing_402_builder" / "priced_product.yaml"
+)
 ODPG_GRAPH = REPO_ROOT / "open_data_products" / "odpg" / "data" / "graph" / "graph.yaml"
 
 
@@ -110,6 +113,19 @@ def test_mcp_tool_calls_work_functionally(
     tool_name: str, arguments: Dict[str, Any]
 ) -> None:
     _call_tool(tool_name, arguments)
+
+
+def test_mcp_load_summary_exposes_context_sidecar_references(tmp_path: Path) -> None:
+    graph = tmp_path / "graph.yaml"
+    graph.write_text("schema: odpg\nkind: Graph\n", encoding="utf-8")
+    graph.with_suffix(".gcf").write_text("@0 Graph|x", encoding="utf-8")
+
+    result = _call_tool("load_summary", {"path": str(graph)})
+    payload = json.loads(result["content"][0]["text"])
+
+    assert payload["context_artifacts"][0]["format"] == "gcf"
+    assert payload["context_artifacts"][0]["path"] == str(graph.with_suffix(".gcf"))
+    assert "content" not in result["content"][0]["text"]
 
 
 def test_mcp_unknown_tool_returns_json_rpc_error() -> None:

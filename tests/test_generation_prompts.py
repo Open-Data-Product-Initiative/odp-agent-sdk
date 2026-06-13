@@ -24,6 +24,7 @@ from open_data_products.generation import (
     load_generation_config,
     list_generation_prompts,
     load_generation_prompt,
+    load_source_documents,
     list_ollama_models,
     openai_chat_generate,
     openai_generate,
@@ -341,6 +342,40 @@ def test_render_generation_prompt_accepts_one_source_file():
     assert "Source file: turnaround-delay-signal.txt" in prompt
     assert "Turnaround Delay Spike Signal" in prompt
     assert "Passenger Flow and Queue Data Product" not in prompt
+
+
+def test_load_source_documents_prefers_compact_yaml_context_sidecars(tmp_path):
+    """Test YAML source context uses compact sidecars when available."""
+    graph = tmp_path / "graph.yaml"
+    graph.write_text("yaml graph body", encoding="utf-8")
+    graph.with_suffix(".toon").write_text("toon graph body", encoding="utf-8")
+    graph.with_suffix(".gcf").write_text("gcf graph body", encoding="utf-8")
+
+    context = load_source_documents(graph)
+
+    assert "--- Source file: graph.yaml (context: graph.gcf) ---" in context
+    assert "gcf graph body" in context
+    assert "toon graph body" not in context
+    assert "yaml graph body" not in context
+
+
+def test_load_source_documents_includes_yaml_sidecars_from_source_folders(tmp_path):
+    """Test source folders include YAML artifacts only through compact sidecars."""
+    note = tmp_path / "brief.md"
+    note.write_text("Business objective: reduce churn", encoding="utf-8")
+    graph = tmp_path / "graph.yaml"
+    graph.write_text("yaml graph body", encoding="utf-8")
+    graph.with_suffix(".gcf").write_text("gcf graph body", encoding="utf-8")
+    config = tmp_path / "generation.config.yaml"
+    config.write_text("provider: ollama", encoding="utf-8")
+
+    context = load_source_documents(tmp_path)
+
+    assert "Source file: brief.md" in context
+    assert "Business objective: reduce churn" in context
+    assert "Source file: graph.yaml (context: graph.gcf)" in context
+    assert "gcf graph body" in context
+    assert "provider: ollama" not in context
 
 
 def test_list_ollama_models_reads_local_tags(monkeypatch):
