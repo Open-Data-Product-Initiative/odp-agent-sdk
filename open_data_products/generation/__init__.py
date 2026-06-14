@@ -2,22 +2,47 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 import json
 import os
 from pathlib import Path
 import re
 import shutil
 import ssl
-from typing import Any, Callable, Dict, List, Optional, Sequence, Union
+from typing import Any, Dict, List, Optional, Sequence
 from urllib import error, request
 
 import certifi
 import yaml
 
-from .._context_artifacts import select_context_artifact
+from ..odps._normalization import (
+    ODPS_DATA_QUALITY_DIMENSION_ALIASES,
+    ODPS_DATA_QUALITY_DIMENSIONS,
+    ODPS_DATA_QUALITY_UNITS,
+    ODPS_SLA_DIMENSION_ALIASES,
+    ODPS_SLA_DIMENSIONS,
+    ODPS_SLA_UNITS,
+    normalize_odps_dimension,
+)
+from . import models, prompts
+from .models import (
+    GENERATION_TASKS,
+    GENERATION_TASK_ALIASES,
+    HOLISTIC_GENERATION_TASKS,
+    GeneratedArtifact,
+    GenerationSettings,
+    GenerationTask,
+    ModelClient,
+    PathLike,
+)
+from .prompts import (
+    copy_generation_prompts,
+    list_generation_prompts,
+    load_generation_prompt,
+    load_source_documents,
+    render_generation_prompt,
+    source_document_paths as _source_document_paths,
+)
 
-_PROMPT_DIR = Path(__file__).resolve().parent / "data" / "prompts"
 DEFAULT_OLLAMA_URL = "http://localhost:11434"
 DEFAULT_OPENAI_URL = "https://api.openai.com/v1"
 DEFAULT_OPENAI_CHAT_URL = "http://localhost:1234/v1"
@@ -29,60 +54,6 @@ DEFAULT_OLLAMA_GENERATE_TIMEOUT = 300
 DEFAULT_OPENAI_GENERATE_TIMEOUT = 300
 DEFAULT_OPENAI_USER_AGENT = "open-data-products-python/0.2"
 DEFAULT_GENERATION_CONFIG = Path(__file__).resolve().parent / "generation.config.yaml"
-ODPS_SLA_DIMENSIONS = {
-    "latency",
-    "uptime",
-    "responseTime",
-    "errorRate",
-    "endOfSupport",
-    "endOfLife",
-    "updateFrequency",
-    "timeToDetect",
-    "timeToNotify",
-    "timeToRepair",
-    "emailResponseTime",
-}
-ODPS_SLA_DIMENSION_ALIASES = {
-    "availability": "uptime",
-    "available": "uptime",
-    "freshness": "updateFrequency",
-    "datafreshness": "updateFrequency",
-    "data-freshness": "updateFrequency",
-    "refresh": "updateFrequency",
-    "refreshtimeliness": "updateFrequency",
-    "refresh-timeliness": "updateFrequency",
-    "refreshfrequency": "updateFrequency",
-    "refresh-frequency": "updateFrequency",
-}
-ODPS_SLA_UNITS = {
-    "percent",
-    "milliseconds",
-    "seconds",
-    "minutes",
-    "days",
-    "weeks",
-    "months",
-    "years",
-    "never",
-    "date",
-    "null",
-}
-ODPS_DATA_QUALITY_DIMENSIONS = {
-    "accuracy",
-    "completeness",
-    "conformity",
-    "consistency",
-    "coverage",
-    "timeliness",
-    "validity",
-    "uniqueness",
-}
-ODPS_DATA_QUALITY_DIMENSION_ALIASES = {
-    "freshness": "timeliness",
-    "datafreshness": "timeliness",
-    "data-freshness": "timeliness",
-}
-ODPS_DATA_QUALITY_UNITS = {"percentage", "number"}
 ODPS_PRODUCT_TYPES = {
     "raw data",
     "derived data",
@@ -199,250 +170,6 @@ BUILT_IN_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "maxTokens": DEFAULT_ANTHROPIC_MAX_TOKENS,
     },
 }
-
-ModelClient = Callable[[str, str], str]
-
-
-@dataclass(frozen=True)
-class GenerationTask:
-    """Prompt and output mapping for one local generation artifact."""
-
-    name: str
-    prompt_name: str
-    output_name: str
-    expected_root: str
-    fragment_root: Optional[str] = None
-    filename_prefix: Optional[str] = None
-    graph_node_type: Optional[str] = None
-
-
-@dataclass(frozen=True)
-class GenerationSettings:
-    """Resolved LLM generation provider and path settings."""
-
-    provider: str
-    model: str
-    input_path: str
-    output_path: str
-    provider_type: str = "ollama"
-    base_url: Optional[str] = None
-    api_key_env: Optional[str] = None
-    api_version: Optional[str] = None
-    max_tokens: Optional[int] = None
-    model_path: Optional[str] = None
-    context_window: Optional[int] = None
-    gpu_layers: Optional[int] = None
-    prompt_path: Optional[str] = None
-
-
-@dataclass(frozen=True)
-class GeneratedArtifact:
-    """Generated YAML artifact metadata."""
-
-    name: str
-    prompt_name: str
-    output_path: Path
-    valid_yaml: bool
-    errors: List[str] = field(default_factory=list)
-    review_notes: List[str] = field(default_factory=list)
-    drafted_components: List[str] = field(default_factory=list)
-    evidence_gaps: List[str] = field(default_factory=list)
-
-    def to_dict(self) -> dict:
-        """Return a JSON-ready artifact summary."""
-        return {
-            "name": self.name,
-            "prompt": self.prompt_name,
-            "output": str(self.output_path),
-            "valid_yaml": self.valid_yaml,
-            "errors": list(self.errors),
-            "review_notes": list(self.review_notes),
-            "drafted_components": list(self.drafted_components),
-            "evidence_gaps": list(self.evidence_gaps),
-        }
-
-
-GENERATION_TASKS: Sequence[GenerationTask] = (
-    GenerationTask(
-        name="odpc_product_references",
-        prompt_name="odps_data_product_fragment.md",
-        output_name="odpc_product_references.yaml",
-        expected_root="productReferences",
-        fragment_root="productReference",
-        filename_prefix="product_reference",
-        graph_node_type="DataProduct",
-    ),
-    GenerationTask(
-        name="odps_products",
-        prompt_name="odps_product_minimal_yaml.md",
-        output_name="odps_product.yaml",
-        expected_root="product",
-        filename_prefix="odps_product",
-        graph_node_type="DataProduct",
-    ),
-    GenerationTask(
-        name="odpc_use_cases",
-        prompt_name="odpc_use_case_fragment.md",
-        output_name="odpc_use_cases.yaml",
-        expected_root="useCases",
-        fragment_root="useCase",
-        filename_prefix="use_case",
-        graph_node_type="UseCase",
-    ),
-    GenerationTask(
-        name="odpc_objectives",
-        prompt_name="odpc_objective_fragment.md",
-        output_name="odpc_objectives.yaml",
-        expected_root="businessObjectives",
-        fragment_root="businessObjective",
-        filename_prefix="business_objective",
-        graph_node_type="BusinessObjective",
-    ),
-    GenerationTask(
-        name="odpc_signals",
-        prompt_name="odpc_signal_fragment.md",
-        output_name="odpc_signals.yaml",
-        expected_root="signals",
-        fragment_root="signal",
-        filename_prefix="signal",
-        graph_node_type="Signal",
-    ),
-    GenerationTask(
-        name="odpg_graph",
-        prompt_name="odpg_graph_yaml.md",
-        output_name="odpg_graph.yaml",
-        expected_root="graph",
-    ),
-)
-
-HOLISTIC_GENERATION_TASKS: Sequence[GenerationTask] = tuple(
-    task for task in GENERATION_TASKS if task.name != "odps_products"
-)
-
-GENERATION_TASK_ALIASES = {
-    "product-reference": "odpc_product_references",
-    "product-references": "odpc_product_references",
-    "odpc-product-reference": "odpc_product_references",
-    "odpc-product-references": "odpc_product_references",
-    "odps-product": "odps_products",
-    "odps-products": "odps_products",
-    "use-case": "odpc_use_cases",
-    "usecase": "odpc_use_cases",
-    "use-cases": "odpc_use_cases",
-    "objective": "odpc_objectives",
-    "objectives": "odpc_objectives",
-    "business-objective": "odpc_objectives",
-    "signal": "odpc_signals",
-    "signals": "odpc_signals",
-    "graph": "odpg_graph",
-    "odpg": "odpg_graph",
-}
-
-
-def list_generation_prompts(prompt_dir: Optional[PathLike] = None) -> List[str]:
-    """List bundled local generation prompt filenames."""
-    root = Path(prompt_dir) if prompt_dir else _PROMPT_DIR
-    return sorted(path.name for path in root.glob("*.md"))
-
-
-def load_generation_prompt(name: str, prompt_dir: Optional[PathLike] = None) -> str:
-    """Load a bundled local generation prompt by filename."""
-    if "/" in name or "\\" in name:
-        raise KeyError(f"Unknown generation prompt: {name}")
-
-    prompt_path = (Path(prompt_dir) if prompt_dir else _PROMPT_DIR) / name
-    if not prompt_path.is_file():
-        raise KeyError(f"Unknown generation prompt: {name}")
-    return prompt_path.read_text(encoding="utf-8")
-
-
-def copy_generation_prompts(
-    destination: PathLike,
-    *,
-    overwrite: bool = False,
-) -> List[Path]:
-    """Copy bundled generation prompts to a user-editable folder."""
-    target = Path(destination)
-    target.mkdir(parents=True, exist_ok=True)
-    copied = []
-    for prompt_path in sorted(_PROMPT_DIR.glob("*.md")):
-        output = target / prompt_path.name
-        if output.exists() and not overwrite:
-            raise FileExistsError(f"Prompt file already exists: {output}")
-        shutil.copyfile(prompt_path, output)
-        copied.append(output)
-    return copied
-
-
-PathLike = Union[str, Path]
-
-
-def load_source_documents(source_dir: PathLike) -> str:
-    """Load source documents as one prompt context."""
-    paths = _source_document_paths(source_dir)
-
-    if not paths:
-        raise ValueError(f"No supported source documents found at {source_dir}")
-
-    sections = []
-    for path in paths:
-        heading, content = _source_document_context(path)
-        sections.append(
-            "\n".join(
-                [
-                    heading,
-                    content,
-                ]
-            )
-        )
-    return "\n\n".join(sections)
-
-
-def _source_document_context(path: Path) -> tuple[str, str]:
-    if path.suffix.lower() in {".yaml", ".yml"}:
-        try:
-            artifact = select_context_artifact(path, preferred=("gcf", "toon"))
-        except FileNotFoundError:
-            pass
-        else:
-            return (
-                f"--- Source file: {path.name} (context: {artifact.path.name}) ---",
-                artifact.content.strip(),
-            )
-    return f"--- Source file: {path.name} ---", path.read_text(encoding="utf-8").strip()
-
-
-def _source_document_paths(source: PathLike) -> List[Path]:
-    root = Path(source)
-    if root.is_file():
-        return [root]
-    if root.is_dir():
-        return sorted(
-            path
-            for path in root.iterdir()
-            if path.is_file()
-            and (path.suffix.lower() in {".md", ".txt"} or _has_context_sidecar(path))
-        )
-    raise FileNotFoundError(f"Source document path not found: {root}")
-
-
-def _has_context_sidecar(path: Path) -> bool:
-    if path.suffix.lower() not in {".yaml", ".yml"}:
-        return False
-    return path.with_suffix(".gcf").is_file() or path.with_suffix(".toon").is_file()
-
-
-def render_generation_prompt(
-    prompt_name: str,
-    source_dir: PathLike,
-    prompt_dir: Optional[PathLike] = None,
-) -> str:
-    """Render a generation prompt with source documents inlined."""
-    return load_generation_prompt(prompt_name, prompt_dir=prompt_dir).replace(
-        "{source_documents}",
-        load_source_documents(source_dir),
-    )
-
 
 def ollama_generate(
     prompt: str,
@@ -2159,7 +1886,7 @@ def _normalize_odps_sla(sla: object) -> None:
         dimensions = [
             dimension
             for dimension in (
-                _normalize_odps_dimension(
+                normalize_odps_dimension(
                     dimension,
                     allowed_dimensions=ODPS_SLA_DIMENSIONS,
                     dimension_aliases=ODPS_SLA_DIMENSION_ALIASES,
@@ -2257,7 +1984,7 @@ def _normalize_odps_data_quality(data_quality: object) -> None:
         dimensions = [
             dimension
             for dimension in (
-                _normalize_odps_dimension(
+                normalize_odps_dimension(
                     dimension,
                     allowed_dimensions=ODPS_DATA_QUALITY_DIMENSIONS,
                     dimension_aliases=ODPS_DATA_QUALITY_DIMENSION_ALIASES,
@@ -2320,80 +2047,6 @@ def _component_profiles(component: Dict[str, Any]) -> Dict[str, Any]:
     if isinstance(declarative, list):
         return {"default": {"dimensions": declarative}}
     return {}
-
-
-def _normalize_odps_dimension(
-    dimension: Dict[str, Any],
-    *,
-    allowed_dimensions: set,
-    dimension_aliases: Dict[str, str],
-    allowed_units: set,
-    keep_description: bool,
-    stringify_objective: bool,
-) -> Dict[str, Any]:
-    raw_name = dimension.get("name") or dimension.get("dimension")
-    name = _normalize_odps_dimension_name(
-        raw_name,
-        allowed_dimensions=allowed_dimensions,
-        dimension_aliases=dimension_aliases,
-    )
-    if not name:
-        return {}
-    normalized: Dict[str, Any] = {"dimension": name}
-    if "objective" in dimension:
-        objective = dimension["objective"]
-        if _is_hour_unit(dimension.get("unit")) and "minutes" in allowed_units:
-            objective = _hours_to_minutes(objective)
-        normalized["objective"] = str(objective) if stringify_objective else objective
-    unit = _normalize_odps_unit(dimension.get("unit"), allowed_units)
-    if not unit and _is_hour_unit(dimension.get("unit")) and "minutes" in allowed_units:
-        unit = "minutes"
-    if unit:
-        normalized["unit"] = unit
-    display_title = dimension.get("displayTitle") or dimension.get("display_title")
-    if display_title is not None:
-        normalized["displayTitle"] = display_title
-    description = dimension.get("description")
-    if keep_description and isinstance(description, str) and description.strip():
-        normalized["description"] = description.strip()
-    return normalized
-
-
-def _normalize_odps_dimension_name(
-    value: object,
-    *,
-    allowed_dimensions: set,
-    dimension_aliases: Dict[str, str],
-) -> Optional[str]:
-    if not isinstance(value, str):
-        return None
-    stripped = value.strip()
-    if stripped in allowed_dimensions:
-        return stripped
-    compact = re.sub(r"[^a-z0-9]+", "-", stripped.lower()).strip("-")
-    return dimension_aliases.get(compact) or dimension_aliases.get(
-        compact.replace("-", "")
-    )
-
-
-def _normalize_odps_unit(value: object, allowed_units: set) -> Optional[str]:
-    if not isinstance(value, str):
-        return None
-    stripped = value.strip()
-    return stripped if stripped in allowed_units else None
-
-
-def _is_hour_unit(value: object) -> bool:
-    return isinstance(value, str) and value.strip().casefold() in {"hour", "hours"}
-
-
-def _hours_to_minutes(value: object) -> object:
-    try:
-        number = float(value)
-    except (TypeError, ValueError):
-        return value
-    minutes = number * 60
-    return int(minutes) if minutes.is_integer() else minutes
 
 
 def _normalize_odps_pricing_plans(pricing_plans: object) -> None:

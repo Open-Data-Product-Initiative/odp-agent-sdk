@@ -460,7 +460,7 @@ open-data-products generate \
 ```
 
 For the planned SDK workflow recipe layer above provider presets, see
-[`sdk-workflow-profiles-plan.md`](sdk-workflow-profiles-plan.md).
+[`sdk-workflow-profiles-plan.md`](../planning/sdk-workflow-profiles-plan.md).
 
 ## Validate And Build From Generated Fragments
 
@@ -518,7 +518,7 @@ optionally chunk and merge facts for long sources with `--max-source-chars`,
 generate minimal ODPS YAML, optionally draft requested components, assemble the
 final document, validate locally, and repair once when validation fails.
 Contributor-facing implementation notes for this pipeline live in
-[`generation-development.md`](generation-development.md).
+[`generation-development.md`](../development/generation.md).
 
 Use Python helpers to inspect or render prompts:
 

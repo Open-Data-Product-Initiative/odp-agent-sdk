@@ -22,23 +22,21 @@ import json
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
-from .. import (
-    check_product_contract_alignment,
-    extract_contract_schema,
+from ..agent import (
     explain_document,
-    generate_product_contract_report,
-    get_config,
-    get_resource,
-    list_resources,
     load_document,
-    load_summary,
-    resolve_product_contracts,
     resolve_references,
-    summarize_contract,
-    validate_contract,
-    validate_config,
     validate_document,
 )
+from ..contracts import (
+    check_product_contract_alignment,
+    extract_contract_schema,
+    generate_product_contract_report,
+    resolve_product_contracts,
+    summarize_contract,
+    validate_contract,
+)
+from ..generation import get_config, validate_config
 from ..odpc import (
     build_catalog_artifacts,
     load_object_records,
@@ -61,6 +59,8 @@ from ..odpv import (
     resolve_vocabulary_term as _resolve_vocabulary_term,
     search_vocabulary,
 )
+from ..resources import get_resource, list_resources
+from ..summary import load_summary
 
 Handler = Callable[[Dict[str, Any]], Dict[str, Any]]
 

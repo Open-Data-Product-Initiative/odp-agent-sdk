@@ -111,9 +111,39 @@ def test_unified_cli_generate_help_is_provider_neutral(
     assert "local LLM" not in help_text
 
 
+@pytest.mark.parametrize(
+    ("argv", "expected"),
+    [
+        (["validate", "--help"], "usage: open-data-products validate"),
+        (["generate", "--help"], "usage: open-data-products generate"),
+        (["odpc-build", "--help"], "usage: open-data-products odpc-build"),
+        (["odpg-build", "--help"], "usage: open-data-products odpg-build"),
+        (["portfolio", "--help"], "usage: open-data-products portfolio"),
+        (["product", "--help"], "usage: open-data-products product"),
+        (["manifest", "--help"], "usage: open-data-products manifest"),
+        (["serve", "--help"], "usage: open-data-products serve"),
+    ],
+)
+def test_cli_command_family_help_smoke(
+    argv: List[str],
+    expected: str,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    with pytest.raises(SystemExit) as exc_info:
+        main(argv)
+
+    assert exc_info.value.code == 0
+    assert expected in capsys.readouterr().out
+
+
 def test_unified_cli_json_errors_are_structured(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
+    from open_data_products import cli_core
+
+    assert cli_core.split_csv("fi, sv,,en") == ["fi", "sv", "en"]
+    assert callable(cli_core.print_error_payload)
+
     assert main(["portfolio", "build", "--json"]) == 1
     payload = _json_output(capsys)
     assert payload["spec"] == "portfolio"
@@ -144,6 +174,11 @@ def test_unified_cli_version_flag(
 def test_product_cli_help_uses_compact_command_metavar_and_examples(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
+    from open_data_products import cli_product
+
+    assert callable(cli_product.add_product_subparser)
+    assert callable(cli_product.handle_product_command)
+
     with pytest.raises(SystemExit) as exc_info:
         main(["product", "--help"])
 

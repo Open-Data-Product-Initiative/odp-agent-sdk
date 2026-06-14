@@ -1255,16 +1255,16 @@ All v4.1 features are optional:
 
 ### Complete v4.1 Example
 
-See [examples/odps_v41_example.py](../examples/odps_v41_example.py) for a comprehensive working example demonstrating all v4.1 features.
+See [examples/odps_v41_example.py](../../examples/odps_v41_example.py) for a comprehensive working example demonstrating all v4.1 features.
 
 ---
 
 ## Usage Examples
 
-See the [examples directory](../examples/) for comprehensive usage examples:
+See the [examples directory](../../examples/) for comprehensive usage examples:
 
 - `odps_v41_example.py`: **NEW** - Complete v4.1 features demonstration
 - `basic_usage.py`: Fundamental operations and features
 - `advanced_features.py`: Advanced functionality and customization
 
-For more information, see the [README](../README.md) and [CHANGELOG](../CHANGELOG.md).
+For more information, see the [README](../../README.md).

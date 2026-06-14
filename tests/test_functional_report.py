@@ -7,7 +7,7 @@ import pytest
 pytestmark = pytest.mark.functional
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-REPORT = REPO_ROOT / "docs" / "functional-test-report.md"
+REPORT = REPO_ROOT / "docs" / "reports" / "functional-test-report.md"
 
 
 def test_functional_report_lists_public_functional_suites() -> None:

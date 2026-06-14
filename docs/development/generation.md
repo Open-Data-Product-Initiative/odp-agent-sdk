@@ -3,7 +3,7 @@
 This page explains how LLM generation is wired inside the SDK. It is intended
 for contributors who change prompts, provider handling, normalization, or
 validation behavior. User-facing setup and command examples stay in
-[`docs/generation.md`](generation.md).
+[`docs/user/generation.md`](../user/generation.md).
 
 Generation is intentionally conservative: LLM output is treated as a draft that
 must pass local parsing, normalization, and validation before the CLI reports it

@@ -125,7 +125,7 @@ print(generate_product_contract_report("examples/product.yaml").summary)
 
 Run `open-data-products serve` to expose the SDK as a local MCP server, or
 `open-data-products manifest --json` to render the ARWS manifest. See
-[Agent surface](docs/agent-surface.md) for Codex/Claude Code setup, MCP tools,
+[Agent surface](docs/user/agent-surface.md) for Codex/Claude Code setup, MCP tools,
 and bundled skills.
 
 ## Package Structure
@@ -166,19 +166,20 @@ phone, email, and URI formats where those standards apply.
 This README is intentionally a short landing page. Use the focused references
 below for implementation details:
 
-- [API reference](docs/API.md): Agent API, spec helper namespaces, ODPS models, validators, serialization, and examples.
-- [Agent surface](docs/agent-surface.md): MCP server, ARWS manifest, and bundled skills for agent hosts.
-- [Command guide](docs/commands.md): what each common CLI command does, what it reads, and what it writes.
-- [LLM generation](docs/generation.md): Ollama, embedded llama.cpp, or configured external LLM source-doc to ODPC fragment and ODPG graph workflow.
-- [Embedded llama.cpp guide](docs/llama-cpp.md): install the optional extra, configure a GGUF model path, and run local generation without a separate LLM server.
-- [LLM selection guide](docs/llm-selection-guide.md): opinionated local and hosted model choices by SDK workflow.
-- [Generation development notes](docs/generation-development.md): contributor-facing prompt pipeline, ODPS normalization, validation, repair, and testing guidance.
-- [Portfolio development notes](docs/portfolio-development.md): contributor-facing portfolio workspace orchestration, renderer, localization, validation, and testing guidance.
-- [Development notes index](docs/development.md): contributor-facing internals notes for complex SDK surfaces.
-- [Data Contract workflows](docs/data-contracts.md): ODPS contract resolution, optional `datacontract-cli`, alignment, and reports.
-- [Capability drift reports](docs/capability-drift/README.md): dated SDK alignment reports against upstream specification tooling.
-- [Tooling development model](docs/tooling-development-model.md): human-facing explanation of how spec-level scripts mature into consolidated SDK capabilities.
-- [Functional test report](docs/functional-test-report.md): public API, CLI, and MCP functional coverage matrix.
+- [Documentation index](docs/README.md): organized map of user guides, development notes, planning docs, and reports.
+- [API reference](docs/user/API.md): Agent API, spec helper namespaces, ODPS models, validators, serialization, and examples.
+- [Agent surface](docs/user/agent-surface.md): MCP server, ARWS manifest, and bundled skills for agent hosts.
+- [Command guide](docs/user/commands.md): what each common CLI command does, what it reads, and what it writes.
+- [LLM generation](docs/user/generation.md): Ollama, embedded llama.cpp, or configured external LLM source-doc to ODPC fragment and ODPG graph workflow.
+- [Embedded llama.cpp guide](docs/user/llama-cpp.md): install the optional extra, configure a GGUF model path, and run local generation without a separate LLM server.
+- [LLM selection guide](docs/user/llm-selection-guide.md): opinionated local and hosted model choices by SDK workflow.
+- [Generation development notes](docs/development/generation.md): contributor-facing prompt pipeline, ODPS normalization, validation, repair, and testing guidance.
+- [Portfolio development notes](docs/development/portfolio.md): contributor-facing portfolio workspace orchestration, renderer, localization, validation, and testing guidance.
+- [Development notes index](docs/development/README.md): contributor-facing internals notes for complex SDK surfaces.
+- [Data Contract workflows](docs/user/data-contracts.md): ODPS contract resolution, optional `datacontract-cli`, alignment, and reports.
+- [Capability drift reports](docs/reports/capability-drift/README.md): dated SDK alignment reports against upstream specification tooling.
+- [Tooling development model](docs/planning/tooling-development-model.md): human-facing explanation of how spec-level scripts mature into consolidated SDK capabilities.
+- [Functional test report](docs/reports/functional-test-report.md): public API, CLI, and MCP functional coverage matrix.
 - [Example scripts](examples/): runnable ODPS examples, including v4.1 strategy and MCP access examples.
 - [Course-style guides](examples/guides/README.md): Udemy-aligned SDK and portfolio lessons, with a beginner Python setup guide.
 - [Sample apps](examples/apps/README.md): independent CLIs built on top of the SDK.
@@ -188,7 +189,7 @@ below for implementation details:
 
 Most commands print human-readable output by default; add `--json` when agents,
 CI jobs, or scripts need a stable machine-readable response. See the
-[command guide](docs/commands.md) for what each command reads, checks, and
+[command guide](docs/user/commands.md) for what each command reads, checks, and
 produces.
 
 ```bash
@@ -208,7 +209,7 @@ open-data-products resources --id odpg.objects --json
 
 The LLM generation commands require a configured local or hosted provider. The
 default is Ollama; embedded llama.cpp and hosted providers are configured in the
-generation config. See [LLM generation](docs/generation.md#llm-setup).
+generation config. See [LLM generation](docs/user/generation.md#llm-setup).
 
 Use the bundled default config and bundled prompts as-is:
 
@@ -373,11 +374,11 @@ open-data-products product resolve-contracts examples/product.yaml --json
 open-data-products product contract-schema examples/contract.yaml --json
 ```
 
-See [Data Contract workflows](docs/data-contracts.md) for product contract
+See [Data Contract workflows](docs/user/data-contracts.md) for product contract
 resolution, optional `datacontract-cli` integration, alignment checks, reports,
 and supported ODPS contract reference shapes.
 Live LLM generation requires Ollama or a configured provider API key; see
-[LLM generation](docs/generation.md) for runnable provider examples.
+[LLM generation](docs/user/generation.md) for runnable provider examples.
 
 ### Spec-Specific Entry Points
 
@@ -441,7 +442,7 @@ python examples/odps_v41_example.py
   [standalone HTML](examples/odpc_catalog.html)
 
 ### Generation Inputs And Outputs
-See [LLM generation](docs/generation.md) for source documents, prompts,
+See [LLM generation](docs/user/generation.md) for source documents, prompts,
 provider configuration, generated fragments, ODPG graph YAML, and graph explorer
 output.
 

@@ -103,8 +103,8 @@ It keeps YAML as the source of truth and renders repeated ODPC collections as
 pipe-delimited rows. Use `write_catalog_gcf()` or `odpc-build --gcf` when a
 workflow wants to compare TOON and GCF sidecars with the target model tokenizer.
 
-See [`toon-development.md`](toon-development.md) for the shared renderer rules.
-See [`gcf-development.md`](gcf-development.md) for GCF measurement notes.
+See [`toon-development.md`](toon.md) for the shared renderer rules.
+See [`gcf-development.md`](gcf.md) for GCF measurement notes.
 
 ## Object Guidance Search
 

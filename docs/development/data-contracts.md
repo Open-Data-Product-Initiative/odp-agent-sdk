@@ -1,7 +1,7 @@
 # Data Contracts Development Notes
 
 This page explains how Data Contract support is organized inside the SDK.
-User-facing examples live in [data-contracts.md](data-contracts.md).
+User-facing examples live in [data-contracts.md](../user/data-contracts.md).
 
 ## Main Code Paths
 
