@@ -948,6 +948,14 @@ def test_build_portfolio_normalizes_generated_plan_to_schema_shapes(
     product_document = load_mapping(
         workspace / "odps" / "products" / "expansion-product.yaml"
     )
+    sla_dimensions = product_document["product"]["SLA"]["declarative"]["default"][
+        "dimensions"
+    ]
+    assert {
+        "dimension": "updateFrequency",
+        "objective": 1440,
+        "unit": "minutes",
+    } in sla_dimensions
     schema = load_mapping(Path("open_data_products/odps/data/schema/odps.json"))
     schema_errors = sorted(
         Draft202012Validator(schema).iter_errors(product_document),

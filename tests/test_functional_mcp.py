@@ -75,6 +75,27 @@ def test_mcp_initialize_and_list_tools() -> None:
     }
 
 
+def test_mcp_manifest_is_json_serializable_and_preserves_tool_contracts() -> None:
+    from open_data_products.mcp.manifest import generate_agent_manifest
+    from open_data_products.mcp.tools import TOOLS
+
+    manifest = generate_agent_manifest()
+    json.dumps(manifest)
+
+    manifest_tools = manifest["tools"]
+    assert [tool["name"] for tool in manifest_tools] == [
+        tool["name"] for tool in TOOLS
+    ]
+    assert all(tool["class"] == "safe" for tool in manifest_tools)
+    assert all("handler" not in tool for tool in manifest_tools)
+    assert all(tool["inputSchema"]["type"] == "object" for tool in manifest_tools)
+    assert {tool["name"] for tool in manifest_tools} >= {
+        "validate_document",
+        "generate_product_contract_report",
+        "extract_data_contract_schema",
+    }
+
+
 @pytest.mark.parametrize(
     ("tool_name", "arguments"),
     [

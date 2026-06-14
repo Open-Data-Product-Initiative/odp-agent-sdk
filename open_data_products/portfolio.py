@@ -20,6 +20,17 @@ from ._io import load_mapping
 from .odpc import load_catalog
 from .odpc.catalog import text_value
 from .odpg import build_graph_explorer_html, load_graph
+from .odps._normalization import (
+    ODPS_DATA_QUALITY_DIMENSION_ALIASES,
+    ODPS_DATA_QUALITY_DIMENSIONS,
+    ODPS_DATA_QUALITY_UNIT_ALIASES,
+    ODPS_DATA_QUALITY_UNITS,
+    ODPS_SLA_DIMENSION_ALIASES,
+    ODPS_SLA_DIMENSIONS,
+    ODPS_SLA_UNIT_ALIASES,
+    ODPS_SLA_UNITS,
+    hours_to_minutes,
+)
 
 DEFAULT_PORTFOLIO_HTML = "index.html"
 PORTFOLIO_SOURCE_SUFFIXES = (".md", ".txt", ".yaml", ".yml", ".json")
@@ -68,73 +79,6 @@ ODPS_VISIBILITY_ALIASES = {
     "restricted": "invitation",
     "external": "public",
     "open": "public",
-}
-ODPS_SLA_DIMENSIONS = {
-    "latency",
-    "uptime",
-    "responseTime",
-    "errorRate",
-    "endOfSupport",
-    "endOfLife",
-    "updateFrequency",
-    "timeToDetect",
-    "timeToNotify",
-    "timeToRepair",
-    "emailResponseTime",
-}
-ODPS_SLA_UNITS = {
-    "percent",
-    "milliseconds",
-    "seconds",
-    "minutes",
-    "days",
-    "weeks",
-    "months",
-    "years",
-    "never",
-    "date",
-    "null",
-}
-ODPS_SLA_UNIT_ALIASES = {
-    "hour": "minutes",
-    "hours": "minutes",
-    "day": "days",
-    "daily": "days",
-    "week": "weeks",
-    "weekly": "weeks",
-    "month": "months",
-    "monthly": "months",
-    "year": "years",
-    "yearly": "years",
-    "percentage": "percent",
-}
-ODPS_DATA_QUALITY_DIMENSIONS = {
-    "accuracy",
-    "completeness",
-    "conformity",
-    "consistency",
-    "coverage",
-    "timeliness",
-    "validity",
-    "uniqueness",
-}
-ODPS_DATA_QUALITY_DIMENSION_ALIASES = {
-    "freshness": "timeliness",
-    "datafreshness": "timeliness",
-    "data-freshness": "timeliness",
-    "reconcile": "consistency",
-    "reconciliation": "consistency",
-    "source-reconciliation": "consistency",
-    "source-count-reconciliation": "consistency",
-    "crm-reconciliation": "consistency",
-    "billing-reconciliation": "consistency",
-}
-ODPS_DATA_QUALITY_UNITS = {"percentage", "number"}
-ODPS_DATA_QUALITY_UNIT_ALIASES = {
-    "percent": "percentage",
-    "percentage": "percentage",
-    "%": "percentage",
-    "count": "number",
 }
 ODPC_SIGNAL_TYPES = {
     "demand",
@@ -1850,24 +1794,13 @@ def _normalize_sla_dimension(dimension: Dict[str, Any]) -> Dict[str, Any]:
     normalized["dimension"] = _normalize_enum(
         raw_dimension,
         ODPS_SLA_DIMENSIONS,
-        {
-            "availability": "uptime",
-            "available": "uptime",
-            "freshness": "updateFrequency",
-            "datafreshness": "updateFrequency",
-            "data-freshness": "updateFrequency",
-            "refresh": "updateFrequency",
-            "refreshtimeliness": "updateFrequency",
-            "refresh-timeliness": "updateFrequency",
-            "refreshfrequency": "updateFrequency",
-            "refresh-frequency": "updateFrequency",
-        },
+        ODPS_SLA_DIMENSION_ALIASES,
         "updateFrequency",
     )
     if "objective" not in normalized:
         normalized["objective"] = _text(normalized.get("target"), "pending")
     if raw_unit.casefold() in {"hour", "hours"}:
-        normalized["objective"] = _hours_to_minutes(normalized.get("objective"))
+        normalized["objective"] = hours_to_minutes(normalized.get("objective"))
     if not _text(normalized.get("unit")):
         normalized["unit"] = "null"
     else:
@@ -1875,15 +1808,6 @@ def _normalize_sla_dimension(dimension: Dict[str, Any]) -> Dict[str, Any]:
             normalized.get("unit"), ODPS_SLA_UNITS, ODPS_SLA_UNIT_ALIASES, "null"
         )
     return normalized
-
-
-def _hours_to_minutes(value: Any) -> Any:
-    try:
-        number = float(value)
-    except (TypeError, ValueError):
-        return value
-    minutes = number * 60
-    return int(minutes) if minutes.is_integer() else minutes
 
 
 def _sla_from_data_ops_update_frequency(data_ops: Dict[str, Any]) -> Dict[str, Any]:

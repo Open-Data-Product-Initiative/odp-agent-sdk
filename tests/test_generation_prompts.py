@@ -39,6 +39,7 @@ from open_data_products.generation import (
 from open_data_products import (
     anthropic_generate as anthropic_public_generate,
     copy_config_template as copy_public_config_template,
+    create_generation_client as create_public_generation_client,
     ensure_ollama_model as ensure_public_ollama_model,
     generate_local_artifact as generate_public_local_artifact,
     generate_local_artifacts as generate_public_local_artifacts,
@@ -49,6 +50,8 @@ from open_data_products import (
     llama_cpp_generate as llama_cpp_public_generate,
     openai_chat_generate as openai_public_chat_generate,
     print_config as print_public_config,
+    render_generation_prompt as render_public_generation_prompt,
+    resolve_generation_settings as resolve_public_generation_settings,
     validate_document,
     validate_config as validate_public_config,
 )
@@ -317,16 +320,25 @@ def test_generation_prompt_rejects_unknown_name():
 
 def test_generation_prompt_helpers_are_public_api():
     """Test that prompt helpers are available from the package root."""
+    from open_data_products.generation import models, prompts
+
     assert "system.md" in list_public_generation_prompts()
     assert load_public_generation_prompt("system.md").startswith(
         "# Local ODP Generation System Prompt"
     )
+    assert GenerationSettings is models.GenerationSettings
+    assert list_generation_prompts is prompts.list_generation_prompts
+    assert load_generation_prompt is prompts.load_generation_prompt
+    assert load_source_documents is prompts.load_source_documents
     assert ensure_public_ollama_model is ensure_ollama_model
     assert generate_public_local_artifact is generate_local_artifact
     assert generate_public_local_artifacts is generate_local_artifacts
     assert anthropic_public_generate is anthropic_generate
     assert llama_cpp_public_generate is llama_cpp_generate
     assert openai_public_chat_generate is openai_chat_generate
+    assert create_public_generation_client is create_generation_client
+    assert render_public_generation_prompt is render_generation_prompt
+    assert resolve_public_generation_settings is resolve_generation_settings
 
 
 def test_render_generation_prompt_inlines_source_documents():
