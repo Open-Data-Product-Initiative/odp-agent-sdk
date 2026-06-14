@@ -1,4 +1,4 @@
-# Open Data Products Python SDK for AI Agents
+# Data Products Python SDK for AI Agents
 
 ![Open Data Products Python SDK](./images/agent.png)
 
