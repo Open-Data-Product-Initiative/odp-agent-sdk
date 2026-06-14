@@ -534,6 +534,48 @@ def test_bundled_generation_config_includes_common_compatible_providers():
     assert claude.api_key_env == "ANTHROPIC_API_KEY"
 
 
+def test_bundled_generation_config_includes_local_model_presets():
+    """Test bundled config exposes local model presets for common runtimes."""
+    expected = {
+        "ollama-gemma3n": ("ollama", "gemma3n:e4b", "http://localhost:11434"),
+        "ollama-qwen25": ("ollama", "qwen2.5:7b", "http://localhost:11434"),
+        "ollama-qwen25-14b": ("ollama", "qwen2.5:14b", "http://localhost:11434"),
+        "ollama-qwen3": ("ollama", "qwen3:8b", "http://localhost:11434"),
+        "ollama-qwen3-14b": ("ollama", "qwen3:14b", "http://localhost:11434"),
+        "ollama-llama": ("ollama", "llama3.1:8b", "http://localhost:11434"),
+        "ollama-mistral": ("ollama", "mistral:7b", "http://localhost:11434"),
+        "ollama-phi": ("ollama", "phi4-mini", "http://localhost:11434"),
+        "ollama-deepseek14b": (
+            "ollama",
+            "deepseek-r1:14b",
+            "http://localhost:11434",
+        ),
+        "ollama-large-q4": ("ollama", "qwen3:32b", "http://localhost:11434"),
+        "lmstudio-gemma4-e4b": (
+            "openai-chat",
+            "google/gemma-4-e4b",
+            "http://localhost:1234/v1",
+        ),
+        "lmstudio-gemma4-12b": (
+            "openai-chat",
+            "google/gemma-4-12b",
+            "http://localhost:1234/v1",
+        ),
+    }
+    config = load_generation_config(DEFAULT_GENERATION_CONFIG)
+
+    for provider, (provider_type, model, base_url) in expected.items():
+        assert provider in config["providers"]
+        settings = resolve_generation_settings(
+            DEFAULT_GENERATION_CONFIG,
+            provider=provider,
+        )
+        assert settings.provider_type == provider_type
+        assert settings.model == model
+        assert settings.base_url == base_url
+        assert settings.api_key_env is None
+
+
 def test_resolve_generation_settings_supports_claude_without_config():
     """Test CLI provider override works for Claude without a config file."""
     settings = resolve_generation_settings(

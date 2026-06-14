@@ -15,6 +15,9 @@ OpenAI-compatible providers and Claude. This workflow stops before catalog
 publishing: it produces source-backed fragment files and a graph file that can
 be validated, inspected, and used by the existing ODPC/ODPG helpers.
 
+For opinionated guidance on which local or hosted model to use for each SDK
+workflow, see the [LLM selection guide](llm-selection-guide.md).
+
 ## LLM Setup
 
 Default local generation requires Ollama running locally and Qwen 2.5
@@ -30,14 +33,39 @@ providers can be selected with a generation config file. OpenAI generation
 requires `OPENAI_API_KEY` in the environment; the SDK stores only the
 environment variable name in config.
 
+The bundled config also includes local provider presets. Pull an Ollama model,
+then select the matching preset:
+
+```bash
+ollama pull gemma3n:e4b
+ollama pull qwen2.5:7b
+ollama pull qwen3:8b
+ollama pull llama3.1:8b
+ollama pull mistral:7b
+ollama pull phi4-mini
+
+open-data-products generate \
+  --config my-generation.config.yaml \
+  --provider ollama-gemma3n \
+  --input source_docs/signals/ \
+  --kind signal \
+  --output generated/ \
+  --json
+```
+
+The larger local presets are available when the machine can tolerate slower
+runs: `ollama-qwen25-14b`, `ollama-qwen3-14b`,
+`ollama-deepseek14b`, and `ollama-large-q4`.
+
 For LM Studio and similar local servers, use a provider entry with
-`type: openai-chat` and set the model to the name loaded in that server:
+`type: openai-chat` and set the model to the name loaded in that server. The
+bundled config includes `lmstudio-gemma4-e4b` and `lmstudio-gemma4-12b`
+presets for local Gemma 4 models:
 
 ```bash
 open-data-products generate \
   --config my-generation.config.yaml \
-  --provider lmstudio \
-  --model deepseek-r1-distill-qwen-7b \
+  --provider lmstudio-gemma4-e4b \
   --input source_docs/signals/ \
   --kind signal \
   --output generated/ \
@@ -209,6 +237,59 @@ providers:
     model: qwen2.5
     baseUrl: http://localhost:11434
 
+  # Local Ollama model presets. Select one with `--provider <name>` after
+  # pulling the matching model with Ollama.
+  ollama-gemma3n:
+    type: ollama
+    model: gemma3n:e4b
+    baseUrl: http://localhost:11434
+
+  ollama-qwen25:
+    type: ollama
+    model: qwen2.5:7b
+    baseUrl: http://localhost:11434
+
+  ollama-qwen3:
+    type: ollama
+    model: qwen3:8b
+    baseUrl: http://localhost:11434
+
+  ollama-llama:
+    type: ollama
+    model: llama3.1:8b
+    baseUrl: http://localhost:11434
+
+  ollama-mistral:
+    type: ollama
+    model: mistral:7b
+    baseUrl: http://localhost:11434
+
+  ollama-phi:
+    type: ollama
+    model: phi4-mini
+    baseUrl: http://localhost:11434
+
+  # Larger local presets that can be slower on laptop-class machines.
+  ollama-qwen25-14b:
+    type: ollama
+    model: qwen2.5:14b
+    baseUrl: http://localhost:11434
+
+  ollama-qwen3-14b:
+    type: ollama
+    model: qwen3:14b
+    baseUrl: http://localhost:11434
+
+  ollama-deepseek14b:
+    type: ollama
+    model: deepseek-r1:14b
+    baseUrl: http://localhost:11434
+
+  ollama-large-q4:
+    type: ollama
+    model: qwen3:32b
+    baseUrl: http://localhost:11434
+
   # Local OpenAI-compatible chat servers such as LM Studio, vLLM, llama.cpp
   # server, LocalAI, and text-generation-webui usually expose
   # /v1/chat/completions. Replace `model` with the model name loaded in that
@@ -218,6 +299,16 @@ providers:
   lmstudio:
     type: openai-chat
     model: local-model
+    baseUrl: http://localhost:1234/v1
+
+  lmstudio-gemma4-e4b:
+    type: openai-chat
+    model: google/gemma-4-e4b
+    baseUrl: http://localhost:1234/v1
+
+  lmstudio-gemma4-12b:
+    type: openai-chat
+    model: google/gemma-4-12b
     baseUrl: http://localhost:1234/v1
 
   vllm:
@@ -313,6 +404,9 @@ open-data-products generate \
   --output /tmp/odp-openai-test \
   --json
 ```
+
+For the planned SDK workflow recipe layer above provider presets, see
+[`sdk-workflow-profiles-plan.md`](sdk-workflow-profiles-plan.md).
 
 ## Validate And Build From Generated Fragments
 

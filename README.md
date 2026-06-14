@@ -167,6 +167,7 @@ below for implementation details:
 - [Agent surface](docs/agent-surface.md): MCP server, ARWS manifest, and bundled skills for agent hosts.
 - [Command guide](docs/commands.md): what each common CLI command does, what it reads, and what it writes.
 - [LLM generation](docs/generation.md): Ollama or configured external LLM source-doc to ODPC fragment and ODPG graph workflow.
+- [LLM selection guide](docs/llm-selection-guide.md): opinionated local and hosted model choices by SDK workflow.
 - [Generation development notes](docs/generation-development.md): contributor-facing prompt pipeline, ODPS normalization, validation, repair, and testing guidance.
 - [Portfolio development notes](docs/portfolio-development.md): contributor-facing portfolio workspace orchestration, renderer, localization, validation, and testing guidance.
 - [Development notes index](docs/development.md): contributor-facing internals notes for complex SDK surfaces.
@@ -250,8 +251,14 @@ different LLM:
 ```bash
 open-data-products generate \
   --config my-generation.config.yaml \
-  --provider lmstudio \
-  --model any-local-model-loaded-in-the-server \
+  --provider ollama-gemma3n \
+  --input source_docs/products/ \
+  --kind product-reference \
+  --output generated/
+
+open-data-products generate \
+  --config my-generation.config.yaml \
+  --provider lmstudio-gemma4-e4b \
   --input source_docs/products/ \
   --kind product-reference \
   --output generated/
@@ -272,6 +279,14 @@ open-data-products generate \
   --kind signal \
   --output generated/
 ```
+
+The bundled config includes local presets for common laptop and workstation
+models. Sweet-spot presets include `ollama-gemma3n`, `ollama-qwen25`,
+`ollama-qwen3`, `ollama-llama`, `ollama-mistral`, `ollama-phi`, and
+`lmstudio-gemma4-e4b`. Larger local presets include `ollama-qwen25-14b`,
+`ollama-qwen3-14b`, `ollama-deepseek14b`, `ollama-large-q4`, and
+`lmstudio-gemma4-12b`. Pull or load the model in the selected runtime before
+running generation.
 
 Generation uses bundled prompt templates by default. If you want to customize
 the prompts, copy them to a project-owned folder, edit the Markdown files, and

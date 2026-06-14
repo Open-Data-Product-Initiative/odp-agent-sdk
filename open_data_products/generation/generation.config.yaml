@@ -36,12 +36,77 @@ providers:
     model: qwen2.5
     baseUrl: http://localhost:11434
 
+  # Local Ollama model presets for Apple Silicon and workstation use. Select
+  # one with `--provider <name>` after pulling the matching model with Ollama.
+  # Sweet spot: light, fast, and practical for structured ODPS-family YAML.
+  ollama-gemma3n:
+    type: ollama
+    model: gemma3n:e4b
+    baseUrl: http://localhost:11434
+
+  ollama-qwen25:
+    type: ollama
+    model: qwen2.5:7b
+    baseUrl: http://localhost:11434
+
+  ollama-qwen3:
+    type: ollama
+    model: qwen3:8b
+    baseUrl: http://localhost:11434
+
+  ollama-llama:
+    type: ollama
+    model: llama3.1:8b
+    baseUrl: http://localhost:11434
+
+  ollama-mistral:
+    type: ollama
+    model: mistral:7b
+    baseUrl: http://localhost:11434
+
+  ollama-phi:
+    type: ollama
+    model: phi4-mini
+    baseUrl: http://localhost:11434
+
+  # Realistic but slower on smaller local machines.
+  ollama-qwen25-14b:
+    type: ollama
+    model: qwen2.5:14b
+    baseUrl: http://localhost:11434
+
+  ollama-qwen3-14b:
+    type: ollama
+    model: qwen3:14b
+    baseUrl: http://localhost:11434
+
+  ollama-deepseek14b:
+    type: ollama
+    model: deepseek-r1:14b
+    baseUrl: http://localhost:11434
+
+  ollama-large-q4:
+    type: ollama
+    model: qwen3:32b
+    baseUrl: http://localhost:11434
+
   # Local OpenAI-compatible chat servers such as LM Studio, vLLM, llama.cpp
   # server, and LocalAI usually expose /v1/chat/completions. Replace `model`
   # with the model name loaded in that server.
   lmstudio:
     type: openai-chat
     model: local-model
+    baseUrl: http://localhost:1234/v1
+
+  # LM Studio / MLX presets for Google's lightweight Gemma 4 family.
+  lmstudio-gemma4-e4b:
+    type: openai-chat
+    model: google/gemma-4-e4b
+    baseUrl: http://localhost:1234/v1
+
+  lmstudio-gemma4-12b:
+    type: openai-chat
+    model: google/gemma-4-12b
     baseUrl: http://localhost:1234/v1
 
   vllm:
@@ -89,6 +154,6 @@ providers:
 
   # Providers with different auth or request formats should get a dedicated
   # SDK client before being enabled here, for example Azure OpenAI, Google
-  # Gemini, Mistral, Cohere, and Bedrock. 
-  # 
+  # Gemini, Mistral, Cohere, and Bedrock.
+  #
   # Contributions for new provider clients are welcome.
