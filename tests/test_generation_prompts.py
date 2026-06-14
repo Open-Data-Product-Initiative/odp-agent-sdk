@@ -3,6 +3,8 @@
 import io
 import json
 from pathlib import Path
+import sys
+import types
 from urllib import error
 
 import pytest
@@ -25,6 +27,7 @@ from open_data_products.generation import (
     list_generation_prompts,
     load_generation_prompt,
     load_source_documents,
+    llama_cpp_generate,
     list_ollama_models,
     openai_chat_generate,
     openai_generate,
@@ -43,6 +46,7 @@ from open_data_products import (
     get_config_path as get_public_config_path,
     list_generation_prompts as list_public_generation_prompts,
     load_generation_prompt as load_public_generation_prompt,
+    llama_cpp_generate as llama_cpp_public_generate,
     openai_chat_generate as openai_public_chat_generate,
     print_config as print_public_config,
     validate_document,
@@ -321,6 +325,7 @@ def test_generation_prompt_helpers_are_public_api():
     assert generate_public_local_artifact is generate_local_artifact
     assert generate_public_local_artifacts is generate_local_artifacts
     assert anthropic_public_generate is anthropic_generate
+    assert llama_cpp_public_generate is llama_cpp_generate
     assert openai_public_chat_generate is openai_chat_generate
 
 
@@ -501,6 +506,7 @@ def test_bundled_generation_config_includes_common_compatible_providers():
     assert "claude" in config["providers"]
     assert "lmstudio" in config["providers"]
     assert "vllm" in config["providers"]
+    assert "llamacpp-embedded" in config["providers"]
 
     openrouter = resolve_generation_settings(
         DEFAULT_GENERATION_CONFIG,
@@ -532,6 +538,27 @@ def test_bundled_generation_config_includes_common_compatible_providers():
     assert claude.provider_type == "anthropic"
     assert claude.base_url == "https://api.anthropic.com/v1"
     assert claude.api_key_env == "ANTHROPIC_API_KEY"
+    llamacpp = resolve_generation_settings(
+        DEFAULT_GENERATION_CONFIG,
+        provider="llamacpp-embedded",
+    )
+    assert llamacpp.provider_type == "llama-cpp"
+    assert llamacpp.model == "local-gguf"
+    assert llamacpp.model_path == "models/qwen2.5-7b-instruct-q4_k_m.gguf"
+    assert llamacpp.context_window == 8192
+    assert llamacpp.gpu_layers == -1
+
+
+def test_llamacpp_embedded_provider_resolves_without_config_file():
+    """Test built-in llama.cpp profile works with --provider only."""
+    settings = resolve_generation_settings(provider="llamacpp-embedded")
+
+    assert settings.provider == "llamacpp-embedded"
+    assert settings.provider_type == "llama-cpp"
+    assert settings.model == "local-gguf"
+    assert settings.model_path == "models/qwen2.5-7b-instruct-q4_k_m.gguf"
+    assert settings.context_window == 8192
+    assert settings.gpu_layers == -1
 
 
 def test_bundled_generation_config_includes_local_model_presets():
@@ -710,6 +737,174 @@ providers:
     assert settings.base_url == "http://localhost:1234/v1"
     assert settings.api_key_env is None
     assert report["valid"] is True
+
+
+def test_resolve_generation_settings_reads_llama_cpp_provider(tmp_path):
+    """Test embedded llama.cpp provider config resolves local model settings."""
+    config = tmp_path / "generation.config.yaml"
+    config.write_text(
+        """
+provider: llamacpp-embedded
+input: .
+output: fragments
+providers:
+  llamacpp-embedded:
+    type: llama-cpp
+    model: local-gguf
+    modelPath: models/qwen2.5-7b-instruct-q4_k_m.gguf
+    contextWindow: 8192
+    gpuLayers: -1
+""",
+        encoding="utf-8",
+    )
+
+    settings = resolve_generation_settings(config)
+    report = validate_config("generation", config)
+
+    assert settings.provider == "llamacpp-embedded"
+    assert settings.provider_type == "llama-cpp"
+    assert settings.model == "local-gguf"
+    assert settings.model_path == "models/qwen2.5-7b-instruct-q4_k_m.gguf"
+    assert settings.context_window == 8192
+    assert settings.gpu_layers == -1
+    assert settings.base_url is None
+    assert settings.api_key_env is None
+    assert report["valid"] is True
+
+
+def test_validate_config_requires_llama_cpp_model_path(tmp_path):
+    """Test embedded llama.cpp config requires an explicit GGUF model path."""
+    config = tmp_path / "generation.config.yaml"
+    config.write_text(
+        """
+provider: llamacpp-embedded
+input: source_docs
+output: fragments
+providers:
+  llamacpp-embedded:
+    type: llama-cpp
+    model: local-gguf
+""",
+        encoding="utf-8",
+    )
+
+    report = validate_config("generation", config)
+
+    assert report["valid"] is False
+    assert (
+        "providers.llamacpp-embedded.modelPath is required for llama-cpp"
+        in report["errors"]
+    )
+
+
+def test_llama_cpp_generate_reports_optional_install(monkeypatch):
+    """Test missing optional llama.cpp support explains how to install it."""
+    monkeypatch.setitem(sys.modules, "llama_cpp", None)
+
+    try:
+        llama_cpp_generate("prompt", model_path="models/test.gguf")
+    except RuntimeError as exc:
+        message = str(exc)
+        assert 'pip install "open-data-products[llama-cpp]"' in message
+        assert "models/test.gguf" not in message
+    else:
+        raise AssertionError("missing llama_cpp module did not raise RuntimeError")
+
+
+def test_llama_cpp_generate_reads_completion_text(monkeypatch):
+    """Test embedded llama.cpp generation calls the optional package lazily."""
+    observed = {}
+
+    class FakeLlama:
+        def __init__(self, model_path, n_ctx, n_gpu_layers):
+            observed["init"] = {
+                "model_path": model_path,
+                "n_ctx": n_ctx,
+                "n_gpu_layers": n_gpu_layers,
+            }
+
+        def __call__(self, prompt, max_tokens, temperature):
+            observed["call"] = {
+                "prompt": prompt,
+                "max_tokens": max_tokens,
+                "temperature": temperature,
+            }
+            return {"choices": [{"text": "generated yaml"}]}
+
+    fake_module = types.SimpleNamespace(Llama=FakeLlama)
+    monkeypatch.setitem(sys.modules, "llama_cpp", fake_module)
+
+    assert (
+        llama_cpp_generate(
+            "prompt",
+            model_path="models/test.gguf",
+            context_window=4096,
+            gpu_layers=-1,
+            max_tokens=512,
+            temperature=0.1,
+        )
+        == "generated yaml"
+    )
+    assert observed == {
+        "init": {
+            "model_path": "models/test.gguf",
+            "n_ctx": 4096,
+            "n_gpu_layers": -1,
+        },
+        "call": {"prompt": "prompt", "max_tokens": 512, "temperature": 0.1},
+    }
+
+
+def test_create_generation_client_uses_llama_cpp(monkeypatch):
+    """Test provider factory creates an embedded llama.cpp model client."""
+    observed = {}
+
+    def fake_llama_cpp_generate(
+        prompt,
+        model_path,
+        context_window=8192,
+        gpu_layers=0,
+        max_tokens=2048,
+        temperature=0.2,
+    ):
+        observed.update(
+            {
+                "prompt": prompt,
+                "model_path": model_path,
+                "context_window": context_window,
+                "gpu_layers": gpu_layers,
+                "max_tokens": max_tokens,
+                "temperature": temperature,
+            }
+        )
+        return "generated"
+
+    monkeypatch.setattr(
+        "open_data_products.generation.llama_cpp_generate",
+        fake_llama_cpp_generate,
+    )
+    settings = GenerationSettings(
+        provider="llamacpp-embedded",
+        provider_type="llama-cpp",
+        model="local-gguf",
+        input_path="source_docs",
+        output_path="fragments",
+        model_path="models/test.gguf",
+        context_window=4096,
+        gpu_layers=-1,
+    )
+
+    client = create_generation_client(settings)
+
+    assert client("prompt", "ignored-model") == "generated"
+    assert observed == {
+        "prompt": "prompt",
+        "model_path": "models/test.gguf",
+        "context_window": 4096,
+        "gpu_layers": -1,
+        "max_tokens": 2048,
+        "temperature": 0.2,
+    }
 
 
 def test_openai_generate_requires_env(monkeypatch):

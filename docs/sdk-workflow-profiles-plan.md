@@ -87,9 +87,11 @@ providers:
     baseUrl: http://127.0.0.1:8080/v1
 
   llamacpp-embedded:
-    type: llama-cpp-python
-    modelPath: models/gemma-3-4b-it-q4.gguf
+    type: llama-cpp
+    model: local-gguf
+    modelPath: models/qwen2.5-7b-instruct-q4_k_m.gguf
     contextWindow: 8192
+    gpuLayers: -1
 
   openai:
     type: openai
@@ -217,7 +219,7 @@ The added value is:
   or a deliberate mix of local and online providers;
 - llama.cpp can be treated as a first-class local runtime in two forms:
   through the existing OpenAI-compatible `openai-chat` provider shape for a
-  separately managed server, or through a future embedded `llama-cpp-python`
+  separately managed server, or through the embedded `llama-cpp`
   provider for in-process GGUF inference;
 - embedded llama.cpp support can give Python SDK users a more direct local path:
   install an optional SDK extra, point the config at a model file, and run the

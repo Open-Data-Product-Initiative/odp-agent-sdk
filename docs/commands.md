@@ -77,8 +77,10 @@ before choosing a more specific command.
 
 ## LLM Generation
 
-These commands require local Ollama or configured provider credentials. See
-[LLM generation](generation.md#llm-setup) for setup details.
+These commands require a configured local or hosted provider. The default is
+local Ollama, while optional embedded llama.cpp support can run GGUF models
+without a separate LLM server. See [LLM generation](generation.md#llm-setup)
+for setup details.
 
 ```bash
 open-data-products generate --kind signal
