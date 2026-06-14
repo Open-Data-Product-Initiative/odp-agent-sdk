@@ -143,15 +143,18 @@ Use `open_data_products.<spec>` namespaces for every standard:
 
 | Area | What agents and developers can do |
 |------|-----------------------------------|
-| Cross-spec API | Detect, load, validate, explain, summarize, and resolve references across ODPS, ODPC, ODPG, and ODPV |
-| MCP + ARWS | Run a local stdio MCP server, expose safe tools, and generate an ARWS agent manifest |
-| ODPS | Create, load, validate, serialize, and inspect ODPS v4.1 data product documents |
-| ODPC | Build catalogs from fragments, validate catalogs, explain catalog metadata, search bundled catalog object guidance, and generate/check derived catalog schema artifacts |
-| ODPG | Validate graphs, summarize nodes and edges, traverse relationships, analyze governance/strategy signals, and extract agent context |
-| ODPV | Load, validate, search, generate vocabulary artifacts, resolve terms and aliases, explain canonical term packets, check relationships, and produce agent context for shared ODP terminology |
-| Data Contracts | Resolve ODPS contract references, validate external contracts through optional `datacontract-cli`, extract schemas, check static alignment, and generate product-level reports |
+| Cross-spec API | Detect, load, validate, explain, summarize, and resolve references across ODPS, ODPC, ODPG, and ODPV documents |
+| Unified CLI | Run validation, generation, catalog, graph, vocabulary, portfolio, contract, resource, manifest, and MCP workflows through `open-data-products` |
+| MCP + ARWS | Run a safe-class stdio MCP server, expose agent tools, and generate an ARWS-compatible manifest |
+| LLM generation | Draft ODPC fragments, ODPG graphs, and ODPS product YAML from source notes with Ollama, embedded llama.cpp, OpenAI-compatible providers, or Claude |
+| Compact context | Generate and consume TOON/GCF sidecars for ODPC catalogs and ODPG graphs while keeping YAML as the source of truth |
+| ODPS | Create, load, validate, serialize, and inspect ODPS v4.1 data product documents with v4.0 compatibility |
+| ODPC | Build catalogs from fragments and ODPS products, render HTML, create TOON/GCF context, search object guidance, and check derived artifacts |
+| ODPG | Build and validate graphs, infer relationships from catalog fragments, render graph explorers, traverse paths, analyze governance signals, and extract agent context |
+| ODPV | Search vocabulary terms, resolve aliases, explain canonical packets, check relationship compatibility, and produce agent-ready term context |
+| Data Contracts | Resolve ODPS contract references, validate external contracts through optional `datacontract-cli`, extract schemas, check static alignment, export contracts, and generate product reports |
 | Portfolio workspaces | Build, refresh, sync, render, localize, and explain connected ODPC/ODPS/ODPG portfolio workspaces from objectives, use cases, signals, and product source lanes |
-| Bundled resources | Discover schemas, examples, vocabulary records, catalog object records, and graph object records through the resource registry |
+| Bundled resources and docs | Discover schemas, prompts, examples, vocabularies, object guidance, graph records, and organized user/developer documentation |
 
 ODPS support is scoped to the 4.x generation of the specification. The SDK
 primarily targets ODPS v4.1 and keeps backward-compatible support for ODPS v4.0
