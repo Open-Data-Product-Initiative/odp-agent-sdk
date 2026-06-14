@@ -13,6 +13,7 @@ review.
 | Situation | Recommended provider | Why |
 |-----------|----------------------|-----|
 | Fast local development | `ollama-gemma3n` | Small, fast, and useful for first-pass structured generation. |
+| Local GGUF inference without a server | `llamacpp-embedded` | Useful when a project wants direct llama.cpp access through `llama-cpp-python` instead of Ollama, LM Studio, vLLM, or a llama.cpp server. |
 | Balanced local work on Apple Silicon with 32 GB memory | `lmstudio-gemma4-12b` | Stronger local model for drafting, graph inference, and portfolio review while still realistic on a developer laptop. |
 | Structured YAML generation | `ollama-qwen3` or `ollama-qwen3-14b` | Practical local choice when schema shape and predictable output matter. |
 | Small draft generation | `ollama-llama`, `ollama-mistral`, or `ollama-phi` | Easy local options for short drafts, summaries, and experiments. |
@@ -39,6 +40,11 @@ review.
 | Release review | Yes | `lmstudio-gemma4-12b` | `ollama-qwen3-14b` | `claude`, `openai` | Use hosted models when release risk is higher than provider cost. |
 
 ## Machine Tiers
+
+Embedded llama.cpp support is optional. Install it with
+`pip install "open-data-products[llama-cpp]"`, then configure a `llama-cpp`
+provider with `modelPath`, `contextWindow`, and `gpuLayers`. Use
+`openai-chat` instead when llama.cpp is running as a separate local server.
 
 | Machine | Practical local choices | Avoid by default |
 |---------|-------------------------|------------------|

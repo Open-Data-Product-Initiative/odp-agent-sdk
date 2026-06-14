@@ -16,6 +16,7 @@ from open_data_products import (
     get_config,
     get_config_path,
     get_resource,
+    llama_cpp_generate,
     list_resources,
     load_generation_prompt,
     print_config,
@@ -78,8 +79,11 @@ artifacts = generate_local_artifacts("open_data_products/generation/source_docs"
   those fragment files.
 - `load_generation_config(path)`, `resolve_generation_settings(...)`, and
   `create_generation_client(settings)`: load provider config and create the
-  configured Ollama, OpenAI-compatible, or Anthropic generation client without
-  storing API keys in source files.
+  configured Ollama, embedded llama.cpp, OpenAI-compatible, or Anthropic
+  generation client without storing API keys in source files.
+- `llama_cpp_generate(prompt, model_path, ...)`: generate text with optional
+  in-process llama.cpp bindings. Requires
+  `pip install "open-data-products[llama-cpp]"`.
 - `ensure_ollama_model(model="qwen2.5")`: check that Ollama is reachable and
   that the requested local model is available before Ollama-backed generation.
 

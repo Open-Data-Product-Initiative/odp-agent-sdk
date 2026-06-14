@@ -365,7 +365,7 @@ providers:
 
     assert payload["valid"] is False
     assert (
-        "providers.groq.type must be one of anthropic, ollama, openai"
+        "providers.groq.type must be one of anthropic, llama-cpp, ollama, openai, openai-chat"
         in payload["errors"]
     )
 

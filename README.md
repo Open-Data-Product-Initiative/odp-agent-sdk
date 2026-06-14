@@ -23,6 +23,9 @@ pip install open-data-products
 # Optional Data Contract validation adapter:
 pip install "open-data-products[contracts]"
 
+# Optional embedded llama.cpp generation support:
+pip install "open-data-products[llama-cpp]"
+
 # For development:
 pip install "open-data-products[dev]"
 ```
@@ -166,7 +169,8 @@ below for implementation details:
 - [API reference](docs/API.md): Agent API, spec helper namespaces, ODPS models, validators, serialization, and examples.
 - [Agent surface](docs/agent-surface.md): MCP server, ARWS manifest, and bundled skills for agent hosts.
 - [Command guide](docs/commands.md): what each common CLI command does, what it reads, and what it writes.
-- [LLM generation](docs/generation.md): Ollama or configured external LLM source-doc to ODPC fragment and ODPG graph workflow.
+- [LLM generation](docs/generation.md): Ollama, embedded llama.cpp, or configured external LLM source-doc to ODPC fragment and ODPG graph workflow.
+- [Embedded llama.cpp guide](docs/llama-cpp.md): install the optional extra, configure a GGUF model path, and run local generation without a separate LLM server.
 - [LLM selection guide](docs/llm-selection-guide.md): opinionated local and hosted model choices by SDK workflow.
 - [Generation development notes](docs/generation-development.md): contributor-facing prompt pipeline, ODPS normalization, validation, repair, and testing guidance.
 - [Portfolio development notes](docs/portfolio-development.md): contributor-facing portfolio workspace orchestration, renderer, localization, validation, and testing guidance.
@@ -202,8 +206,9 @@ open-data-products resources --id odpv.terms --json
 open-data-products resources --id odpg.objects --json
 ```
 
-The LLM generation commands
-[require Ollama or configured provider credentials](docs/generation.md#llm-setup).
+The LLM generation commands require a configured local or hosted provider. The
+default is Ollama; embedded llama.cpp and hosted providers are configured in the
+generation config. See [LLM generation](docs/generation.md#llm-setup).
 
 Use the bundled default config and bundled prompts as-is:
 
@@ -288,6 +293,23 @@ models. Sweet-spot presets include `ollama-gemma3n`, `ollama-qwen25`,
 `lmstudio-gemma4-12b`. Pull or load the model in the selected runtime before
 running generation.
 
+For direct GGUF inference without a separate local LLM server, install optional
+embedded llama.cpp support and select a `llama-cpp` provider:
+
+```bash
+pip install "open-data-products[llama-cpp]"
+```
+
+```yaml
+providers:
+  llamacpp-embedded:
+    type: llama-cpp
+    model: local-gguf
+    modelPath: models/qwen2.5-7b-instruct-q4_k_m.gguf
+    contextWindow: 8192
+    gpuLayers: -1
+```
+
 Generation uses bundled prompt templates by default. If you want to customize
 the prompts, copy them to a project-owned folder, edit the Markdown files, and
 pass that folder with `--prompts`:
@@ -361,8 +383,8 @@ Live LLM generation requires Ollama or a configured provider API key; see
 
 - `open_data_products.generation`: editable prompt templates and provider-backed
   generation helpers for ODPS, ODPC, and ODPG YAML artifacts. Defaults to local
-  Ollama/Qwen 2.5 and can use copied config templates for external providers
-  such as OpenAI.
+  Ollama/Qwen 2.5 and can use copied config templates for embedded llama.cpp,
+  OpenAI-compatible runtimes, and hosted providers such as OpenAI.
 - `open_data_products.odps`: ODPS v4.1 models, standards-aware validation, YAML/JSON I/O, compliance helpers, and `pricing_to_402`.
 - `open_data_products.odpc`: ODPC catalog building, loading, validation, explanation, and object guidance search.
 - `open_data_products.odpg`: ODPG graph validation, summary, traversal, analysis, agent context, object search, external graph conversion, and graph explorer generation.

@@ -175,6 +175,13 @@ BUILT_IN_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "model": "local-model",
         "baseUrl": "http://localhost:8000/v1",
     },
+    "llamacpp-embedded": {
+        "type": "llama-cpp",
+        "model": "local-gguf",
+        "modelPath": "models/qwen2.5-7b-instruct-q4_k_m.gguf",
+        "contextWindow": 8192,
+        "gpuLayers": -1,
+    },
     "claude": {
         "type": "anthropic",
         "model": "claude-sonnet-4-5",
@@ -222,6 +229,9 @@ class GenerationSettings:
     api_key_env: Optional[str] = None
     api_version: Optional[str] = None
     max_tokens: Optional[int] = None
+    model_path: Optional[str] = None
+    context_window: Optional[int] = None
+    gpu_layers: Optional[int] = None
     prompt_path: Optional[str] = None
 
 
@@ -710,6 +720,44 @@ def anthropic_generate(
     raise RuntimeError("Anthropic response did not contain generated text.")
 
 
+def llama_cpp_generate(
+    prompt: str,
+    model_path: str,
+    context_window: int = 8192,
+    gpu_layers: int = 0,
+    max_tokens: int = 2048,
+    temperature: float = 0.2,
+) -> str:
+    """Generate text with optional in-process llama.cpp bindings."""
+    try:
+        from llama_cpp import Llama
+    except ImportError as exc:
+        raise RuntimeError(
+            "llama.cpp generation requires optional support. Install it with: "
+            'pip install "open-data-products[llama-cpp]"'
+        ) from exc
+
+    llm = Llama(
+        model_path=model_path,
+        n_ctx=context_window,
+        n_gpu_layers=gpu_layers,
+    )
+    data = llm(prompt, max_tokens=max_tokens, temperature=temperature)
+    choices = data.get("choices") if isinstance(data, dict) else None
+    if isinstance(choices, list):
+        parts = []
+        for choice in choices:
+            if not isinstance(choice, dict):
+                continue
+            text = choice.get("text")
+            if isinstance(text, str):
+                parts.append(text)
+        if parts:
+            return "\n".join(parts)
+
+    raise RuntimeError("llama.cpp response did not contain generated text.")
+
+
 def _require_ascii_api_key(api_key: str, api_key_env: str, provider: str) -> None:
     try:
         api_key.encode("ascii")
@@ -835,6 +883,9 @@ def validate_config(
         "providers",
         "version",
         "maxTokens",
+        "modelPath",
+        "contextWindow",
+        "gpuLayers",
     }
     for key in config:
         if key not in allowed_top:
@@ -867,7 +918,10 @@ def validate_config(
     _validate_optional_string(config, "prompts", "prompts", errors)
     _validate_optional_string(config, "baseUrl", "baseUrl", errors)
     _validate_optional_string(config, "version", "version", errors)
+    _validate_optional_string(config, "modelPath", "modelPath", errors)
     _validate_optional_positive_int(config, "maxTokens", "maxTokens", errors)
+    _validate_optional_positive_int(config, "contextWindow", "contextWindow", errors)
+    _validate_optional_int(config, "gpuLayers", "gpuLayers", errors)
     _validate_generation_paths(config, source_path, errors, warnings)
     _find_secret_values(config, "", errors)
 
@@ -928,22 +982,41 @@ def _validate_provider_config(
     errors: List[str],
     warnings: List[str],
 ) -> None:
-    allowed_provider = {"type", "model", "baseUrl", "apiKeyEnv", "version", "maxTokens"}
-    allowed_types = {"anthropic", "ollama", "openai", "openai-chat"}
+    allowed_provider = {
+        "type",
+        "model",
+        "baseUrl",
+        "apiKeyEnv",
+        "version",
+        "maxTokens",
+        "modelPath",
+        "contextWindow",
+        "gpuLayers",
+    }
+    allowed_types = {"anthropic", "llama-cpp", "ollama", "openai", "openai-chat"}
     for key in provider:
         if key not in allowed_provider:
             errors.append(f"Unknown generation config key: {path}.{key}")
 
     provider_type = provider.get("type")
     if provider_type is not None and provider_type not in allowed_types:
-        errors.append(f"{path}.type must be one of anthropic, ollama, openai")
+        errors.append(f"{path}.type must be one of {', '.join(sorted(allowed_types))}")
     elif provider_type is None:
         warnings.append(f"{path}.type is not set; provider name will be used")
 
     _validate_optional_string(provider, "model", f"{path}.model", errors)
     _validate_optional_string(provider, "baseUrl", f"{path}.baseUrl", errors)
     _validate_optional_string(provider, "version", f"{path}.version", errors)
+    _validate_optional_string(provider, "modelPath", f"{path}.modelPath", errors)
     _validate_optional_positive_int(provider, "maxTokens", f"{path}.maxTokens", errors)
+    _validate_optional_positive_int(
+        provider, "contextWindow", f"{path}.contextWindow", errors
+    )
+    _validate_optional_int(provider, "gpuLayers", f"{path}.gpuLayers", errors)
+    if provider_type == "llama-cpp" and not (
+        isinstance(provider.get("modelPath"), str) and provider["modelPath"].strip()
+    ):
+        errors.append(f"{path}.modelPath is required for llama-cpp")
     api_key_env = provider.get("apiKeyEnv")
     if api_key_env is not None and (
         not isinstance(api_key_env, str) or _looks_like_secret(api_key_env)
@@ -1023,6 +1096,19 @@ def _validate_optional_positive_int(
         errors.append(f"{path} must be a positive integer")
 
 
+def _validate_optional_int(
+    data: Dict[str, Any],
+    key: str,
+    path: str,
+    errors: List[str],
+) -> None:
+    value = data.get(key)
+    if value is None:
+        return
+    if not isinstance(value, int):
+        errors.append(f"{path} must be an integer")
+
+
 def _find_secret_values(value: Any, path: str, errors: List[str]) -> None:
     if isinstance(value, dict):
         for key, item in value.items():
@@ -1055,6 +1141,9 @@ def _generation_settings_dict(settings: GenerationSettings) -> Dict[str, Any]:
         "api_key_env": settings.api_key_env,
         "api_version": settings.api_version,
         "max_tokens": settings.max_tokens,
+        "model_path": settings.model_path,
+        "context_window": settings.context_window,
+        "gpu_layers": settings.gpu_layers,
         "prompt_path": settings.prompt_path,
     }
 
@@ -1070,6 +1159,9 @@ def _provider_summaries(providers: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
             "api_key_env": provider.get("apiKeyEnv"),
             "api_version": provider.get("version"),
             "max_tokens": provider.get("maxTokens"),
+            "model_path": provider.get("modelPath"),
+            "context_window": provider.get("contextWindow"),
+            "gpu_layers": provider.get("gpuLayers"),
         }
     return summaries
 
@@ -1106,6 +1198,9 @@ def resolve_generation_settings(
     resolved_prompt_path = str(resolved_prompts) if resolved_prompts else None
     api_version = None
     max_tokens = None
+    model_path = None
+    context_window = None
+    gpu_layers = None
 
     if provider_type == "ollama":
         base_url = str(
@@ -1151,6 +1246,21 @@ def resolve_generation_settings(
             or config.get("maxTokens")
             or DEFAULT_ANTHROPIC_MAX_TOKENS
         )
+    elif provider_type == "llama-cpp":
+        base_url = None
+        api_key_env = None
+        model_path_value = provider_config.get("modelPath") or config.get("modelPath")
+        if not model_path_value:
+            raise ValueError("modelPath is required for llama-cpp generation")
+        model_path = str(model_path_value)
+        context_window_value = provider_config.get("contextWindow") or config.get(
+            "contextWindow"
+        )
+        gpu_layers_value = provider_config.get("gpuLayers")
+        if gpu_layers_value is None:
+            gpu_layers_value = config.get("gpuLayers")
+        context_window = int(context_window_value or 8192)
+        gpu_layers = int(gpu_layers_value) if gpu_layers_value is not None else 0
     else:
         raise ValueError(f"Unsupported generation provider type: {provider_type}")
 
@@ -1164,6 +1274,9 @@ def resolve_generation_settings(
         api_key_env=api_key_env,
         api_version=api_version,
         max_tokens=max_tokens,
+        model_path=model_path,
+        context_window=context_window,
+        gpu_layers=gpu_layers,
         prompt_path=resolved_prompt_path,
     )
 
@@ -1203,6 +1316,16 @@ def create_generation_client(settings: GenerationSettings) -> ModelClient:
             base_url=base_url,
             version=version,
             max_tokens=max_tokens,
+        )
+
+    if settings.provider_type == "llama-cpp":
+        if not settings.model_path:
+            raise ValueError("modelPath is required for llama-cpp generation")
+        return lambda prompt, model_name: llama_cpp_generate(
+            prompt,
+            model_path=settings.model_path,
+            context_window=settings.context_window or 8192,
+            gpu_layers=settings.gpu_layers or 0,
         )
 
     raise ValueError(f"Unsupported generation provider type: {settings.provider_type}")
@@ -2677,6 +2800,7 @@ __all__ = [
     "load_generation_config",
     "load_generation_prompt",
     "load_source_documents",
+    "llama_cpp_generate",
     "ollama_generate",
     "openai_chat_generate",
     "openai_generate",

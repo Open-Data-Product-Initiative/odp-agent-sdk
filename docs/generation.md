@@ -4,19 +4,22 @@ The SDK can use a configured LLM provider to turn plain source documents into
 standards-ready ODPC fragments and ODPG graph YAML. The default provider is
 local Ollama with Qwen 2.5, but the same generation workflow also supports
 local OpenAI-compatible servers such as LM Studio, vLLM, llama.cpp server,
-LocalAI, text-generation-webui, and other compatible local runtimes. Through
-those servers, the SDK can run locally hosted models such as Llama, DeepSeek,
-Qwen, Mistral, Mixtral, Phi, Gemma, Code Llama, StarCoder, Yi, Command R,
-Falcon, Granite, Nemotron, Vicuna, WizardLM, and other models exposed by the
-selected local runtime.
+LocalAI, text-generation-webui, and other compatible local runtimes. It can
+also run GGUF models in-process through optional embedded llama.cpp support,
+without depending on a separate local LLM server. Through these local runtimes,
+the SDK can run locally hosted models such as Llama, DeepSeek, Qwen, Mistral,
+Mixtral, Phi, Gemma, Code Llama, StarCoder, Yi, Command R, Falcon, Granite,
+Nemotron, Vicuna, WizardLM, and other compatible models.
 
 Online providers can also be selected through the generation config, including
 OpenAI-compatible providers and Claude. This workflow stops before catalog
 publishing: it produces source-backed fragment files and a graph file that can
 be validated, inspected, and used by the existing ODPC/ODPG helpers.
 
-For opinionated guidance on which local or hosted model to use for each SDK
-workflow, see the [LLM selection guide](llm-selection-guide.md).
+For a step-by-step embedded llama.cpp setup, see the
+[embedded llama.cpp guide](llama-cpp.md). For opinionated guidance on which
+local or hosted model to use for each SDK workflow, see the
+[LLM selection guide](llm-selection-guide.md).
 
 ## LLM Setup
 
@@ -71,6 +74,40 @@ open-data-products generate \
   --output generated/ \
   --json
 ```
+
+For direct embedded llama.cpp support, install the optional extra and point a
+`llama-cpp` provider at a local GGUF model file. See the
+[embedded llama.cpp guide](llama-cpp.md) for the full workflow.
+
+```bash
+pip install "open-data-products[llama-cpp]"
+```
+
+```yaml
+providers:
+  llamacpp-embedded:
+    type: llama-cpp
+    model: local-gguf
+    modelPath: models/qwen2.5-7b-instruct-q4_k_m.gguf
+    contextWindow: 8192
+    gpuLayers: -1
+```
+
+Then select that provider like any other generation runtime:
+
+```bash
+open-data-products generate \
+  --config my-generation.config.yaml \
+  --provider llamacpp-embedded \
+  --input source_docs/signals/ \
+  --kind signal \
+  --output generated/ \
+  --json
+```
+
+Use `type: openai-chat` when llama.cpp is running as a separate server with a
+`/v1/chat/completions` endpoint. Use `type: llama-cpp` when the SDK should load
+the GGUF file directly in the Python process.
 
 ## Folder Layout
 
@@ -316,6 +353,15 @@ providers:
     model: local-model
     baseUrl: http://localhost:8000/v1
 
+  # Embedded llama.cpp support loads a local GGUF model directly in-process.
+  # Install first with: pip install "open-data-products[llama-cpp]"
+  llamacpp-embedded:
+    type: llama-cpp
+    model: local-gguf
+    modelPath: models/qwen2.5-7b-instruct-q4_k_m.gguf
+    contextWindow: 8192
+    gpuLayers: -1
+
   openai:
     type: openai
     model: gpt-4.1-mini
@@ -379,6 +425,14 @@ fixed by the SDK; set `model` to whatever the selected server exposes, or
 override it for one run with `--model`. Common local model families include
 Llama, DeepSeek, Qwen, Mistral, Mixtral, Phi, Gemma, Code Llama, StarCoder, Yi,
 Command R, Falcon, Granite, Nemotron, Vicuna, and WizardLM.
+
+Provider entries with `type: llama-cpp` use optional in-process
+`llama-cpp-python` bindings and load a GGUF model from `modelPath`. Use this
+profile when you want direct llama.cpp inference without starting Ollama, LM
+Studio, vLLM, or a llama.cpp server. Install it with
+`pip install "open-data-products[llama-cpp]"` before selecting the provider.
+The `contextWindow` and `gpuLayers` settings map to the llama.cpp context size
+and GPU offload layer count.
 
 Provider entries with `type: anthropic` use the Anthropic Messages API request
 shape, `x-api-key` authentication, `anthropic-version`, and

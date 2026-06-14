@@ -11,7 +11,7 @@ family. Each standard lives in its own namespace:
 
 # flake8: noqa: E402
 
-__version__ = "0.2.2"
+__version__ = "0.2.3"
 version = __version__
 
 from . import odpc
@@ -68,6 +68,7 @@ from .generation import (
     load_generation_config,
     list_ollama_models,
     list_generation_prompts,
+    llama_cpp_generate,
     load_generation_prompt,
     openai_chat_generate,
     openai_generate,

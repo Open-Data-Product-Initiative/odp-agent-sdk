@@ -80,6 +80,9 @@ contracts-all = [
 measurements = [
     "tiktoken>=0.13.0; python_version >= '3.9'",
 ]
+llama-cpp = [
+    "llama-cpp-python>=0.3",
+]
 dev = [
     "pytest>=6.0",
     "pytest-cov>=3.0.0",

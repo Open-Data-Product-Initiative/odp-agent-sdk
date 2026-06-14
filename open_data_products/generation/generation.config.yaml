@@ -114,6 +114,17 @@ providers:
     model: local-model
     baseUrl: http://localhost:8000/v1
 
+  # Embedded llama.cpp runs GGUF models in-process through the optional
+  # llama-cpp-python integration. Install with:
+  #   pip install "open-data-products[llama-cpp]"
+  # Replace modelPath with a local GGUF file before selecting this provider.
+  llamacpp-embedded:
+    type: llama-cpp
+    model: local-gguf
+    modelPath: models/qwen2.5-7b-instruct-q4_k_m.gguf
+    contextWindow: 8192
+    gpuLayers: -1
+
   openai:
     type: openai
     model: gpt-4.1-mini
