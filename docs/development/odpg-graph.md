@@ -114,7 +114,7 @@ YAML as the source of truth and renders `nodes` and `edges` as TOON tables. Use
 `write_graph_toon()` or `odpg-build --toon` when a workflow needs a compact
 prompt artifact.
 
-See [`toon-development.md`](toon-development.md) for the shared renderer rules.
+See [`toon-development.md`](toon.md) for the shared renderer rules.
 
 ## GCF Rendering
 
@@ -124,7 +124,7 @@ local IDs, and renders edges as compact local-ID references. Use
 `write_graph_gcf()` or `odpg-build --gcf` when an agent workflow sends graph
 context repeatedly or when edge identifiers dominate the prompt payload.
 
-See [`gcf-development.md`](gcf-development.md) for the local measurement notes
+See [`gcf-development.md`](gcf.md) for the local measurement notes
 and scope boundary.
 
 ## Tests

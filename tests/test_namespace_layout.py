@@ -1,6 +1,11 @@
 """Tests for the Open Data Products SDK namespace layout."""
 
+import ast
 import importlib.util
+from pathlib import Path
+
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_public_spec_namespaces_are_importable():
@@ -59,3 +64,36 @@ def test_top_level_package_does_not_export_odps_specific_models():
 
 def test_legacy_odps_package_is_not_part_of_the_sdk():
     assert importlib.util.find_spec("odps") is None
+
+
+def test_cli_uses_concrete_generation_namespace_internally():
+    """Guard internal CLI imports from routing through the root package facade."""
+    cli_path = REPO_ROOT / "open_data_products" / "cli.py"
+    tree = ast.parse(cli_path.read_text(encoding="utf-8"))
+
+    root_generation_imports = [
+        node.lineno
+        for node in ast.walk(tree)
+        if isinstance(node, ast.ImportFrom)
+        and node.module is None
+        and node.level == 1
+        and any(alias.name == "generation" for alias in node.names)
+    ]
+
+    assert root_generation_imports == []
+
+
+def test_mcp_tools_use_concrete_modules_internally():
+    """Guard MCP handlers from depending on the root public API barrel."""
+    tools_path = REPO_ROOT / "open_data_products" / "mcp" / "tools.py"
+    tree = ast.parse(tools_path.read_text(encoding="utf-8"))
+
+    parent_barrel_imports = [
+        node.lineno
+        for node in ast.walk(tree)
+        if isinstance(node, ast.ImportFrom)
+        and node.module is None
+        and node.level == 2
+    ]
+
+    assert parent_barrel_imports == []

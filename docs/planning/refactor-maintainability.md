@@ -306,8 +306,8 @@ Files:
 
 - Review: `pyproject.toml`
 - Review: `README.md`
-- Review: `docs/commands.md`
-- Review: `docs/development.md`
+- Review: `docs/user/commands.md`
+- Review: `docs/development/README.md`
 
 Approach:
 

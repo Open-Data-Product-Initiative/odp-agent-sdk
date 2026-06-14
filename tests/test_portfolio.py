@@ -485,6 +485,65 @@ def write_source_lanes(root: Path) -> None:
     )
 
 
+def test_portfolio_source_helpers_collect_and_compare_lane_changes(
+    tmp_path: Path,
+) -> None:
+    from open_data_products.portfolio_sources import (
+        changed_source_lanes,
+        collect_source_lanes,
+        source_changes,
+        source_change_warnings,
+        source_hashes_by_lane,
+    )
+
+    sources = tmp_path / "sources"
+    write_source_lanes(sources)
+
+    initial_lanes = collect_source_lanes(
+        objectives=sources / "objectives",
+        use_cases=sources / "use-cases",
+        signals=sources / "signals",
+        products=sources / "products",
+    )
+    previous_state = {"sources": initial_lanes}
+
+    (sources / "use-cases" / "retention.md").write_text(
+        "Use case: Retention Workflow with updated renewal handling\n",
+        encoding="utf-8",
+    )
+    (sources / "signals" / "market.txt").unlink()
+    (sources / "products" / "orders.json").write_text(
+        '{"product": "Orders"}\n',
+        encoding="utf-8",
+    )
+    updated_lanes = collect_source_lanes(
+        objectives=sources / "objectives",
+        use_cases=sources / "use-cases",
+        signals=sources / "signals",
+        products=sources / "products",
+    )
+
+    changes = source_changes(previous_state, updated_lanes)
+    changed_lanes = changed_source_lanes(updated_lanes, changes)
+
+    assert source_hashes_by_lane(previous_state)
+    assert changes["lanes"]["useCases"]["updated"] == [
+        str(sources / "use-cases" / "retention.md")
+    ]
+    assert changes["lanes"]["signals"]["removed"] == [
+        str(sources / "signals" / "market.txt")
+    ]
+    assert changes["lanes"]["products"]["created"] == [
+        str(sources / "products" / "orders.json")
+    ]
+    assert [source["path"] for source in changed_lanes["products"]] == [
+        str(sources / "products" / "orders.json")
+    ]
+    assert source_change_warnings(changes) == [
+        f"Source file no longer present: {sources / 'signals' / 'market.txt'}"
+    ]
+
+
 def fake_portfolio_client(prompt: str, model: str) -> str:
     """Return a deterministic portfolio plan and assert source lanes are present."""
     assert model == "test-model"

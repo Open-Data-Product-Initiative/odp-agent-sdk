@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import html
 import json
 import re
@@ -31,9 +30,18 @@ from .odps._normalization import (
     ODPS_SLA_UNITS,
     hours_to_minutes,
 )
+from .portfolio_sources import (
+    changed_source_lanes as _changed_source_lanes,
+    collect_source_files as _collect_source_files,
+    collect_source_lanes as _collect_source_lanes,
+    resolve_source_lane_paths as _resolve_source_lane_paths,
+    source_change_warnings as _source_change_warnings,
+    source_changes as _source_changes,
+    source_hashes as _source_hashes,
+    source_hashes_by_lane as _source_hashes_by_lane,
+)
 
 DEFAULT_PORTFOLIO_HTML = "index.html"
-PORTFOLIO_SOURCE_SUFFIXES = (".md", ".txt", ".yaml", ".yml", ".json")
 PORTFOLIO_LOCALIZATION_BATCH_CHARS = 3500
 PORTFOLIO_LOCALIZATION_BATCH_ITEMS = 50
 PortfolioBuildClient = Callable[[str, str], str]
@@ -895,149 +903,6 @@ def _chunk_localization_strings(
     return chunks
 
 
-def _collect_source_lanes(
-    *,
-    objectives: Optional[Path],
-    use_cases: Optional[Path],
-    signals: Optional[Path],
-    products: Optional[Path],
-) -> Dict[str, List[Dict[str, str]]]:
-    lanes = {
-        "objectives": objectives,
-        "useCases": use_cases,
-        "signals": signals,
-        "products": products,
-    }
-    return {name: _collect_source_files(path) for name, path in lanes.items()}
-
-
-def _resolve_source_lane_paths(
-    previous_state: Dict[str, Any],
-    *,
-    objectives: Optional[Path],
-    use_cases: Optional[Path],
-    signals: Optional[Path],
-    products: Optional[Path],
-) -> Dict[str, str]:
-    saved = previous_state.get("sourceLanePaths")
-    if not isinstance(saved, dict):
-        saved = {}
-    lanes = {
-        "objectives": objectives or saved.get("objectives"),
-        "useCases": use_cases or saved.get("useCases"),
-        "signals": signals or saved.get("signals"),
-        "products": products or saved.get("products"),
-    }
-    return {name: str(path) for name, path in lanes.items() if path is not None}
-
-
-def _collect_source_files(path: Optional[Path]) -> List[Dict[str, str]]:
-    if path is None:
-        return []
-    if not path.exists():
-        raise FileNotFoundError(f"Portfolio source path not found: {path}")
-    paths = [path] if path.is_file() else sorted(_iter_source_files(path))
-    files = []
-    for source_path in paths:
-        text = source_path.read_text(encoding="utf-8")
-        files.append(
-            {
-                "path": str(source_path),
-                "text": text,
-                "sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
-            }
-        )
-    return files
-
-
-def _source_changes(
-    previous_state: Dict[str, Any],
-    lanes: Dict[str, List[Dict[str, str]]],
-) -> Dict[str, Any]:
-    previous_sources = previous_state.get("sources")
-    if not isinstance(previous_sources, dict):
-        previous_sources = {}
-    lane_changes: Dict[str, Dict[str, List[str]]] = {}
-    removed: List[str] = []
-    for lane_name, files in lanes.items():
-        previous_by_path = _source_hashes(previous_sources.get(lane_name))
-        current_by_path = {
-            source["path"]: source["sha256"]
-            for source in files
-            if "path" in source and "sha256" in source
-        }
-        created = sorted(set(current_by_path) - set(previous_by_path))
-        deleted = sorted(set(previous_by_path) - set(current_by_path))
-        changed = sorted(
-            path
-            for path, sha in current_by_path.items()
-            if path in previous_by_path and previous_by_path[path] != sha
-        )
-        unchanged = sorted(
-            path
-            for path, sha in current_by_path.items()
-            if path in previous_by_path and previous_by_path[path] == sha
-        )
-        lane_changes[lane_name] = {
-            "created": created,
-            "updated": changed,
-            "unchanged": unchanged,
-            "removed": deleted,
-        }
-        removed.extend(deleted)
-    return {"lanes": lane_changes, "removed": sorted(removed)}
-
-
-def _source_hashes(value: Any) -> Dict[str, str]:
-    if not isinstance(value, list):
-        return {}
-    hashes = {}
-    for item in value:
-        if isinstance(item, dict) and item.get("path") and item.get("sha256"):
-            hashes[str(item["path"])] = str(item["sha256"])
-    return hashes
-
-
-def _source_hashes_by_lane(state: Dict[str, Any]) -> Dict[str, Dict[str, str]]:
-    sources = state.get("sources") if isinstance(state, dict) else None
-    if not isinstance(sources, dict):
-        return {}
-    return {
-        str(lane): _source_hashes(files)
-        for lane, files in sources.items()
-        if _source_hashes(files)
-    }
-
-
-def _changed_source_lanes(
-    lanes: Dict[str, List[Dict[str, str]]],
-    source_changes: Dict[str, Any],
-) -> Dict[str, List[Dict[str, str]]]:
-    changes = source_changes.get("lanes")
-    if not isinstance(changes, dict):
-        return {name: [] for name in lanes}
-    changed_lanes: Dict[str, List[Dict[str, str]]] = {}
-    for lane_name, files in lanes.items():
-        lane_change = changes.get(lane_name)
-        if not isinstance(lane_change, dict):
-            changed_lanes[lane_name] = []
-            continue
-        changed_paths = set(lane_change.get("created", [])) | set(
-            lane_change.get("updated", [])
-        )
-        changed_lanes[lane_name] = [
-            source for source in files if source.get("path") in changed_paths
-        ]
-    return changed_lanes
-
-
-def _source_change_warnings(source_changes: Dict[str, Any]) -> List[str]:
-    removed = source_changes.get("removed")
-    if not isinstance(removed, list):
-        return []
-    return [f"Source file no longer present: {path}" for path in removed]
-
-
 def _resolve_workspace_title(
     title: Optional[str],
     previous_state: Dict[str, Any],
@@ -1063,12 +928,6 @@ def _apply_workspace_title(
         titled["metadata"] = metadata
     metadata["name"] = title
     return titled
-
-
-def _iter_source_files(path: Path) -> Iterable[Path]:
-    for child in path.rglob("*"):
-        if child.is_file() and child.suffix.lower() in PORTFOLIO_SOURCE_SUFFIXES:
-            yield child
 
 
 def _write_portfolio_artifacts(

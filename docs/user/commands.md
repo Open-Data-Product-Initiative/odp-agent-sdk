@@ -274,7 +274,7 @@ GraphML, GraphSON, RDF/Turtle, OpenCypher, GQL, and Gremlin.
 ## Portfolio Workspaces
 
 Developer implementation notes for this workflow live in
-[`portfolio-development.md`](portfolio-development.md).
+[`portfolio-development.md`](../development/portfolio.md).
 
 ```bash
 open-data-products portfolio build \
@@ -406,5 +406,5 @@ open-data-products product contract-schema examples/contract.yaml --json
 Extracts normalized model and field information from a local Data Contract
 file. This command does not require the optional `datacontract-cli` adapter.
 
-See [Data Contract workflows](data-contracts.md) for optional validation,
+See [Data Contract workflows](../user/data-contracts.md) for optional validation,
 alignment, reports, and export commands that use `datacontract-cli`.
