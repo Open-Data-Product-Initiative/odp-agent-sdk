@@ -81,12 +81,30 @@ Current tool names include:
 
 ## ARWS Manifest
 
-The same tool set is exposed as an
+The SDK also emits an
 [ARWS](https://agenticpatterns.veso.ai/arws) agent manifest:
 
 ```bash
 open-data-products manifest --json
 ```
+
+The manifest is a full SDK capability map. It keeps the stable MCP-compatible
+`tools` array, then adds discovery metadata for agent hosts:
+
+- `interfaces`: CLI, stdio MCP, and manifest commands
+- `standards`: ODPS, ODPC, ODPG, and ODPV coverage
+- `capabilities`: validation, generation, local/hosted LLM runtime, fragment,
+  portfolio, catalog/graph, compact-context sidecar, vocabulary,
+  product-contract, and resource surfaces
+- `workflows`: common command recipes mapped to related MCP tools, including
+  generation config setup, local/hosted provider selection, fragment
+  generation, ODPC catalog assembly, ODPG graph assembly, TOON/GCF sidecar
+  generation, graph inspection/conversion, vocabulary exploration,
+  product-contract checks, and the full portfolio lifecycle from build through
+  refresh, sync, localize, render, and explain
+- `resources`: logical IDs for bundled schemas, vocabularies, prompts, and
+  retrieval indexes
+- `safety`: read-only MCP policy and CLI state-changing boundaries
 
 ## Skills
 

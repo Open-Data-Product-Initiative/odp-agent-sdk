@@ -34,5 +34,6 @@ or virtual environments before. Then follow the Udemy lecture numbers.
 17. [What the portfolio builder creates](17-what-the-portfolio-builder-creates/)
 18. [Build the first portfolio in Colab](18-build-first-portfolio-in-colab/)
 19. [Update the portfolio and review version history](19-update-portfolio-and-review-version-history/)
-20. [Final review: human view and agent-ready YAML](20-final-review-human-view-and-agent-ready-yaml/)
-21. [Wrap-up and next steps](21-wrap-up-and-next-steps/)
+20. [How to localize a portfolio](20-how-to-localize-portfolio/)
+21. [Final review: human view and agent-ready YAML](21-final-review-human-view-and-agent-ready-yaml/)
+22. [Wrap-up and next steps](22-wrap-up-and-next-steps/)

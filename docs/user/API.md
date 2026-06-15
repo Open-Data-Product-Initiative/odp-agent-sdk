@@ -120,8 +120,9 @@ open-data-products serve
 ```
 
 `open-data-products serve` runs the local stdio MCP server. The MCP tool
-registry and ARWS manifest expose the safe read-only tools documented in
-`README.md` and `llms.txt`.
+registry exposes safe read-only tools; the ARWS manifest keeps that tool
+contract and adds SDK capability, workflow, resource, interface, and safety
+metadata for agent discovery.
 
 ## Package Namespace
 

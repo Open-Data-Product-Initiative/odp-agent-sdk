@@ -6,6 +6,9 @@ adding features, fixing validation behavior, or extending agent surfaces.
 
 Use these pages when changing complex SDK behavior:
 
+- [SDK architecture overview](sdk-architecture.md): high-level package map,
+  boundaries, data flow, agent surfaces, and where new contributors should add
+  code. See also the [visual HTML overview](sdk-architecture.html).
 - [Generation development](generation.md): prompt pipelines,
   provider handling, ODPS product generation, normalization, validation, and
   repair.

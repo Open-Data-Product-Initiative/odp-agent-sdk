@@ -15,6 +15,10 @@ This folder is organized by audience and purpose.
 ## Development Notes
 
 - [Development index](development/README.md): contributor-facing internals map.
+- [SDK architecture overview](development/sdk-architecture.md): high-level
+  package map and contributor onboarding guide.
+- [SDK architecture visual overview](development/sdk-architecture.html):
+  standalone illustrated HTML page.
 - [Generation development](development/generation.md)
 - [Portfolio development](development/portfolio.md)
 - [ODPS validation development](development/odps-validation.md)

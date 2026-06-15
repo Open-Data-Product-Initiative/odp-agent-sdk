@@ -65,10 +65,26 @@ The current server is intentionally small and portable.
 
 ## Manifest
 
-`generate_agent_manifest()` renders public tool metadata without handlers. It
-includes tool name, description, class, and input schema.
+`generate_agent_manifest()` renders the agent discovery payload. The top-level
+manifest describes SDK interfaces, supported standards, capabilities, workflows,
+logical bundled resources, and safety boundaries.
+
+The `tools` array remains the MCP-compatible contract. Tool entries include
+name, description, class, and input schema, but never handler callables.
 
 Keep the manifest and MCP tool list aligned by deriving both from `TOOLS`.
+Keep manifest resources logical: expose resource IDs, specs, types, and
+descriptions, not package filesystem paths.
+When adding multi-step CLI workflows such as portfolio workspaces, describe the
+full lifecycle in `capabilities` and add one manifest workflow entry per user
+action so agent hosts do not need to infer hidden subcommands from prose.
+When build commands emit compact context formats, expose them as structured
+`context_formats` and `sidecar_outputs` fields in the relevant manifest
+capability and workflows.
+When generation commands support provider selection, expose local and hosted
+runtime families as structured provider metadata so agents can choose between
+offline development, local servers, embedded GGUF inference, and hosted
+providers.
 
 ## Safe Surface Policy
 
@@ -95,4 +111,3 @@ Use these files when changing MCP or manifest behavior:
 
 For new tools, add tests for registry metadata, handler output, manifest output,
 and error behavior where relevant.
-
