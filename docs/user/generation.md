@@ -3,13 +3,13 @@
 The SDK can use a configured LLM provider to turn plain source documents into
 standards-ready ODPC fragments and ODPG graph YAML. The default provider is
 local Ollama with Qwen 2.5, but the same generation workflow also supports
-local OpenAI-compatible servers such as LM Studio, vLLM, llama.cpp server,
-LocalAI, text-generation-webui, and other compatible local runtimes. It can
-also run GGUF models in-process through optional embedded llama.cpp support,
-without depending on a separate local LLM server. Through these local runtimes,
-the SDK can run locally hosted models such as Llama, DeepSeek, Qwen, Mistral,
-Mixtral, Phi, Gemma, Code Llama, StarCoder, Yi, Command R, Falcon, Granite,
-Nemotron, Vicuna, WizardLM, and other compatible models.
+local OpenAI-compatible servers such as LM Studio, vLLM, NVIDIA NIM, llama.cpp
+server, LocalAI, text-generation-webui, and other compatible local runtimes. It
+can also run GGUF models in-process through optional embedded llama.cpp
+support, without depending on a separate local LLM server. Through these local
+runtimes, the SDK can run locally hosted models such as Llama, DeepSeek, Qwen,
+Mistral, Mixtral, Phi, Gemma, Code Llama, StarCoder, Yi, Command R, Falcon,
+Granite, Nemotron, Vicuna, WizardLM, and other compatible models.
 
 Online providers can also be selected through the generation config, including
 OpenAI-compatible providers and Claude. This workflow stops before catalog
@@ -17,8 +17,9 @@ publishing: it produces source-backed fragment files and a graph file that can
 be validated, inspected, and used by the existing ODPC/ODPG helpers.
 
 For a step-by-step embedded llama.cpp setup, see the
-[embedded llama.cpp guide](llama-cpp.md). For opinionated guidance on which
-local or hosted model to use for each SDK workflow, see the
+[embedded llama.cpp guide](llama-cpp.md). For a local NVIDIA NIM container
+workflow, see the [NVIDIA NIM guide](nvidia-nim.md). For opinionated guidance
+on which local or hosted model to use for each SDK workflow, see the
 [LLM selection guide](llm-selection-guide.md).
 
 ## LLM Setup
@@ -60,15 +61,26 @@ The larger local presets are available when the machine can tolerate slower
 runs: `ollama-qwen25-14b`, `ollama-qwen3-14b`,
 `ollama-deepseek14b`, and `ollama-large-q4`.
 
-For LM Studio and similar local servers, use a provider entry with
+For LM Studio, NVIDIA NIM, and similar local servers, use a provider entry with
 `type: openai-chat` and set the model to the name loaded in that server. The
 bundled config includes `lmstudio-gemma4-e4b` and `lmstudio-gemma4-12b`
-presets for local Gemma 4 models:
+presets for local Gemma 4 models, plus `nvidia-nim` for NIM LLM containers on
+`http://localhost:8000/v1`. See the [NVIDIA NIM guide](nvidia-nim.md) for the
+container startup and readiness checks.
 
 ```bash
 open-data-products generate \
   --config my-generation.config.yaml \
   --provider lmstudio-gemma4-e4b \
+  --input source_docs/signals/ \
+  --kind signal \
+  --output generated/ \
+  --json
+
+open-data-products generate \
+  --config my-generation.config.yaml \
+  --provider nvidia-nim \
+  --model meta/llama-3.1-8b-instruct \
   --input source_docs/signals/ \
   --kind signal \
   --output generated/ \
@@ -327,8 +339,8 @@ providers:
     model: qwen3:32b
     baseUrl: http://localhost:11434
 
-  # Local OpenAI-compatible chat servers such as LM Studio, vLLM, llama.cpp
-  # server, LocalAI, and text-generation-webui usually expose
+  # Local OpenAI-compatible chat servers such as LM Studio, vLLM, NVIDIA NIM,
+  # llama.cpp server, LocalAI, and text-generation-webui usually expose
   # /v1/chat/completions. Replace `model` with the model name loaded in that
   # server, such as Llama, DeepSeek, Qwen, Mistral, Mixtral, Phi, Gemma,
   # Code Llama, StarCoder, Yi, Command R, Falcon, Granite, Nemotron, Vicuna,
@@ -349,6 +361,11 @@ providers:
     baseUrl: http://localhost:1234/v1
 
   vllm:
+    type: openai-chat
+    model: local-model
+    baseUrl: http://localhost:8000/v1
+
+  nvidia-nim:
     type: openai-chat
     model: local-model
     baseUrl: http://localhost:8000/v1
@@ -419,12 +436,12 @@ OpenRouter and Groq.
 Provider entries with `type: openai-chat` use the Chat Completions request
 shape, `baseUrl + /chat/completions`. Use this profile for local
 OpenAI-compatible servers such as LM Studio, vLLM, llama.cpp server, and
-LocalAI. They can also work with other local runtimes that expose compatible
-chat completions endpoints, such as text-generation-webui. Model names are not
-fixed by the SDK; set `model` to whatever the selected server exposes, or
-override it for one run with `--model`. Common local model families include
-Llama, DeepSeek, Qwen, Mistral, Mixtral, Phi, Gemma, Code Llama, StarCoder, Yi,
-Command R, Falcon, Granite, Nemotron, Vicuna, and WizardLM.
+NVIDIA NIM. They can also work with other local runtimes that expose compatible
+chat completions endpoints, such as LocalAI and text-generation-webui. Model
+names are not fixed by the SDK; set `model` to whatever the selected server
+exposes, or override it for one run with `--model`. Common local model families
+include Llama, DeepSeek, Qwen, Mistral, Mixtral, Phi, Gemma, Code Llama,
+StarCoder, Yi, Command R, Falcon, Granite, Nemotron, Vicuna, and WizardLM.
 
 Provider entries with `type: llama-cpp` use optional in-process
 `llama-cpp-python` bindings and load a GGUF model from `modelPath`. Use this

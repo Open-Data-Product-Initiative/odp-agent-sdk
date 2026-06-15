@@ -90,9 +90,9 @@ providers:
     model: qwen3:32b
     baseUrl: http://localhost:11434
 
-  # Local OpenAI-compatible chat servers such as LM Studio, vLLM, llama.cpp
-  # server, and LocalAI usually expose /v1/chat/completions. Replace `model`
-  # with the model name loaded in that server.
+  # Local OpenAI-compatible chat servers such as LM Studio, vLLM, NVIDIA NIM,
+  # llama.cpp server, and LocalAI usually expose /v1/chat/completions. Replace
+  # `model` with the model name loaded in that server.
   lmstudio:
     type: openai-chat
     model: local-model
@@ -110,6 +110,13 @@ providers:
     baseUrl: http://localhost:1234/v1
 
   vllm:
+    type: openai-chat
+    model: local-model
+    baseUrl: http://localhost:8000/v1
+
+  # NVIDIA NIM for LLM containers expose OpenAI-compatible chat completions on
+  # the NIM server port. Replace `model` with the model served by the container.
+  nvidia-nim:
     type: openai-chat
     model: local-model
     baseUrl: http://localhost:8000/v1

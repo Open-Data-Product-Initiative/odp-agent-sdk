@@ -175,6 +175,8 @@ below for implementation details:
 - [Command guide](docs/user/commands.md): what each common CLI command does, what it reads, and what it writes.
 - [LLM generation](docs/user/generation.md): Ollama, embedded llama.cpp, or configured external LLM source-doc to ODPC fragment and ODPG graph workflow.
 - [Embedded llama.cpp guide](docs/user/llama-cpp.md): install the optional extra, configure a GGUF model path, and run local generation without a separate LLM server.
+- [NVIDIA NIM guide](docs/user/nvidia-nim.md): run SDK generation through a
+  local NVIDIA NIM LLM container.
 - [LLM selection guide](docs/user/llm-selection-guide.md): opinionated local and hosted model choices by SDK workflow.
 - [Generation development notes](docs/development/generation.md): contributor-facing prompt pipeline, ODPS normalization, validation, repair, and testing guidance.
 - [Portfolio development notes](docs/development/portfolio.md): contributor-facing portfolio workspace orchestration, renderer, localization, validation, and testing guidance.
@@ -274,6 +276,14 @@ open-data-products generate \
 
 open-data-products generate \
   --config my-generation.config.yaml \
+  --provider nvidia-nim \
+  --model meta/llama-3.1-8b-instruct \
+  --input source_docs/products/ \
+  --kind product-reference \
+  --output generated/
+
+open-data-products generate \
+  --config my-generation.config.yaml \
   --provider groq \
   --model openai/gpt-oss-120b \
   --input source_docs/products/ \
@@ -292,10 +302,11 @@ open-data-products generate \
 The bundled config includes local presets for common laptop and workstation
 models. Sweet-spot presets include `ollama-gemma3n`, `ollama-qwen25`,
 `ollama-qwen3`, `ollama-llama`, `ollama-mistral`, `ollama-phi`, and
-`lmstudio-gemma4-e4b`. Larger local presets include `ollama-qwen25-14b`,
-`ollama-qwen3-14b`, `ollama-deepseek14b`, `ollama-large-q4`, and
-`lmstudio-gemma4-12b`. Pull or load the model in the selected runtime before
-running generation.
+`lmstudio-gemma4-e4b`. Local OpenAI-compatible server presets include
+`nvidia-nim` for NVIDIA NIM LLM containers on `http://localhost:8000/v1`.
+Larger local presets include `ollama-qwen25-14b`, `ollama-qwen3-14b`,
+`ollama-deepseek14b`, `ollama-large-q4`, and `lmstudio-gemma4-12b`. Pull or
+load the model in the selected runtime before running generation.
 
 For direct GGUF inference without a separate local LLM server, install optional
 embedded llama.cpp support and select a `llama-cpp` provider:
@@ -388,7 +399,8 @@ Live LLM generation requires Ollama or a configured provider API key; see
 - `open_data_products.generation`: editable prompt templates and provider-backed
   generation helpers for ODPS, ODPC, and ODPG YAML artifacts. Defaults to local
   Ollama/Qwen 2.5 and can use copied config templates for embedded llama.cpp,
-  OpenAI-compatible runtimes, and hosted providers such as OpenAI.
+  OpenAI-compatible runtimes such as NVIDIA NIM, and hosted providers such as
+  OpenAI.
 - `open_data_products.odps`: ODPS v4.1 models, standards-aware validation, YAML/JSON I/O, compliance helpers, and `pricing_to_402`.
 - `open_data_products.odpc`: ODPC catalog building, loading, validation, explanation, and object guidance search.
 - `open_data_products.odpg`: ODPG graph validation, summary, traversal, analysis, agent context, object search, external graph conversion, and graph explorer generation.

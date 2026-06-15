@@ -7,6 +7,8 @@ This folder is organized by audience and purpose.
 - [Command guide](user/commands.md): common CLI workflows and outputs.
 - [LLM generation](user/generation.md): source documents, providers, prompts, and generated artifacts.
 - [Embedded llama.cpp](user/llama-cpp.md): local GGUF model setup without a separate server.
+- [NVIDIA NIM generation](user/nvidia-nim.md): run generation through a
+  local NIM LLM container.
 - [LLM selection guide](user/llm-selection-guide.md): model choices by SDK workflow.
 - [Data Contract workflows](user/data-contracts.md): product contract resolution, validation, alignment, and reports.
 - [Agent surface](user/agent-surface.md): MCP server, ARWS manifest, and bundled skills.

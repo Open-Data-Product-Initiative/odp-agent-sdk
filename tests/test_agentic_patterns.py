@@ -439,6 +439,7 @@ class TestAgentManifest:
             "ollama",
             "lmstudio",
             "vllm",
+            "nvidia-nim",
             "llamacpp-embedded",
         ]
         assert llm_runtime["hosted_providers"] == [

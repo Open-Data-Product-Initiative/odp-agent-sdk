@@ -146,6 +146,11 @@ BUILT_IN_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "model": "local-model",
         "baseUrl": "http://localhost:8000/v1",
     },
+    "nvidia-nim": {
+        "type": "openai-chat",
+        "model": "local-model",
+        "baseUrl": "http://localhost:8000/v1",
+    },
     "llamacpp-embedded": {
         "type": "llama-cpp",
         "model": "local-gguf",

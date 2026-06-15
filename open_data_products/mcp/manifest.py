@@ -116,6 +116,7 @@ def _capabilities() -> List[Dict[str, Any]]:
                 "ollama",
                 "lmstudio",
                 "vllm",
+                "nvidia-nim",
                 "llamacpp-embedded",
             ],
             "hosted_providers": [

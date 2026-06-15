@@ -518,6 +518,7 @@ def test_bundled_generation_config_includes_common_compatible_providers():
     assert "claude" in config["providers"]
     assert "lmstudio" in config["providers"]
     assert "vllm" in config["providers"]
+    assert "nvidia-nim" in config["providers"]
     assert "llamacpp-embedded" in config["providers"]
 
     openrouter = resolve_generation_settings(
@@ -543,6 +544,14 @@ def test_bundled_generation_config_includes_common_compatible_providers():
     assert lmstudio.base_url == "http://localhost:1234/v1"
     assert lmstudio.model == "local-model"
     assert lmstudio.api_key_env is None
+    nvidia_nim = resolve_generation_settings(
+        DEFAULT_GENERATION_CONFIG,
+        provider="nvidia-nim",
+    )
+    assert nvidia_nim.provider_type == "openai-chat"
+    assert nvidia_nim.base_url == "http://localhost:8000/v1"
+    assert nvidia_nim.model == "local-model"
+    assert nvidia_nim.api_key_env is None
     claude = resolve_generation_settings(
         DEFAULT_GENERATION_CONFIG,
         provider="claude",
@@ -661,6 +670,13 @@ def test_resolve_generation_settings_supports_claude_without_config():
         ),
         (
             "vllm",
+            "openai-chat",
+            "local-model",
+            "http://localhost:8000/v1",
+            None,
+        ),
+        (
+            "nvidia-nim",
             "openai-chat",
             "local-model",
             "http://localhost:8000/v1",

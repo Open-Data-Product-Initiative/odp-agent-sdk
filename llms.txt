@@ -227,9 +227,12 @@ selected YAML with
 `open-data-products config generation --config my-generation.config.yaml --print`.
 The check requires explicit provider/model settings, rejects key typos and
 secret-looking values, and verifies configured input and prompt paths exist.
-For local OpenAI-compatible servers such as LM Studio, vLLM, llama.cpp server,
-or LocalAI, use provider entries with `type: openai-chat`; model names are
-user-controlled strings and should match the selected server's loaded model.
+For local OpenAI-compatible servers such as LM Studio, vLLM, NVIDIA NIM,
+llama.cpp server, or LocalAI, use provider entries with `type: openai-chat`;
+model names are user-controlled strings and should match the selected server's
+loaded model. The bundled `nvidia-nim` preset targets local NIM LLM containers
+on `http://localhost:8000/v1`; see `docs/user/nvidia-nim.md` for the container
+startup, readiness checks, model discovery, and SDK command shape.
 
 Use `list_generation_prompts()` and `load_generation_prompt(name)` from Python,
 or discover prompt resources with `open-data-products resources --json`.
