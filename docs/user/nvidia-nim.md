@@ -7,6 +7,31 @@ endpoint at `http://localhost:8000/v1/chat/completions`.
 Use this mode when you want generation backed by a NIM container that you run
 and manage outside the SDK.
 
+## Why NVIDIA NIM
+
+NVIDIA NIM is broader than a generic LLM endpoint. The NVIDIA catalog includes
+language models, vision models, embedding and retrieval models, speech models,
+safety models, and domain-specialist models for scientific and technical
+workflows such as biology and chemistry.
+
+For SDK generation, the relevant NIM capability is the OpenAI-compatible chat
+endpoint exposed by a running LLM container. That lets the SDK use models such
+as Llama, Nemotron, Mistral, Qwen, and other NIM-served language models through
+the same `openai-chat` request path used for local OpenAI-compatible runtimes.
+
+NIM is useful when you want:
+
+- local inference on your own NVIDIA GPU machine or server;
+- NVIDIA-optimized model serving through a production-oriented container;
+- access to NVIDIA's Nemotron model family;
+- a path to domain-specific NVIDIA model families beyond general chat models;
+- an OpenAI-compatible API surface for SDK generation.
+
+Keep the deployment boundary clear. The `nvidia-nim` SDK preset targets a local
+NIM LLM container at `http://localhost:8000/v1`. Hosted NVIDIA endpoints and
+catalog free-tier endpoints are separate services with their own base URLs,
+authentication, model availability, and rate limits.
+
 ## 1. Prepare NVIDIA NIM
 
 Install the NVIDIA container runtime, Docker, and a supported NVIDIA GPU driver
