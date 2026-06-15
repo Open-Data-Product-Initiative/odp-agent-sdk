@@ -123,6 +123,7 @@ def _capabilities() -> List[Dict[str, Any]]:
                 "openai",
                 "openrouter",
                 "groq",
+                "together",
                 "claude",
             ],
             "provider_types": [

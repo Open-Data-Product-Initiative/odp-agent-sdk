@@ -22,3 +22,28 @@ covers NGC login, running the container, startup tuning through
 `NIM_MODEL_PROFILE`, NIM environment variables, backend CLI arguments, and
 `NIM_PASSTHROUGH_ARGS`, health checks, model discovery, project config usage,
 and the boundary between local/container NIM and hosted NVIDIA APIs.
+
+## Together AI hosted provider preset
+
+The generation workflow now also includes a bundled `together` provider preset
+for Together AI's OpenAI-compatible Chat Completions API. The preset uses:
+
+- `type: openai-chat`
+- `baseUrl: https://api.together.ai/v1`
+- `apiKeyEnv: TOGETHER_API_KEY`
+- `model: meta-llama/Llama-3.3-70B-Instruct-Turbo`
+
+This gives users a hosted open-model option alongside OpenAI, OpenRouter, Groq,
+and Claude without adding another SDK client or dependency. Users can override
+the model with any Together chat model exposed by their account:
+
+```bash
+export TOGETHER_API_KEY="..."
+
+open-data-products generate \
+  --provider together \
+  --model meta-llama/Llama-3.3-70B-Instruct-Turbo \
+  --input source_docs/products/ \
+  --kind product-reference \
+  --output generated/
+```

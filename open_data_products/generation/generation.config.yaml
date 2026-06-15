@@ -159,6 +159,17 @@ providers:
     # Example: export GROQ_API_KEY="..."
     apiKeyEnv: GROQ_API_KEY
 
+  # Together AI exposes OpenAI-compatible chat completions. Select this
+  # provider with `--provider together`, and choose any chat model supported by
+  # Together.
+  together:
+    type: openai-chat
+    model: meta-llama/Llama-3.3-70B-Instruct-Turbo
+    baseUrl: https://api.together.ai/v1
+    # Export TOGETHER_API_KEY before selecting this provider.
+    # Example: export TOGETHER_API_KEY="..."
+    apiKeyEnv: TOGETHER_API_KEY
+
   # Anthropic Claude uses its own Messages API client.
   claude:
     type: anthropic

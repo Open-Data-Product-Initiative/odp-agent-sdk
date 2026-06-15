@@ -446,6 +446,7 @@ class TestAgentManifest:
             "openai",
             "openrouter",
             "groq",
+            "together",
             "claude",
         ]
         assert llm_runtime["provider_types"] == [

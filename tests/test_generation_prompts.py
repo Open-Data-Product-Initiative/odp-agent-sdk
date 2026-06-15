@@ -515,6 +515,7 @@ def test_bundled_generation_config_includes_common_compatible_providers():
 
     assert "openrouter" in config["providers"]
     assert "groq" in config["providers"]
+    assert "together" in config["providers"]
     assert "claude" in config["providers"]
     assert "lmstudio" in config["providers"]
     assert "vllm" in config["providers"]
@@ -536,6 +537,14 @@ def test_bundled_generation_config_includes_common_compatible_providers():
     assert groq.provider_type == "openai"
     assert groq.base_url == "https://api.groq.com/openai/v1"
     assert groq.api_key_env == "GROQ_API_KEY"
+    together = resolve_generation_settings(
+        DEFAULT_GENERATION_CONFIG,
+        provider="together",
+    )
+    assert together.provider_type == "openai-chat"
+    assert together.base_url == "https://api.together.ai/v1"
+    assert together.model == "meta-llama/Llama-3.3-70B-Instruct-Turbo"
+    assert together.api_key_env == "TOGETHER_API_KEY"
     lmstudio = resolve_generation_settings(
         DEFAULT_GENERATION_CONFIG,
         provider="lmstudio",
@@ -660,6 +669,13 @@ def test_resolve_generation_settings_supports_claude_without_config():
             "openai/gpt-oss-120b",
             "https://api.groq.com/openai/v1",
             "GROQ_API_KEY",
+        ),
+        (
+            "together",
+            "openai-chat",
+            "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+            "https://api.together.ai/v1",
+            "TOGETHER_API_KEY",
         ),
         (
             "lmstudio",

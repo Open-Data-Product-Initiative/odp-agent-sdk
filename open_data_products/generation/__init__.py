@@ -136,6 +136,12 @@ BUILT_IN_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "baseUrl": "https://api.groq.com/openai/v1",
         "apiKeyEnv": "GROQ_API_KEY",
     },
+    "together": {
+        "type": "openai-chat",
+        "model": "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+        "baseUrl": "https://api.together.ai/v1",
+        "apiKeyEnv": "TOGETHER_API_KEY",
+    },
     "lmstudio": {
         "type": "openai-chat",
         "model": "local-model",
