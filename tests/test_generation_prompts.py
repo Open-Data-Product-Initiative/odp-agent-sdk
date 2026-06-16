@@ -518,6 +518,9 @@ def test_bundled_generation_config_includes_common_compatible_providers():
     assert "together" in config["providers"]
     assert "cerebras" in config["providers"]
     assert "sambanova" in config["providers"]
+    assert "mistral" in config["providers"]
+    assert "gemini" in config["providers"]
+    assert "xai" in config["providers"]
     assert "claude" in config["providers"]
     assert "lmstudio" in config["providers"]
     assert "vllm" in config["providers"]
@@ -563,6 +566,30 @@ def test_bundled_generation_config_includes_common_compatible_providers():
     assert sambanova.base_url == "https://api.sambanova.ai/v1"
     assert sambanova.model == "Meta-Llama-3.3-70B-Instruct"
     assert sambanova.api_key_env == "SAMBANOVA_API_KEY"
+    mistral = resolve_generation_settings(
+        DEFAULT_GENERATION_CONFIG,
+        provider="mistral",
+    )
+    assert mistral.provider_type == "openai-chat"
+    assert mistral.base_url == "https://api.mistral.ai/v1"
+    assert mistral.model == "mistral-large-latest"
+    assert mistral.api_key_env == "MISTRAL_API_KEY"
+    gemini = resolve_generation_settings(
+        DEFAULT_GENERATION_CONFIG,
+        provider="gemini",
+    )
+    assert gemini.provider_type == "openai-chat"
+    assert gemini.base_url == "https://generativelanguage.googleapis.com/v1beta/openai"
+    assert gemini.model == "gemini-3.5-flash"
+    assert gemini.api_key_env == "GEMINI_API_KEY"
+    xai = resolve_generation_settings(
+        DEFAULT_GENERATION_CONFIG,
+        provider="xai",
+    )
+    assert xai.provider_type == "openai-chat"
+    assert xai.base_url == "https://api.x.ai/v1"
+    assert xai.model == "grok-4.3"
+    assert xai.api_key_env == "XAI_API_KEY"
     lmstudio = resolve_generation_settings(
         DEFAULT_GENERATION_CONFIG,
         provider="lmstudio",
@@ -708,6 +735,27 @@ def test_resolve_generation_settings_supports_claude_without_config():
             "Meta-Llama-3.3-70B-Instruct",
             "https://api.sambanova.ai/v1",
             "SAMBANOVA_API_KEY",
+        ),
+        (
+            "mistral",
+            "openai-chat",
+            "mistral-large-latest",
+            "https://api.mistral.ai/v1",
+            "MISTRAL_API_KEY",
+        ),
+        (
+            "gemini",
+            "openai-chat",
+            "gemini-3.5-flash",
+            "https://generativelanguage.googleapis.com/v1beta/openai",
+            "GEMINI_API_KEY",
+        ),
+        (
+            "xai",
+            "openai-chat",
+            "grok-4.3",
+            "https://api.x.ai/v1",
+            "XAI_API_KEY",
         ),
         (
             "lmstudio",

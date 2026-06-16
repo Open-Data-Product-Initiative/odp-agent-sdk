@@ -449,6 +449,9 @@ class TestAgentManifest:
             "together",
             "cerebras",
             "sambanova",
+            "mistral",
+            "gemini",
+            "xai",
             "claude",
         ]
         assert llm_runtime["provider_types"] == [

@@ -12,8 +12,9 @@ Mistral, Mixtral, Phi, Gemma, Code Llama, StarCoder, Yi, Command R, Falcon,
 Granite, Nemotron, Vicuna, WizardLM, and other compatible models.
 
 Online providers can also be selected through the generation config, including
-OpenAI-compatible providers such as Together AI, Cerebras, and SambaNova, plus
-Claude through the Anthropic Messages API. This workflow stops before catalog
+OpenAI-compatible providers such as Together AI, Cerebras, SambaNova, Mistral,
+Gemini, and xAI, plus Claude through the Anthropic Messages API. This workflow
+stops before catalog
 publishing: it produces source-backed fragment files and a graph file that can
 be validated, inspected, and used by the existing ODPC/ODPG helpers.
 
@@ -122,49 +123,8 @@ Use `type: openai-chat` when llama.cpp is running as a separate server with a
 `/v1/chat/completions` endpoint. Use `type: llama-cpp` when the SDK should load
 the GGUF file directly in the Python process.
 
-## Provider And Model Matrix
-
-Provider catalogs change over time. The tables below show bundled defaults and
-practical example model IDs for the SDK's generation config. Use `--model` to
-override the default model for one run, and check the selected provider's
-current model catalog before relying on an ID in production.
-
-Hosted provider columns use API-backed inference outside your machine:
-
-| Model or family | OpenAI `openai` | OpenRouter `openrouter` | Groq `groq` | Together AI `together` |
-|-----------------|-----------------|--------------------------|-------------|--------------------------|
-| GPT 4.1 mini | `gpt-4.1-mini` | `openai/gpt-4.1-mini` | - | - |
-| GPT OSS 120B | - | provider catalog | `openai/gpt-oss-120b` | provider catalog |
-| Llama 3.3 70B | - | provider catalog | provider catalog | `meta-llama/Llama-3.3-70B-Instruct-Turbo` |
-| DeepSeek | - | provider catalog | provider catalog | provider catalog |
-| Other provider models | - | use provider model ID | use provider model ID | use provider model ID |
-
-| Model or family | Cerebras `cerebras` | SambaNova `sambanova` | Anthropic `claude` |
-|-----------------|----------------------|------------------------|--------------------|
-| GPT OSS 120B | `gpt-oss-120b` | `gpt-oss-120b` | - |
-| Llama 3.3 70B | provider catalog | `Meta-Llama-3.3-70B-Instruct` | - |
-| DeepSeek | provider catalog | `DeepSeek-V3.1` | - |
-| Claude Sonnet | - | - | `claude-sonnet-4-5` |
-| Other provider models | use provider model ID | use provider model ID | use Anthropic model ID |
-
-Local provider columns use a runtime or model server you run:
-
-| Model or family | Ollama presets | LM Studio presets | vLLM/local chat |
-|-----------------|----------------|-------------------|-----------------|
-| Qwen 2.5 | `qwen2.5`, `qwen2.5:7b`, `qwen2.5:14b` | load manually | serve manually |
-| Qwen 3 | `qwen3:8b`, `qwen3:14b`, `qwen3:32b` | load manually | serve manually |
-| Gemma | `gemma3n:e4b` | `google/gemma-4-e4b`, `google/gemma-4-12b` | serve manually |
-| Llama | `llama3.1:8b` | load manually | serve manually |
-| DeepSeek | `deepseek-r1:14b` | load manually | serve manually |
-| Any local model | model installed in Ollama | model loaded in LM Studio | model served by chat API |
-
-| Model or family | NVIDIA NIM | Embedded llama.cpp |
-|-----------------|------------|--------------------|
-| Qwen | NIM catalog if available | GGUF path |
-| Gemma | NIM catalog if available | GGUF path |
-| Llama | `meta/llama-3.1-8b-instruct` example | GGUF path |
-| DeepSeek | NIM catalog if available | GGUF path |
-| Any local model | model returned by `/v1/models` | local `.gguf` file |
+For a direct provider-by-model comparison across hosted and local runtimes, see
+the [provider and model matrix](provider-model-matrix.md).
 
 ## Folder Layout
 
@@ -320,6 +280,30 @@ open-data-products generate \
   --prompts prompts/ \
   --provider sambanova \
   --model Meta-Llama-3.3-70B-Instruct \
+  --kind signal \
+  --json
+
+open-data-products generate \
+  --config my-generation.config.yaml \
+  --prompts prompts/ \
+  --provider mistral \
+  --model mistral-large-latest \
+  --kind signal \
+  --json
+
+open-data-products generate \
+  --config my-generation.config.yaml \
+  --prompts prompts/ \
+  --provider gemini \
+  --model gemini-3.5-flash \
+  --kind signal \
+  --json
+
+open-data-products generate \
+  --config my-generation.config.yaml \
+  --prompts prompts/ \
+  --provider xai \
+  --model grok-4.3 \
   --kind signal \
   --json
 ```
@@ -487,6 +471,24 @@ providers:
     baseUrl: https://api.sambanova.ai/v1
     apiKeyEnv: SAMBANOVA_API_KEY
 
+  mistral:
+    type: openai-chat
+    model: mistral-large-latest
+    baseUrl: https://api.mistral.ai/v1
+    apiKeyEnv: MISTRAL_API_KEY
+
+  gemini:
+    type: openai-chat
+    model: gemini-3.5-flash
+    baseUrl: https://generativelanguage.googleapis.com/v1beta/openai
+    apiKeyEnv: GEMINI_API_KEY
+
+  xai:
+    type: openai-chat
+    model: grok-4.3
+    baseUrl: https://api.x.ai/v1
+    apiKeyEnv: XAI_API_KEY
+
   # Anthropic Claude uses its own Messages API client.
   claude:
     type: anthropic
@@ -522,8 +524,9 @@ OpenRouter and Groq.
 
 Provider entries with `type: openai-chat` use the Chat Completions request
 shape, `baseUrl + /chat/completions`. Hosted providers such as Together AI,
-Cerebras, and SambaNova use this profile when they expose OpenAI-compatible
-chat completions with Bearer token authentication. Use this profile for local
+Cerebras, SambaNova, Mistral, Gemini, and xAI use this profile when they expose
+OpenAI-compatible chat completions with Bearer token authentication. Use this
+profile for local
 OpenAI-compatible servers such as LM Studio, vLLM, llama.cpp server, and
 NVIDIA NIM. They can also work with other local runtimes that expose compatible
 chat completions endpoints, such as LocalAI and text-generation-webui. Model

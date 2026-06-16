@@ -25,9 +25,9 @@ and the boundary between local/container NIM and hosted NVIDIA APIs.
 
 ## Hosted OpenAI-compatible provider presets
 
-The generation workflow now also includes bundled `together`, `cerebras`, and
-`sambanova` provider presets for hosted OpenAI-compatible Chat Completions
-APIs. The Together preset uses:
+The generation workflow now also includes bundled `together`, `cerebras`,
+`sambanova`, `mistral`, `gemini`, and `xai` provider presets for hosted
+OpenAI-compatible Chat Completions APIs. The Together preset uses:
 
 - `type: openai-chat`
 - `baseUrl: https://api.together.ai/v1`
@@ -47,6 +47,27 @@ The SambaNova preset uses:
 - `baseUrl: https://api.sambanova.ai/v1`
 - `apiKeyEnv: SAMBANOVA_API_KEY`
 - `model: Meta-Llama-3.3-70B-Instruct`
+
+The Mistral preset uses:
+
+- `type: openai-chat`
+- `baseUrl: https://api.mistral.ai/v1`
+- `apiKeyEnv: MISTRAL_API_KEY`
+- `model: mistral-large-latest`
+
+The Gemini preset uses:
+
+- `type: openai-chat`
+- `baseUrl: https://generativelanguage.googleapis.com/v1beta/openai`
+- `apiKeyEnv: GEMINI_API_KEY`
+- `model: gemini-3.5-flash`
+
+The xAI preset uses:
+
+- `type: openai-chat`
+- `baseUrl: https://api.x.ai/v1`
+- `apiKeyEnv: XAI_API_KEY`
+- `model: grok-4.3`
 
 This gives users hosted open-model options alongside OpenAI, OpenRouter, Groq,
 and Claude without adding another SDK client or dependency. Users can override
@@ -76,6 +97,33 @@ export SAMBANOVA_API_KEY="..."
 open-data-products generate \
   --provider sambanova \
   --model Meta-Llama-3.3-70B-Instruct \
+  --input source_docs/products/ \
+  --kind product-reference \
+  --output generated/
+
+export MISTRAL_API_KEY="..."
+
+open-data-products generate \
+  --provider mistral \
+  --model mistral-large-latest \
+  --input source_docs/products/ \
+  --kind product-reference \
+  --output generated/
+
+export GEMINI_API_KEY="..."
+
+open-data-products generate \
+  --provider gemini \
+  --model gemini-3.5-flash \
+  --input source_docs/products/ \
+  --kind product-reference \
+  --output generated/
+
+export XAI_API_KEY="..."
+
+open-data-products generate \
+  --provider xai \
+  --model grok-4.3 \
   --input source_docs/products/ \
   --kind product-reference \
   --output generated/

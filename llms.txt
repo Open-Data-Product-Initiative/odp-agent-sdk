@@ -207,9 +207,10 @@ models, endpoints, input/output folders, and secret environment variable names
 in config. Do not store API key values in config. For OpenAI-compatible
 providers, use env vars such as `OPENAI_API_KEY`, `OPENROUTER_API_KEY`,
 `GROQ_API_KEY`, `TOGETHER_API_KEY`, `CEREBRAS_API_KEY`, or
-`SAMBANOVA_API_KEY`. For Anthropic Claude, use `ANTHROPIC_API_KEY` with a
-provider entry of `type: anthropic`. The OpenAI-compatible provider path has
-been smoke-tested with OpenAI
+`SAMBANOVA_API_KEY`. Additional hosted OpenAI-compatible presets use
+`MISTRAL_API_KEY`, `GEMINI_API_KEY`, or `XAI_API_KEY`. For Anthropic Claude,
+use `ANTHROPIC_API_KEY` with a provider entry of `type: anthropic`. The
+OpenAI-compatible provider path has been smoke-tested with OpenAI
 `gpt-4.1-mini` and Groq `openai/gpt-oss-120b` for ODPC signal fragment
 generation.
 
@@ -235,6 +236,8 @@ model names are user-controlled strings and should match the selected server's
 loaded model. The bundled `nvidia-nim` preset targets local NIM LLM containers
 on `http://localhost:8000/v1`; see `docs/user/nvidia-nim.md` for the container
 startup, readiness checks, model discovery, and SDK command shape.
+For a direct lookup table of provider presets and example model IDs, read
+`docs/user/provider-model-matrix.md`.
 
 Use `list_generation_prompts()` and `load_generation_prompt(name)` from Python,
 or discover prompt resources with `open-data-products resources --json`.

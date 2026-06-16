@@ -192,6 +192,36 @@ providers:
     # Example: export SAMBANOVA_API_KEY="..."
     apiKeyEnv: SAMBANOVA_API_KEY
 
+  # Mistral AI exposes OpenAI-compatible chat completions. Select this provider
+  # with `--provider mistral`, and choose any model supported by Mistral.
+  mistral:
+    type: openai-chat
+    model: mistral-large-latest
+    baseUrl: https://api.mistral.ai/v1
+    # Export MISTRAL_API_KEY before selecting this provider.
+    # Example: export MISTRAL_API_KEY="..."
+    apiKeyEnv: MISTRAL_API_KEY
+
+  # Gemini exposes an OpenAI-compatible chat completions layer. Select this
+  # provider with `--provider gemini`, and choose any compatible Gemini model.
+  gemini:
+    type: openai-chat
+    model: gemini-3.5-flash
+    baseUrl: https://generativelanguage.googleapis.com/v1beta/openai
+    # Export GEMINI_API_KEY before selecting this provider.
+    # Example: export GEMINI_API_KEY="..."
+    apiKeyEnv: GEMINI_API_KEY
+
+  # xAI exposes OpenAI-compatible chat completions for Grok models. Select this
+  # provider with `--provider xai`, and choose any model supported by xAI.
+  xai:
+    type: openai-chat
+    model: grok-4.3
+    baseUrl: https://api.x.ai/v1
+    # Export XAI_API_KEY before selecting this provider.
+    # Example: export XAI_API_KEY="..."
+    apiKeyEnv: XAI_API_KEY
+
   # Anthropic Claude uses its own Messages API client.
   claude:
     type: anthropic

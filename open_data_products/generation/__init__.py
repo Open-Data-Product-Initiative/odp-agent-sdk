@@ -154,6 +154,24 @@ BUILT_IN_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "baseUrl": "https://api.sambanova.ai/v1",
         "apiKeyEnv": "SAMBANOVA_API_KEY",
     },
+    "mistral": {
+        "type": "openai-chat",
+        "model": "mistral-large-latest",
+        "baseUrl": "https://api.mistral.ai/v1",
+        "apiKeyEnv": "MISTRAL_API_KEY",
+    },
+    "gemini": {
+        "type": "openai-chat",
+        "model": "gemini-3.5-flash",
+        "baseUrl": "https://generativelanguage.googleapis.com/v1beta/openai",
+        "apiKeyEnv": "GEMINI_API_KEY",
+    },
+    "xai": {
+        "type": "openai-chat",
+        "model": "grok-4.3",
+        "baseUrl": "https://api.x.ai/v1",
+        "apiKeyEnv": "XAI_API_KEY",
+    },
     "lmstudio": {
         "type": "openai-chat",
         "model": "local-model",

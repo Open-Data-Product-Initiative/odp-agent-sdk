@@ -174,6 +174,7 @@ below for implementation details:
 - [Agent surface](docs/user/agent-surface.md): MCP server, ARWS manifest, and bundled skills for agent hosts.
 - [Command guide](docs/user/commands.md): what each common CLI command does, what it reads, and what it writes.
 - [LLM generation](docs/user/generation.md): Ollama, embedded llama.cpp, or configured external LLM source-doc to ODPC fragment and ODPG graph workflow.
+- [Provider and model matrix](docs/user/provider-model-matrix.md): direct hosted and local provider/model lookup.
 - [Embedded llama.cpp guide](docs/user/llama-cpp.md): install the optional extra, configure a GGUF model path, and run local generation without a separate LLM server.
 - [NVIDIA NIM guide](docs/user/nvidia-nim.md): run SDK generation through a
   local NVIDIA NIM LLM container.
@@ -316,6 +317,30 @@ open-data-products generate \
 
 open-data-products generate \
   --config my-generation.config.yaml \
+  --provider mistral \
+  --model mistral-large-latest \
+  --input source_docs/products/ \
+  --kind product-reference \
+  --output generated/
+
+open-data-products generate \
+  --config my-generation.config.yaml \
+  --provider gemini \
+  --model gemini-3.5-flash \
+  --input source_docs/products/ \
+  --kind product-reference \
+  --output generated/
+
+open-data-products generate \
+  --config my-generation.config.yaml \
+  --provider xai \
+  --model grok-4.3 \
+  --input source_docs/products/ \
+  --kind product-reference \
+  --output generated/
+
+open-data-products generate \
+  --config my-generation.config.yaml \
   --provider claude \
   --model claude-sonnet-4-5 \
   --input source_docs/turnaround-delay-signal.txt \
@@ -424,7 +449,7 @@ Live LLM generation requires Ollama or a configured provider API key; see
   generation helpers for ODPS, ODPC, and ODPG YAML artifacts. Defaults to local
   Ollama/Qwen 2.5 and can use copied config templates for embedded llama.cpp,
   OpenAI-compatible runtimes such as NVIDIA NIM, and hosted providers such as
-  OpenAI, Together AI, Cerebras, and SambaNova.
+  OpenAI, Together AI, Cerebras, SambaNova, Mistral, Gemini, and xAI.
 - `open_data_products.odps`: ODPS v4.1 models, standards-aware validation, YAML/JSON I/O, compliance helpers, and `pricing_to_402`.
 - `open_data_products.odpc`: ODPC catalog building, loading, validation, explanation, and object guidance search.
 - `open_data_products.odpg`: ODPG graph validation, summary, traversal, analysis, agent context, object search, external graph conversion, and graph explorer generation.

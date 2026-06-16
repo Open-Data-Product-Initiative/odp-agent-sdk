@@ -6,6 +6,7 @@ This folder is organized by audience and purpose.
 
 - [Command guide](user/commands.md): common CLI workflows and outputs.
 - [LLM generation](user/generation.md): source documents, providers, prompts, and generated artifacts.
+- [Provider and model matrix](user/provider-model-matrix.md): direct hosted and local provider/model lookup.
 - [Embedded llama.cpp](user/llama-cpp.md): local GGUF model setup without a separate server.
 - [NVIDIA NIM generation](user/nvidia-nim.md): run generation through a
   local NIM LLM container.
