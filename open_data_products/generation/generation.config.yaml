@@ -181,6 +181,17 @@ providers:
     # Example: export CEREBRAS_API_KEY="..."
     apiKeyEnv: CEREBRAS_API_KEY
 
+  # SambaNova exposes OpenAI-compatible chat completions. Select this provider
+  # with `--provider sambanova`, and choose any model supported by SambaCloud or
+  # your SambaStack deployment.
+  sambanova:
+    type: openai-chat
+    model: Meta-Llama-3.3-70B-Instruct
+    baseUrl: https://api.sambanova.ai/v1
+    # Export SAMBANOVA_API_KEY before selecting this provider.
+    # Example: export SAMBANOVA_API_KEY="..."
+    apiKeyEnv: SAMBANOVA_API_KEY
+
   # Anthropic Claude uses its own Messages API client.
   claude:
     type: anthropic

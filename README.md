@@ -308,6 +308,14 @@ open-data-products generate \
 
 open-data-products generate \
   --config my-generation.config.yaml \
+  --provider sambanova \
+  --model Meta-Llama-3.3-70B-Instruct \
+  --input source_docs/products/ \
+  --kind product-reference \
+  --output generated/
+
+open-data-products generate \
+  --config my-generation.config.yaml \
   --provider claude \
   --model claude-sonnet-4-5 \
   --input source_docs/turnaround-delay-signal.txt \
@@ -416,7 +424,7 @@ Live LLM generation requires Ollama or a configured provider API key; see
   generation helpers for ODPS, ODPC, and ODPG YAML artifacts. Defaults to local
   Ollama/Qwen 2.5 and can use copied config templates for embedded llama.cpp,
   OpenAI-compatible runtimes such as NVIDIA NIM, and hosted providers such as
-  OpenAI, Together AI, and Cerebras.
+  OpenAI, Together AI, Cerebras, and SambaNova.
 - `open_data_products.odps`: ODPS v4.1 models, standards-aware validation, YAML/JSON I/O, compliance helpers, and `pricing_to_402`.
 - `open_data_products.odpc`: ODPC catalog building, loading, validation, explanation, and object guidance search.
 - `open_data_products.odpg`: ODPG graph validation, summary, traversal, analysis, agent context, object search, external graph conversion, and graph explorer generation.

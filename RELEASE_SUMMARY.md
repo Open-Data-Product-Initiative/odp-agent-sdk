@@ -23,11 +23,11 @@ covers NGC login, running the container, startup tuning through
 `NIM_PASSTHROUGH_ARGS`, health checks, model discovery, project config usage,
 and the boundary between local/container NIM and hosted NVIDIA APIs.
 
-## Together AI hosted provider preset
+## Hosted OpenAI-compatible provider presets
 
-The generation workflow now also includes bundled `together` and `cerebras`
-provider presets for hosted OpenAI-compatible Chat Completions APIs. The
-Together preset uses:
+The generation workflow now also includes bundled `together`, `cerebras`, and
+`sambanova` provider presets for hosted OpenAI-compatible Chat Completions
+APIs. The Together preset uses:
 
 - `type: openai-chat`
 - `baseUrl: https://api.together.ai/v1`
@@ -40,6 +40,13 @@ The Cerebras preset uses:
 - `baseUrl: https://api.cerebras.ai/v1`
 - `apiKeyEnv: CEREBRAS_API_KEY`
 - `model: gpt-oss-120b`
+
+The SambaNova preset uses:
+
+- `type: openai-chat`
+- `baseUrl: https://api.sambanova.ai/v1`
+- `apiKeyEnv: SAMBANOVA_API_KEY`
+- `model: Meta-Llama-3.3-70B-Instruct`
 
 This gives users hosted open-model options alongside OpenAI, OpenRouter, Groq,
 and Claude without adding another SDK client or dependency. Users can override
@@ -60,6 +67,15 @@ export CEREBRAS_API_KEY="..."
 open-data-products generate \
   --provider cerebras \
   --model gpt-oss-120b \
+  --input source_docs/products/ \
+  --kind product-reference \
+  --output generated/
+
+export SAMBANOVA_API_KEY="..."
+
+open-data-products generate \
+  --provider sambanova \
+  --model Meta-Llama-3.3-70B-Instruct \
   --input source_docs/products/ \
   --kind product-reference \
   --output generated/

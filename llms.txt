@@ -206,9 +206,10 @@ External providers are configured with a YAML file. Store provider names,
 models, endpoints, input/output folders, and secret environment variable names
 in config. Do not store API key values in config. For OpenAI-compatible
 providers, use env vars such as `OPENAI_API_KEY`, `OPENROUTER_API_KEY`,
-`GROQ_API_KEY`, `TOGETHER_API_KEY`, or `CEREBRAS_API_KEY`. For Anthropic
-Claude, use `ANTHROPIC_API_KEY` with a provider entry of `type: anthropic`.
-The OpenAI-compatible provider path has been smoke-tested with OpenAI
+`GROQ_API_KEY`, `TOGETHER_API_KEY`, `CEREBRAS_API_KEY`, or
+`SAMBANOVA_API_KEY`. For Anthropic Claude, use `ANTHROPIC_API_KEY` with a
+provider entry of `type: anthropic`. The OpenAI-compatible provider path has
+been smoke-tested with OpenAI
 `gpt-4.1-mini` and Groq `openai/gpt-oss-120b` for ODPC signal fragment
 generation.
 

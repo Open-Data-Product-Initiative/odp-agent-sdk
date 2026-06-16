@@ -148,6 +148,12 @@ BUILT_IN_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "baseUrl": "https://api.cerebras.ai/v1",
         "apiKeyEnv": "CEREBRAS_API_KEY",
     },
+    "sambanova": {
+        "type": "openai-chat",
+        "model": "Meta-Llama-3.3-70B-Instruct",
+        "baseUrl": "https://api.sambanova.ai/v1",
+        "apiKeyEnv": "SAMBANOVA_API_KEY",
+    },
     "lmstudio": {
         "type": "openai-chat",
         "model": "local-model",

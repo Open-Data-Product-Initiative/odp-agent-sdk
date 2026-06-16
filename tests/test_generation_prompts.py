@@ -517,6 +517,7 @@ def test_bundled_generation_config_includes_common_compatible_providers():
     assert "groq" in config["providers"]
     assert "together" in config["providers"]
     assert "cerebras" in config["providers"]
+    assert "sambanova" in config["providers"]
     assert "claude" in config["providers"]
     assert "lmstudio" in config["providers"]
     assert "vllm" in config["providers"]
@@ -554,6 +555,14 @@ def test_bundled_generation_config_includes_common_compatible_providers():
     assert cerebras.base_url == "https://api.cerebras.ai/v1"
     assert cerebras.model == "gpt-oss-120b"
     assert cerebras.api_key_env == "CEREBRAS_API_KEY"
+    sambanova = resolve_generation_settings(
+        DEFAULT_GENERATION_CONFIG,
+        provider="sambanova",
+    )
+    assert sambanova.provider_type == "openai-chat"
+    assert sambanova.base_url == "https://api.sambanova.ai/v1"
+    assert sambanova.model == "Meta-Llama-3.3-70B-Instruct"
+    assert sambanova.api_key_env == "SAMBANOVA_API_KEY"
     lmstudio = resolve_generation_settings(
         DEFAULT_GENERATION_CONFIG,
         provider="lmstudio",
@@ -692,6 +701,13 @@ def test_resolve_generation_settings_supports_claude_without_config():
             "gpt-oss-120b",
             "https://api.cerebras.ai/v1",
             "CEREBRAS_API_KEY",
+        ),
+        (
+            "sambanova",
+            "openai-chat",
+            "Meta-Llama-3.3-70B-Instruct",
+            "https://api.sambanova.ai/v1",
+            "SAMBANOVA_API_KEY",
         ),
         (
             "lmstudio",
