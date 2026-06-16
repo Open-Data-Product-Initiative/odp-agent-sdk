@@ -124,6 +124,7 @@ def _capabilities() -> List[Dict[str, Any]]:
                 "openrouter",
                 "groq",
                 "together",
+                "cerebras",
                 "claude",
             ],
             "provider_types": [

@@ -170,6 +170,17 @@ providers:
     # Example: export TOGETHER_API_KEY="..."
     apiKeyEnv: TOGETHER_API_KEY
 
+  # Cerebras Inference exposes OpenAI-compatible chat completions. Select this
+  # provider with `--provider cerebras`, and choose any model supported by
+  # Cerebras.
+  cerebras:
+    type: openai-chat
+    model: gpt-oss-120b
+    baseUrl: https://api.cerebras.ai/v1
+    # Export CEREBRAS_API_KEY before selecting this provider.
+    # Example: export CEREBRAS_API_KEY="..."
+    apiKeyEnv: CEREBRAS_API_KEY
+
   # Anthropic Claude uses its own Messages API client.
   claude:
     type: anthropic

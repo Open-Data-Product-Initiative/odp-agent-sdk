@@ -142,6 +142,12 @@ BUILT_IN_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "baseUrl": "https://api.together.ai/v1",
         "apiKeyEnv": "TOGETHER_API_KEY",
     },
+    "cerebras": {
+        "type": "openai-chat",
+        "model": "gpt-oss-120b",
+        "baseUrl": "https://api.cerebras.ai/v1",
+        "apiKeyEnv": "CEREBRAS_API_KEY",
+    },
     "lmstudio": {
         "type": "openai-chat",
         "model": "local-model",

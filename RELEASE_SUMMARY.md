@@ -25,17 +25,25 @@ and the boundary between local/container NIM and hosted NVIDIA APIs.
 
 ## Together AI hosted provider preset
 
-The generation workflow now also includes a bundled `together` provider preset
-for Together AI's OpenAI-compatible Chat Completions API. The preset uses:
+The generation workflow now also includes bundled `together` and `cerebras`
+provider presets for hosted OpenAI-compatible Chat Completions APIs. The
+Together preset uses:
 
 - `type: openai-chat`
 - `baseUrl: https://api.together.ai/v1`
 - `apiKeyEnv: TOGETHER_API_KEY`
 - `model: meta-llama/Llama-3.3-70B-Instruct-Turbo`
 
-This gives users a hosted open-model option alongside OpenAI, OpenRouter, Groq,
+The Cerebras preset uses:
+
+- `type: openai-chat`
+- `baseUrl: https://api.cerebras.ai/v1`
+- `apiKeyEnv: CEREBRAS_API_KEY`
+- `model: gpt-oss-120b`
+
+This gives users hosted open-model options alongside OpenAI, OpenRouter, Groq,
 and Claude without adding another SDK client or dependency. Users can override
-the model with any Together chat model exposed by their account:
+the model with any chat model exposed by their selected provider account:
 
 ```bash
 export TOGETHER_API_KEY="..."
@@ -43,6 +51,15 @@ export TOGETHER_API_KEY="..."
 open-data-products generate \
   --provider together \
   --model meta-llama/Llama-3.3-70B-Instruct-Turbo \
+  --input source_docs/products/ \
+  --kind product-reference \
+  --output generated/
+
+export CEREBRAS_API_KEY="..."
+
+open-data-products generate \
+  --provider cerebras \
+  --model gpt-oss-120b \
   --input source_docs/products/ \
   --kind product-reference \
   --output generated/

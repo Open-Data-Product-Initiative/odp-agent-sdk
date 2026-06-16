@@ -12,8 +12,8 @@ Mistral, Mixtral, Phi, Gemma, Code Llama, StarCoder, Yi, Command R, Falcon,
 Granite, Nemotron, Vicuna, WizardLM, and other compatible models.
 
 Online providers can also be selected through the generation config, including
-OpenAI-compatible providers such as Together AI, plus Claude through the
-Anthropic Messages API. This workflow stops before catalog
+OpenAI-compatible providers such as Together AI and Cerebras, plus Claude
+through the Anthropic Messages API. This workflow stops before catalog
 publishing: it produces source-backed fragment files and a graph file that can
 be validated, inspected, and used by the existing ODPC/ODPG helpers.
 
@@ -262,6 +262,14 @@ open-data-products generate \
   --model meta-llama/Llama-3.3-70B-Instruct-Turbo \
   --kind signal \
   --json
+
+open-data-products generate \
+  --config my-generation.config.yaml \
+  --prompts prompts/ \
+  --provider cerebras \
+  --model gpt-oss-120b \
+  --kind signal \
+  --json
 ```
 
 CLI flags are for temporary overrides. Use them when testing a different model,
@@ -415,6 +423,12 @@ providers:
     baseUrl: https://api.together.ai/v1
     apiKeyEnv: TOGETHER_API_KEY
 
+  cerebras:
+    type: openai-chat
+    model: gpt-oss-120b
+    baseUrl: https://api.cerebras.ai/v1
+    apiKeyEnv: CEREBRAS_API_KEY
+
   # Anthropic Claude uses its own Messages API client.
   claude:
     type: anthropic
@@ -450,8 +464,8 @@ OpenRouter and Groq.
 
 Provider entries with `type: openai-chat` use the Chat Completions request
 shape, `baseUrl + /chat/completions`. Hosted providers such as Together AI can
-use this profile when they expose OpenAI-compatible chat completions with
-Bearer token authentication. Use this profile for local
+and Cerebras use this profile when they expose OpenAI-compatible chat
+completions with Bearer token authentication. Use this profile for local
 OpenAI-compatible servers such as LM Studio, vLLM, llama.cpp server, and
 NVIDIA NIM. They can also work with other local runtimes that expose compatible
 chat completions endpoints, such as LocalAI and text-generation-webui. Model
