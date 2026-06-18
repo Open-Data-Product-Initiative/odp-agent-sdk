@@ -1,14 +1,37 @@
 # Provider And Model Matrix
 
-Provider catalogs change over time. The tables below show bundled defaults and
-practical example model IDs for the SDK's generation config. Use `--model` to
-override the default model for one run, and check the selected provider's
-current model catalog before relying on an ID in production.
+Provider catalogs change over time. The tables below show bundled provider
+presets, bundled defaults, and practical example model IDs for the SDK's
+generation config. Use `--model` to override the default model for one run, and
+check the selected provider's current model catalog before relying on an ID in
+production.
 
 For full generation setup, prompts, source document layout, and output
 behavior, see [LLM generation](generation.md).
 
-## Hosted Providers
+For provider-specific setup guides, see [NVIDIA NIM generation](nvidia-nim.md),
+[embedded llama.cpp](llama-cpp.md), and [Z.ai GLM generation](zai-glm.md).
+
+## Hosted Provider Presets
+
+These presets are available by provider name through `--provider <name>`.
+
+| Provider preset | Type | Default model | Base URL | API key env |
+|-----------------|------|---------------|----------|-------------|
+| `openai` | `openai` | `gpt-4.1-mini` | `https://api.openai.com/v1` | `OPENAI_API_KEY` |
+| `openrouter` | `openai` | `openai/gpt-4.1-mini` | `https://openrouter.ai/api/v1` | `OPENROUTER_API_KEY` |
+| `groq` | `openai` | `openai/gpt-oss-120b` | `https://api.groq.com/openai/v1` | `GROQ_API_KEY` |
+| `together` | `openai-chat` | `meta-llama/Llama-3.3-70B-Instruct-Turbo` | `https://api.together.ai/v1` | `TOGETHER_API_KEY` |
+| `cerebras` | `openai-chat` | `gpt-oss-120b` | `https://api.cerebras.ai/v1` | `CEREBRAS_API_KEY` |
+| `sambanova` | `openai-chat` | `Meta-Llama-3.3-70B-Instruct` | `https://api.sambanova.ai/v1` | `SAMBANOVA_API_KEY` |
+| `mistral` | `openai-chat` | `mistral-large-latest` | `https://api.mistral.ai/v1` | `MISTRAL_API_KEY` |
+| `gemini` | `openai-chat` | `gemini-3.5-flash` | `https://generativelanguage.googleapis.com/v1beta/openai` | `GEMINI_API_KEY` |
+| `xai` | `openai-chat` | `grok-4.3` | `https://api.x.ai/v1` | `XAI_API_KEY` |
+| `zai` | `openai-chat` | `glm-5.2` | `https://api.z.ai/api/paas/v4` | `ZAI_API_KEY` |
+| `claude` | `anthropic` | `claude-sonnet-4-5` | `https://api.anthropic.com/v1` | `ANTHROPIC_API_KEY` |
+| `anthropic` | `anthropic` | `claude-sonnet-4-5` | `https://api.anthropic.com/v1` | `ANTHROPIC_API_KEY` |
+
+## Hosted Model Lookup
 
 Hosted provider columns use API-backed inference outside your machine.
 
@@ -28,14 +51,40 @@ Hosted provider columns use API-backed inference outside your machine.
 | Mistral Large | - | - | `mistral-large-latest` |
 | Other provider models | use provider model ID | use provider model ID | use provider model ID |
 
-| Model or family | Gemini `gemini` | xAI `xai` | Anthropic `claude` |
-|-----------------|-----------------|-----------|--------------------|
-| Gemini Flash | `gemini-3.5-flash` | - | - |
-| Grok | - | `grok-4.3` | - |
-| Claude Sonnet | - | - | `claude-sonnet-4-5` |
-| Other provider models | use Gemini model ID | use xAI model ID | use Anthropic model ID |
+| Model or family | Gemini `gemini` | xAI `xai` | Z.ai `zai` | Anthropic `claude` |
+|-----------------|-----------------|-----------|-------------|--------------------|
+| Gemini Flash | `gemini-3.5-flash` | - | - | - |
+| Grok | - | `grok-4.3` | - | - |
+| GLM | - | - | `glm-5.2` | - |
+| Claude Sonnet | - | - | - | `claude-sonnet-4-5` |
+| Other provider models | use Gemini model ID | use xAI model ID | use GLM model ID | use Anthropic model ID |
 
-## Local Providers
+## Local Provider Presets
+
+These presets are bundled in either the built-in provider map, the copied
+generation config template, or both.
+
+| Provider preset | Type | Default model | Base URL or model path |
+|-----------------|------|---------------|------------------------|
+| `ollama` | `ollama` | `qwen2.5` | `http://localhost:11434` |
+| `ollama-gemma3n` | `ollama` | `gemma3n:e4b` | `http://localhost:11434` |
+| `ollama-qwen25` | `ollama` | `qwen2.5:7b` | `http://localhost:11434` |
+| `ollama-qwen25-14b` | `ollama` | `qwen2.5:14b` | `http://localhost:11434` |
+| `ollama-qwen3` | `ollama` | `qwen3:8b` | `http://localhost:11434` |
+| `ollama-qwen3-14b` | `ollama` | `qwen3:14b` | `http://localhost:11434` |
+| `ollama-large-q4` | `ollama` | `qwen3:32b` | `http://localhost:11434` |
+| `ollama-llama` | `ollama` | `llama3.1:8b` | `http://localhost:11434` |
+| `ollama-mistral` | `ollama` | `mistral:7b` | `http://localhost:11434` |
+| `ollama-phi` | `ollama` | `phi4-mini` | `http://localhost:11434` |
+| `ollama-deepseek14b` | `ollama` | `deepseek-r1:14b` | `http://localhost:11434` |
+| `lmstudio` | `openai-chat` | `local-model` | `http://localhost:1234/v1` |
+| `lmstudio-gemma4-e4b` | `openai-chat` | `google/gemma-4-e4b` | `http://localhost:1234/v1` |
+| `lmstudio-gemma4-12b` | `openai-chat` | `google/gemma-4-12b` | `http://localhost:1234/v1` |
+| `vllm` | `openai-chat` | `local-model` | `http://localhost:8000/v1` |
+| `nvidia-nim` | `openai-chat` | `local-model` | `http://localhost:8000/v1` |
+| `llamacpp-embedded` | `llama-cpp` | `local-gguf` | `models/qwen2.5-7b-instruct-q4_k_m.gguf` |
+
+## Local Model Lookup
 
 Local provider columns use a runtime or model server you run.
 

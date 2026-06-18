@@ -179,6 +179,8 @@ below for implementation details:
 - [Embedded llama.cpp guide](docs/user/llama-cpp.md): install the optional extra, configure a GGUF model path, and run local generation without a separate LLM server.
 - [NVIDIA NIM guide](docs/user/nvidia-nim.md): run SDK generation through a
   local NVIDIA NIM LLM container.
+- [Z.ai GLM guide](docs/user/zai-glm.md): run SDK generation through the hosted
+  Z.ai GLM OpenAI-compatible API.
 - [LLM selection guide](docs/user/llm-selection-guide.md): opinionated local and hosted model choices by SDK workflow.
 - [Generation development notes](docs/development/generation.md): contributor-facing prompt pipeline, ODPS normalization, validation, repair, and testing guidance.
 - [Portfolio development notes](docs/development/portfolio.md): contributor-facing portfolio workspace orchestration, renderer, localization, validation, and testing guidance.
@@ -343,6 +345,14 @@ open-data-products generate \
 
 open-data-products generate \
   --config my-generation.config.yaml \
+  --provider zai \
+  --model glm-5.2 \
+  --input source_docs/products/ \
+  --kind product-reference \
+  --output generated/
+
+open-data-products generate \
+  --config my-generation.config.yaml \
   --provider claude \
   --model claude-sonnet-4-5 \
   --input source_docs/turnaround-delay-signal.txt \
@@ -457,7 +467,7 @@ Live LLM generation requires Ollama or a configured provider API key; see
   generation helpers for ODPS, ODPC, and ODPG YAML artifacts. Defaults to local
   Ollama/Qwen 2.5 and can use copied config templates for embedded llama.cpp,
   OpenAI-compatible runtimes such as NVIDIA NIM, and hosted providers such as
-  OpenAI, Together AI, Cerebras, SambaNova, Mistral, Gemini, and xAI.
+  OpenAI, Together AI, Cerebras, SambaNova, Mistral, Gemini, xAI, and Z.ai.
 - `open_data_products.odps`: ODPS v4.1 models, standards-aware validation, YAML/JSON I/O, compliance helpers, and `pricing_to_402`.
 - `open_data_products.odpc`: ODPC catalog building, loading, validation, explanation, and object guidance search.
 - `open_data_products.odpg`: ODPG graph validation, summary, traversal, analysis, agent context, object search, external graph conversion, and graph explorer generation.

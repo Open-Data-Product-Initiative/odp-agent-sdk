@@ -484,7 +484,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         help=(
             "LLM provider override. Defaults to config provider or ollama. "
             "Use a configured provider name such as openai, openrouter, groq, "
-            "or claude."
+            "zai, or claude."
         ),
     )
     generate_parser.add_argument(
@@ -733,7 +733,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     )
     odpg_build_parser.add_argument(
         "--provider",
-        help="Provider override such as ollama, openai, openrouter, groq, lmstudio, or claude.",
+        help="Provider override such as ollama, openai, openrouter, groq, zai, lmstudio, or claude.",
     )
     odpg_build_parser.add_argument(
         "--model",

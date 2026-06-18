@@ -222,6 +222,17 @@ providers:
     # Example: export XAI_API_KEY="..."
     apiKeyEnv: XAI_API_KEY
 
+  # Z.ai exposes GLM models through an OpenAI-compatible chat completions API.
+  # Select this provider with `--provider zai`, and choose any compatible GLM
+  # model available to your Z.ai API key.
+  zai:
+    type: openai-chat
+    model: glm-5.2
+    baseUrl: https://api.z.ai/api/paas/v4
+    # Export ZAI_API_KEY before selecting this provider.
+    # Example: export ZAI_API_KEY="..."
+    apiKeyEnv: ZAI_API_KEY
+
   # Anthropic Claude uses its own Messages API client.
   claude:
     type: anthropic

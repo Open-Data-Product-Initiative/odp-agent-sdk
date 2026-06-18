@@ -13,15 +13,16 @@ Granite, Nemotron, Vicuna, WizardLM, and other compatible models.
 
 Online providers can also be selected through the generation config, including
 OpenAI-compatible providers such as Together AI, Cerebras, SambaNova, Mistral,
-Gemini, and xAI, plus Claude through the Anthropic Messages API. This workflow
-stops before catalog
+Gemini, xAI, and Z.ai, plus Claude through the Anthropic Messages API. This
+workflow stops before catalog
 publishing: it produces source-backed fragment files and a graph file that can
 be validated, inspected, and used by the existing ODPC/ODPG helpers.
 
 For a step-by-step embedded llama.cpp setup, see the
 [embedded llama.cpp guide](llama-cpp.md). For a local NVIDIA NIM container
-workflow, see the [NVIDIA NIM guide](nvidia-nim.md). For opinionated guidance
-on which local or hosted model to use for each SDK workflow, see the
+workflow, see the [NVIDIA NIM guide](nvidia-nim.md). For hosted GLM generation,
+see the [Z.ai GLM guide](zai-glm.md). For opinionated guidance on which local
+or hosted model to use for each SDK workflow, see the
 [LLM selection guide](llm-selection-guide.md).
 
 ## LLM Setup
@@ -306,6 +307,14 @@ open-data-products generate \
   --model grok-4.3 \
   --kind signal \
   --json
+
+open-data-products generate \
+  --config my-generation.config.yaml \
+  --prompts prompts/ \
+  --provider zai \
+  --model glm-5.2 \
+  --kind signal \
+  --json
 ```
 
 CLI flags are for temporary overrides. Use them when testing a different model,
@@ -489,6 +498,12 @@ providers:
     baseUrl: https://api.x.ai/v1
     apiKeyEnv: XAI_API_KEY
 
+  zai:
+    type: openai-chat
+    model: glm-5.2
+    baseUrl: https://api.z.ai/api/paas/v4
+    apiKeyEnv: ZAI_API_KEY
+
   # Anthropic Claude uses its own Messages API client.
   claude:
     type: anthropic
@@ -524,9 +539,9 @@ OpenRouter and Groq.
 
 Provider entries with `type: openai-chat` use the Chat Completions request
 shape, `baseUrl + /chat/completions`. Hosted providers such as Together AI,
-Cerebras, SambaNova, Mistral, Gemini, and xAI use this profile when they expose
-OpenAI-compatible chat completions with Bearer token authentication. Use this
-profile for local
+Cerebras, SambaNova, Mistral, Gemini, xAI, and Z.ai use this profile when they
+expose OpenAI-compatible chat completions with Bearer token authentication. Use
+this profile for local
 OpenAI-compatible servers such as LM Studio, vLLM, llama.cpp server, and
 NVIDIA NIM. They can also work with other local runtimes that expose compatible
 chat completions endpoints, such as LocalAI and text-generation-webui. Model

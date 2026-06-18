@@ -10,6 +10,8 @@ This folder is organized by audience and purpose.
 - [Embedded llama.cpp](user/llama-cpp.md): local GGUF model setup without a separate server.
 - [NVIDIA NIM generation](user/nvidia-nim.md): run generation through a
   local NIM LLM container.
+- [Z.ai GLM generation](user/zai-glm.md): run generation through the hosted
+  Z.ai GLM OpenAI-compatible API.
 - [LLM selection guide](user/llm-selection-guide.md): model choices by SDK workflow.
 - [Data Contract workflows](user/data-contracts.md): product contract resolution, validation, alignment, and reports.
 - [Agent surface](user/agent-surface.md): MCP server, ARWS manifest, and bundled skills.
@@ -37,6 +39,7 @@ This folder is organized by audience and purpose.
 - [Maintainability refactor plan](planning/refactor-maintainability.md)
 - [Portfolio workflow plan](planning/portfolio-workflow-plan.md)
 - [SDK workflow profiles plan](planning/sdk-workflow-profiles-plan.md)
+- [SDK workflow recipes GUI plan](planning/sdk-workflow-recipes-gui-plan.md)
 - [Tooling development model](planning/tooling-development-model.md)
 - [Online LLM generation story](planning/online-llm-generation-story.md)
 

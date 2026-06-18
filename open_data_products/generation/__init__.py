@@ -172,6 +172,12 @@ BUILT_IN_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "baseUrl": "https://api.x.ai/v1",
         "apiKeyEnv": "XAI_API_KEY",
     },
+    "zai": {
+        "type": "openai-chat",
+        "model": "glm-5.2",
+        "baseUrl": "https://api.z.ai/api/paas/v4",
+        "apiKeyEnv": "ZAI_API_KEY",
+    },
     "lmstudio": {
         "type": "openai-chat",
         "model": "local-model",

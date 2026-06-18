@@ -521,6 +521,7 @@ def test_bundled_generation_config_includes_common_compatible_providers():
     assert "mistral" in config["providers"]
     assert "gemini" in config["providers"]
     assert "xai" in config["providers"]
+    assert "zai" in config["providers"]
     assert "claude" in config["providers"]
     assert "lmstudio" in config["providers"]
     assert "vllm" in config["providers"]
@@ -590,6 +591,14 @@ def test_bundled_generation_config_includes_common_compatible_providers():
     assert xai.base_url == "https://api.x.ai/v1"
     assert xai.model == "grok-4.3"
     assert xai.api_key_env == "XAI_API_KEY"
+    zai = resolve_generation_settings(
+        DEFAULT_GENERATION_CONFIG,
+        provider="zai",
+    )
+    assert zai.provider_type == "openai-chat"
+    assert zai.base_url == "https://api.z.ai/api/paas/v4"
+    assert zai.model == "glm-5.2"
+    assert zai.api_key_env == "ZAI_API_KEY"
     lmstudio = resolve_generation_settings(
         DEFAULT_GENERATION_CONFIG,
         provider="lmstudio",
@@ -756,6 +765,13 @@ def test_resolve_generation_settings_supports_claude_without_config():
             "grok-4.3",
             "https://api.x.ai/v1",
             "XAI_API_KEY",
+        ),
+        (
+            "zai",
+            "openai-chat",
+            "glm-5.2",
+            "https://api.z.ai/api/paas/v4",
+            "ZAI_API_KEY",
         ),
         (
             "lmstudio",
