@@ -56,6 +56,11 @@ Common workflows:
   Build a portfolio workspace:
     open-data-products portfolio build --objectives inputs/objectives/ --use-cases inputs/use-cases/ --signals inputs/signals/ --products inputs/products/ --output portfolio/
 
+  Exchange OKF context bundles:
+    open-data-products okf-validate knowledge-bundle/ --json
+    open-data-products okf-import knowledge-bundle/ --output source_docs/
+    open-data-products okf-export catalog.yaml --output okf-bundle/
+
   Use --json when scripting or handing command output to agents.
 
 Core document commands:
@@ -63,6 +68,15 @@ Core document commands:
   explain      Print an agent-readable document summary
   refs         List document references
   summary      Return lightweight file metadata
+
+OKF context bundle commands:
+  okf-validate         Validate an Open Knowledge Format bundle
+  okf-summary          Summarize OKF concepts without returning bodies
+  okf-import           Write OKF concepts as generation source documents
+  okf-export           Export ODPC catalog or portfolio artifacts as OKF
+  resources --id okf.spec        Return OKF adapter/spec reference metadata
+  MCP validate_okf_bundle        Validate OKF bundles from agents
+  MCP list_okf_concepts          List concept metadata without Markdown bodies
 
 ODPC catalog commands:
   odpc-build           Build one ODPC catalog from YAML/JSON fragments
@@ -126,6 +140,11 @@ Examples:
   open-data-products odpc-summary catalog.yaml
   open-data-products odpc-search "catalog data" --limit 3
   open-data-products odpc-artifacts open_data_products/generation/fragments/ --check
+  open-data-products okf-validate knowledge-bundle/ --json
+  open-data-products okf-summary knowledge-bundle/ --json
+  open-data-products okf-import knowledge-bundle/ --output source_docs/
+  open-data-products okf-export catalog.yaml --output okf-bundle/
+  open-data-products resources --id okf.spec --json
   open-data-products odpv-summary
   open-data-products odpv-search "governance policy risk" --limit 3
   open-data-products odpv-context DataProduct
@@ -353,6 +372,40 @@ def main(argv: Optional[List[str]] = None) -> int:
     )
     summary_parser.add_argument("document", help="Path to an ODP document")
     summary_parser.add_argument("--json", action="store_true", help="Emit JSON")
+
+    okf_validate_parser = subparsers.add_parser(
+        "okf-validate", help="Validate an OKF bundle"
+    )
+    okf_validate_parser.add_argument("bundle", help="Path to an OKF bundle directory")
+    okf_validate_parser.add_argument("--json", action="store_true", help="Emit JSON")
+
+    okf_summary_parser = subparsers.add_parser(
+        "okf-summary", help="Summarize an OKF bundle without concept bodies"
+    )
+    okf_summary_parser.add_argument("bundle", help="Path to an OKF bundle directory")
+    okf_summary_parser.add_argument("--json", action="store_true", help="Emit JSON")
+
+    okf_import_parser = subparsers.add_parser(
+        "okf-import", help="Write OKF concepts as generation source documents"
+    )
+    okf_import_parser.add_argument("bundle", help="Path to an OKF bundle directory")
+    okf_import_parser.add_argument(
+        "--output",
+        required=True,
+        help="Directory for generated Markdown source documents.",
+    )
+    okf_import_parser.add_argument("--json", action="store_true", help="Emit JSON")
+
+    okf_export_parser = subparsers.add_parser(
+        "okf-export", help="Export ODPC catalog or portfolio artifacts as OKF"
+    )
+    okf_export_parser.add_argument(
+        "source", help="ODPC catalog file or portfolio workspace directory"
+    )
+    okf_export_parser.add_argument(
+        "--output", required=True, help="Directory for the OKF bundle."
+    )
+    okf_export_parser.add_argument("--json", action="store_true", help="Emit JSON")
 
     config_parser = subparsers.add_parser(
         "config", help="Show or copy SDK config templates"
@@ -1039,6 +1092,82 @@ def main(argv: Optional[List[str]] = None) -> int:
                 print(json.dumps(summary, indent=2))
             else:
                 _print_summary_report(summary)
+            return 0
+
+        if args.command == "okf-validate":
+            from .okf import validate_okf_bundle
+
+            result = validate_okf_bundle(args.bundle)
+            if args.json:
+                print(json.dumps(result.to_dict(), indent=2))
+            elif result.valid:
+                print(f"{args.bundle}: valid OKF bundle")
+                print(f"Concepts: {result.concept_count}")
+                for warning in result.warnings:
+                    print(f"Warning: {warning}", file=sys.stderr)
+            else:
+                print(f"{args.bundle}: invalid OKF bundle", file=sys.stderr)
+                for error in result.errors:
+                    print(f"- {error}", file=sys.stderr)
+            return 0 if result.valid else 1
+
+        if args.command == "okf-summary":
+            from .okf import summarize_okf_bundle
+
+            summary = summarize_okf_bundle(args.bundle)
+            if args.json:
+                print(json.dumps(summary, indent=2))
+            else:
+                print(f"OKF Bundle: {args.bundle}")
+                print(f"Valid: {summary['valid']}")
+                print(f"Concepts: {summary['concept_count']}")
+                for concept in summary["concepts"]:
+                    if isinstance(concept, dict):
+                        title = concept.get("title") or concept.get("id")
+                        print(f"- {concept.get('id')}: {title}")
+            return 0 if summary["valid"] else 1
+
+        if args.command == "okf-import":
+            from .okf import import_okf_bundle
+
+            try:
+                written = import_okf_bundle(args.bundle, args.output)
+            except (OSError, ValueError) as exc:
+                print(f"OKF import error: {exc}", file=sys.stderr)
+                return 1
+            payload = {
+                "spec": "okf",
+                "kind": "ImportedSourceDocuments",
+                "output": args.output,
+                "written": [str(path) for path in written],
+            }
+            if args.json:
+                print(json.dumps(payload, indent=2))
+            else:
+                print(f"OKF source documents written: {len(written)}")
+                for path in written:
+                    print(path)
+            return 0
+
+        if args.command == "okf-export":
+            from .okf import export_okf_bundle
+
+            try:
+                written = export_okf_bundle(args.source, args.output)
+            except (OSError, ValueError) as exc:
+                print(f"OKF export error: {exc}", file=sys.stderr)
+                return 1
+            payload = {
+                "spec": "okf",
+                "kind": "KnowledgeBundle",
+                "output": args.output,
+                "written": [str(path) for path in written],
+            }
+            if args.json:
+                print(json.dumps(payload, indent=2))
+            else:
+                print(f"OKF bundle written: {args.output}")
+                print(f"Files: {len(written)}")
             return 0
 
         if args.command == "config":

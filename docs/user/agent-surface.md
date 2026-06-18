@@ -48,7 +48,8 @@ host to launch the server.
 
 The MCP server exposes safe tools for validation, explanation, references,
 resource discovery, summaries, ODPC object search, ODPV vocabulary work, ODPG
-graph reasoning, and product-level Data Contract context.
+graph reasoning, OKF context bundle metadata, and product-level Data Contract
+context.
 
 Current tool names include:
 
@@ -58,6 +59,8 @@ Current tool names include:
 - `list_resources`
 - `get_resource`
 - `load_summary`
+- `validate_okf_bundle`
+- `list_okf_concepts`
 - `catalog_artifacts`
 - `search_terms`
 - `resolve_vocabulary_term`
@@ -95,11 +98,12 @@ The manifest is a full SDK capability map. It keeps the stable MCP-compatible
 - `standards`: ODPS, ODPC, ODPG, and ODPV coverage
 - `capabilities`: validation, generation, local/hosted LLM runtime, fragment,
   portfolio, catalog/graph, compact-context sidecar, vocabulary,
-  product-contract, and resource surfaces
+  OKF context-bundle, product-contract, and resource surfaces
 - `workflows`: common command recipes mapped to related MCP tools, including
   generation config setup, local/hosted provider selection, fragment
   generation, ODPC catalog assembly, ODPG graph assembly, TOON/GCF sidecar
-  generation, graph inspection/conversion, vocabulary exploration,
+  generation, OKF validation/import/export, graph inspection/conversion,
+  vocabulary exploration,
   product-contract checks, and the full portfolio lifecycle from build through
   refresh, sync, localize, render, and explain
 - `resources`: logical IDs for bundled schemas, vocabularies, prompts, and

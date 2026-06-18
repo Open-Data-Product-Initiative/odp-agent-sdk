@@ -51,6 +51,7 @@ from ..odpg import (
     traverse_graph as _traverse_graph,
     validate_graph as _validate_graph,
 )
+from ..okf import summarize_okf_bundle, validate_okf_bundle
 from ..odpv import (
     agent_vocabulary_context as _agent_vocabulary_context,
     check_vocabulary_relationship as _check_vocabulary_relationship,
@@ -135,6 +136,14 @@ def _h_validate_config(args: Dict[str, Any]) -> Dict[str, Any]:
 
 def _h_load_summary(args: Dict[str, Any]) -> Dict[str, Any]:
     return _json_envelope(load_summary(args["path"]))
+
+
+def _h_validate_okf_bundle(args: Dict[str, Any]) -> Dict[str, Any]:
+    return _json_envelope(validate_okf_bundle(args["path"]).to_dict())
+
+
+def _h_list_okf_concepts(args: Dict[str, Any]) -> Dict[str, Any]:
+    return _json_envelope(summarize_okf_bundle(args["path"]))
 
 
 def _h_catalog_artifacts(args: Dict[str, Any]) -> Dict[str, Any]:
@@ -247,7 +256,9 @@ def _h_agent_context(args: Dict[str, Any]) -> Dict[str, Any]:
 
 def _h_resolve_product_contracts(args: Dict[str, Any]) -> Dict[str, Any]:
     refs = resolve_product_contracts(args["path"])
-    return _json_envelope({"count": len(refs), "contracts": [r.to_dict() for r in refs]})
+    return _json_envelope(
+        {"count": len(refs), "contracts": [r.to_dict() for r in refs]}
+    )
 
 
 def _h_validate_product_contracts(args: Dict[str, Any]) -> Dict[str, Any]:
@@ -345,6 +356,10 @@ _CONTRACT_PROP = {
     "description": "Filesystem path or URL to a Data Contract file.",
 }
 _TERM_PROP = {"type": "string", "description": "ODPV term id."}
+_OKF_BUNDLE_PROP = {
+    "type": "string",
+    "description": "Filesystem path to an OKF bundle directory.",
+}
 
 TOOLS: List[Dict[str, Any]] = [
     {
@@ -432,6 +447,20 @@ TOOLS: List[Dict[str, Any]] = [
         "class": "safe",
         "inputSchema": _object_schema({"path": _PATH_PROP}, ["path"]),
         "handler": _h_load_summary,
+    },
+    {
+        "name": "validate_okf_bundle",
+        "description": "Validate an OKF bundle and return conformance errors and link warnings.",
+        "class": "safe",
+        "inputSchema": _object_schema({"path": _OKF_BUNDLE_PROP}, ["path"]),
+        "handler": _h_validate_okf_bundle,
+    },
+    {
+        "name": "list_okf_concepts",
+        "description": "List OKF concept metadata without returning full Markdown bodies.",
+        "class": "safe",
+        "inputSchema": _object_schema({"path": _OKF_BUNDLE_PROP}, ["path"]),
+        "handler": _h_list_okf_concepts,
     },
     {
         "name": "catalog_artifacts",

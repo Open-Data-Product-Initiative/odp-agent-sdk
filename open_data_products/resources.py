@@ -95,6 +95,13 @@ _RESOURCE_DEFINITIONS: Tuple[ResourceDefinition, ...] = (
         "Bundled ODPV term records for retrieval and search.",
     ),
     (
+        "okf.spec",
+        "okf",
+        "reference",
+        "okf_spec.md",
+        "Reference pointer for OKF v0.1 adapter support.",
+    ),
+    (
         "generation.prompt.system",
         "generation",
         "prompt",

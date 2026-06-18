@@ -144,10 +144,11 @@ Use `open_data_products.<spec>` namespaces for every standard:
 | Area | What agents and developers can do |
 |------|-----------------------------------|
 | Cross-spec API | Detect, load, validate, explain, summarize, and resolve references across ODPS, ODPC, ODPG, and ODPV documents |
-| Unified CLI | Run validation, generation, catalog, graph, vocabulary, portfolio, contract, resource, manifest, and MCP workflows through `open-data-products` |
+| Unified CLI | Run validation, generation, catalog, graph, vocabulary, portfolio, OKF context, contract, resource, manifest, and MCP workflows through `open-data-products` |
 | MCP + ARWS | Run a safe-class stdio MCP server, expose agent tools, and generate an ARWS-compatible manifest |
 | LLM generation | Draft ODPC fragments, ODPG graphs, and ODPS product YAML from source notes with Ollama, embedded llama.cpp, OpenAI-compatible providers, or Claude |
 | Compact context | Generate and consume TOON/GCF sidecars for ODPC catalogs and ODPG graphs while keeping YAML as the source of truth |
+| OKF context bundles | Validate Open Knowledge Format Markdown/frontmatter bundles, import them as generation source docs, and export ODPC catalog or portfolio artifacts as OKF context |
 | ODPS | Create, load, validate, serialize, and inspect ODPS v4.1 data product documents with v4.0 compatibility |
 | ODPC | Build catalogs from fragments and ODPS products, render HTML, create TOON/GCF context, search object guidance, and check derived artifacts |
 | ODPG | Build and validate graphs, infer relationships from catalog fragments, render graph explorers, traverse paths, analyze governance signals, and extract agent context |
@@ -211,6 +212,7 @@ open-data-products resources --id generation.prompt.system --json
 open-data-products resources --id odpc.objects --json
 open-data-products resources --id odpv.terms --json
 open-data-products resources --id odpg.objects --json
+open-data-products resources --id okf.spec --json
 ```
 
 The LLM generation commands require a configured local or hosted provider. The
@@ -401,6 +403,12 @@ open-data-products odpc-build examples/odpc_catalog_fragments/ --output /tmp/odp
 open-data-products odpc-summary /tmp/odp-catalog.yaml
 open-data-products odpc-search "catalog data" --limit 3
 
+# OKF context bundle helpers
+open-data-products okf-validate knowledge-bundle/ --json
+open-data-products okf-summary knowledge-bundle/ --json
+open-data-products okf-import knowledge-bundle/ --output source_docs/
+open-data-products okf-export /tmp/odp-catalog.yaml --output /tmp/okf-bundle/
+
 # ODPV vocabulary helpers
 open-data-products odpv-summary
 open-data-products odpv-search "governance policy risk" --limit 3
@@ -454,6 +462,7 @@ Live LLM generation requires Ollama or a configured provider API key; see
 - `open_data_products.odpc`: ODPC catalog building, loading, validation, explanation, and object guidance search.
 - `open_data_products.odpg`: ODPG graph validation, summary, traversal, analysis, agent context, object search, external graph conversion, and graph explorer generation.
 - `open_data_products.odpv`: ODPV vocabulary loading, validation, search, and generated vocabulary artifacts.
+- `open_data_products.okf`: Open Knowledge Format validation, summary, import, and export helpers for external Markdown/frontmatter context bundles.
 
 ## Development
 

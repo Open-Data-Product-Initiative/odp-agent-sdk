@@ -48,7 +48,11 @@ def functional_paths(tmp_path: Path) -> Dict[str, Tuple[Path, str]]:
     odpc_path.write_text(yaml.safe_dump(_odpc_catalog()), encoding="utf-8")
     return {
         "odps": (
-            REPO_ROOT / "examples" / "apps" / "pricing_402_builder" / "priced_product.yaml",
+            REPO_ROOT
+            / "examples"
+            / "apps"
+            / "pricing_402_builder"
+            / "priced_product.yaml",
             "OpenDataProduct",
         ),
         "odpc": (odpc_path, "Catalog"),
@@ -64,7 +68,7 @@ def functional_paths(tmp_path: Path) -> Dict[str, Tuple[Path, str]]:
 
 
 def test_agent_api_workflow_across_all_specs(
-    functional_paths: Dict[str, Tuple[Path, str]]
+    functional_paths: Dict[str, Tuple[Path, str]],
 ) -> None:
     for expected_spec, (path, expected_kind) in functional_paths.items():
         document = load_document(path)
@@ -97,6 +101,7 @@ def test_resource_registry_functional_paths_exist() -> None:
         "odpc",
         "odpg",
         "odpv",
+        "okf",
     }
 
 

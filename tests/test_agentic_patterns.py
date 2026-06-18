@@ -298,6 +298,7 @@ class TestAgentManifest:
             "portfolio-workspaces",
             "catalog-and-graph-builds",
             "compact-context-sidecars",
+            "okf-context-bundles",
             "vocabulary-context",
             "product-contracts",
         }
@@ -326,6 +327,9 @@ class TestAgentManifest:
             "build-odpg-graph",
             "inspect-odpg-graph",
             "convert-odpg-graph",
+            "validate-okf-bundle",
+            "export-okf-bundle",
+            "import-okf-bundle",
             "explore-vocabulary",
             "inspect-product-contracts",
         }
@@ -508,6 +512,7 @@ class TestAgentManifest:
             "odps.schema.json",
             "odpv.terms",
             "generation.prompt.system",
+            "okf.spec",
         }
         for resource in resources:
             assert set(resource) == {"id", "spec", "type", "description"}

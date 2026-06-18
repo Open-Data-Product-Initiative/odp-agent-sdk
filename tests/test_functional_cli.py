@@ -39,8 +39,13 @@ def test_unified_cli_help_uses_compact_command_metavar(
     assert "Generate ODPC fragments from source notes:" in help_text
     assert "Build catalog and graph review artifacts:" in help_text
     assert "Build a portfolio workspace:" in help_text
+    assert "Exchange OKF context bundles:" in help_text
     assert "Use --json when scripting" in help_text
     assert "Core document commands:" in help_text
+    assert "OKF context bundle commands:" in help_text
+    assert "resources --id okf.spec" in help_text
+    assert "MCP validate_okf_bundle" in help_text
+    assert "MCP list_okf_concepts" in help_text
     assert "ODPC catalog commands:" in help_text
     assert "resources --id odpc.objects" in help_text
     assert "MCP search_objects" in help_text
@@ -70,6 +75,8 @@ def test_unified_cli_help_uses_compact_command_metavar(
     )
     assert "open-data-products resources --id odpc.objects --json" in help_text
     assert "open-data-products resources --id odpv.terms --json" in help_text
+    assert "open-data-products okf-summary knowledge-bundle/ --json" in help_text
+    assert "open-data-products resources --id okf.spec --json" in help_text
     assert (
         "open-data-products odpg-generate graph.yaml --output graph-explorer.html"
         in help_text

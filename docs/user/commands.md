@@ -14,6 +14,7 @@ open-data-products validate product.yaml
 open-data-products generate --input source_docs/ --kind product-reference --output generated/
 open-data-products odpc-build fragments/ --output catalog.yaml --html catalog.html --toon catalog.toon --gcf catalog.gcf
 open-data-products odpg-build fragments/ --output graph.yaml --toon graph.toon --gcf graph.gcf
+open-data-products okf-validate knowledge-bundle/ --json
 open-data-products portfolio build --objectives inputs/objectives/ --use-cases inputs/use-cases/ --signals inputs/signals/ --products inputs/products/ --output portfolio/
 ```
 
@@ -69,11 +70,48 @@ open-data-products resources --id generation.prompt.system --json
 open-data-products resources --id odpc.objects --json
 open-data-products resources --id odpv.terms --json
 open-data-products resources --id odpg.objects --json
+open-data-products resources --id okf.spec --json
 ```
 
 Returns metadata for one bundled resource. These commands are helpful for
 agents that need to discover what guidance or generated artifacts are available
 before choosing a more specific command.
+
+## OKF Context Bundles
+
+```bash
+open-data-products okf-validate knowledge-bundle/
+```
+
+Validates an Open Knowledge Format bundle. OKF is treated as an external
+Markdown/frontmatter context format, not as a replacement for ODPS, ODPC, ODPG,
+or ODPV artifacts. The validator checks parseable concept frontmatter, required
+`type` values, reserved `index.md` and `log.md` conventions, and reports broken
+links as warnings.
+
+```bash
+open-data-products okf-summary knowledge-bundle/ --json
+```
+
+Returns concept metadata without Markdown bodies. This is the safer default for
+agent discovery and mirrors the MCP `list_okf_concepts` behavior.
+
+```bash
+open-data-products okf-import knowledge-bundle/ --output source_docs/
+```
+
+Writes each OKF concept as a generation-ready Markdown source document. Use this
+when OKF knowledge should feed the existing `generate --input source_docs/ ...`
+workflow.
+
+```bash
+open-data-products okf-export catalog.yaml --output okf-bundle/
+open-data-products okf-export portfolio/ --output okf-bundle/
+```
+
+Exports an ODPC catalog file or portfolio workspace into an OKF bundle. ODPC
+catalog YAML remains the structured source of truth; the OKF output is a
+portable context view for humans and agents.
 
 ## LLM Generation
 

@@ -63,7 +63,7 @@ dependencies = [
 
 [project.scripts]
 # Unified CLI. Subcommands include validate, explain, refs, resources, summary,
-# generate, ODPC/ODPG/ODPV helpers, product workflows, manifest, and serve.
+# generate, OKF, ODPC/ODPG/ODPV helpers, product workflows, manifest, and serve.
 # The MCP server runs via `open-data-products serve`.
 open-data-products = "open_data_products.cli:main"
 # Backward-compatible graph explorer entry point. Prefer the unified
@@ -129,6 +129,9 @@ packages = [
 ]
 
 [tool.setuptools.package-data]
+"open_data_products" = [
+    "okf_spec.md",
+]
 "open_data_products.generation" = [
     "generation.config.yaml",
     "data/prompts/*.md",

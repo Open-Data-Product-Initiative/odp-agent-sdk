@@ -209,6 +209,18 @@ def _capabilities() -> List[Dict[str, Any]]:
             ),
         },
         {
+            "id": "okf-context-bundles",
+            "title": "Open Knowledge Format context bundles",
+            "standards": ["external-okf", "odpc", "odps", "odpg"],
+            "interfaces": ["python", "cli", "mcp"],
+            "lifecycle": ["validate", "summarize", "import", "export"],
+            "summary": (
+                "Validate OKF Markdown/frontmatter bundles, import concepts as "
+                "generation source documents, and export ODPC catalog or "
+                "portfolio artifacts as OKF context."
+            ),
+        },
+        {
             "id": "vocabulary-context",
             "title": "Vocabulary search and context",
             "standards": ["odpv"],
@@ -281,8 +293,35 @@ def _workflows() -> List[Dict[str, Any]]:
                 "open-data-products resources --json",
                 "open-data-products resources --id odpc.objects --json",
                 "open-data-products resources --id odpv.terms --json",
+                "open-data-products resources --id okf.spec --json",
             ],
             "mcp_tools": ["list_resources", "get_resource"],
+        },
+        {
+            "id": "validate-okf-bundle",
+            "title": "Validate and summarize an OKF context bundle",
+            "commands": [
+                "open-data-products okf-validate knowledge-bundle/ --json",
+                "open-data-products okf-summary knowledge-bundle/ --json",
+            ],
+            "mcp_tools": ["validate_okf_bundle", "list_okf_concepts"],
+        },
+        {
+            "id": "import-okf-bundle",
+            "title": "Import OKF concepts as generation source documents",
+            "commands": [
+                "open-data-products okf-import knowledge-bundle/ --output source_docs/"
+            ],
+            "mcp_tools": ["validate_okf_bundle", "list_okf_concepts"],
+        },
+        {
+            "id": "export-okf-bundle",
+            "title": "Export ODPC catalog or portfolio artifacts as OKF",
+            "commands": [
+                "open-data-products okf-export catalog.yaml --output okf-bundle/",
+                "open-data-products okf-export portfolio/ --output okf-bundle/",
+            ],
+            "mcp_tools": ["validate_document", "load_summary"],
         },
         {
             "id": "generate-odpc-fragments",

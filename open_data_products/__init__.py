@@ -11,7 +11,7 @@ family. Each standard lives in its own namespace:
 
 # flake8: noqa: E402
 
-__version__ = "0.2.4"
+__version__ = "0.2.5"
 version = __version__
 
 from . import odpc
@@ -101,6 +101,15 @@ from .odpg import (
     write_graph_gcf,
     write_graph_toon,
 )
+from .okf import (
+    OkfConcept,
+    OkfValidationResult,
+    export_okf_bundle,
+    import_okf_bundle,
+    load_okf_bundle,
+    summarize_okf_bundle,
+    validate_okf_bundle,
+)
 from .odpv import (
     agent_vocabulary_context,
     check_vocabulary_relationship,
@@ -127,6 +136,8 @@ __all__ = [
     "odpg",
     "odps",
     "odpv",
+    "OkfConcept",
+    "OkfValidationResult",
     "Reference",
     "Resource",
     "ValidationResult",
@@ -157,6 +168,7 @@ __all__ = [
     "dump_graph_yaml",
     "explain_contract",
     "export_contract",
+    "export_okf_bundle",
     "extract_contract_schema",
     "extract_contract_schema_from_document",
     "explain_document",
@@ -170,9 +182,11 @@ __all__ = [
     "load_document",
     "load_contract",
     "load_summary",
+    "load_okf_bundle",
     "list_generation_prompts",
     "load_generation_prompt",
     "pricing_to_402",
+    "import_okf_bundle",
     "generate_product_contract_report",
     "anthropic_generate",
     "copy_config_template",
@@ -207,8 +221,10 @@ __all__ = [
     "resolve_product_contracts",
     "summarize_contract",
     "summarize_contract_document",
+    "summarize_okf_bundle",
     "validate_contract",
     "validate_document",
+    "validate_okf_bundle",
     "write_catalog",
     "write_catalog_gcf",
     "write_catalog_html",
