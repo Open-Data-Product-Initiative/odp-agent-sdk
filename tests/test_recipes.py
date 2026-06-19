@@ -680,6 +680,30 @@ def test_execute_recipe_run_localizes_portfolio_after_llm_and_review_approval(
     assert qa["sourceStringCount"] > 0
     assert qa["languages"]["fi"]["presentStringCount"] > 0
     assert qa["languages"]["sv"]["presentStringCount"] > 0
+    write_check = result["steps"][0]["summary"]["writeCheck"]
+    assert write_check == {
+        "status": "matched",
+        "planned": [
+            "generated/portfolio/index.fi.html",
+            "generated/portfolio/index.html",
+            "generated/portfolio/index.sv.html",
+            "generated/portfolio/portfolio-i18n.yaml",
+        ],
+        "artifacts": [
+            "generated/portfolio/index.fi.html",
+            "generated/portfolio/index.html",
+            "generated/portfolio/index.sv.html",
+            "generated/portfolio/portfolio-i18n.yaml",
+        ],
+        "matched": [
+            "generated/portfolio/index.fi.html",
+            "generated/portfolio/index.html",
+            "generated/portfolio/index.sv.html",
+            "generated/portfolio/portfolio-i18n.yaml",
+        ],
+        "missing": [],
+        "extra": [],
+    }
     assert (workspace / "portfolio-i18n.yaml").is_file()
     assert (workspace / "index.fi.html").is_file()
     assert (workspace / "index.sv.html").is_file()
@@ -692,6 +716,7 @@ def test_execute_recipe_run_localizes_portfolio_after_llm_and_review_approval(
     assert manifest["status"] == "passed"
     assert manifest["steps"][0]["review"]["decision"] == "approved-by-cli-flag"
     assert manifest["steps"][0]["summary"]["localizationQa"] == qa
+    assert manifest["steps"][0]["summary"]["writeCheck"] == write_check
 
 
 def test_execute_recipe_run_records_failed_deterministic_step(

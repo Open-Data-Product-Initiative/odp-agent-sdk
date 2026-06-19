@@ -1247,6 +1247,8 @@ def _step_result(
     issues: Optional[Sequence[str]] = None,
     summary: Optional[Mapping[str, object]] = None,
 ) -> Dict[str, object]:
+    artifact_paths = list(artifacts or [])
+    write_check = _write_check(step, artifact_paths)
     result: Dict[str, object] = {
         "id": step.get("id", ""),
         "command": step.get("command", ""),
@@ -1255,14 +1257,55 @@ def _step_result(
         "review": step.get("review", {}),
         "startedAt": started_at,
         "completedAt": _utc_now(),
-        "artifacts": list(artifacts or []),
+        "artifacts": artifact_paths,
         "issues": list(issues or []),
     }
     if summary is not None:
         result["summary"] = {
             key: value for key, value in summary.items() if value is not None
         }
+    if write_check is not None:
+        summary_value = result.setdefault("summary", {})
+        if isinstance(summary_value, dict):
+            summary_value["writeCheck"] = write_check
     return result
+
+
+def _write_check(
+    step: Mapping[str, object],
+    artifacts: Sequence[str],
+) -> Optional[Dict[str, object]]:
+    planned = []
+    planned_writes = step.get("plannedWrites")
+    if isinstance(planned_writes, list):
+        for item in planned_writes:
+            if isinstance(item, dict) and item.get("allowed") is True:
+                path = item.get("path")
+                if isinstance(path, str) and path:
+                    planned.append(path)
+    artifact_paths = [path for path in artifacts if path]
+    if not planned and not artifact_paths:
+        return None
+    planned_set = set(planned)
+    artifact_set = set(artifact_paths)
+    missing = sorted(planned_set - artifact_set)
+    extra = sorted(artifact_set - planned_set)
+    if missing and extra:
+        status = "mismatch"
+    elif missing:
+        status = "missing"
+    elif extra:
+        status = "extra"
+    else:
+        status = "matched"
+    return {
+        "status": status,
+        "planned": sorted(planned_set),
+        "artifacts": sorted(artifact_set),
+        "matched": sorted(planned_set & artifact_set),
+        "missing": missing,
+        "extra": extra,
+    }
 
 
 def _required_path(

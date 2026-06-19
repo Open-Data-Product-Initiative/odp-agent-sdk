@@ -36,3 +36,5 @@
   is now the first LLM-backed recipe command supported after those gates pass,
   with provider readiness checked before execution. Localization runs now include
   objective QA coverage counters in portfolio results and recipe run manifests.
+  Executed steps also report `writeCheck` to compare planned writes with actual
+  artifacts.

@@ -541,6 +541,43 @@ score:
 }
 ```
 
+Executed steps that have planned writes or artifacts also include `writeCheck`.
+This compares dry-run `plannedWrites` with the artifacts recorded after
+execution:
+
+```json
+{
+  "summary": {
+    "writeCheck": {
+      "status": "matched",
+      "planned": [
+        "workspace/portfolio-i18n.yaml",
+        "workspace/index.html",
+        "workspace/index.fi.html",
+        "workspace/index.sv.html"
+      ],
+      "artifacts": [
+        "workspace/portfolio-i18n.yaml",
+        "workspace/index.html",
+        "workspace/index.fi.html",
+        "workspace/index.sv.html"
+      ],
+      "matched": [
+        "workspace/portfolio-i18n.yaml",
+        "workspace/index.html",
+        "workspace/index.fi.html",
+        "workspace/index.sv.html"
+      ],
+      "missing": [],
+      "extra": []
+    }
+  }
+}
+```
+
+`writeCheck.status` is `matched`, `missing`, `extra`, or `mismatch`. It is a
+review signal; it does not turn a successful command into a failed command.
+
 The manifest is intentionally a reference and audit record, not a copy of all
 workflow outputs. It does not embed full ODPS, ODPC, ODPG, portfolio, prompt, or
 generated document bodies. Use the `artifacts` paths and `summary` metadata to
