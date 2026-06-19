@@ -18,6 +18,7 @@ repository.
 - Claude Code project MCP config: `.mcp.json`
 - Main human README: `README.md`
 - API reference: `docs/user/API.md`
+- ODPR recipe workflows: `docs/user/recipe-workflows.md`
 - Beginner setup guide: `examples/guides/00-setup-python/`
 - Course-style guide index: `examples/guides/README.md`
 - Functional test report: `docs/reports/functional-test-report.md`
@@ -77,8 +78,16 @@ Use the top-level API when the input spec is unknown:
 - `check_vocabulary_relationship(source, verb, target)`
 - `agent_vocabulary_context(term_id)`
 
-These functions support ODPS, ODPC, ODPG, and ODPV documents through one
-consistent agent-facing surface.
+ODPR recipe workflow helpers:
+
+- `load_recipe(path)`
+- `validate_recipe(path)`
+- `plan_recipe_run(path, config_path=None)`
+- `execute_recipe_run(path, config_path=None)`
+
+The cross-spec document helpers support ODPS, ODPC, ODPG, and ODPV documents
+through one consistent agent-facing surface. ODPR recipe helpers validate and
+plan workflow recipes around those SDK commands.
 
 Data Contract functions are product-oriented. The SDK resolves native ODPS
 `/product/contract` entries (`$ref`, `contractURL`, inline `spec`) and
@@ -121,6 +130,12 @@ Use these commands for machine-readable workflows:
 - `open-data-products product contract-schema <contract.yaml> --json`
 - `open-data-products product export-contract <contract.yaml> --format jsonschema --json`
 - `open-data-products product audit <product.yaml> --json`
+- `open-data-products config recipes --copy-to recipes.config.yaml`
+- `open-data-products config recipes --config recipes.config.yaml --check --json`
+- `open-data-products recipe list --config recipes.config.yaml --json`
+- `open-data-products recipe validate <recipe.yaml> --json`
+- `open-data-products recipe run <recipe.yaml> --config recipes.config.yaml --dry-run --json`
+- `open-data-products recipe run <recipe.yaml> --config recipes.config.yaml --execute --json`
 
 ODPG graph reasoning commands:
 

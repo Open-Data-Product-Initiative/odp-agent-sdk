@@ -175,6 +175,7 @@ below for implementation details:
 - [Agent surface](docs/user/agent-surface.md): MCP server, ARWS manifest, and bundled skills for agent hosts.
 - [Command guide](docs/user/commands.md): what each common CLI command does, what it reads, and what it writes.
 - [LLM generation](docs/user/generation.md): Ollama, embedded llama.cpp, or configured external LLM source-doc to ODPC fragment and ODPG graph workflow.
+- [ODPR recipe workflows](docs/user/recipe-workflows.md): recipe files, runner config, provider readiness, dry-run planning, guarded execution, review status, and run manifests.
 - [Provider and model matrix](docs/user/provider-model-matrix.md): direct hosted and local provider/model lookup.
 - [Embedded llama.cpp guide](docs/user/llama-cpp.md): install the optional extra, configure a GGUF model path, and run local generation without a separate LLM server.
 - [NVIDIA NIM guide](docs/user/nvidia-nim.md): run SDK generation through a

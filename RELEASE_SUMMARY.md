@@ -14,4 +14,6 @@
   compact run manifests written under `.odp/runs/`.
   ODPR schemas, recipe guidance, and the recipe config template are also
   discoverable through the SDK resource registry, with `recipe search` for
-  bundled ODPR guidance records.
+  bundled ODPR guidance records. Added a dedicated ODPR recipe workflow user
+  guide covering recipe files, `recipes.config.yaml`, `generation.config.yaml`,
+  dry-run JSON, guarded execution, review policy, write policy, and manifests.

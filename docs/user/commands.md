@@ -77,6 +77,27 @@ Returns metadata for one bundled resource. These commands are helpful for
 agents that need to discover what guidance or generated artifacts are available
 before choosing a more specific command.
 
+## ODPR Recipe Workflows
+
+```bash
+open-data-products config recipes --copy-to recipes.config.yaml
+open-data-products config recipes --config recipes.config.yaml --check --json
+open-data-products recipe list --config recipes.config.yaml --json
+open-data-products recipe validate recipes/ci-validate.yaml --json
+open-data-products recipe run recipes/ci-validate.yaml --config recipes.config.yaml --dry-run --json
+open-data-products recipe run recipes/ci-validate.yaml --config recipes.config.yaml --execute --json
+```
+
+Recipes define ordered SDK workflow steps. The recipe runner config defines
+write policy, review policy, run manifest location, recipe search paths, and
+the path to `generation.config.yaml`. Always dry-run before execute. Dry-runs
+show resolved step parameters, planned writes, provider readiness, review
+status, and blocking reasons without calling providers or writing workflow
+outputs.
+
+See [ODPR recipe workflows](recipe-workflows.md) for the full config model,
+JSON fields, guarded execution behavior, and run manifest contract.
+
 ## OKF Context Bundles
 
 ```bash
