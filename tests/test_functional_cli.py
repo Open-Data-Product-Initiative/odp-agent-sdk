@@ -290,6 +290,7 @@ recipe:
     plan = _json_output(capsys)
     assert plan["mode"] == "dry-run"
     assert plan["steps"][0]["resolved"]["parameters"]["languages"] == ["fi", "sv"]
+    assert plan["steps"][0]["review"]["status"] == "review-needed"
     assert "resolvedCommand" not in plan["steps"][0]
 
 
@@ -403,6 +404,149 @@ recipe:
         for reason in payload["blockingReasons"]
     )
     assert (tmp_path / payload["manifest"]["path"]).is_file()
+
+
+def test_recipe_cli_execute_blocks_state_changing_step_outside_allow_writes(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    recipe_path = tmp_path / "recipe.yaml"
+    config_path = tmp_path / "recipes.config.yaml"
+    recipe_path.write_text(
+        """
+schema: https://opendataproducts.org/odpr-v1.0/schema/odpr.yaml
+version: "1.0"
+kind: Recipe
+recipe:
+  metadata:
+    id: RCP-SYNC-001
+    name:
+      en: Sync Portfolio
+  version: "1.0.0"
+  type: ci
+  steps:
+    - id: sync
+      command: portfolio.sync
+      with:
+        workspace: portfolio/
+""",
+        encoding="utf-8",
+    )
+    config_path.write_text(
+        """
+version: "1.0"
+execution:
+  manifestDir: .odp/runs/
+  allowWrites:
+    - generated/
+""",
+        encoding="utf-8",
+    )
+
+    assert (
+        main(
+            [
+                "recipe",
+                "run",
+                str(recipe_path),
+                "--config",
+                str(config_path),
+                "--execute",
+                "--json",
+            ]
+        )
+        == 1
+    )
+    payload = _json_output(capsys)
+
+    assert payload["status"] == "blocked"
+    assert payload["steps"][0]["status"] == "blocked"
+    assert any(
+        "planned write outside allowWrites" in reason["message"]
+        for reason in payload["blockingReasons"]
+    )
+
+
+def test_recipe_cli_dry_run_reports_provider_missing_env(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    recipe_path = tmp_path / "recipe.yaml"
+    config_path = tmp_path / "recipes.config.yaml"
+    generation_path = tmp_path / "generation.config.yaml"
+    workspace = tmp_path / "generated" / "portfolio"
+    workspace.mkdir(parents=True)
+    recipe_path.write_text(
+        """
+schema: https://opendataproducts.org/odpr-v1.0/schema/odpr.yaml
+version: "1.0"
+kind: Recipe
+recipe:
+  metadata:
+    id: RCP-LOCALIZE-001
+    name:
+      en: Localize Portfolio
+  version: "1.0.0"
+  type: localization
+  steps:
+    - id: localize
+      command: portfolio.localize
+      providerRef: configured-openai
+      with:
+        workspace: generated/portfolio/
+        languages:
+          - fi
+""",
+        encoding="utf-8",
+    )
+    config_path.write_text(
+        """
+version: "1.0"
+providers:
+  generationConfig: generation.config.yaml
+""",
+        encoding="utf-8",
+    )
+    generation_path.write_text(
+        """
+provider: configured-openai
+providers:
+  configured-openai:
+    type: openai
+    model: gpt-test
+    apiKeyEnv: TEST_ODPR_OPENAI_API_KEY
+""",
+        encoding="utf-8",
+    )
+    monkeypatch.delenv("TEST_ODPR_OPENAI_API_KEY", raising=False)
+
+    assert (
+        main(
+            [
+                "recipe",
+                "run",
+                str(recipe_path),
+                "--config",
+                str(config_path),
+                "--dry-run",
+                "--json",
+            ]
+        )
+        == 0
+    )
+    payload = _json_output(capsys)
+
+    assert payload["providers"] == [
+        {
+            "ref": "configured-openai",
+            "model": "gpt-test",
+            "type": "openai",
+            "readiness": "missing-env",
+            "missingEnv": ["TEST_ODPR_OPENAI_API_KEY"],
+            "source": str(generation_path),
+        }
+    ]
 
 
 def test_config_recipes_check_reports_recipe_config(

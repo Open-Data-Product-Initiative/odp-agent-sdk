@@ -74,6 +74,29 @@ recipe:
     )
 
 
+def _write_portfolio_sync_recipe(path: Path) -> None:
+    path.write_text(
+        """
+schema: https://opendataproducts.org/odpr-v1.0/schema/odpr.yaml
+version: "1.0"
+kind: Recipe
+recipe:
+  metadata:
+    id: RCP-SYNC-001
+    name:
+      en: Sync Portfolio
+  version: "1.0.0"
+  type: ci
+  steps:
+    - id: sync
+      command: portfolio.sync
+      with:
+        workspace: portfolio/
+""",
+        encoding="utf-8",
+    )
+
+
 def _write_catalog(path: Path) -> None:
     path.write_text(
         """
@@ -100,6 +123,35 @@ catalog:
         version: "4.0"
         format: yaml
         $ref: ./product.yaml
+""",
+        encoding="utf-8",
+    )
+
+
+def _write_recipe_config(path: Path, generation_config: str) -> None:
+    path.write_text(
+        f"""
+version: "1.0"
+providers:
+  generationConfig: {generation_config}
+""",
+        encoding="utf-8",
+    )
+
+
+def _write_generation_config(path: Path) -> None:
+    path.write_text(
+        """
+provider: ollama
+providers:
+  configured-openai:
+    type: openai
+    model: gpt-test
+    apiKeyEnv: TEST_ODPR_OPENAI_API_KEY
+  configured-local:
+    type: ollama
+    model: qwen-test
+    baseUrl: http://localhost:11434
 """,
         encoding="utf-8",
     )
@@ -208,6 +260,177 @@ def test_plan_recipe_run_dry_run_returns_structured_parameters(
         "path": "generated/portfolio/index.fi.html",
         "allowed": True,
     } in step["plannedWrites"]
+    assert step["review"]["status"] == "review-needed"
+    assert step["review"]["reasons"] == [
+        {
+            "code": "llm_backed_step",
+            "message": "LLM-backed steps require review before execution.",
+        }
+    ]
+
+
+def test_plan_recipe_run_marks_configured_recipe_type_review_needed(
+    tmp_path: Path,
+) -> None:
+    """Test release-type recipes are review-needed when config requires it."""
+    recipe_path = tmp_path / "recipe.yaml"
+    config_path = tmp_path / "recipes.config.yaml"
+    _write_validate_recipe(recipe_path)
+    data = yaml.safe_load(recipe_path.read_text(encoding="utf-8"))
+    data["recipe"]["type"] = "release"
+    recipe_path.write_text(yaml.safe_dump(data), encoding="utf-8")
+    config_path.write_text(
+        """
+version: "1.0"
+execution:
+  requireReviewFor:
+    - release
+""",
+        encoding="utf-8",
+    )
+
+    plan = plan_recipe_run(
+        recipe_path,
+        config_path=config_path,
+        project_root=tmp_path,
+    )
+
+    assert plan["steps"][0]["review"]["status"] == "review-needed"
+    assert plan["steps"][0]["review"]["reasons"] == [
+        {
+            "code": "recipe_type_requires_review",
+            "message": "Recipe type requires review: release",
+        }
+    ]
+
+
+def test_plan_recipe_run_marks_deterministic_ci_review_not_required(
+    tmp_path: Path,
+) -> None:
+    """Test deterministic CI recipes stay review-not-required by default."""
+    recipe_path = tmp_path / "recipe.yaml"
+    _write_validate_recipe(recipe_path)
+
+    plan = plan_recipe_run(recipe_path, project_root=tmp_path)
+
+    assert plan["steps"][0]["review"] == {"status": "not-required", "reasons": []}
+
+
+def test_plan_recipe_run_reports_provider_ready_when_env_is_present(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    """Test provider readiness checks configured env vars without provider calls."""
+    recipe_path = tmp_path / "recipe.yaml"
+    config_path = tmp_path / "recipes.config.yaml"
+    generation_path = tmp_path / "generation.config.yaml"
+    _write_recipe(recipe_path)
+    data = yaml.safe_load(recipe_path.read_text(encoding="utf-8"))
+    data["recipe"]["execution"]["providerRef"] = "configured-openai"
+    data["recipe"]["steps"][0]["providerRef"] = "configured-openai"
+    recipe_path.write_text(yaml.safe_dump(data), encoding="utf-8")
+    _write_recipe_config(config_path, "generation.config.yaml")
+    _write_generation_config(generation_path)
+    monkeypatch.setenv("TEST_ODPR_OPENAI_API_KEY", "present")
+
+    plan = plan_recipe_run(
+        recipe_path,
+        config_path=config_path,
+        project_root=tmp_path,
+    )
+
+    assert plan["providers"] == [
+        {
+            "ref": "configured-openai",
+            "model": "claude-sonnet-4-5",
+            "type": "openai",
+            "readiness": "ready",
+            "missingEnv": [],
+            "source": str(generation_path),
+        }
+    ]
+
+
+def test_plan_recipe_run_reports_missing_provider_env(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    """Test provider readiness reports missing environment variables."""
+    recipe_path = tmp_path / "recipe.yaml"
+    config_path = tmp_path / "recipes.config.yaml"
+    generation_path = tmp_path / "generation.config.yaml"
+    _write_recipe(recipe_path)
+    data = yaml.safe_load(recipe_path.read_text(encoding="utf-8"))
+    data["recipe"]["execution"]["providerRef"] = "configured-openai"
+    data["recipe"]["steps"][0]["providerRef"] = "configured-openai"
+    recipe_path.write_text(yaml.safe_dump(data), encoding="utf-8")
+    _write_recipe_config(config_path, "generation.config.yaml")
+    _write_generation_config(generation_path)
+    monkeypatch.delenv("TEST_ODPR_OPENAI_API_KEY", raising=False)
+
+    plan = plan_recipe_run(
+        recipe_path,
+        config_path=config_path,
+        project_root=tmp_path,
+    )
+
+    assert plan["providers"][0]["readiness"] == "missing-env"
+    assert plan["providers"][0]["missingEnv"] == ["TEST_ODPR_OPENAI_API_KEY"]
+
+
+def test_plan_recipe_run_reports_unknown_provider(tmp_path: Path) -> None:
+    """Test provider readiness reports recipe provider refs missing from config."""
+    recipe_path = tmp_path / "recipe.yaml"
+    config_path = tmp_path / "recipes.config.yaml"
+    generation_path = tmp_path / "generation.config.yaml"
+    _write_recipe(recipe_path)
+    data = yaml.safe_load(recipe_path.read_text(encoding="utf-8"))
+    data["recipe"]["execution"]["providerRef"] = "not-configured"
+    data["recipe"]["steps"][0]["providerRef"] = "not-configured"
+    recipe_path.write_text(yaml.safe_dump(data), encoding="utf-8")
+    _write_recipe_config(config_path, "generation.config.yaml")
+    _write_generation_config(generation_path)
+
+    plan = plan_recipe_run(
+        recipe_path,
+        config_path=config_path,
+        project_root=tmp_path,
+    )
+
+    assert plan["providers"] == [
+        {
+            "ref": "not-configured",
+            "model": "claude-sonnet-4-5",
+            "type": None,
+            "readiness": "unknown-provider",
+            "missingEnv": [],
+            "source": None,
+        }
+    ]
+
+
+def test_plan_recipe_run_reports_local_provider_ready(tmp_path: Path) -> None:
+    """Test local providers do not require API-key environment variables."""
+    recipe_path = tmp_path / "recipe.yaml"
+    config_path = tmp_path / "recipes.config.yaml"
+    generation_path = tmp_path / "generation.config.yaml"
+    _write_recipe(recipe_path)
+    data = yaml.safe_load(recipe_path.read_text(encoding="utf-8"))
+    data["recipe"]["execution"]["providerRef"] = "configured-local"
+    data["recipe"]["steps"][0]["providerRef"] = "configured-local"
+    recipe_path.write_text(yaml.safe_dump(data), encoding="utf-8")
+    _write_recipe_config(config_path, "generation.config.yaml")
+    _write_generation_config(generation_path)
+
+    plan = plan_recipe_run(
+        recipe_path,
+        config_path=config_path,
+        project_root=tmp_path,
+    )
+
+    assert plan["providers"][0]["type"] == "ollama"
+    assert plan["providers"][0]["readiness"] == "ready"
+    assert plan["providers"][0]["missingEnv"] == []
 
 
 def test_execute_recipe_run_runs_deterministic_validate_and_writes_manifest(
@@ -232,6 +455,7 @@ def test_execute_recipe_run_runs_deterministic_validate_and_writes_manifest(
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     assert manifest["runId"] == result["runId"]
     assert manifest["steps"][0]["id"] == "validate-catalog"
+    assert manifest["steps"][0]["review"] == {"status": "not-required", "reasons": []}
 
 
 def test_execute_recipe_run_blocks_llm_backed_steps(tmp_path: Path) -> None:
@@ -249,6 +473,47 @@ def test_execute_recipe_run_blocks_llm_backed_steps(tmp_path: Path) -> None:
     assert result["steps"][0]["status"] == "blocked"
     assert any(
         reason["code"] == "llm_execution_not_supported"
+        for reason in result["blockingReasons"]
+    )
+
+
+def test_execute_recipe_run_blocks_portfolio_sync_outside_allow_writes(
+    tmp_path: Path,
+) -> None:
+    """Test state-changing deterministic steps honor configured write roots."""
+    recipe_path = tmp_path / "recipe.yaml"
+    config_path = tmp_path / "recipes.config.yaml"
+    _write_portfolio_sync_recipe(recipe_path)
+    config_path.write_text(
+        """
+version: "1.0"
+execution:
+  manifestDir: .odp/runs/
+  allowWrites:
+    - generated/
+""",
+        encoding="utf-8",
+    )
+
+    plan = plan_recipe_run(
+        recipe_path,
+        config_path=config_path,
+        project_root=tmp_path,
+    )
+    result = execute_recipe_run(
+        recipe_path,
+        config_path=config_path,
+        project_root=tmp_path,
+    )
+
+    assert plan["canRun"] is False
+    assert plan["steps"][0]["plannedWrites"] == [
+        {"path": "portfolio/", "allowed": False}
+    ]
+    assert result["status"] == "blocked"
+    assert result["steps"][0]["status"] == "blocked"
+    assert any(
+        "planned write outside allowWrites" in reason["message"]
         for reason in result["blockingReasons"]
     )
 

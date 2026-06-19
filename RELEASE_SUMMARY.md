@@ -9,7 +9,9 @@
   and agent-safe `recipe list`, `recipe validate`, `recipe catalog`, and
   `recipe run --dry-run` CLI planning commands. Deterministic/report recipe
   execution is now guarded behind `recipe run --execute`, with LLM-backed steps
-  blocked explicitly and compact run manifests written under `.odp/runs/`.
+  blocked explicitly, review-needed status visible in dry-run plans and run
+  manifests, provider readiness resolved from generation config/env vars, and
+  compact run manifests written under `.odp/runs/`.
   ODPR schemas, recipe guidance, and the recipe config template are also
   discoverable through the SDK resource registry, with `recipe search` for
   bundled ODPR guidance records.

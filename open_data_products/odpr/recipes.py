@@ -5,9 +5,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
 import json
+import os
 from pathlib import Path
 import shutil
-from typing import Dict, List, Mapping, Optional, Sequence, Union
+from typing import Dict, List, Mapping, Optional, Sequence, Tuple, Union
 
 import yaml
 
@@ -287,6 +288,7 @@ def plan_recipe_run(
         for step in recipe_doc.steps:
             planned = _planned_step(
                 step,
+                recipe,
                 root,
                 allow_writes,
                 execution,
@@ -316,7 +318,7 @@ def plan_recipe_run(
             "recipeConfig": str(config_path) if config_path else None,
             "generationConfig": _generation_config(config),
         },
-        "providers": _provider_readiness(steps),
+        "providers": _provider_readiness(steps, config, config_path, root),
         "steps": steps,
     }
     if mode == "execute":
@@ -532,6 +534,7 @@ def _dump_yaml(data: Mapping[str, object]) -> str:
 
 def _planned_step(
     step: Mapping[str, object],
+    recipe: Mapping[str, object],
     root: Path,
     allow_writes: Sequence[Path],
     execution: Mapping[str, object],
@@ -565,7 +568,7 @@ def _planned_step(
         },
         "inputs": _step_inputs(command, with_values, root),
         "plannedWrites": _planned_writes(command, with_values, root, allow_writes),
-        "review": {"status": "not-required"},
+        "review": _review_status(classification, recipe, config),
     }
 
 
@@ -715,6 +718,8 @@ def _planned_writes(
         if isinstance(workspace, str):
             for language in _language_list(languages):
                 paths.append(f"{workspace.rstrip('/')}/index.{language}.html")
+    elif command == "portfolio.sync":
+        _append_string(paths, values.get("workspace"))
     elif command == "portfolio.render":
         output = values.get("output")
         workspace = values.get("workspace")
@@ -778,7 +783,13 @@ def _generation_config_exists(config_path: Path, generation_config: str) -> bool
 
 def _provider_readiness(
     steps: Sequence[Mapping[str, object]],
+    config: Mapping[str, object],
+    config_path: Optional[PathLike],
+    root: Path,
 ) -> List[Dict[str, object]]:
+    providers_config, providers_source = _generation_providers(
+        config, config_path, root
+    )
     providers: Dict[str, Dict[str, object]] = {}
     for step in steps:
         resolved = _mapping(step.get("resolved"))
@@ -786,13 +797,106 @@ def _provider_readiness(
         provider = _string(parameters.get("providerRef"))
         if not provider:
             continue
+        provider_config = _mapping(providers_config.get(provider))
+        source = str(providers_source) if provider_config else "built-in"
+        if not provider_config:
+            provider_config = _built_in_provider(provider)
+        if not provider_config:
+            providers[provider] = {
+                "ref": provider,
+                "model": parameters.get("model"),
+                "type": None,
+                "readiness": "unknown-provider",
+                "missingEnv": [],
+                "source": None,
+            }
+            continue
+        api_key_env = _string(provider_config.get("apiKeyEnv"))
+        missing_env = []
+        if api_key_env and not os.environ.get(api_key_env):
+            missing_env.append(api_key_env)
         providers[provider] = {
             "ref": provider,
-            "model": parameters.get("model"),
-            "readiness": "unchecked",
-            "missingEnv": [],
+            "model": parameters.get("model") or provider_config.get("model"),
+            "type": provider_config.get("type"),
+            "readiness": "missing-env" if missing_env else "ready",
+            "missingEnv": missing_env,
+            "source": source,
         }
     return list(providers.values())
+
+
+def _generation_providers(
+    config: Mapping[str, object],
+    config_path: Optional[PathLike],
+    root: Path,
+) -> Tuple[Mapping[str, object], Optional[Path]]:
+    generation_config = _generation_config(config)
+    if not generation_config:
+        return {}, None
+    source_path = Path(generation_config)
+    if not source_path.is_absolute():
+        base = Path(config_path).parent if config_path is not None else root
+        source_path = base / source_path
+    try:
+        from ..generation import load_generation_config
+
+        generation = load_generation_config(source_path)
+    except (FileNotFoundError, ValueError):
+        return {}, source_path
+    providers = generation.get("providers")
+    return (_mapping(providers), source_path)
+
+
+def _built_in_provider(provider: str) -> Mapping[str, object]:
+    try:
+        from ..generation import BUILT_IN_PROVIDERS
+    except ImportError:
+        return {}
+    return _mapping(BUILT_IN_PROVIDERS.get(provider))
+
+
+def _review_status(
+    classification: str,
+    recipe: Mapping[str, object],
+    config: Mapping[str, object],
+) -> Dict[str, object]:
+    reasons = []
+    review = _mapping(recipe.get("review"))
+    if review.get("required") is True:
+        reasons.append(
+            {
+                "code": "recipe_review_required",
+                "message": "Recipe declares review.required: true.",
+            }
+        )
+    recipe_type = _string(recipe.get("type"))
+    require_review_for = _require_review_for(config)
+    if recipe_type and recipe_type in require_review_for:
+        reasons.append(
+            {
+                "code": "recipe_type_requires_review",
+                "message": f"Recipe type requires review: {recipe_type}",
+            }
+        )
+    if classification == "llm-backed":
+        reasons.append(
+            {
+                "code": "llm_backed_step",
+                "message": "LLM-backed steps require review before execution.",
+            }
+        )
+    if reasons:
+        return {"status": "review-needed", "reasons": reasons}
+    return {"status": "not-required", "reasons": []}
+
+
+def _require_review_for(config: Mapping[str, object]) -> Sequence[str]:
+    execution = _mapping(config.get("execution"))
+    value = execution.get("requireReviewFor")
+    if not isinstance(value, list):
+        return []
+    return [item for item in value if isinstance(item, str)]
 
 
 def _execution_config_issues(config_path: Optional[PathLike]) -> List[str]:
@@ -950,6 +1054,7 @@ def _blocked_step(step: Mapping[str, object]) -> Dict[str, object]:
         "command": step.get("command", ""),
         "classification": step.get("classification", ""),
         "status": "blocked",
+        "review": step.get("review", {}),
         "artifacts": [],
         "issues": [],
     }
@@ -969,6 +1074,7 @@ def _step_result(
         "command": step.get("command", ""),
         "classification": step.get("classification", ""),
         "status": status,
+        "review": step.get("review", {}),
         "startedAt": started_at,
         "completedAt": _utc_now(),
         "artifacts": list(artifacts or []),
