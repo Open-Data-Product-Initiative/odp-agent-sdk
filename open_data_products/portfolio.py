@@ -444,6 +444,7 @@ def localize_portfolio(
 
     created, updated, unchanged = _group_written_paths(written)
     validation_results = _portfolio_validation_results(data)
+    localization_qa = _localization_qa(source_strings, translations, target_languages)
     return {
         "spec": "portfolio",
         "kind": "PortfolioLocalize",
@@ -457,6 +458,7 @@ def localize_portfolio(
         "unchanged": unchanged,
         "warnings": warnings,
         "validationResults": validation_results,
+        "localizationQa": localization_qa,
         "valid": _valid_portfolio(validation_results),
     }
 
@@ -2880,6 +2882,57 @@ def _prune_i18n_html_translations(
         for key in list(html_translations):
             if str(key) not in source_strings:
                 del html_translations[key]
+
+
+def _localization_qa(
+    source_strings: Sequence[str],
+    translations: Mapping[str, Any],
+    target_languages: Sequence[str],
+) -> Dict[str, object]:
+    source_set = set(source_strings)
+    source_count = len(source_set)
+    languages: Dict[str, Dict[str, object]] = {}
+    for language in target_languages:
+        language_map = translations.get(language)
+        if not isinstance(language_map, dict):
+            language_map = {}
+        html_translations = language_map.get("html")
+        if not isinstance(html_translations, dict):
+            html_translations = {}
+        present_keys = {
+            str(key)
+            for key, value in html_translations.items()
+            if str(key) in source_set and str(value).strip()
+        }
+        changed_keys = {
+            str(key)
+            for key, value in html_translations.items()
+            if str(key) in source_set
+            and str(value).strip()
+            and str(value).strip() != str(key)
+        }
+        unchanged_keys = present_keys - changed_keys
+        missing_count = max(source_count - len(present_keys), 0)
+        languages[language] = {
+            "translationCount": len(html_translations),
+            "sourceStringCount": source_count,
+            "presentStringCount": len(present_keys),
+            "changedStringCount": len(changed_keys),
+            "unchangedStringCount": len(unchanged_keys),
+            "missingStringCount": missing_count,
+            "coverage": _ratio(len(present_keys), source_count),
+            "changedCoverage": _ratio(len(changed_keys), source_count),
+        }
+    return {
+        "sourceStringCount": source_count,
+        "languages": languages,
+    }
+
+
+def _ratio(numerator: int, denominator: int) -> float:
+    if denominator <= 0:
+        return 1.0
+    return round(numerator / denominator, 4)
 
 
 def _normalize_language_tag(value: str) -> str:

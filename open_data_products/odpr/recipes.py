@@ -1192,6 +1192,7 @@ def _portfolio_step_result(
                 if result.get("workspace")
                 else None
             ),
+            "localizationQa": result.get("localizationQa"),
         },
     )
 

@@ -34,4 +34,5 @@
   (`--allow-llm`) from review approval (`--approve-review`) and records the
   resulting `executionPolicy` in responses and run manifests. `portfolio.localize`
   is now the first LLM-backed recipe command supported after those gates pass,
-  with provider readiness checked before execution.
+  with provider readiness checked before execution. Localization runs now include
+  objective QA coverage counters in portfolio results and recipe run manifests.

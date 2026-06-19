@@ -676,6 +676,10 @@ def test_execute_recipe_run_localizes_portfolio_after_llm_and_review_approval(
     assert result["blockingReasons"] == []
     assert result["steps"][0]["status"] == "passed"
     assert result["steps"][0]["review"]["decision"] == "approved-by-cli-flag"
+    qa = result["steps"][0]["summary"]["localizationQa"]
+    assert qa["sourceStringCount"] > 0
+    assert qa["languages"]["fi"]["presentStringCount"] > 0
+    assert qa["languages"]["sv"]["presentStringCount"] > 0
     assert (workspace / "portfolio-i18n.yaml").is_file()
     assert (workspace / "index.fi.html").is_file()
     assert (workspace / "index.sv.html").is_file()
@@ -687,6 +691,7 @@ def test_execute_recipe_run_localizes_portfolio_after_llm_and_review_approval(
     }
     assert manifest["status"] == "passed"
     assert manifest["steps"][0]["review"]["decision"] == "approved-by-cli-flag"
+    assert manifest["steps"][0]["summary"]["localizationQa"] == qa
 
 
 def test_execute_recipe_run_records_failed_deterministic_step(

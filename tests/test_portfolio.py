@@ -1237,6 +1237,13 @@ translations:
         "fi": str(workspace / "index.fi.html"),
         "sv": str(workspace / "index.sv.html"),
     }
+    qa = result["localizationQa"]
+    assert qa["sourceStringCount"] > 0
+    assert qa["languages"]["fi"]["sourceStringCount"] == qa["sourceStringCount"]
+    assert qa["languages"]["fi"]["presentStringCount"] > 0
+    assert qa["languages"]["fi"]["changedStringCount"] > 0
+    assert 0 < qa["languages"]["fi"]["coverage"] <= 1
+    assert 0 < qa["languages"]["fi"]["changedCoverage"] <= 1
     assert "validationResults" in result
     assert product_path.read_text(encoding="utf-8") == original_product_yaml
 

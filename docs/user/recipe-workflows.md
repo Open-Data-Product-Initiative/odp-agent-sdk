@@ -513,6 +513,34 @@ has `status: blocked`.
 For failed deterministic steps, `status` is `failed`, `exitCode` is `1`, and
 the failed step includes `issues`.
 
+For `portfolio.localize`, the step summary also includes `localizationQa`.
+These are objective coverage counters, not a subjective translation quality
+score:
+
+```json
+{
+  "summary": {
+    "kind": "PortfolioLocalize",
+    "valid": true,
+    "workspace": "workspace",
+    "localizationQa": {
+      "sourceStringCount": 100,
+      "languages": {
+        "fi": {
+          "translationCount": 99,
+          "presentStringCount": 99,
+          "changedStringCount": 94,
+          "unchangedStringCount": 5,
+          "missingStringCount": 1,
+          "coverage": 0.99,
+          "changedCoverage": 0.94
+        }
+      }
+    }
+  }
+}
+```
+
 The manifest is intentionally a reference and audit record, not a copy of all
 workflow outputs. It does not embed full ODPS, ODPC, ODPG, portfolio, prompt, or
 generated document bodies. Use the `artifacts` paths and `summary` metadata to
