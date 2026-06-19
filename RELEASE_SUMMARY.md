@@ -17,3 +17,11 @@
   bundled ODPR guidance records. Added a dedicated ODPR recipe workflow user
   guide covering recipe files, `recipes.config.yaml`, `generation.config.yaml`,
   dry-run JSON, guarded execution, review policy, write policy, and manifests.
+  Added starter recipe examples for CI validation, deterministic portfolio
+  sync/render/explain, and LLM-backed release localization dry-runs.
+  Recipe runner config now supports explicit `projectRoot`, allowing configs to
+  live under `config/` while workflows and workspaces stay rooted at the
+  project directory. `recipe validate`, `recipe run`, and the Python recipe
+  helpers can now use `recipes.defaultRecipe` when the recipe path is omitted,
+  while JSON responses expose `recipeSelection` so agents can distinguish
+  command arguments from config defaults.

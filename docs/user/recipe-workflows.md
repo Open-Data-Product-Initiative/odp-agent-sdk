@@ -32,6 +32,56 @@ Use recipes for workflows that need to be repeated, reviewed, delegated, or
 automated. For a one-off local experiment, direct SDK commands are often
 simpler.
 
+## Starter Examples
+
+The repository includes starter recipes under `examples/recipes/`:
+
+| Example | What it demonstrates |
+| --- | --- |
+| `examples/recipes/workflows/ci-validate-catalog.yaml` | Deterministic catalog validation that can dry-run and execute. |
+| `examples/recipes/workflows/portfolio-sync-render.yaml` | Deterministic portfolio sync, render, and explain steps with writes limited to `workspace/`. |
+| `examples/recipes/workflows/release-portfolio-localize.yaml` | LLM-backed release localization that dry-runs with provider readiness and review status, then blocks in guarded execute mode. |
+
+The example runner config is `examples/recipes/config/recipes.config.yaml`.
+The example provider config is `examples/recipes/config/generation.config.yaml`.
+
+Run the deterministic validation example:
+
+```bash
+open-data-products recipe validate examples/recipes/workflows/ci-validate-catalog.yaml --json
+open-data-products recipe run examples/recipes/workflows/ci-validate-catalog.yaml \
+  --config examples/recipes/config/recipes.config.yaml \
+  --dry-run \
+  --json
+open-data-products recipe run examples/recipes/workflows/ci-validate-catalog.yaml \
+  --config examples/recipes/config/recipes.config.yaml \
+  --execute \
+  --json
+```
+
+Because the example config sets `recipes.defaultRecipe`, you can also omit the
+recipe path:
+
+```bash
+open-data-products recipe run \
+  --config examples/recipes/config/recipes.config.yaml \
+  --dry-run \
+  --json
+```
+
+Dry-run the LLM-backed release example:
+
+```bash
+open-data-products recipe run examples/recipes/workflows/release-portfolio-localize.yaml \
+  --config examples/recipes/config/recipes.config.yaml \
+  --dry-run \
+  --json
+```
+
+If `ANTHROPIC_API_KEY` is not set, the dry-run reports provider readiness as
+`missing-env`. Execute mode blocks this recipe because LLM-backed recipe
+execution is not enabled yet.
+
 The SDK keeps three files separate:
 
 | File | Purpose |
@@ -82,6 +132,7 @@ Example:
 
 ```yaml
 version: "1.0"
+projectRoot: .
 
 recipes:
   paths:
@@ -106,6 +157,38 @@ execution:
 
 `recipes.config.yaml` is not the LLM provider config. It only points to
 `generation.config.yaml` so recipe dry-runs can resolve provider readiness.
+
+`projectRoot` tells the runner where workflow paths are resolved from. If it is
+omitted, the config file's directory is used. This keeps existing configs
+working. When the config lives in a subfolder, use `projectRoot` to point back
+to the project root:
+
+```yaml
+version: "1.0"
+projectRoot: ..
+
+recipes:
+  paths:
+    - workflows/
+
+providers:
+  generationConfig: config/generation.config.yaml
+
+execution:
+  allowWrites:
+    - workspace/
+```
+
+`recipes.defaultRecipe` is a fallback for `recipe validate` and `recipe run`.
+If the command includes an explicit recipe path, the command argument wins. If
+the command omits a recipe path, the runner uses `recipes.defaultRecipe`. If
+both are missing, the command fails with a clear error.
+
+The Python helpers follow the same rule. `validate_recipe(config_path=...)`,
+`plan_recipe_run(config_path=...)`, and `execute_recipe_run(config_path=...)`
+use `recipes.defaultRecipe` when the recipe path argument is omitted, and their
+JSON-compatible payloads include `recipeSelection` for the same reason as the
+CLI output.
 
 ## Generation Config
 
@@ -179,6 +262,11 @@ Important JSON fields:
 ```json
 {
   "mode": "dry-run",
+  "recipeSelection": {
+    "source": "argument",
+    "path": "recipes/release-portfolio-review.yaml",
+    "defaultRecipe": "recipes/ci-validate-catalog.yaml"
+  },
   "canRun": true,
   "blockingReasons": [],
   "providers": [
@@ -425,8 +513,8 @@ Agents should use this order:
 
 1. `open-data-products recipe validate <recipe> --json`
 2. `open-data-products recipe run <recipe> --config recipes.config.yaml --dry-run --json`
-3. Inspect `canRun`, `blockingReasons`, `providers`, `steps[].plannedWrites`,
-   and `steps[].review`.
+3. Inspect `recipeSelection`, `canRun`, `blockingReasons`, `providers`,
+   `steps[].plannedWrites`, and `steps[].review`.
 4. Run `--execute --json` only when the dry-run has no blocking reasons and
    the intended step classes are supported.
 5. Read `manifest.path` for the audit result instead of scanning generated

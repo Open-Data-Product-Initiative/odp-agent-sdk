@@ -494,7 +494,11 @@ def main(argv: Optional[List[str]] = None) -> int:
         "validate",
         help="Validate one ODPR Recipe, Provider, or RecipeCatalog",
     )
-    recipe_validate_parser.add_argument("recipe", help="ODPR YAML or JSON file")
+    recipe_validate_parser.add_argument(
+        "recipe",
+        nargs="?",
+        help="ODPR YAML or JSON file. Uses recipes.defaultRecipe when omitted.",
+    )
     recipe_validate_parser.add_argument(
         "--config",
         help="Optional recipe runner config YAML.",
@@ -540,7 +544,11 @@ def main(argv: Optional[List[str]] = None) -> int:
         "run",
         help="Plan or execute one workflow recipe",
     )
-    recipe_run_parser.add_argument("recipe", help="Recipe YAML file")
+    recipe_run_parser.add_argument(
+        "recipe",
+        nargs="?",
+        help="Recipe YAML file. Uses recipes.defaultRecipe when omitted.",
+    )
     recipe_run_parser.add_argument(
         "--config",
         help="Optional recipe runner config YAML.",
@@ -1404,11 +1412,17 @@ def main(argv: Optional[List[str]] = None) -> int:
                     payload = list_recipes(config_path=args.config)
                     exit_code = 0
                 elif args.recipe_command == "validate":
-                    base_payload = validate_odpr_document(args.recipe)
-                    if base_payload.get("kind") == "Recipe":
-                        payload = validate_recipe(args.recipe)
+                    if args.recipe is None:
+                        payload = validate_recipe(None, config_path=args.config)
                     else:
-                        payload = base_payload
+                        base_payload = validate_odpr_document(args.recipe)
+                        if base_payload.get("kind") == "Recipe":
+                            payload = validate_recipe(
+                                args.recipe,
+                                config_path=args.config,
+                            )
+                        else:
+                            payload = base_payload
                     exit_code = 0 if payload["valid"] else 1
                 elif args.recipe_command == "catalog":
                     output_path = write_recipe_catalog(

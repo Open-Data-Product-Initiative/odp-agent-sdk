@@ -549,6 +549,76 @@ providers:
     ]
 
 
+def test_recipe_cli_uses_config_default_recipe_when_path_is_omitted(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    config = REPO_ROOT / "examples" / "recipes" / "config" / "recipes.config.yaml"
+
+    assert main(["recipe", "validate", "--config", str(config), "--json"]) == 0
+    validate_payload = _json_output(capsys)
+    assert validate_payload["recipe"]["id"] == "RCP-CI-VALIDATE-001"
+    assert validate_payload["recipeSelection"] == {
+        "source": "config-default",
+        "path": "workflows/ci-validate-catalog.yaml",
+        "defaultRecipe": "workflows/ci-validate-catalog.yaml",
+    }
+
+    assert main(["recipe", "run", "--config", str(config), "--dry-run", "--json"]) == 0
+    run_payload = _json_output(capsys)
+    assert run_payload["recipe"]["id"] == "RCP-CI-VALIDATE-001"
+    assert run_payload["recipeSelection"]["source"] == "config-default"
+
+
+def test_recipe_cli_explicit_recipe_argument_wins_over_config_default(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    config = REPO_ROOT / "examples" / "recipes" / "config" / "recipes.config.yaml"
+    recipe = (
+        REPO_ROOT
+        / "examples"
+        / "recipes"
+        / "workflows"
+        / "release-portfolio-localize.yaml"
+    )
+
+    assert (
+        main(
+            [
+                "recipe",
+                "run",
+                str(recipe),
+                "--config",
+                str(config),
+                "--dry-run",
+                "--json",
+            ]
+        )
+        == 0
+    )
+    payload = _json_output(capsys)
+
+    assert payload["recipe"]["id"] == "RCP-PORTFOLIO-LOCALIZE-001"
+    assert payload["recipeSelection"] == {
+        "source": "argument",
+        "path": str(recipe),
+        "defaultRecipe": "workflows/ci-validate-catalog.yaml",
+    }
+
+
+def test_recipe_cli_requires_path_without_config_default(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    assert main(["recipe", "run", "--dry-run", "--json"]) == 1
+    payload = _json_output(capsys)
+
+    assert payload["mode"] == "run"
+    assert (
+        payload["error"]
+        == "recipe path is required unless recipes.defaultRecipe is set in "
+        "recipes.config.yaml"
+    )
+
+
 def test_config_recipes_check_reports_recipe_config(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],

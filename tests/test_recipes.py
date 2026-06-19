@@ -10,6 +10,7 @@ from open_data_products.odpr import (
     build_recipe_catalog,
     execute_recipe_run,
     get_recipe_guidance,
+    list_recipes,
     load_odpr_schema,
     load_recipe,
     load_recipe_guidance,
@@ -19,6 +20,9 @@ from open_data_products.odpr import (
     validate_recipe,
     validate_recipe_config,
 )
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+EXAMPLE_RECIPES = REPO_ROOT / "examples" / "recipes"
 
 
 def _write_recipe(path: Path) -> None:
@@ -169,6 +173,74 @@ def test_validate_recipe_accepts_inline_steps(tmp_path: Path) -> None:
     assert report["recipe"]["id"] == "RCP-LOCALIZE-001"
     assert report["steps"][0]["classification"] == "llm-backed"
     assert report["schemaValidation"] == "draft-2020-12"
+
+
+def test_example_recipes_validate_and_list() -> None:
+    """Test packaged example recipes stay valid and discoverable."""
+    config_path = EXAMPLE_RECIPES / "config" / "recipes.config.yaml"
+
+    for recipe_name in (
+        "ci-validate-catalog.yaml",
+        "portfolio-sync-render.yaml",
+        "release-portfolio-localize.yaml",
+    ):
+        report = validate_recipe(EXAMPLE_RECIPES / "workflows" / recipe_name)
+        assert report["valid"] is True
+
+    catalog = list_recipes(config_path=config_path)
+    recipes = catalog["recipeCatalog"]["recipes"]
+    assert [recipe["path"] for recipe in recipes] == [
+        "workflows/ci-validate-catalog.yaml",
+        "workflows/portfolio-sync-render.yaml",
+        "workflows/release-portfolio-localize.yaml",
+    ]
+
+    plan = plan_recipe_run(
+        EXAMPLE_RECIPES / "workflows" / "release-portfolio-localize.yaml",
+        config_path=config_path,
+    )
+    assert plan["recipeSelection"] == {
+        "source": "argument",
+        "path": str(EXAMPLE_RECIPES / "workflows" / "release-portfolio-localize.yaml"),
+        "defaultRecipe": "workflows/ci-validate-catalog.yaml",
+    }
+    assert plan["steps"][0]["inputs"] == [{"path": "workspace/", "exists": True}]
+    assert plan["providers"][0]["source"] == str(
+        EXAMPLE_RECIPES / "config" / "generation.config.yaml"
+    )
+
+
+def test_recipe_api_uses_config_default_recipe_when_path_is_omitted() -> None:
+    """Test Python recipe APIs share CLI defaultRecipe behavior."""
+    config_path = EXAMPLE_RECIPES / "config" / "recipes.config.yaml"
+
+    result = None
+    try:
+        validation = validate_recipe(config_path=config_path)
+        plan = plan_recipe_run(config_path=config_path)
+        result = execute_recipe_run(config_path=config_path)
+
+        assert validation["recipe"]["id"] == "RCP-CI-VALIDATE-001"
+        assert validation["recipeSelection"] == {
+            "source": "config-default",
+            "path": "workflows/ci-validate-catalog.yaml",
+            "defaultRecipe": "workflows/ci-validate-catalog.yaml",
+        }
+        assert plan["recipe"]["id"] == "RCP-CI-VALIDATE-001"
+        assert plan["recipeSelection"]["source"] == "config-default"
+        assert result["status"] == "passed"
+        assert result["recipeSelection"]["source"] == "config-default"
+        manifest_path = EXAMPLE_RECIPES / result["manifest"]["path"]
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        assert manifest["recipeSelection"]["source"] == "config-default"
+    finally:
+        if result is not None:
+            manifest_path = EXAMPLE_RECIPES / result["manifest"]["path"]
+            if manifest_path.exists():
+                manifest_path.unlink()
+            for directory in (manifest_path.parent, manifest_path.parent.parent):
+                if directory.exists():
+                    directory.rmdir()
 
 
 def test_odpr_schema_is_bundled() -> None:

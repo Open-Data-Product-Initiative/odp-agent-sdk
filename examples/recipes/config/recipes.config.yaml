@@ -1,28 +1,26 @@
 version: "1.0"
-projectRoot: .
+projectRoot: ..
 
 recipes:
   paths:
-    - recipes/
-    - .odp/recipes/
-  defaultRecipe: recipes/release-portfolio-review.yaml
+    - workflows/
+  defaultRecipe: workflows/ci-validate-catalog.yaml
 
 providers:
-  generationConfig: generation.config.yaml
-  defaultProviderRef: ollama
+  generationConfig: config/generation.config.yaml
+  defaultProviderRef: claude
 
 execution:
   manifestDir: .odp/runs/
   allowWrites:
-    - generated/
-    - portfolio/
+    - workspace/
   requireReviewFor:
-    - production
     - release
+    - production
   stopOnWarning: false
 
 outputs:
-  defaultJson: false
+  defaultJson: true
   keepRunLogs: true
   reportName: recipe-run.json
 

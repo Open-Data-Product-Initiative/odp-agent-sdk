@@ -93,9 +93,20 @@ def load_recipe(path: PathLike) -> RecipeDocument:
     )
 
 
-def validate_recipe(path: PathLike) -> Dict[str, object]:
+def validate_recipe(
+    path: Optional[PathLike] = None,
+    *,
+    config_path: Optional[PathLike] = None,
+    project_root: Optional[PathLike] = None,
+) -> Dict[str, object]:
     """Validate one recipe without executing steps."""
-    recipe_path = Path(path)
+    config = _load_optional_recipe_config(config_path)
+    recipe_path, recipe_selection = _resolve_recipe_path(
+        path,
+        config_path,
+        project_root,
+        config,
+    )
     base_report = validate_odpr_document(recipe_path)
     errors: List[str] = list(base_report["errors"])
     warnings: List[str] = list(base_report["warnings"])
@@ -118,6 +129,7 @@ def validate_recipe(path: PathLike) -> Dict[str, object]:
 
     return {
         "mode": "validate",
+        "recipeSelection": recipe_selection,
         "valid": not errors,
         "errors": errors,
         "warnings": warnings,
@@ -143,10 +155,22 @@ def validate_recipe_config(path: PathLike) -> Dict[str, object]:
             "warnings": [],
         }
 
-    allowed_top = {"version", "recipes", "providers", "execution", "outputs", "gui"}
+    allowed_top = {
+        "version",
+        "projectRoot",
+        "recipes",
+        "providers",
+        "execution",
+        "outputs",
+        "gui",
+    }
     for key in config:
         if key not in allowed_top:
             errors.append(f"Unknown top-level recipes config key: {key}")
+    project_root_value = config.get("projectRoot")
+    if project_root_value is not None and not isinstance(project_root_value, str):
+        errors.append("projectRoot must be a string")
+    root = _project_root(None, config_path, None, config)
 
     recipes = _mapping(config.get("recipes"))
     paths = recipes.get("paths")
@@ -165,7 +189,7 @@ def validate_recipe_config(path: PathLike) -> Dict[str, object]:
     if generation_config is not None:
         if not isinstance(generation_config, str):
             errors.append("providers.generationConfig must be a string")
-        elif not _generation_config_exists(config_path, generation_config):
+        elif not _generation_config_exists(config_path, generation_config, root):
             warnings.append(
                 f"providers.generationConfig does not exist: {generation_config}"
             )
@@ -215,6 +239,7 @@ def get_recipe_config(config_path: Optional[PathLike] = None) -> Dict[str, objec
         "domain": "recipes",
         "template_path": str(DEFAULT_RECIPE_CONFIG),
         "config_path": str(source_path),
+        "projectRoot": config.get("projectRoot"),
         "editable": config_path is not None,
         "copy_hint": (
             "Copy this template to your project, edit recipe paths and write "
@@ -263,7 +288,7 @@ def copy_recipe_config_template(
 
 
 def plan_recipe_run(
-    path: PathLike,
+    path: Optional[PathLike] = None,
     *,
     mode: str = "dry-run",
     config_path: Optional[PathLike] = None,
@@ -272,11 +297,16 @@ def plan_recipe_run(
     model: Optional[str] = None,
 ) -> Dict[str, object]:
     """Return an agent-facing recipe run plan without executing steps."""
-    recipe_path = Path(path)
-    root = _project_root(recipe_path, config_path, project_root)
+    config = _load_optional_recipe_config(config_path)
+    recipe_path, recipe_selection = _resolve_recipe_path(
+        path,
+        config_path,
+        project_root,
+        config,
+    )
     validation = validate_recipe(recipe_path)
     recipe_doc = load_recipe(recipe_path) if validation["valid"] else None
-    config = _load_optional_recipe_config(config_path)
+    root = _project_root(recipe_path, config_path, project_root, config)
     allow_writes = _allow_write_roots(config)
     steps = []
     blocking = list(validation["errors"])
@@ -307,6 +337,7 @@ def plan_recipe_run(
     can_run = not blocking
     payload: Dict[str, object] = {
         "mode": mode,
+        "recipeSelection": recipe_selection,
         "recipe": validation["recipe"],
         "canRun": can_run,
         "blockingReasons": [
@@ -335,7 +366,7 @@ def plan_recipe_run(
 
 
 def execute_recipe_run(
-    path: PathLike,
+    path: Optional[PathLike] = None,
     *,
     config_path: Optional[PathLike] = None,
     project_root: Optional[PathLike] = None,
@@ -343,9 +374,14 @@ def execute_recipe_run(
     model: Optional[str] = None,
 ) -> Dict[str, object]:
     """Execute deterministic and report-only recipe steps with a run manifest."""
-    recipe_path = Path(path)
-    root = _project_root(recipe_path, config_path, project_root)
     config = _load_optional_recipe_config(config_path)
+    recipe_path, recipe_selection = _resolve_recipe_path(
+        path,
+        config_path,
+        project_root,
+        config,
+    )
+    root = _project_root(recipe_path, config_path, project_root, config)
     run_id = _run_id()
     plan = plan_recipe_run(
         recipe_path,
@@ -403,6 +439,7 @@ def execute_recipe_run(
         "exitCode": exit_code,
         "startedAt": started_at,
         "completedAt": completed_at,
+        "recipeSelection": recipe_selection,
         "recipe": plan["recipe"],
         "config": plan["config"],
         "blockingReasons": blocking,
@@ -412,6 +449,7 @@ def execute_recipe_run(
     manifest_path = _write_run_manifest(root, config, run_id, manifest_payload)
     return {
         "mode": "execute",
+        "recipeSelection": recipe_selection,
         "runId": run_id,
         "status": status,
         "exitCode": exit_code,
@@ -430,8 +468,8 @@ def list_recipes(
     project_root: Optional[PathLike] = None,
 ) -> Dict[str, object]:
     """Return a RecipeCatalog-style listing for configured recipe paths."""
-    root = _project_root(None, config_path, project_root)
     config = _load_optional_recipe_config(config_path)
+    root = _project_root(None, config_path, project_root, config)
     search_paths = _recipe_search_paths(config) or [Path("recipes")]
     recipes: List[Dict[str, object]] = []
     warnings: List[str] = []
@@ -744,6 +782,38 @@ def _load_optional_recipe_config(
         return {}
 
 
+def _resolve_recipe_path(
+    path: Optional[PathLike],
+    config_path: Optional[PathLike],
+    project_root: Optional[PathLike],
+    config: Mapping[str, object],
+) -> Tuple[Path, Dict[str, Optional[str]]]:
+    default_recipe = _default_recipe(config)
+    if path is not None:
+        recipe_path = Path(path)
+        return recipe_path, {
+            "source": "argument",
+            "path": str(path),
+            "defaultRecipe": default_recipe,
+        }
+    if not default_recipe:
+        raise ValueError(
+            "recipe path is required unless recipes.defaultRecipe is set in "
+            "recipes.config.yaml"
+        )
+    root = _project_root(None, config_path, project_root, config)
+    return root / default_recipe, {
+        "source": "config-default",
+        "path": default_recipe,
+        "defaultRecipe": default_recipe,
+    }
+
+
+def _default_recipe(config: Mapping[str, object]) -> Optional[str]:
+    recipes = _mapping(config.get("recipes"))
+    return _string(recipes.get("defaultRecipe"))
+
+
 def _recipe_search_paths(config: Mapping[str, object]) -> Sequence[Path]:
     recipes = _mapping(config.get("recipes"))
     paths = recipes.get("paths")
@@ -770,8 +840,15 @@ def _default_provider(config: Mapping[str, object]) -> Optional[str]:
     return _string(providers.get("defaultProviderRef"))
 
 
-def _generation_config_exists(config_path: Path, generation_config: str) -> bool:
-    if (config_path.parent / generation_config).is_file():
+def _generation_config_exists(
+    config_path: Path,
+    generation_config: str,
+    root: Path,
+) -> bool:
+    source_path = Path(generation_config)
+    if not source_path.is_absolute():
+        source_path = root / source_path
+    if source_path.is_file():
         return True
     if (
         config_path == DEFAULT_RECIPE_CONFIG
@@ -836,8 +913,7 @@ def _generation_providers(
         return {}, None
     source_path = Path(generation_config)
     if not source_path.is_absolute():
-        base = Path(config_path).parent if config_path is not None else root
-        source_path = base / source_path
+        source_path = root / source_path
     try:
         from ..generation import load_generation_config
 
@@ -1238,11 +1314,19 @@ def _project_root(
     recipe_path: Optional[Path],
     config_path: Optional[PathLike],
     project_root: Optional[PathLike],
+    config: Optional[Mapping[str, object]] = None,
 ) -> Path:
     if project_root is not None:
-        return Path(project_root)
+        return Path(project_root).resolve()
+    if config is not None and config_path is not None:
+        configured_root = _string(config.get("projectRoot"))
+        if configured_root:
+            root = Path(configured_root)
+            if root.is_absolute():
+                return root
+            return (Path(config_path).parent / root).resolve()
     if config_path is not None:
-        return Path(config_path).parent
+        return Path(config_path).parent.resolve()
     if recipe_path is not None:
-        return recipe_path.parent
-    return Path.cwd()
+        return recipe_path.parent.resolve()
+    return Path.cwd().resolve()
