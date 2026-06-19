@@ -32,6 +32,27 @@ _RESOURCE_DEFINITIONS: Tuple[ResourceDefinition, ...] = (
         "Bundled ODPS v4.1 data product schema in JSON format.",
     ),
     (
+        "odpr.schema.yaml",
+        "odpr",
+        "schema",
+        "odpr/data/schema/odpr.yaml",
+        "Bundled ODPR recipe schema in YAML format.",
+    ),
+    (
+        "odpr.schema.json",
+        "odpr",
+        "schema",
+        "odpr/data/schema/odpr.json",
+        "Bundled ODPR recipe schema in JSON format.",
+    ),
+    (
+        "odpr.recipe-config-template",
+        "odpr",
+        "config",
+        "odpr/recipes.config.yaml",
+        "Bundled recipe runner config template.",
+    ),
+    (
         "odpc.schema.yaml",
         "odpc",
         "schema",

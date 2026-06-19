@@ -98,6 +98,7 @@ def test_resource_registry_functional_paths_exist() -> None:
     assert {resource.spec for resource in resources} == {
         "generation",
         "odps",
+        "odpr",
         "odpc",
         "odpg",
         "odpv",

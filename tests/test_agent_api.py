@@ -41,7 +41,9 @@ def sample_odps_product():
 
 
 def test_unified_load_validate_and_explain_odps(tmp_path):
-    path = REPO_ROOT / "examples" / "apps" / "pricing_402_builder" / "priced_product.yaml"
+    path = (
+        REPO_ROOT / "examples" / "apps" / "pricing_402_builder" / "priced_product.yaml"
+    )
 
     loaded = load_document(path)
     result = validate_document(path)
@@ -122,10 +124,12 @@ def test_resources_are_listable_and_retrievable():
     resources = list_resources()
 
     assert any(resource.id == "odpg.schema.yaml" for resource in resources)
+    assert any(resource.id == "odpr.schema.yaml" for resource in resources)
+    assert any(resource.id == "odpr.schema.json" for resource in resources)
+    assert any(resource.id == "odpr.recipe-config-template" for resource in resources)
     assert any(resource.id == "generation.prompt.system" for resource in resources)
     assert any(
-        resource.id == "generation.prompt.odps_product_facts"
-        for resource in resources
+        resource.id == "generation.prompt.odps_product_facts" for resource in resources
     )
     assert any(
         resource.id == "generation.prompt.odps_product_minimal_yaml"
@@ -136,6 +140,7 @@ def test_resources_are_listable_and_retrievable():
         for resource in resources
     )
     assert get_resource("odpv.terms").id == "odpv.terms"
+    assert get_resource("odpr.schema.yaml").spec == "odpr"
     assert get_resource("generation.prompt.system").type == "prompt"
 
 
@@ -160,7 +165,9 @@ def test_unified_validate_and_explain_odpv():
 
 
 def test_top_level_cli_json_validate_and_explain(tmp_path, capsys):
-    path = REPO_ROOT / "examples" / "apps" / "pricing_402_builder" / "priced_product.yaml"
+    path = (
+        REPO_ROOT / "examples" / "apps" / "pricing_402_builder" / "priced_product.yaml"
+    )
 
     assert main(["validate", str(path), "--json"]) == 0
     validate_payload = json.loads(capsys.readouterr().out)
@@ -180,9 +187,7 @@ def test_top_level_cli_json_validate_and_explain(tmp_path, capsys):
     assert "summary" not in explain_payload
 
 
-def test_top_level_cli_json_explain_odpg_returns_structured_payload(
-    tmp_path, capsys
-):
+def test_top_level_cli_json_explain_odpg_returns_structured_payload(tmp_path, capsys):
     path = tmp_path / "graph.yaml"
     path.write_text(
         yaml.safe_dump(

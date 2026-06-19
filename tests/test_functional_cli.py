@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
 import pytest
+import yaml
 
 from open_data_products import __version__
 from open_data_products.cli import main
@@ -60,6 +61,8 @@ def test_unified_cli_help_uses_compact_command_metavar(
     assert "ODPV vocabulary commands:" in help_text
     assert "odpv-summary" in help_text
     assert "odpv-search" in help_text
+    assert "ODPR recipe commands:" in help_text
+    assert "resources --id odpr.schema.yaml" in help_text
     assert "ODPG graph commands:" in help_text
     assert "odpg-build" in help_text
     assert "odpg-generate" in help_text
@@ -75,6 +78,7 @@ def test_unified_cli_help_uses_compact_command_metavar(
     )
     assert "open-data-products resources --id odpc.objects --json" in help_text
     assert "open-data-products resources --id odpv.terms --json" in help_text
+    assert "open-data-products resources --id odpr.schema.yaml --json" in help_text
     assert "open-data-products okf-summary knowledge-bundle/ --json" in help_text
     assert "open-data-products resources --id okf.spec --json" in help_text
     assert (
@@ -363,6 +367,92 @@ recipes:
     assert payload["mode"] == "list"
     assert recipes[0]["path"] == "recipes/release.yaml"
     assert recipes[0]["commands"] == ["portfolio.explain"]
+
+
+def test_recipe_cli_catalog_writes_metadata_only_catalog(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    recipes_dir = tmp_path / "recipes"
+    recipes_dir.mkdir()
+    (recipes_dir / "release.yaml").write_text(
+        """
+schema: https://opendataproducts.org/odpr-v1.0/schema/odpr.yaml
+version: "1.0"
+kind: Recipe
+recipe:
+  metadata:
+    id: RCP-RELEASE-001
+    name:
+      en: Release
+  version: "1.0.0"
+  type: release
+  steps:
+    - id: explain
+      command: portfolio.explain
+      with:
+        workspace: generated/portfolio/
+""",
+        encoding="utf-8",
+    )
+    config_path = tmp_path / "recipes.config.yaml"
+    config_path.write_text(
+        """
+version: "1.0"
+recipes:
+  paths:
+    - recipes/
+""",
+        encoding="utf-8",
+    )
+    output = tmp_path / "recipes" / "catalog.yaml"
+
+    assert (
+        main(
+            [
+                "recipe",
+                "catalog",
+                "--config",
+                str(config_path),
+                "--output",
+                str(output),
+                "--json",
+            ]
+        )
+        == 0
+    )
+    payload = _json_output(capsys)
+    catalog = yaml.safe_load(output.read_text(encoding="utf-8"))
+    entry = catalog["recipeCatalog"]["recipes"][0]
+    assert payload["kind"] == "RecipeCatalog"
+    assert payload["output"] == str(output)
+    assert entry["path"] == "recipes/release.yaml"
+    assert "steps" not in entry
+    assert "plannedWrites" not in entry
+
+
+def test_recipe_cli_validate_accepts_provider_document(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    provider_path = tmp_path / "provider.yaml"
+    provider_path.write_text(
+        """
+schema: https://opendataproducts.org/odpr-v1.0/schema/odpr.yaml
+version: "1.0"
+kind: Provider
+provider:
+  id: production-quality
+  provider: openai
+  credentialsRef: env:OPENAI_API_KEY
+""",
+        encoding="utf-8",
+    )
+
+    assert main(["recipe", "validate", str(provider_path), "--json"]) == 0
+    payload = _json_output(capsys)
+    assert payload["kind"] == "Provider"
+    assert payload["valid"] is True
 
 
 def test_unified_cli_document_workflow(capsys: pytest.CaptureFixture[str]) -> None:

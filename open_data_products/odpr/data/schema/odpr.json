@@ -1,0 +1,1459 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://opendataproducts.org/odpr-v1.0/schema/odpr.yaml",
+  "title": "Data Product Recipe Specification",
+  "description": "Lightweight workflow recipes for repeatable data product delivery.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "version",
+    "kind"
+  ],
+  "properties": {
+    "schema": {
+      "type": "string",
+      "const": "https://opendataproducts.org/odpr-v1.0/schema/odpr.yaml"
+    },
+    "version": {
+      "type": "string",
+      "const": "1.0"
+    },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "Recipe",
+        "Provider",
+        "RecipeCatalog"
+      ]
+    },
+    "recipe": {
+      "$ref": "#/$defs/Recipe"
+    },
+    "provider": {
+      "$ref": "#/$defs/Provider"
+    },
+    "recipeCatalog": {
+      "$ref": "#/$defs/RecipeCatalog"
+    }
+  },
+  "oneOf": [
+    {
+      "required": [
+        "recipe"
+      ],
+      "properties": {
+        "kind": {
+          "const": "Recipe"
+        }
+      },
+      "not": {
+        "anyOf": [
+          {
+            "required": [
+              "provider"
+            ]
+          },
+          {
+            "required": [
+              "recipeCatalog"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "required": [
+        "provider"
+      ],
+      "properties": {
+        "kind": {
+          "const": "Provider"
+        }
+      },
+      "not": {
+        "anyOf": [
+          {
+            "required": [
+              "recipe"
+            ]
+          },
+          {
+            "required": [
+              "recipeCatalog"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "required": [
+        "recipeCatalog"
+      ],
+      "properties": {
+        "kind": {
+          "const": "RecipeCatalog"
+        }
+      },
+      "not": {
+        "anyOf": [
+          {
+            "required": [
+              "recipe"
+            ]
+          },
+          {
+            "required": [
+              "provider"
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "$defs": {
+    "LocalizedText": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      },
+      "minProperties": 1,
+      "properties": {
+        "en": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "Text": {
+      "oneOf": [
+        {
+          "type": "string",
+          "minLength": 1
+        },
+        {
+          "$ref": "#/$defs/LocalizedText"
+        }
+      ]
+    },
+    "Metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^x-": {}
+      },
+      "required": [
+        "id",
+        "name"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "name": {
+          "$ref": "#/$defs/LocalizedText"
+        },
+        "description": {
+          "$ref": "#/$defs/LocalizedText"
+        },
+        "owner": {
+          "type": "string"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "NamedPath": {
+      "type": "object",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^x-": {}
+      },
+      "required": [
+        "id",
+        "path"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "path": {
+          "$ref": "#/$defs/RelativePath"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "yaml",
+            "html",
+            "toon",
+            "gcf",
+            "json",
+            "directory"
+          ]
+        },
+        "description": {
+          "$ref": "#/$defs/Text"
+        }
+      }
+    },
+    "RelativePath": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!/)(?!.*(^|/)\\.\\.(/|$)).+"
+    },
+    "ContextPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^x-": {}
+      },
+      "required": [
+        "format"
+      ],
+      "properties": {
+        "format": {
+          "type": "string",
+          "enum": [
+            "yaml",
+            "toon",
+            "gcf",
+            "auto"
+          ]
+        },
+        "fallback": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "yaml",
+              "toon",
+              "gcf",
+              "auto"
+            ]
+          }
+        }
+      }
+    },
+    "ExecutionPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^x-": {}
+      },
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": [
+            "local",
+            "hosted",
+            "hybrid",
+            "none"
+          ]
+        },
+        "providerRef": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "Step": {
+      "type": "object",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^x-": {}
+      },
+      "required": [
+        "id",
+        "command"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "command": {
+          "type": "string",
+          "minLength": 1
+        },
+        "providerRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "model": {
+          "type": "string",
+          "minLength": 1
+        },
+        "context": {
+          "$ref": "#/$defs/ContextPolicy"
+        },
+        "with": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "optional": {
+          "type": "boolean"
+        },
+        "timeoutSeconds": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "allOf": [
+        {
+          "$ref": "#/$defs/GenerateStepRule"
+        },
+        {
+          "$ref": "#/$defs/OdpcBuildStepRule"
+        },
+        {
+          "$ref": "#/$defs/OdpgBuildStepRule"
+        },
+        {
+          "$ref": "#/$defs/OdpgRenderStepRule"
+        },
+        {
+          "$ref": "#/$defs/PortfolioBuildStepRule"
+        },
+        {
+          "$ref": "#/$defs/PortfolioRefreshStepRule"
+        },
+        {
+          "$ref": "#/$defs/PortfolioSyncStepRule"
+        },
+        {
+          "$ref": "#/$defs/PortfolioLocalizeStepRule"
+        },
+        {
+          "$ref": "#/$defs/PortfolioRenderStepRule"
+        },
+        {
+          "$ref": "#/$defs/PortfolioExplainStepRule"
+        },
+        {
+          "$ref": "#/$defs/ValidateStepRule"
+        },
+        {
+          "$ref": "#/$defs/ExplainStepRule"
+        },
+        {
+          "if": {
+            "properties": {
+              "command": {
+                "enum": [
+                  "odpc.build",
+                  "odpg.render",
+                  "portfolio.sync",
+                  "portfolio.render",
+                  "portfolio.explain",
+                  "validate",
+                  "explain"
+                ]
+              }
+            },
+            "required": [
+              "command"
+            ]
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "providerRef"
+                  ]
+                },
+                {
+                  "required": [
+                    "model"
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "WithBase": {
+      "type": "object"
+    },
+    "GenerateWith": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/WithBase"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "patternProperties": {
+            "^x-": {}
+          },
+          "required": [
+            "input",
+            "kind",
+            "output"
+          ],
+          "properties": {
+            "input": {
+              "$ref": "#/$defs/RelativePath"
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "product-reference",
+                "odps-product",
+                "use-case",
+                "objective",
+                "signal",
+                "graph"
+              ]
+            },
+            "output": {
+              "$ref": "#/$defs/RelativePath"
+            },
+            "config": {
+              "$ref": "#/$defs/RelativePath"
+            },
+            "prompts": {
+              "$ref": "#/$defs/RelativePath"
+            },
+            "profile": {
+              "type": "string"
+            },
+            "includeComponents": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "maxSourceChars": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "ollamaUrl": {
+              "type": "string"
+            }
+          }
+        }
+      ]
+    },
+    "OdpcBuildWith": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/WithBase"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "patternProperties": {
+            "^x-": {}
+          },
+          "required": [
+            "input",
+            "output"
+          ],
+          "properties": {
+            "input": {
+              "$ref": "#/$defs/RelativePath"
+            },
+            "output": {
+              "$ref": "#/$defs/RelativePath"
+            },
+            "html": {
+              "$ref": "#/$defs/RelativePath"
+            },
+            "toon": {
+              "$ref": "#/$defs/RelativePath"
+            },
+            "gcf": {
+              "$ref": "#/$defs/RelativePath"
+            },
+            "id": {
+              "type": "string"
+            },
+            "name": {
+              "$ref": "#/$defs/Text"
+            },
+            "description": {
+              "$ref": "#/$defs/Text"
+            },
+            "recursive": {
+              "type": "boolean"
+            },
+            "validate": {
+              "type": "boolean"
+            }
+          }
+        }
+      ]
+    },
+    "OdpgBuildWith": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/WithBase"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "patternProperties": {
+            "^x-": {}
+          },
+          "required": [
+            "input",
+            "output"
+          ],
+          "properties": {
+            "input": {
+              "$ref": "#/$defs/RelativePath"
+            },
+            "output": {
+              "$ref": "#/$defs/RelativePath"
+            },
+            "toon": {
+              "$ref": "#/$defs/RelativePath"
+            },
+            "gcf": {
+              "$ref": "#/$defs/RelativePath"
+            },
+            "contextGraph": {
+              "$ref": "#/$defs/RelativePath"
+            },
+            "id": {
+              "type": "string"
+            },
+            "name": {
+              "$ref": "#/$defs/Text"
+            },
+            "description": {
+              "$ref": "#/$defs/Text"
+            },
+            "recursive": {
+              "type": "boolean"
+            },
+            "validate": {
+              "type": "boolean"
+            },
+            "config": {
+              "$ref": "#/$defs/RelativePath"
+            },
+            "prompts": {
+              "$ref": "#/$defs/RelativePath"
+            },
+            "ollamaUrl": {
+              "type": "string"
+            }
+          }
+        }
+      ]
+    },
+    "OdpgRenderWith": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/WithBase"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "patternProperties": {
+            "^x-": {}
+          },
+          "required": [
+            "graph",
+            "output"
+          ],
+          "properties": {
+            "graph": {
+              "$ref": "#/$defs/RelativePath"
+            },
+            "output": {
+              "$ref": "#/$defs/RelativePath"
+            }
+          }
+        }
+      ]
+    },
+    "PortfolioBuildWith": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/WithBase"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "patternProperties": {
+            "^x-": {}
+          },
+          "properties": {
+            "objectives": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/RelativePath"
+              }
+            },
+            "useCases": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/RelativePath"
+              }
+            },
+            "signals": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/RelativePath"
+              }
+            },
+            "products": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/RelativePath"
+              }
+            },
+            "output": {
+              "$ref": "#/$defs/RelativePath"
+            },
+            "workspace": {
+              "$ref": "#/$defs/RelativePath"
+            },
+            "title": {
+              "$ref": "#/$defs/Text"
+            },
+            "config": {
+              "$ref": "#/$defs/RelativePath"
+            },
+            "prompts": {
+              "$ref": "#/$defs/RelativePath"
+            },
+            "ollamaUrl": {
+              "type": "string"
+            },
+            "strictValidation": {
+              "type": "boolean"
+            }
+          },
+          "anyOf": [
+            {
+              "required": [
+                "output"
+              ]
+            },
+            {
+              "required": [
+                "workspace"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "PortfolioRefreshWith": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/WithBase"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "patternProperties": {
+            "^x-": {}
+          },
+          "required": [
+            "workspace"
+          ],
+          "properties": {
+            "workspace": {
+              "$ref": "#/$defs/RelativePath"
+            },
+            "objectives": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/RelativePath"
+              }
+            },
+            "useCases": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/RelativePath"
+              }
+            },
+            "signals": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/RelativePath"
+              }
+            },
+            "products": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/RelativePath"
+              }
+            },
+            "title": {
+              "$ref": "#/$defs/Text"
+            },
+            "config": {
+              "$ref": "#/$defs/RelativePath"
+            },
+            "allSources": {
+              "type": "boolean"
+            },
+            "prompts": {
+              "$ref": "#/$defs/RelativePath"
+            },
+            "ollamaUrl": {
+              "type": "string"
+            },
+            "strictValidation": {
+              "type": "boolean"
+            }
+          }
+        }
+      ]
+    },
+    "WorkspaceOnlyWith": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/WithBase"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "patternProperties": {
+            "^x-": {}
+          },
+          "required": [
+            "workspace"
+          ],
+          "properties": {
+            "workspace": {
+              "$ref": "#/$defs/RelativePath"
+            },
+            "strictValidation": {
+              "type": "boolean"
+            }
+          }
+        }
+      ]
+    },
+    "PortfolioLocalizeWith": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/WithBase"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "patternProperties": {
+            "^x-": {}
+          },
+          "required": [
+            "workspace",
+            "languages"
+          ],
+          "properties": {
+            "workspace": {
+              "$ref": "#/$defs/RelativePath"
+            },
+            "languages": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "pattern": "^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})*$"
+              }
+            },
+            "defaultLanguage": {
+              "type": "string",
+              "pattern": "^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})*$"
+            },
+            "config": {
+              "$ref": "#/$defs/RelativePath"
+            },
+            "prompts": {
+              "$ref": "#/$defs/RelativePath"
+            },
+            "ollamaUrl": {
+              "type": "string"
+            },
+            "strictValidation": {
+              "type": "boolean"
+            }
+          }
+        }
+      ]
+    },
+    "PortfolioRenderWith": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/WithBase"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "patternProperties": {
+            "^x-": {}
+          },
+          "required": [
+            "workspace"
+          ],
+          "properties": {
+            "workspace": {
+              "$ref": "#/$defs/RelativePath"
+            },
+            "output": {
+              "$ref": "#/$defs/RelativePath"
+            },
+            "strictValidation": {
+              "type": "boolean"
+            }
+          }
+        }
+      ]
+    },
+    "ValidateWith": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/WithBase"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "patternProperties": {
+            "^x-": {}
+          },
+          "required": [
+            "document"
+          ],
+          "properties": {
+            "document": {
+              "$ref": "#/$defs/RelativePath"
+            }
+          }
+        }
+      ]
+    },
+    "ExplainWith": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/WithBase"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "patternProperties": {
+            "^x-": {}
+          },
+          "required": [
+            "document"
+          ],
+          "properties": {
+            "document": {
+              "$ref": "#/$defs/RelativePath"
+            }
+          }
+        }
+      ]
+    },
+    "PortfolioExplainWith": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/WithBase"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "patternProperties": {
+            "^x-": {}
+          },
+          "required": [
+            "workspace"
+          ],
+          "properties": {
+            "workspace": {
+              "$ref": "#/$defs/RelativePath"
+            }
+          }
+        }
+      ]
+    },
+    "GenerateStepRule": {
+      "if": {
+        "properties": {
+          "command": {
+            "const": "generate"
+          }
+        },
+        "required": [
+          "command"
+        ]
+      },
+      "then": {
+        "required": [
+          "with"
+        ],
+        "properties": {
+          "with": {
+            "$ref": "#/$defs/GenerateWith"
+          }
+        }
+      }
+    },
+    "OdpcBuildStepRule": {
+      "if": {
+        "properties": {
+          "command": {
+            "const": "odpc.build"
+          }
+        },
+        "required": [
+          "command"
+        ]
+      },
+      "then": {
+        "required": [
+          "with"
+        ],
+        "properties": {
+          "with": {
+            "$ref": "#/$defs/OdpcBuildWith"
+          }
+        }
+      }
+    },
+    "OdpgBuildStepRule": {
+      "if": {
+        "properties": {
+          "command": {
+            "const": "odpg.build"
+          }
+        },
+        "required": [
+          "command"
+        ]
+      },
+      "then": {
+        "required": [
+          "with"
+        ],
+        "properties": {
+          "with": {
+            "$ref": "#/$defs/OdpgBuildWith"
+          }
+        }
+      }
+    },
+    "OdpgRenderStepRule": {
+      "if": {
+        "properties": {
+          "command": {
+            "const": "odpg.render"
+          }
+        },
+        "required": [
+          "command"
+        ]
+      },
+      "then": {
+        "required": [
+          "with"
+        ],
+        "properties": {
+          "with": {
+            "$ref": "#/$defs/OdpgRenderWith"
+          }
+        }
+      }
+    },
+    "PortfolioBuildStepRule": {
+      "if": {
+        "properties": {
+          "command": {
+            "const": "portfolio.build"
+          }
+        },
+        "required": [
+          "command"
+        ]
+      },
+      "then": {
+        "required": [
+          "with"
+        ],
+        "properties": {
+          "with": {
+            "$ref": "#/$defs/PortfolioBuildWith"
+          }
+        }
+      }
+    },
+    "PortfolioRefreshStepRule": {
+      "if": {
+        "properties": {
+          "command": {
+            "const": "portfolio.refresh"
+          }
+        },
+        "required": [
+          "command"
+        ]
+      },
+      "then": {
+        "required": [
+          "with"
+        ],
+        "properties": {
+          "with": {
+            "$ref": "#/$defs/PortfolioRefreshWith"
+          }
+        }
+      }
+    },
+    "PortfolioSyncStepRule": {
+      "if": {
+        "properties": {
+          "command": {
+            "const": "portfolio.sync"
+          }
+        },
+        "required": [
+          "command"
+        ]
+      },
+      "then": {
+        "required": [
+          "with"
+        ],
+        "properties": {
+          "with": {
+            "$ref": "#/$defs/WorkspaceOnlyWith"
+          }
+        }
+      }
+    },
+    "PortfolioLocalizeStepRule": {
+      "if": {
+        "properties": {
+          "command": {
+            "const": "portfolio.localize"
+          }
+        },
+        "required": [
+          "command"
+        ]
+      },
+      "then": {
+        "required": [
+          "with"
+        ],
+        "properties": {
+          "with": {
+            "$ref": "#/$defs/PortfolioLocalizeWith"
+          }
+        }
+      }
+    },
+    "PortfolioRenderStepRule": {
+      "if": {
+        "properties": {
+          "command": {
+            "const": "portfolio.render"
+          }
+        },
+        "required": [
+          "command"
+        ]
+      },
+      "then": {
+        "required": [
+          "with"
+        ],
+        "properties": {
+          "with": {
+            "$ref": "#/$defs/PortfolioRenderWith"
+          }
+        }
+      }
+    },
+    "PortfolioExplainStepRule": {
+      "if": {
+        "properties": {
+          "command": {
+            "const": "portfolio.explain"
+          }
+        },
+        "required": [
+          "command"
+        ]
+      },
+      "then": {
+        "required": [
+          "with"
+        ],
+        "properties": {
+          "with": {
+            "$ref": "#/$defs/PortfolioExplainWith"
+          }
+        }
+      }
+    },
+    "ValidateStepRule": {
+      "if": {
+        "properties": {
+          "command": {
+            "const": "validate"
+          }
+        },
+        "required": [
+          "command"
+        ]
+      },
+      "then": {
+        "required": [
+          "with"
+        ],
+        "properties": {
+          "with": {
+            "$ref": "#/$defs/ValidateWith"
+          }
+        }
+      }
+    },
+    "ExplainStepRule": {
+      "if": {
+        "properties": {
+          "command": {
+            "const": "explain"
+          }
+        },
+        "required": [
+          "command"
+        ]
+      },
+      "then": {
+        "required": [
+          "with"
+        ],
+        "properties": {
+          "with": {
+            "$ref": "#/$defs/ExplainWith"
+          }
+        }
+      }
+    },
+    "Gate": {
+      "type": "object",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^x-": {}
+      },
+      "required": [
+        "id",
+        "type"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "validation",
+            "quality",
+            "review",
+            "publication"
+          ]
+        },
+        "required": {
+          "type": "boolean",
+          "default": false
+        },
+        "description": {
+          "$ref": "#/$defs/Text"
+        }
+      }
+    },
+    "ReviewPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^x-": {}
+      },
+      "properties": {
+        "required": {
+          "type": "boolean"
+        },
+        "mode": {
+          "type": "string",
+          "enum": [
+            "human",
+            "agent",
+            "both",
+            "none"
+          ]
+        },
+        "reviewer": {
+          "type": "string"
+        },
+        "instructions": {
+          "$ref": "#/$defs/Text"
+        }
+      }
+    },
+    "RunPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^x-": {}
+      },
+      "properties": {
+        "timeoutSeconds": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "stopOnFailure": {
+          "type": "boolean",
+          "default": true
+        },
+        "maxRetries": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "Provider": {
+      "type": "object",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^x-": {}
+      },
+      "required": [
+        "id",
+        "provider"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "provider": {
+          "type": "string",
+          "minLength": 1
+        },
+        "model": {
+          "type": "string",
+          "minLength": 1
+        },
+        "providerClass": {
+          "type": "string",
+          "enum": [
+            "local",
+            "hosted",
+            "hybrid",
+            "none"
+          ]
+        },
+        "endpointRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "credentialsRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "temperature": {
+          "type": "number",
+          "minimum": 0
+        },
+        "settings": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "description": {
+          "type": "string"
+        },
+        "environment": {
+          "type": "string"
+        }
+      }
+    },
+    "RecipeCatalogEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^x-": {}
+      },
+      "required": [
+        "path",
+        "id",
+        "version",
+        "type",
+        "name"
+      ],
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/RelativePath"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+([A-Za-z0-9.+-]*)?$"
+        },
+        "type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "name": {
+          "$ref": "#/$defs/LocalizedText"
+        },
+        "description": {
+          "$ref": "#/$defs/LocalizedText"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "environment": {
+          "type": "string"
+        },
+        "executionMode": {
+          "type": "string",
+          "enum": [
+            "local",
+            "hosted",
+            "hybrid",
+            "none"
+          ]
+        },
+        "providerRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "contextFormat": {
+          "type": "string",
+          "enum": [
+            "yaml",
+            "toon",
+            "gcf",
+            "auto"
+          ]
+        },
+        "requiresReview": {
+          "type": "boolean"
+        },
+        "commands": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "RecipeCatalog": {
+      "type": "object",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^x-": {}
+      },
+      "required": [
+        "metadata",
+        "recipes"
+      ],
+      "properties": {
+        "metadata": {
+          "$ref": "#/$defs/Metadata"
+        },
+        "recipes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/RecipeCatalogEntry"
+          }
+        }
+      }
+    },
+    "Recipe": {
+      "type": "object",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^x-": {}
+      },
+      "required": [
+        "metadata",
+        "version",
+        "type",
+        "steps"
+      ],
+      "properties": {
+        "metadata": {
+          "$ref": "#/$defs/Metadata"
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+([A-Za-z0-9.+-]*)?$"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "dev",
+            "ci",
+            "release",
+            "localization",
+            "hybrid",
+            "agent"
+          ]
+        },
+        "inputs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/NamedPath"
+          }
+        },
+        "outputs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/NamedPath"
+          }
+        },
+        "context": {
+          "$ref": "#/$defs/ContextPolicy"
+        },
+        "execution": {
+          "$ref": "#/$defs/ExecutionPolicy"
+        },
+        "steps": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/Step"
+          }
+        },
+        "gates": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Gate"
+          }
+        },
+        "review": {
+          "$ref": "#/$defs/ReviewPolicy"
+        },
+        "environment": {
+          "type": "string"
+        },
+        "runPolicy": {
+          "$ref": "#/$defs/RunPolicy"
+        }
+      }
+    }
+  }
+}

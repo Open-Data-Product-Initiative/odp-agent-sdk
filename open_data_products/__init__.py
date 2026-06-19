@@ -129,6 +129,7 @@ from .portfolio import (
 from .resources import get_resource, list_resources
 from .odpr import (
     RecipeDocument,
+    build_recipe_catalog,
     copy_recipe_config_template,
     get_recipe_config,
     get_recipe_config_path,
@@ -138,6 +139,8 @@ from .odpr import (
     print_recipe_config,
     validate_recipe,
     validate_recipe_config,
+    validate_odpr_document,
+    write_recipe_catalog,
 )
 from .results import Reference, Resource, ValidationResult
 from .summary import load_summary
@@ -162,6 +165,7 @@ __all__ = [
     "build_catalog_artifacts",
     "build_graph",
     "build_portfolio",
+    "build_recipe_catalog",
     "check_vocabulary_relationship",
     "convert_file",
     "convert_graph",
@@ -237,6 +241,8 @@ __all__ = [
     "validate_config",
     "validate_recipe",
     "validate_recipe_config",
+    "validate_odpr_document",
+    "write_recipe_catalog",
     "write_graph",
     "render_graph_gcf",
     "render_graph_toon",

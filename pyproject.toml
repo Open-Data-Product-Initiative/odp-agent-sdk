@@ -112,6 +112,8 @@ packages = [
     "open_data_products.generation.source_docs",
     "open_data_products.mcp",
     "open_data_products.odpr",
+    "open_data_products.odpr.data",
+    "open_data_products.odpr.data.schema",
     "open_data_products.odpc",
     "open_data_products.odpc.data",
     "open_data_products.odpc.data.catalog",
@@ -135,6 +137,10 @@ packages = [
 ]
 "open_data_products.odpr" = [
     "recipes.config.yaml",
+]
+"open_data_products.odpr.data.schema" = [
+    "*.yaml",
+    "*.json",
 ]
 "open_data_products.generation" = [
     "generation.config.yaml",

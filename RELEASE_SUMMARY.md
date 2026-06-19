@@ -3,3 +3,9 @@
 - Added the hosted `zai` provider preset for the general Z.ai GLM
   OpenAI-compatible API, including config, manifest metadata, tests, a dedicated
   user guide, and complete provider-matrix coverage for bundled presets.
+- Added the first ODPR recipe workflow surface with an `open_data_products.odpr`
+  namespace, bundled ODPR schemas, Draft 2020-12 schema validation, embedded
+  secret checks, metadata-only `RecipeCatalog` generation, recipe runner config,
+  and agent-safe `recipe list`, `recipe validate`, `recipe catalog`, and
+  `recipe run --dry-run` CLI planning commands. ODPR schemas and the recipe
+  config template are also discoverable through the SDK resource registry.

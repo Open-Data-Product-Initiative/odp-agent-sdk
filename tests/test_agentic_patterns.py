@@ -515,6 +515,9 @@ class TestAgentManifest:
 
         assert {resource["id"] for resource in resources} >= {
             "odps.schema.json",
+            "odpr.schema.yaml",
+            "odpr.schema.json",
+            "odpr.recipe-config-template",
             "odpv.terms",
             "generation.prompt.system",
             "okf.spec",

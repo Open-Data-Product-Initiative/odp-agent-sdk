@@ -13,25 +13,26 @@ The SDK now has:
 - `open_data_products.odpr`
 - recipe loading
 - recipe structural validation
+- ODPR document validation for `Recipe`, `Provider`, and `RecipeCatalog`
+- bundled ODPR YAML and JSON schemas
+- Draft 2020-12 JSON Schema validation for ODPR documents
+- embedded-secret scanning for ODPR documents
 - recipe runner config validation
 - recipe catalog-style listing from configured folders
+- metadata-only `RecipeCatalog` generation
 - dry-run planning with structured `resolved.parameters`
 - CLI commands under `open-data-products recipe ...`
 
 The SDK does not yet have:
 
-- bundled ODPR schema resources
-- JSON Schema validation for ODPR documents
-- embedded-secret scanning for ODPR documents
-- persistent `RecipeCatalog` generation
 - bundled ODPR `recipes.jsonl` search records
 
 ## Script Mapping
 
 | ODPR script | What it does in the spec repo | SDK decision | SDK target |
 | --- | --- | --- | --- |
-| `validate_recipe.py` | Validates `Recipe`, `Provider`, or `RecipeCatalog` documents against the ODPR JSON Schema and rejects embedded secrets. | Bring first. This is core SDK behavior. | Add schema-backed validation and secret scanning to `open_data_products.odpr`. Keep `recipe validate` using it. |
-| `build_recipe_catalog.py` | Builds metadata-only `RecipeCatalog` YAML from canonical recipe examples. | Bring next, but generalize it. | Add `build_recipe_catalog()` and a CLI command such as `open-data-products recipe catalog --config recipes.config.yaml --output catalog.yaml`. |
+| `validate_recipe.py` | Validates `Recipe`, `Provider`, or `RecipeCatalog` documents against the ODPR JSON Schema and rejects embedded secrets. | Brought. The SDK bundles the ODPR schema, runs Draft 2020-12 validation, and applies secret/runtime hardening. | `open_data_products.odpr.validation` and `open-data-products recipe validate`. |
+| `build_recipe_catalog.py` | Builds metadata-only `RecipeCatalog` YAML from canonical recipe examples. | Brought and generalized for project recipe folders. | `build_recipe_catalog()`, `write_recipe_catalog()`, and `open-data-products recipe catalog --config recipes.config.yaml --output catalog.yaml`. |
 | `search_recipes.py` | Searches ODPR `recipes.jsonl` concept records by query or id. | Bring after bundled ODPR resources exist. | Add `open-data-products recipe search ...` or expose through `resources`/MCP search if the records are bundled. |
 | `odpr_paths.py` | Centralizes spec-repo source paths. | Do not port as-is. | Replace with package resource helpers under `open_data_products.odpr.resources` if ODPR schema/examples are bundled. |
 | `generate_recipe_artifacts.py` | Generates derived `odpr.json` from canonical `odpr.yaml`. | Do not bring as runtime feature. | Keep this in the ODPR spec repo. SDK should consume released/generated schema artifacts, not generate spec artifacts for users. |
@@ -43,6 +44,10 @@ The SDK does not yet have:
 ### 1. Schema-Backed ODPR Validation
 
 Add SDK support for validating ODPR documents using bundled schema artifacts.
+
+Status: implemented. The SDK validates ODPR root kinds, required fields,
+command-specific step parameter schemas, metadata-only catalog constraints, and
+embedded secrets through the bundled ODPR schema plus SDK hardening checks.
 
 Target behavior:
 
@@ -80,6 +85,8 @@ Port the useful parts of `validate_recipe.py`:
 This belongs in SDK validation because users will author provider profiles in
 projects, not only in the ODPR spec repo.
 
+Status: implemented in `open_data_products.odpr.validation`.
+
 ### 3. RecipeCatalog Builder
 
 The SDK already returns catalog-style JSON from `recipe list`. It should also be
@@ -101,6 +108,8 @@ The generated catalog should:
   provider ref, context format, review requirement, and command list;
 - not include steps, run ids, logs, planned writes, provider readiness, or
   runtime status.
+
+Status: implemented for configured project recipe paths.
 
 ## Bring Later
 
@@ -150,15 +159,10 @@ capabilities.
 
 ## Recommended SDK Implementation Sequence
 
-1. Add ODPR schema/resource bundle and validation helpers.
-2. Port secret scanning from `validate_recipe.py`.
-3. Update `recipe validate` to validate `Recipe`, `Provider`, and
+1. Keep `recipe validate` validating `Recipe`, `Provider`, and
    `RecipeCatalog`.
-4. Add `recipe catalog` to write metadata-only `RecipeCatalog` files.
-5. Add tests for schema validation, secret rejection, and metadata-only catalog
-   generation.
-6. Add ODPR resources to `resources` and agent manifest metadata.
-7. Add recipe guidance search only after `recipes.jsonl` is bundled.
+2. Add ODPR resources to `resources` and agent manifest metadata.
+3. Add recipe guidance search only after `recipes.jsonl` is bundled.
 
 ## Non-Goals
 
