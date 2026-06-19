@@ -293,6 +293,118 @@ recipe:
     assert "resolvedCommand" not in plan["steps"][0]
 
 
+def test_recipe_cli_execute_runs_deterministic_recipe(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    recipe_path = tmp_path / "recipe.yaml"
+    catalog_path = tmp_path / "catalog.yaml"
+    catalog_path.write_text(
+        """
+schema: https://opendataproducts.org/odpc-v1.0/schema/odpc.yaml
+version: "1.0"
+kind: Catalog
+catalog:
+  metadata:
+    id: CAT-001
+    name:
+      en: Customer Data Product Catalog
+    description:
+      en: Catalog for customer-facing data products.
+  productReferences:
+    - id: PRODUCT-001
+      productID: PRODUCT-001
+      productVersion: "1.0"
+      name:
+        en: Customer Product
+      description:
+        en: Customer product reference.
+      productModel:
+        standard: ODPS
+        version: "4.0"
+        format: yaml
+        $ref: ./product.yaml
+""",
+        encoding="utf-8",
+    )
+    recipe_path.write_text(
+        """
+schema: https://opendataproducts.org/odpr-v1.0/schema/odpr.yaml
+version: "1.0"
+kind: Recipe
+recipe:
+  metadata:
+    id: RCP-VALIDATE-001
+    name:
+      en: Validate Catalog
+  version: "1.0.0"
+  type: ci
+  steps:
+    - id: validate-catalog
+      command: validate
+      with:
+        document: catalog.yaml
+""",
+        encoding="utf-8",
+    )
+
+    assert main(["recipe", "run", str(recipe_path), "--execute", "--json"]) == 0
+    payload = _json_output(capsys)
+
+    assert payload["mode"] == "execute"
+    assert payload["status"] == "passed"
+    assert payload["canRun"] is True
+    assert payload["steps"][0]["status"] == "passed"
+    assert payload["steps"][0]["summary"]["spec"] == "odpc"
+    assert (tmp_path / payload["manifest"]["path"]).is_file()
+
+
+def test_recipe_cli_execute_blocks_llm_backed_recipe(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    recipe_path = tmp_path / "recipe.yaml"
+    workspace = tmp_path / "generated" / "portfolio"
+    workspace.mkdir(parents=True)
+    recipe_path.write_text(
+        """
+schema: https://opendataproducts.org/odpr-v1.0/schema/odpr.yaml
+version: "1.0"
+kind: Recipe
+recipe:
+  metadata:
+    id: RCP-LOCALIZE-001
+    name:
+      en: Localize Portfolio
+  version: "1.0.0"
+  type: localization
+  steps:
+    - id: localize
+      command: portfolio.localize
+      providerRef: claude
+      model: claude-sonnet-4-5
+      with:
+        workspace: generated/portfolio/
+        languages:
+          - fi
+""",
+        encoding="utf-8",
+    )
+
+    assert main(["recipe", "run", str(recipe_path), "--execute", "--json"]) == 1
+    payload = _json_output(capsys)
+
+    assert payload["mode"] == "execute"
+    assert payload["status"] == "blocked"
+    assert payload["canRun"] is False
+    assert payload["steps"][0]["status"] == "blocked"
+    assert any(
+        reason["code"] == "llm_execution_not_supported"
+        for reason in payload["blockingReasons"]
+    )
+    assert (tmp_path / payload["manifest"]["path"]).is_file()
+
+
 def test_config_recipes_check_reports_recipe_config(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
