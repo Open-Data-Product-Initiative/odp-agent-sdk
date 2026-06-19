@@ -99,6 +99,7 @@ ODPV vocabulary commands:
 Discovery and agent commands:
   resources    List bundled schemas, vocabularies, and indexes
   config       Show or copy editable SDK config templates
+  recipe       List, validate, and dry-run workflow recipes
   manifest     Emit the MCP/agent manifest
   serve        Run the MCP server over stdio
 
@@ -152,6 +153,9 @@ Examples:
   open-data-products resources --id odpv.terms --json
   open-data-products config generation --copy-to my-generation.config.yaml
   open-data-products config generation --copy-prompts-to prompts/
+  open-data-products recipe list --config recipes.config.yaml --json
+  open-data-products recipe validate recipes/release-portfolio-review.yaml --json
+  open-data-products recipe run recipes/release-portfolio-review.yaml --dry-run --json
   open-data-products resources --json
   open-data-products generate --input source_docs/ --kind product-reference --output generated/
   open-data-products generate --input product.md --kind odps-product --output generated/
@@ -413,7 +417,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     config_parser.add_argument(
         "domain",
         nargs="?",
-        choices=["generation"],
+        choices=["generation", "recipes"],
         default="generation",
         help="Config domain to inspect. Defaults to generation.",
     )
@@ -455,6 +459,63 @@ def main(argv: Optional[List[str]] = None) -> int:
         help="Print the raw YAML config template or selected config file.",
     )
     config_parser.add_argument("--json", action="store_true", help="Emit JSON")
+
+    recipe_parser = subparsers.add_parser(
+        "recipe",
+        help="List, validate, and dry-run workflow recipes",
+    )
+    recipe_subparsers = recipe_parser.add_subparsers(
+        dest="recipe_command",
+        metavar="RECIPE_COMMAND",
+        required=True,
+    )
+    recipe_list_parser = recipe_subparsers.add_parser(
+        "list",
+        help="List recipe metadata from recipes.config.yaml",
+    )
+    recipe_list_parser.add_argument(
+        "--config",
+        help="Recipe runner config YAML. Defaults to recipes.config.yaml when present.",
+    )
+    recipe_list_parser.add_argument("--json", action="store_true", help="Emit JSON")
+    recipe_validate_parser = recipe_subparsers.add_parser(
+        "validate",
+        help="Validate one workflow recipe",
+    )
+    recipe_validate_parser.add_argument("recipe", help="Recipe YAML file")
+    recipe_validate_parser.add_argument(
+        "--config",
+        help="Optional recipe runner config YAML.",
+    )
+    recipe_validate_parser.add_argument("--json", action="store_true", help="Emit JSON")
+    recipe_run_parser = recipe_subparsers.add_parser(
+        "run",
+        help="Plan or execute one workflow recipe",
+    )
+    recipe_run_parser.add_argument("recipe", help="Recipe YAML file")
+    recipe_run_parser.add_argument(
+        "--config",
+        help="Optional recipe runner config YAML.",
+    )
+    recipe_run_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Emit the resolved plan without writes or provider calls.",
+    )
+    recipe_run_parser.add_argument(
+        "--execute",
+        action="store_true",
+        help="Run state-changing steps. Execution is not implemented in the first slice.",
+    )
+    recipe_run_parser.add_argument(
+        "--provider-ref",
+        help="Provider reference override for compatible LLM-backed steps.",
+    )
+    recipe_run_parser.add_argument(
+        "--model",
+        help="Model override for compatible LLM-backed steps.",
+    )
+    recipe_run_parser.add_argument("--json", action="store_true", help="Emit JSON")
 
     generate_parser = subparsers.add_parser(
         "generate",
@@ -1178,25 +1239,53 @@ def main(argv: Optional[List[str]] = None) -> int:
                 print_config,
                 validate_config,
             )
+            from .odpr import (
+                copy_recipe_config_template,
+                get_recipe_config,
+                get_recipe_config_path,
+                print_recipe_config,
+                validate_recipe_config,
+            )
 
             try:
                 if args.print:
-                    print(print_config(args.domain, args.config_path), end="")
+                    if args.domain == "recipes":
+                        print(print_recipe_config(args.config_path), end="")
+                    else:
+                        print(print_config(args.domain, args.config_path), end="")
                     return 0
                 if args.check:
-                    payload = validate_config(args.domain, args.config_path)
+                    if args.domain == "recipes":
+                        payload = validate_recipe_config(
+                            args.config_path or get_recipe_config_path()
+                        )
+                    else:
+                        payload = validate_config(args.domain, args.config_path)
                 else:
-                    payload = get_config(args.domain, args.config_path)
+                    if args.domain == "recipes":
+                        payload = get_recipe_config(args.config_path)
+                    else:
+                        payload = get_config(args.domain, args.config_path)
                 if args.copy_to:
-                    copied_to = copy_config_template(
-                        args.domain,
-                        args.copy_to,
-                        overwrite=args.overwrite,
-                    )
+                    if args.domain == "recipes":
+                        copied_to = copy_recipe_config_template(
+                            args.copy_to,
+                            overwrite=args.overwrite,
+                        )
+                    else:
+                        copied_to = copy_config_template(
+                            args.domain,
+                            args.copy_to,
+                            overwrite=args.overwrite,
+                        )
                     payload["copied_to"] = str(copied_to)
                     payload["config_path"] = str(copied_to)
                     payload["editable"] = True
                 if args.copy_prompts_to:
+                    if args.domain == "recipes":
+                        raise ValueError(
+                            "--copy-prompts-to is only available for generation config"
+                        )
                     copied_prompts = copy_generation_prompts(
                         args.copy_prompts_to,
                         overwrite=args.overwrite,
@@ -1226,6 +1315,18 @@ def main(argv: Optional[List[str]] = None) -> int:
                     print(f"Copied editable config to: {payload['copied_to']}")
                 if "copied_prompts" in payload:
                     print(f"Copied prompts to: {payload['prompt_dir']}")
+                if args.domain == "recipes":
+                    print(f"Recipe paths: {payload['recipes']['paths']}")
+                    print(
+                        "Default provider ref: "
+                        f"{payload['providers']['defaultProviderRef']}"
+                    )
+                    print(f"Allow writes: {payload['execution']['allowWrites']}")
+                    print(
+                        "Edit a copied config and pass it with "
+                        "`open-data-products recipe list --config <path>`."
+                    )
+                    return 0
                 resolved = payload["resolved"]
                 print(f"Provider: {resolved['provider']}")
                 print(f"Model: {resolved['model']}")
@@ -1238,6 +1339,64 @@ def main(argv: Optional[List[str]] = None) -> int:
             if args.check:
                 return 0 if payload["valid"] else 1
             return 0
+
+        if args.command == "recipe":
+            from .odpr import list_recipes, plan_recipe_run, validate_recipe
+
+            try:
+                if args.recipe_command == "list":
+                    payload = list_recipes(config_path=args.config)
+                    exit_code = 0
+                elif args.recipe_command == "validate":
+                    payload = validate_recipe(args.recipe)
+                    exit_code = 0 if payload["valid"] else 1
+                elif args.recipe_command == "run":
+                    mode = "execute" if args.execute else "dry-run"
+                    payload = plan_recipe_run(
+                        args.recipe,
+                        mode=mode,
+                        config_path=args.config,
+                        provider_ref=args.provider_ref,
+                        model=args.model,
+                    )
+                    exit_code = 0 if payload["canRun"] else 1
+                else:
+                    raise ValueError(f"Unknown recipe command: {args.recipe_command}")
+            except (FileNotFoundError, ValueError) as exc:
+                payload = {
+                    "mode": getattr(args, "recipe_command", "recipe"),
+                    "valid": False,
+                    "error": str(exc),
+                }
+                exit_code = 1
+
+            if args.json:
+                print(json.dumps(payload, indent=2))
+            else:
+                if args.recipe_command == "list":
+                    catalog = payload.get("recipeCatalog", {})
+                    recipes = catalog.get("recipes", [])
+                    print(f"Recipes: {len(recipes)}")
+                    for recipe in recipes:
+                        print(
+                            f"- {recipe.get('id') or '(missing id)'} "
+                            f"{recipe.get('path')}"
+                        )
+                elif args.recipe_command == "validate":
+                    recipe = payload.get("recipe", {})
+                    print(f"Recipe: {recipe.get('id') or args.recipe}")
+                    print(f"Valid: {payload.get('valid')}")
+                    for error in payload.get("errors", []):
+                        print(f"Error: {error}")
+                    for warning in payload.get("warnings", []):
+                        print(f"Warning: {warning}")
+                else:
+                    print(f"Mode: {payload.get('mode')}")
+                    print(f"Can run: {payload.get('canRun')}")
+                    for reason in payload.get("blockingReasons", []):
+                        if isinstance(reason, dict):
+                            print(f"Blocking: {reason.get('message')}")
+            return exit_code
 
         if args.command == "generate":
             from .generation import (

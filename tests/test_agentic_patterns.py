@@ -296,6 +296,7 @@ class TestAgentManifest:
             "fragment-workflows",
             "llm-runtime-support",
             "portfolio-workspaces",
+            "recipe-workflows",
             "catalog-and-graph-builds",
             "compact-context-sidecars",
             "okf-context-bundles",
@@ -307,6 +308,7 @@ class TestAgentManifest:
             "odpc",
             "odpg",
             "odpv",
+            "odpr",
         }
 
     def test_manifest_describes_workflows_and_interfaces(self):
@@ -318,7 +320,9 @@ class TestAgentManifest:
         assert workflow_ids >= {
             "validate-artifact",
             "configure-generation",
+            "configure-recipes",
             "discover-resources",
+            "plan-recipe-workflow",
             "generate-odpc-fragments",
             "generate-odps-product",
             "build-portfolio",

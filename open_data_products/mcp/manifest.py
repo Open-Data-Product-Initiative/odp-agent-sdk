@@ -82,6 +82,11 @@ def _standards() -> List[Dict[str, str]]:
             "name": "Open Data Product Vocabulary",
             "description": "Canonical vocabulary terms and relationship guidance.",
         },
+        {
+            "id": "odpr",
+            "name": "Open Data Product Recipes",
+            "description": "Portable recipe and recipe catalog contracts for workflow planning.",
+        },
     ]
 
 
@@ -179,6 +184,31 @@ def _capabilities() -> List[Dict[str, Any]]:
             "summary": (
                 "Build, refresh, sync, render, localize, and explain static "
                 "portfolio workspaces from source lanes and generated artifacts."
+            ),
+        },
+        {
+            "id": "recipe-workflows",
+            "title": "ODPR recipe workflow planning",
+            "standards": ["odpr", "odps", "odpc", "odpg"],
+            "interfaces": ["cli", "python"],
+            "lifecycle": ["list", "validate", "dry-run"],
+            "step_commands": [
+                "generate",
+                "odpc.build",
+                "odpg.build",
+                "odpg.render",
+                "portfolio.build",
+                "portfolio.refresh",
+                "portfolio.sync",
+                "portfolio.localize",
+                "portfolio.render",
+                "portfolio.explain",
+                "validate",
+                "explain",
+            ],
+            "summary": (
+                "List, validate, and dry-run ODPR-style workflow recipes with "
+                "structured agent-readable resolved step parameters."
             ),
         },
         {
@@ -288,6 +318,16 @@ def _workflows() -> List[Dict[str, Any]]:
             "mcp_tools": ["get_config", "validate_config"],
         },
         {
+            "id": "configure-recipes",
+            "title": "Inspect and copy recipe runner configuration",
+            "commands": [
+                "open-data-products config recipes --json",
+                "open-data-products config recipes --copy-to recipes.config.yaml",
+                "open-data-products config recipes --config recipes.config.yaml --check --json",
+            ],
+            "mcp_tools": [],
+        },
+        {
             "id": "discover-resources",
             "title": "Discover bundled schemas, prompts, and retrieval indexes",
             "commands": [
@@ -346,6 +386,16 @@ def _workflows() -> List[Dict[str, Any]]:
                 "open-data-products generate --input transcripts/ --kind odps-product --profile complete-draft --include-components SLA,dataQuality,pricingPlans --output products/",
             ],
             "mcp_tools": ["get_config", "validate_config"],
+        },
+        {
+            "id": "plan-recipe-workflow",
+            "title": "List, validate, and dry-run workflow recipes",
+            "commands": [
+                "open-data-products recipe list --config recipes.config.yaml --json",
+                "open-data-products recipe validate recipes/release-portfolio-review.yaml --json",
+                "open-data-products recipe run recipes/release-portfolio-review.yaml --dry-run --json",
+            ],
+            "mcp_tools": [],
         },
         {
             "id": "build-portfolio",

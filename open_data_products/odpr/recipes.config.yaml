@@ -1,0 +1,31 @@
+version: "1.0"
+
+recipes:
+  paths:
+    - recipes/
+    - .odp/recipes/
+  defaultRecipe: recipes/release-portfolio-review.yaml
+
+providers:
+  generationConfig: generation.config.yaml
+  defaultProviderRef: ollama
+
+execution:
+  manifestDir: .odp/runs/
+  allowWrites:
+    - generated/
+    - portfolio/
+  requireReviewFor:
+    - production
+    - release
+  stopOnWarning: false
+
+outputs:
+  defaultJson: false
+  keepRunLogs: true
+  reportName: recipe-run.json
+
+gui:
+  exposeDryRunPlan: true
+  exposeRunManifest: true
+  allowStateChangingRuns: false

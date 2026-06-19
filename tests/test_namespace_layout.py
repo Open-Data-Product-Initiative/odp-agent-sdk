@@ -4,16 +4,16 @@ import ast
 import importlib.util
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_public_spec_namespaces_are_importable():
-    from open_data_products import odpc, odpg, odps, odpv
+    from open_data_products import odpc, odpg, odpr, odps, odpv
 
     assert odps.SPEC_ID == "odps"
     assert odpc.SPEC_ID == "odpc"
     assert odpg.SPEC_ID == "odpg"
+    assert odpr.SPEC_ID == "odpr"
     assert odpv.SPEC_ID == "odpv"
 
 
@@ -27,7 +27,7 @@ def test_top_level_package_exposes_version_alias():
 
 def test_top_level_package_exposes_stable_workflow_facades():
     import open_data_products
-    from open_data_products import agent, generation, portfolio
+    from open_data_products import agent, generation, odpr, portfolio
     from open_data_products.contracts import product as contracts_product
     from open_data_products.odpc import catalog as odpc_catalog
     from open_data_products.odpg import graph as odpg_graph
@@ -44,6 +44,7 @@ def test_top_level_package_exposes_stable_workflow_facades():
         generation.generate_local_artifacts_for_kind
     )
     assert open_data_products.build_portfolio is portfolio.build_portfolio
+    assert open_data_products.validate_recipe is odpr.validate_recipe
     assert open_data_products.generate_product_contract_report is (
         contracts_product.generate_product_contract_report
     )
@@ -91,9 +92,7 @@ def test_mcp_tools_use_concrete_modules_internally():
     parent_barrel_imports = [
         node.lineno
         for node in ast.walk(tree)
-        if isinstance(node, ast.ImportFrom)
-        and node.module is None
-        and node.level == 2
+        if isinstance(node, ast.ImportFrom) and node.module is None and node.level == 2
     ]
 
     assert parent_barrel_imports == []

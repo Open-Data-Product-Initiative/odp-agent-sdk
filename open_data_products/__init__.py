@@ -16,6 +16,7 @@ version = __version__
 
 from . import odpc
 from . import odpg
+from . import odpr
 from . import odps
 from . import odpv
 from .agent import (
@@ -126,6 +127,18 @@ from .portfolio import (
     sync_portfolio,
 )
 from .resources import get_resource, list_resources
+from .odpr import (
+    RecipeDocument,
+    copy_recipe_config_template,
+    get_recipe_config,
+    get_recipe_config_path,
+    list_recipes,
+    load_recipe,
+    plan_recipe_run,
+    print_recipe_config,
+    validate_recipe,
+    validate_recipe_config,
+)
 from .results import Reference, Resource, ValidationResult
 from .summary import load_summary
 
@@ -134,12 +147,14 @@ __all__ = [
     "version",
     "odpc",
     "odpg",
+    "odpr",
     "odps",
     "odpv",
     "OkfConcept",
     "OkfValidationResult",
     "Reference",
     "Resource",
+    "RecipeDocument",
     "ValidationResult",
     "AlignmentFinding",
     "agent_vocabulary_context",
@@ -183,6 +198,7 @@ __all__ = [
     "load_contract",
     "load_summary",
     "load_okf_bundle",
+    "load_recipe",
     "list_generation_prompts",
     "load_generation_prompt",
     "pricing_to_402",
@@ -191,6 +207,7 @@ __all__ = [
     "anthropic_generate",
     "copy_config_template",
     "copy_generation_prompts",
+    "copy_recipe_config_template",
     "create_generation_client",
     "ensure_ollama_model",
     "generate_local_artifact",
@@ -198,11 +215,15 @@ __all__ = [
     "generate_local_artifacts",
     "get_config",
     "get_config_path",
+    "get_recipe_config",
+    "get_recipe_config_path",
     "load_generation_config",
     "list_ollama_models",
+    "list_recipes",
     "openai_chat_generate",
     "openai_generate",
     "print_config",
+    "print_recipe_config",
     "render_catalog_gcf",
     "render_catalog_html",
     "render_catalog_toon",
@@ -210,9 +231,12 @@ __all__ = [
     "render_generation_prompt",
     "refresh_portfolio",
     "render_portfolio",
+    "plan_recipe_run",
     "resolve_generation_settings",
     "sync_portfolio",
     "validate_config",
+    "validate_recipe",
+    "validate_recipe_config",
     "write_graph",
     "render_graph_gcf",
     "render_graph_toon",

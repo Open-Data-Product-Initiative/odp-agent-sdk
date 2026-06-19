@@ -126,6 +126,7 @@ def test_unified_cli_generate_help_is_provider_neutral(
         (["odpc-build", "--help"], "usage: open-data-products odpc-build"),
         (["odpg-build", "--help"], "usage: open-data-products odpg-build"),
         (["portfolio", "--help"], "usage: open-data-products portfolio"),
+        (["recipe", "--help"], "usage: open-data-products recipe"),
         (["product", "--help"], "usage: open-data-products product"),
         (["manifest", "--help"], "usage: open-data-products manifest"),
         (["serve", "--help"], "usage: open-data-products serve"),
@@ -228,6 +229,140 @@ def test_portfolio_cli_help_uses_human_first_examples(
         "portfolio build --objectives inputs/objectives/ --use-cases inputs/use-cases/ --signals inputs/signals/ --products inputs/products/ --output generated/portfolio/ --json"
         not in help_text
     )
+
+
+def test_recipe_cli_validates_and_dry_runs_recipe(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    recipe_path = tmp_path / "recipe.yaml"
+    workspace = tmp_path / "generated" / "portfolio"
+    workspace.mkdir(parents=True)
+    recipe_path.write_text(
+        """
+schema: https://opendataproducts.org/odpr-v1.0/schema/odpr.yaml
+version: "1.0"
+kind: Recipe
+recipe:
+  metadata:
+    id: RCP-LOCALIZE-001
+    name:
+      en: Localize Portfolio
+  version: "1.0.0"
+  type: localization
+  steps:
+    - id: localize
+      command: portfolio.localize
+      providerRef: claude
+      model: claude-sonnet-4-5
+      with:
+        workspace: generated/portfolio/
+        languages:
+          - fi
+          - sv
+""",
+        encoding="utf-8",
+    )
+
+    assert main(["recipe", "validate", str(recipe_path), "--json"]) == 0
+    validate_payload = _json_output(capsys)
+    assert validate_payload["mode"] == "validate"
+    assert validate_payload["valid"] is True
+    assert validate_payload["recipe"]["id"] == "RCP-LOCALIZE-001"
+
+    assert (
+        main(
+            [
+                "recipe",
+                "run",
+                str(recipe_path),
+                "--dry-run",
+                "--json",
+            ]
+        )
+        == 0
+    )
+    plan = _json_output(capsys)
+    assert plan["mode"] == "dry-run"
+    assert plan["steps"][0]["resolved"]["parameters"]["languages"] == ["fi", "sv"]
+    assert "resolvedCommand" not in plan["steps"][0]
+
+
+def test_config_recipes_check_reports_recipe_config(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    config_path = tmp_path / "recipes.config.yaml"
+    config_path.write_text(
+        """
+version: "1.0"
+recipes:
+  paths:
+    - recipes/
+providers:
+  defaultProviderRef: claude
+execution:
+  manifestDir: .odp/runs/
+  allowWrites:
+    - generated/
+""",
+        encoding="utf-8",
+    )
+
+    assert (
+        main(["config", "recipes", "--config", str(config_path), "--check", "--json"])
+        == 0
+    )
+    payload = _json_output(capsys)
+    assert payload["domain"] == "recipes"
+    assert payload["valid"] is True
+    assert payload["errors"] == []
+
+
+def test_recipe_cli_list_uses_config_relative_paths(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    recipes_dir = tmp_path / "recipes"
+    recipes_dir.mkdir()
+    recipe_path = recipes_dir / "release.yaml"
+    recipe_path.write_text(
+        """
+schema: https://opendataproducts.org/odpr-v1.0/schema/odpr.yaml
+version: "1.0"
+kind: Recipe
+recipe:
+  metadata:
+    id: RCP-RELEASE-001
+    name:
+      en: Release
+  version: "1.0.0"
+  type: release
+  steps:
+    - id: explain
+      command: portfolio.explain
+      with:
+        workspace: generated/portfolio/
+""",
+        encoding="utf-8",
+    )
+    config_path = tmp_path / "recipes.config.yaml"
+    config_path.write_text(
+        """
+version: "1.0"
+recipes:
+  paths:
+    - recipes/
+""",
+        encoding="utf-8",
+    )
+
+    assert main(["recipe", "list", "--config", str(config_path), "--json"]) == 0
+    payload = _json_output(capsys)
+    recipes = payload["recipeCatalog"]["recipes"]
+    assert payload["mode"] == "list"
+    assert recipes[0]["path"] == "recipes/release.yaml"
+    assert recipes[0]["commands"] == ["portfolio.explain"]
 
 
 def test_unified_cli_document_workflow(capsys: pytest.CaptureFixture[str]) -> None:
