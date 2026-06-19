@@ -2,11 +2,18 @@
 
 SPEC_ID = "odpr"
 
+from .guidance import (
+    DEFAULT_RECIPE_GUIDANCE,
+    get_recipe_guidance,
+    load_recipe_guidance,
+    search_recipe_guidance,
+)
 from .recipes import (
     DEFAULT_RECIPE_CONFIG,
     RecipeDocument,
     build_recipe_catalog,
     copy_recipe_config_template,
+    execute_recipe_run,
     get_recipe_config,
     get_recipe_config_path,
     list_recipes,
@@ -27,11 +34,14 @@ from .validation import (
 
 __all__ = [
     "SPEC_ID",
+    "DEFAULT_RECIPE_GUIDANCE",
     "DEFAULT_RECIPE_CONFIG",
     "DEFAULT_ODPR_SCHEMA",
     "RecipeDocument",
     "build_recipe_catalog",
     "copy_recipe_config_template",
+    "execute_recipe_run",
+    "get_recipe_guidance",
     "get_recipe_config",
     "get_recipe_config_path",
     "list_recipes",
@@ -44,5 +54,7 @@ __all__ = [
     "find_embedded_secrets",
     "load_odpr_data",
     "load_odpr_schema",
+    "load_recipe_guidance",
+    "search_recipe_guidance",
     "validate_odpr_document",
 ]

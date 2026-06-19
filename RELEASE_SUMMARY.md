@@ -7,5 +7,9 @@
   namespace, bundled ODPR schemas, Draft 2020-12 schema validation, embedded
   secret checks, metadata-only `RecipeCatalog` generation, recipe runner config,
   and agent-safe `recipe list`, `recipe validate`, `recipe catalog`, and
-  `recipe run --dry-run` CLI planning commands. ODPR schemas and the recipe
-  config template are also discoverable through the SDK resource registry.
+  `recipe run --dry-run` CLI planning commands. Deterministic/report recipe
+  execution is now guarded behind `recipe run --execute`, with LLM-backed steps
+  blocked explicitly and compact run manifests written under `.odp/runs/`.
+  ODPR schemas, recipe guidance, and the recipe config template are also
+  discoverable through the SDK resource registry, with `recipe search` for
+  bundled ODPR guidance records.

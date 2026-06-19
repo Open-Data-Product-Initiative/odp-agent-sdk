@@ -53,6 +53,13 @@ _RESOURCE_DEFINITIONS: Tuple[ResourceDefinition, ...] = (
         "Bundled recipe runner config template.",
     ),
     (
+        "odpr.recipes",
+        "odpr",
+        "jsonl",
+        "odpr/data/recipes/recipes.jsonl",
+        "Bundled ODPR recipe guidance records for search and agent context.",
+    ),
+    (
         "odpc.schema.yaml",
         "odpc",
         "schema",

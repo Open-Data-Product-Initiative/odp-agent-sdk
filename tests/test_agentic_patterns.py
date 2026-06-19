@@ -518,6 +518,7 @@ class TestAgentManifest:
             "odpr.schema.yaml",
             "odpr.schema.json",
             "odpr.recipe-config-template",
+            "odpr.recipes",
             "odpv.terms",
             "generation.prompt.system",
             "okf.spec",

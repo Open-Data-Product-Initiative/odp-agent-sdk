@@ -2,14 +2,19 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 import yaml
 
 from open_data_products.odpr import (
     build_recipe_catalog,
+    execute_recipe_run,
+    get_recipe_guidance,
     load_odpr_schema,
     load_recipe,
+    load_recipe_guidance,
     plan_recipe_run,
+    search_recipe_guidance,
     validate_odpr_document,
     validate_recipe,
     validate_recipe_config,
@@ -46,6 +51,60 @@ recipe:
     )
 
 
+def _write_validate_recipe(path: Path) -> None:
+    path.write_text(
+        """
+schema: https://opendataproducts.org/odpr-v1.0/schema/odpr.yaml
+version: "1.0"
+kind: Recipe
+recipe:
+  metadata:
+    id: RCP-VALIDATE-001
+    name:
+      en: Validate Catalog
+  version: "1.0.0"
+  type: ci
+  steps:
+    - id: validate-catalog
+      command: validate
+      with:
+        document: catalog.yaml
+""",
+        encoding="utf-8",
+    )
+
+
+def _write_catalog(path: Path) -> None:
+    path.write_text(
+        """
+schema: https://opendataproducts.org/odpc-v1.0/schema/odpc.yaml
+version: "1.0"
+kind: Catalog
+catalog:
+  metadata:
+    id: CAT-001
+    name:
+      en: Customer Data Product Catalog
+    description:
+      en: Catalog for customer-facing data products.
+  productReferences:
+    - id: PRODUCT-001
+      productID: PRODUCT-001
+      productVersion: "1.0"
+      name:
+        en: Customer Product
+      description:
+        en: Customer product reference.
+      productModel:
+        standard: ODPS
+        version: "4.0"
+        format: yaml
+        $ref: ./product.yaml
+""",
+        encoding="utf-8",
+    )
+
+
 def test_validate_recipe_accepts_inline_steps(tmp_path: Path) -> None:
     """Test that a minimal ODPR recipe validates."""
     recipe_path = tmp_path / "recipe.yaml"
@@ -70,6 +129,21 @@ def test_odpr_schema_is_bundled() -> None:
         "Provider",
         "RecipeCatalog",
     ]
+
+
+def test_recipe_guidance_is_bundled_and_searchable() -> None:
+    """Test bundled ODPR recipe guidance records are searchable."""
+    records = load_recipe_guidance()
+
+    assert {record["id"] for record in records} >= {
+        "Recipe",
+        "Provider",
+        "RecipeCatalog",
+    }
+    assert get_recipe_guidance("RecipeCatalog")["id"] == "RecipeCatalog"
+    matches = search_recipe_guidance("metadata discovery")
+    assert matches
+    assert matches[0]["id"] == "RecipeCatalog"
 
 
 def test_validate_recipe_rejects_provider_on_deterministic_step(tmp_path: Path) -> None:
@@ -134,6 +208,49 @@ def test_plan_recipe_run_dry_run_returns_structured_parameters(
         "path": "generated/portfolio/index.fi.html",
         "allowed": True,
     } in step["plannedWrites"]
+
+
+def test_execute_recipe_run_runs_deterministic_validate_and_writes_manifest(
+    tmp_path: Path,
+) -> None:
+    """Test execute mode runs deterministic steps and records an audit manifest."""
+    recipe_path = tmp_path / "recipe.yaml"
+    catalog_path = tmp_path / "catalog.yaml"
+    _write_validate_recipe(recipe_path)
+    _write_catalog(catalog_path)
+
+    result = execute_recipe_run(recipe_path, project_root=tmp_path)
+
+    assert result["mode"] == "execute"
+    assert result["status"] == "passed"
+    assert result["exitCode"] == 0
+    assert result["canRun"] is True
+    assert result["manifest"]["path"].startswith(".odp/runs/odpr-")
+    assert result["steps"][0]["status"] == "passed"
+    assert result["steps"][0]["summary"]["spec"] == "odpc"
+    manifest_path = tmp_path / result["manifest"]["path"]
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert manifest["runId"] == result["runId"]
+    assert manifest["steps"][0]["id"] == "validate-catalog"
+
+
+def test_execute_recipe_run_blocks_llm_backed_steps(tmp_path: Path) -> None:
+    """Test execute mode refuses LLM-backed steps until execution is supported."""
+    recipe_path = tmp_path / "recipe.yaml"
+    workspace = tmp_path / "generated" / "portfolio"
+    workspace.mkdir(parents=True)
+    _write_recipe(recipe_path)
+
+    result = execute_recipe_run(recipe_path, project_root=tmp_path)
+
+    assert result["status"] == "blocked"
+    assert result["exitCode"] == 1
+    assert result["canRun"] is False
+    assert result["steps"][0]["status"] == "blocked"
+    assert any(
+        reason["code"] == "llm_execution_not_supported"
+        for reason in result["blockingReasons"]
+    )
 
 
 def test_validate_recipe_config_checks_paths(tmp_path: Path) -> None:

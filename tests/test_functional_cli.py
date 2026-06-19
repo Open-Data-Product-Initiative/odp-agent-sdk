@@ -79,6 +79,7 @@ def test_unified_cli_help_uses_compact_command_metavar(
     assert "open-data-products resources --id odpc.objects --json" in help_text
     assert "open-data-products resources --id odpv.terms --json" in help_text
     assert "open-data-products resources --id odpr.schema.yaml --json" in help_text
+    assert "open-data-products recipe search localization --json" in help_text
     assert "open-data-products okf-summary knowledge-bundle/ --json" in help_text
     assert "open-data-products resources --id okf.spec --json" in help_text
     assert (
@@ -453,6 +454,19 @@ provider:
     payload = _json_output(capsys)
     assert payload["kind"] == "Provider"
     assert payload["valid"] is True
+
+
+def test_recipe_cli_searches_bundled_guidance(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    assert main(["recipe", "search", "metadata", "discovery", "--json"]) == 0
+    payload = _json_output(capsys)
+    assert payload[0]["id"] == "RecipeCatalog"
+
+    assert main(["recipe", "search", "--id", "Provider", "--json"]) == 0
+    provider = _json_output(capsys)
+    assert provider["id"] == "Provider"
+    assert "provider profile" in provider["definition"]
 
 
 def test_unified_cli_document_workflow(capsys: pytest.CaptureFixture[str]) -> None:

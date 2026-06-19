@@ -1,8 +1,10 @@
-"""Recipe workflow loading, validation, and dry-run planning."""
+"""Recipe workflow loading, validation, and execution planning."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timezone
+import json
 from pathlib import Path
 import shutil
 from typing import Dict, List, Mapping, Optional, Sequence, Union
@@ -328,6 +330,96 @@ def plan_recipe_run(
         )
         payload["canRun"] = False
     return payload
+
+
+def execute_recipe_run(
+    path: PathLike,
+    *,
+    config_path: Optional[PathLike] = None,
+    project_root: Optional[PathLike] = None,
+    provider_ref: Optional[str] = None,
+    model: Optional[str] = None,
+) -> Dict[str, object]:
+    """Execute deterministic and report-only recipe steps with a run manifest."""
+    recipe_path = Path(path)
+    root = _project_root(recipe_path, config_path, project_root)
+    config = _load_optional_recipe_config(config_path)
+    run_id = _run_id()
+    plan = plan_recipe_run(
+        recipe_path,
+        mode="dry-run",
+        config_path=config_path,
+        project_root=root,
+        provider_ref=provider_ref,
+        model=model,
+    )
+    plan["mode"] = "execute"
+    blocking = list(plan["blockingReasons"])
+    for issue in _execution_config_issues(config_path):
+        blocking.append({"code": "config_invalid", "message": issue, "blocking": True})
+    for step in plan["steps"]:
+        if not isinstance(step, dict):
+            continue
+        if step.get("classification") == "llm-backed":
+            blocking.append(
+                {
+                    "code": "llm_execution_not_supported",
+                    "message": (
+                        f"{step.get('id', '')} uses {step.get('command', '')}; "
+                        "LLM-backed recipe execution is not enabled yet."
+                    ),
+                    "blocking": True,
+                }
+            )
+
+    started_at = _utc_now()
+    step_results: List[Dict[str, object]] = []
+    status = "blocked"
+    exit_code = 1
+    if not blocking:
+        status = "passed"
+        exit_code = 0
+        for step in plan["steps"]:
+            if not isinstance(step, dict):
+                continue
+            result = _execute_step(step, root)
+            step_results.append(result)
+            if result["status"] == "failed":
+                status = "failed"
+                exit_code = 1
+                break
+    else:
+        step_results = [
+            _blocked_step(step) for step in plan["steps"] if isinstance(step, dict)
+        ]
+
+    completed_at = _utc_now()
+    manifest_payload = {
+        "runId": run_id,
+        "mode": "execute",
+        "status": status,
+        "exitCode": exit_code,
+        "startedAt": started_at,
+        "completedAt": completed_at,
+        "recipe": plan["recipe"],
+        "config": plan["config"],
+        "blockingReasons": blocking,
+        "warnings": plan["warnings"],
+        "steps": step_results,
+    }
+    manifest_path = _write_run_manifest(root, config, run_id, manifest_payload)
+    return {
+        "mode": "execute",
+        "runId": run_id,
+        "status": status,
+        "exitCode": exit_code,
+        "canRun": not blocking,
+        "recipe": plan["recipe"],
+        "blockingReasons": blocking,
+        "warnings": plan["warnings"],
+        "manifest": {"path": _relative_path(manifest_path, root)},
+        "steps": step_results,
+    }
 
 
 def list_recipes(
@@ -701,6 +793,243 @@ def _provider_readiness(
             "missingEnv": [],
         }
     return list(providers.values())
+
+
+def _execution_config_issues(config_path: Optional[PathLike]) -> List[str]:
+    if config_path is None:
+        return []
+    report = validate_recipe_config(config_path)
+    return list(report["errors"])
+
+
+def _execute_step(step: Mapping[str, object], root: Path) -> Dict[str, object]:
+    command = str(step.get("command", ""))
+    parameters = _mapping(_mapping(step.get("resolved")).get("parameters"))
+    started_at = _utc_now()
+    try:
+        if command == "validate":
+            from ..agent import validate_document
+
+            document = _required_path(parameters, "document", root)
+            result = validate_document(document)
+            payload = result.to_dict()
+            return _step_result(
+                step,
+                "passed" if result.valid else "failed",
+                started_at,
+                issues=list(payload.get("errors", [])),
+                summary={
+                    "spec": payload.get("spec"),
+                    "kind": payload.get("kind"),
+                    "valid": payload.get("valid"),
+                    "path": _relative_path(document, root),
+                },
+            )
+        if command == "explain":
+            from ..agent import explain_document
+
+            document = _required_path(parameters, "document", root)
+            explanation = explain_document(document)
+            return _step_result(
+                step,
+                "passed",
+                started_at,
+                summary={
+                    "path": _relative_path(document, root),
+                    "format": "text",
+                    "characterCount": len(explanation),
+                },
+            )
+        if command == "odpg.render":
+            from ..odpg import generate_graph_explorer
+
+            graph = _required_path(parameters, "graph", root)
+            output = _required_path(parameters, "output", root)
+            output_path = generate_graph_explorer(graph, output)
+            return _step_result(
+                step,
+                "passed",
+                started_at,
+                artifacts=[_relative_path(output_path, root)],
+            )
+        if command == "portfolio.sync":
+            from ..portfolio import sync_portfolio
+
+            workspace = _required_path(parameters, "workspace", root)
+            result = sync_portfolio(workspace)
+            return _portfolio_step_result(step, started_at, root, result)
+        if command == "portfolio.render":
+            from ..portfolio import render_portfolio
+
+            workspace = _required_path(parameters, "workspace", root)
+            output = _optional_path(parameters, "output", root)
+            result = render_portfolio(workspace, output_path=output)
+            return _portfolio_step_result(step, started_at, root, result)
+        if command == "portfolio.explain":
+            from ..portfolio import explain_portfolio
+
+            workspace = _required_path(parameters, "workspace", root)
+            result = explain_portfolio(workspace)
+            return _step_result(
+                step,
+                "passed" if result.get("valid") is not False else "failed",
+                started_at,
+                issues=_portfolio_issues(result),
+                summary={
+                    "workspace": _relative_path(workspace, root),
+                    "valid": result.get("valid"),
+                    "productSpecCount": result.get("productSpecCount"),
+                    "graphNodeCount": result.get("graphNodeCount"),
+                    "graphEdgeCount": result.get("graphEdgeCount"),
+                },
+            )
+    except (FileNotFoundError, ValueError, OSError) as exc:
+        return _step_result(step, "failed", started_at, issues=[str(exc)])
+    return _step_result(
+        step,
+        "failed",
+        started_at,
+        issues=[f"Execution is not implemented for command: {command}"],
+    )
+
+
+def _portfolio_step_result(
+    step: Mapping[str, object],
+    started_at: str,
+    root: Path,
+    result: Mapping[str, object],
+) -> Dict[str, object]:
+    artifacts = []
+    for key in ("html", "snapshot"):
+        value = result.get(key)
+        if isinstance(value, str) and value:
+            artifacts.append(_relative_path(Path(value), root))
+    for key in ("created", "updated", "unchanged"):
+        values = result.get(key)
+        if isinstance(values, list):
+            for value in values:
+                if isinstance(value, str):
+                    artifacts.append(_relative_path(Path(value), root))
+    return _step_result(
+        step,
+        "passed" if result.get("valid") is not False else "failed",
+        started_at,
+        artifacts=sorted(set(artifacts)),
+        issues=_portfolio_issues(result),
+        summary={
+            "kind": result.get("kind"),
+            "valid": result.get("valid"),
+            "workspace": (
+                _relative_path(Path(str(result.get("workspace", ""))), root)
+                if result.get("workspace")
+                else None
+            ),
+        },
+    )
+
+
+def _portfolio_issues(result: Mapping[str, object]) -> List[str]:
+    issues: List[str] = []
+    warnings = result.get("warnings")
+    if isinstance(warnings, list):
+        issues.extend(str(warning) for warning in warnings)
+    validation_results = result.get("validationResults")
+    if isinstance(validation_results, list):
+        for item in validation_results:
+            if isinstance(item, dict) and item.get("valid") is False:
+                path = item.get("path", "portfolio artifact")
+                errors = item.get("errors")
+                if isinstance(errors, list):
+                    issues.extend(f"{path}: {error}" for error in errors)
+    return issues
+
+
+def _blocked_step(step: Mapping[str, object]) -> Dict[str, object]:
+    return {
+        "id": step.get("id", ""),
+        "command": step.get("command", ""),
+        "classification": step.get("classification", ""),
+        "status": "blocked",
+        "artifacts": [],
+        "issues": [],
+    }
+
+
+def _step_result(
+    step: Mapping[str, object],
+    status: str,
+    started_at: str,
+    *,
+    artifacts: Optional[Sequence[str]] = None,
+    issues: Optional[Sequence[str]] = None,
+    summary: Optional[Mapping[str, object]] = None,
+) -> Dict[str, object]:
+    result: Dict[str, object] = {
+        "id": step.get("id", ""),
+        "command": step.get("command", ""),
+        "classification": step.get("classification", ""),
+        "status": status,
+        "startedAt": started_at,
+        "completedAt": _utc_now(),
+        "artifacts": list(artifacts or []),
+        "issues": list(issues or []),
+    }
+    if summary is not None:
+        result["summary"] = {
+            key: value for key, value in summary.items() if value is not None
+        }
+    return result
+
+
+def _required_path(
+    parameters: Mapping[str, object],
+    key: str,
+    root: Path,
+) -> Path:
+    value = parameters.get(key)
+    if not isinstance(value, str) or not value:
+        raise ValueError(f"Missing required path parameter: {key}")
+    return root / value
+
+
+def _optional_path(
+    parameters: Mapping[str, object],
+    key: str,
+    root: Path,
+) -> Optional[Path]:
+    value = parameters.get(key)
+    if not isinstance(value, str) or not value:
+        return None
+    return root / value
+
+
+def _write_run_manifest(
+    root: Path,
+    config: Mapping[str, object],
+    run_id: str,
+    payload: Mapping[str, object],
+) -> Path:
+    manifest_dir = _manifest_dir(config)
+    output = root / manifest_dir / f"{run_id}.json"
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    return output
+
+
+def _manifest_dir(config: Mapping[str, object]) -> Path:
+    execution = _mapping(config.get("execution"))
+    value = execution.get("manifestDir")
+    if isinstance(value, str) and value:
+        return Path(value)
+    return Path(".odp") / "runs"
+
+
+def _run_id() -> str:
+    return datetime.now(timezone.utc).strftime("odpr-%Y%m%dT%H%M%SZ")
+
+
+def _utc_now() -> str:
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
 
 
 def _load_yaml_mapping(path: Path, label: str) -> Mapping[str, object]:

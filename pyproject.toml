@@ -113,6 +113,7 @@ packages = [
     "open_data_products.mcp",
     "open_data_products.odpr",
     "open_data_products.odpr.data",
+    "open_data_products.odpr.data.recipes",
     "open_data_products.odpr.data.schema",
     "open_data_products.odpc",
     "open_data_products.odpc.data",
@@ -141,6 +142,9 @@ packages = [
 "open_data_products.odpr.data.schema" = [
     "*.yaml",
     "*.json",
+]
+"open_data_products.odpr.data.recipes" = [
+    "*.jsonl",
 ]
 "open_data_products.generation" = [
     "generation.config.yaml",

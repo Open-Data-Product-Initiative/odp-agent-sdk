@@ -102,6 +102,7 @@ ODPR recipe commands:
   recipe catalog        Build a metadata-only RecipeCatalog
   resources --id odpr.schema.yaml          Return the bundled ODPR YAML schema
   resources --id odpr.recipe-config-template  Return the recipe runner config template
+  resources --id odpr.recipes              Return bundled ODPR recipe guidance records
 
 Discovery and agent commands:
   resources    List bundled schemas, vocabularies, and indexes
@@ -162,6 +163,8 @@ Examples:
   open-data-products config generation --copy-prompts-to prompts/
   open-data-products resources --id odpr.schema.yaml --json
   open-data-products resources --id odpr.recipe-config-template --json
+  open-data-products recipe search localization --json
+  open-data-products recipe search --id RecipeCatalog --json
   open-data-products recipe list --config recipes.config.yaml --json
   open-data-products recipe validate recipes/release-portfolio-review.yaml --json
   open-data-products recipe run recipes/release-portfolio-review.yaml --dry-run --json
@@ -512,6 +515,27 @@ def main(argv: Optional[List[str]] = None) -> int:
         help="Output RecipeCatalog YAML path.",
     )
     recipe_catalog_parser.add_argument("--json", action="store_true", help="Emit JSON")
+    recipe_search_parser = recipe_subparsers.add_parser(
+        "search",
+        help="Search bundled ODPR recipe guidance",
+    )
+    recipe_search_parser.add_argument(
+        "query",
+        nargs="*",
+        help="Keyword query for bundled ODPR recipe guidance.",
+    )
+    recipe_search_parser.add_argument(
+        "--id",
+        dest="guidance_id",
+        help="Return one guidance record by id.",
+    )
+    recipe_search_parser.add_argument(
+        "--limit",
+        type=int,
+        default=5,
+        help="Maximum number of search matches.",
+    )
+    recipe_search_parser.add_argument("--json", action="store_true", help="Emit JSON")
     recipe_run_parser = recipe_subparsers.add_parser(
         "run",
         help="Plan or execute one workflow recipe",
@@ -1371,6 +1395,8 @@ def main(argv: Optional[List[str]] = None) -> int:
                 validate_odpr_document,
                 validate_recipe,
                 write_recipe_catalog,
+                get_recipe_guidance,
+                search_recipe_guidance,
             )
 
             try:
@@ -1392,16 +1418,35 @@ def main(argv: Optional[List[str]] = None) -> int:
                     payload = validate_odpr_document(output_path)
                     payload["output"] = str(output_path)
                     exit_code = 0 if payload["valid"] else 1
+                elif args.recipe_command == "search":
+                    if args.guidance_id:
+                        payload = get_recipe_guidance(args.guidance_id)
+                    else:
+                        payload = search_recipe_guidance(
+                            " ".join(args.query or []),
+                            limit=args.limit,
+                        )
+                    exit_code = 0
                 elif args.recipe_command == "run":
-                    mode = "execute" if args.execute else "dry-run"
-                    payload = plan_recipe_run(
-                        args.recipe,
-                        mode=mode,
-                        config_path=args.config,
-                        provider_ref=args.provider_ref,
-                        model=args.model,
-                    )
-                    exit_code = 0 if payload["canRun"] else 1
+                    if args.execute:
+                        from .odpr import execute_recipe_run
+
+                        payload = execute_recipe_run(
+                            args.recipe,
+                            config_path=args.config,
+                            provider_ref=args.provider_ref,
+                            model=args.model,
+                        )
+                        exit_code = int(payload["exitCode"])
+                    else:
+                        payload = plan_recipe_run(
+                            args.recipe,
+                            mode="dry-run",
+                            config_path=args.config,
+                            provider_ref=args.provider_ref,
+                            model=args.model,
+                        )
+                        exit_code = 0 if payload["canRun"] else 1
                 else:
                     raise ValueError(f"Unknown recipe command: {args.recipe_command}")
             except (FileNotFoundError, ValueError) as exc:
@@ -1437,6 +1482,12 @@ def main(argv: Optional[List[str]] = None) -> int:
                     print(f"Valid: {payload.get('valid')}")
                     for error in payload.get("errors", []):
                         print(f"Error: {error}")
+                elif args.recipe_command == "search":
+                    records = payload if isinstance(payload, list) else [payload]
+                    print(f"Guidance records: {len(records)}")
+                    for record in records:
+                        if isinstance(record, dict):
+                            print(f"- {record.get('id')}: {record.get('definition')}")
                 else:
                     print(f"Mode: {payload.get('mode')}")
                     print(f"Can run: {payload.get('canRun')}")

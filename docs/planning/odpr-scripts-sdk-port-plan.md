@@ -20,12 +20,17 @@ The SDK now has:
 - recipe runner config validation
 - recipe catalog-style listing from configured folders
 - metadata-only `RecipeCatalog` generation
+- bundled ODPR `recipes.jsonl` guidance records
+- recipe guidance search by query or id
 - dry-run planning with structured `resolved.parameters`
+- guarded execution for deterministic/report-only recipe steps
+- compact run manifests under `.odp/runs/`
 - CLI commands under `open-data-products recipe ...`
 
 The SDK does not yet have:
 
-- bundled ODPR `recipes.jsonl` search records
+- LLM-backed recipe execution
+- resume/retry support for partially completed recipe runs
 
 ## Script Mapping
 
@@ -33,7 +38,7 @@ The SDK does not yet have:
 | --- | --- | --- | --- |
 | `validate_recipe.py` | Validates `Recipe`, `Provider`, or `RecipeCatalog` documents against the ODPR JSON Schema and rejects embedded secrets. | Brought. The SDK bundles the ODPR schema, runs Draft 2020-12 validation, and applies secret/runtime hardening. | `open_data_products.odpr.validation` and `open-data-products recipe validate`. |
 | `build_recipe_catalog.py` | Builds metadata-only `RecipeCatalog` YAML from canonical recipe examples. | Brought and generalized for project recipe folders. | `build_recipe_catalog()`, `write_recipe_catalog()`, and `open-data-products recipe catalog --config recipes.config.yaml --output catalog.yaml`. |
-| `search_recipes.py` | Searches ODPR `recipes.jsonl` concept records by query or id. | Bring after bundled ODPR resources exist. | Add `open-data-products recipe search ...` or expose through `resources`/MCP search if the records are bundled. |
+| `search_recipes.py` | Searches ODPR `recipes.jsonl` concept records by query or id. | Brought. Bundled records are searchable by query or id. | `search_recipe_guidance()`, `get_recipe_guidance()`, `open-data-products recipe search ...`, and `odpr.recipes` resource. |
 | `odpr_paths.py` | Centralizes spec-repo source paths. | Do not port as-is. | Replace with package resource helpers under `open_data_products.odpr.resources` if ODPR schema/examples are bundled. |
 | `generate_recipe_artifacts.py` | Generates derived `odpr.json` from canonical `odpr.yaml`. | Do not bring as runtime feature. | Keep this in the ODPR spec repo. SDK should consume released/generated schema artifacts, not generate spec artifacts for users. |
 | `check_agent_artifacts.py` | CI consistency check for schema, examples, `recipes.jsonl`, catalog, and `llms.txt`. | Do not bring as CLI feature. Port selected assertions into SDK tests after bundling ODPR artifacts. | Add tests only, not a public SDK command. |
@@ -118,6 +123,9 @@ Status: implemented for configured project recipe paths.
 Bring `search_recipes.py` only after the SDK bundles ODPR recipe guidance
 records.
 
+Status: implemented. The SDK bundles `odpr.recipes`, parses the current ODPR
+guidance records, and exposes `open-data-products recipe search`.
+
 Possible shape:
 
 ```bash
@@ -162,12 +170,15 @@ capabilities.
 1. Keep `recipe validate` validating `Recipe`, `Provider`, and
    `RecipeCatalog`.
 2. Add ODPR resources to `resources` and agent manifest metadata.
-3. Add recipe guidance search only after `recipes.jsonl` is bundled.
+3. Expand guarded execution command by command, keeping LLM-backed operations
+   blocked until provider, review-gate, and prompt-audit behavior are fully
+   tested.
 
 ## Non-Goals
 
 - Do not port spec artifact generation as SDK runtime behavior.
 - Do not expose `RecipeRunPlan`, `RecipeRunManifest`, or `RecipeInspection` as
   ODPR v1 document kinds.
-- Do not add state-changing recipe execution until validation, catalog
-  generation, and write-scope planning are solid.
+- Do not enable LLM-backed recipe execution until validation, catalog
+  generation, write-scope planning, provider configuration, and review gates
+  are solid.

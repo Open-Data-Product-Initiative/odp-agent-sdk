@@ -392,9 +392,11 @@ def _workflows() -> List[Dict[str, Any]]:
             "title": "List, validate, and dry-run workflow recipes",
             "commands": [
                 "open-data-products recipe list --config recipes.config.yaml --json",
+                "open-data-products recipe search localization --json",
                 "open-data-products recipe validate recipes/release-portfolio-review.yaml --json",
                 "open-data-products recipe catalog --config recipes.config.yaml --output recipes/catalog.yaml --json",
                 "open-data-products recipe run recipes/release-portfolio-review.yaml --dry-run --json",
+                "open-data-products recipe run recipes/ci-validate.yaml --execute --json",
             ],
             "mcp_tools": [],
         },

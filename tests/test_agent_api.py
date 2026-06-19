@@ -127,6 +127,7 @@ def test_resources_are_listable_and_retrievable():
     assert any(resource.id == "odpr.schema.yaml" for resource in resources)
     assert any(resource.id == "odpr.schema.json" for resource in resources)
     assert any(resource.id == "odpr.recipe-config-template" for resource in resources)
+    assert any(resource.id == "odpr.recipes" for resource in resources)
     assert any(resource.id == "generation.prompt.system" for resource in resources)
     assert any(
         resource.id == "generation.prompt.odps_product_facts" for resource in resources
@@ -141,6 +142,7 @@ def test_resources_are_listable_and_retrievable():
     )
     assert get_resource("odpv.terms").id == "odpv.terms"
     assert get_resource("odpr.schema.yaml").spec == "odpr"
+    assert get_resource("odpr.recipes").type == "jsonl"
     assert get_resource("generation.prompt.system").type == "prompt"
 
 
