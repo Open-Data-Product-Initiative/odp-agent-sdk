@@ -17,14 +17,17 @@ from open_data_products import (
     get_config_path,
     get_resource,
     llama_cpp_generate,
+    list_recipes,
     list_resources,
     load_generation_prompt,
     print_config,
+    plan_recipe_run,
     load_document,
     load_summary,
     resolve_references,
     validate_config,
     validate_document,
+    validate_recipe,
 )
 
 document = load_document("examples/product.yaml")
@@ -42,6 +45,9 @@ config_yaml = print_config("generation", "my-generation.config.yaml")
 prompt = load_generation_prompt("odps_data_product_fragment.md", prompt_dir="prompts")
 signal = generate_local_artifact("signal", "signal.txt", "open_data_products/generation/fragments")
 artifacts = generate_local_artifacts("open_data_products/generation/source_docs", "open_data_products/generation/fragments")
+recipe_catalog = list_recipes(config_path="examples/recipes/config/recipes.config.yaml")
+recipe_report = validate_recipe(config_path="examples/recipes/config/recipes.config.yaml")
+recipe_plan = plan_recipe_run(config_path="examples/recipes/config/recipes.config.yaml")
 ```
 
 ### Core Functions
@@ -86,6 +92,63 @@ artifacts = generate_local_artifacts("open_data_products/generation/source_docs"
   `pip install "open-data-products[llama-cpp]"`.
 - `ensure_ollama_model(model="qwen2.5")`: check that Ollama is reachable and
   that the requested local model is available before Ollama-backed generation.
+
+### ODPR Recipe Workflow Helpers
+
+Use ODPR recipe helpers when a workflow needs to be planned, reviewed, repeated,
+or delegated to an agent before execution.
+
+```python
+from open_data_products import (
+    execute_recipe_run,
+    get_recipe_config,
+    list_recipes,
+    plan_recipe_run,
+    search_recipe_guidance,
+    validate_recipe,
+    validate_recipe_config,
+)
+
+config_path = "examples/recipes/config/recipes.config.yaml"
+
+config = get_recipe_config(config_path)
+catalog = list_recipes(config_path=config_path)
+validation = validate_recipe(config_path=config_path)
+plan = plan_recipe_run(config_path=config_path)
+result = execute_recipe_run(config_path=config_path)
+guidance = search_recipe_guidance("localization", limit=3)
+config_report = validate_recipe_config(config_path)
+```
+
+- `get_recipe_config(config_path=None)`: return a safe summary of the bundled
+  or selected recipe runner config.
+- `validate_recipe_config(path)`: validate `recipes.config.yaml`, including
+  recipe search paths, generation config references, manifest directory, and
+  write roots.
+- `list_recipes(config_path=None, project_root=None)`: build a metadata-only
+  recipe catalog from configured search paths.
+- `validate_recipe(path=None, config_path=None, project_root=None)`: validate
+  one ODPR Recipe. If `path` is omitted, `recipes.defaultRecipe` from the
+  selected config is used.
+- `plan_recipe_run(path=None, config_path=None, project_root=None, ...)`: return
+  the dry-run plan with `recipeSelection`, `canRun`, `blockingReasons`,
+  provider readiness, planned writes, review status, and resolved step
+  parameters. It does not execute commands or write artifacts.
+- `execute_recipe_run(path=None, config_path=None, project_root=None,
+  allow_llm=False, approve_review=False, ...)`: execute currently supported
+  deterministic/report steps and write a compact run manifest. LLM-backed steps
+  require `allow_llm=True`; review-needed steps require `approve_review=True`.
+  `portfolio.localize` is the first provider-backed recipe command supported;
+  other LLM-backed commands still fail after the policy gates until implemented.
+- `search_recipe_guidance(query, limit=5)`: search bundled ODPR guidance
+  records.
+
+The recipe path argument is optional for `validate_recipe`, `plan_recipe_run`,
+and `execute_recipe_run` when `recipes.defaultRecipe` is configured. Returned
+payloads include `recipeSelection` so callers can distinguish explicit recipe
+arguments from config defaults. Safe MCP tools expose listing, validation,
+guidance search, and dry-run planning; recipe execution remains a CLI/Python
+operation because it can write manifests and artifacts.
 
 ### Shared Result Types
 
@@ -132,6 +195,7 @@ The SDK uses one namespace per Open Data Products standard:
 - `open_data_products.odpc` for Open Data Product Catalog
 - `open_data_products.odpg` for Open Data Product Graph
 - `open_data_products.odpv` for Open Data Product Vocabulary
+- `open_data_products.odpr` for Open Data Product Recipes
 - `open_data_products.generation` for LLM generation prompts and provider config
 
 Import ODPS APIs from `open_data_products.odps`:
@@ -175,6 +239,11 @@ from open_data_products.generation import (
     list_generation_prompts,
     load_generation_prompt,
 )
+from open_data_products.odpr import (
+    list_recipes,
+    plan_recipe_run,
+    validate_recipe,
+)
 ```
 
 - `open_data_products.odpc`: catalog building from ODPC fragments or ODPS
@@ -185,6 +254,9 @@ from open_data_products.generation import (
   context, object search, and standalone graph explorer generation.
 - `open_data_products.odpv`: vocabulary loading, validation, search, generated
   JSON/JSONL/YAML artifacts, and artifact drift checks.
+- `open_data_products.odpr`: recipe loading, config inspection, recipe catalog
+  listing, validation, dry-run planning, guarded deterministic execution, run
+  manifests, and bundled recipe guidance.
 - `open_data_products.generation`: editable prompt files for guiding configured
   LLM providers to produce ODPS, ODPC, and ODPG YAML that can be validated by
   the SDK, plus local Ollama and OpenAI generation helpers.

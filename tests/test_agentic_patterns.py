@@ -97,6 +97,10 @@ EXPECTED_TOOLS = {
     "validate_data_contract",
     "summarize_data_contract",
     "extract_data_contract_schema",
+    "list_recipes",
+    "validate_recipe",
+    "plan_recipe_run",
+    "search_recipe_guidance",
 }
 
 
@@ -233,7 +237,25 @@ class TestLlmsText:
             "validate_document",
             "traverse_graph",
             "load_summary",
+            "plan_recipe_run",
+            "search_recipe_guidance",
             "AGENTS.md",
+        ):
+            assert expected in content
+
+    def test_api_reference_documents_recipe_helpers(self):
+        path = REPO_ROOT / "docs" / "user" / "API.md"
+
+        content = path.read_text(encoding="utf-8")
+
+        for expected in (
+            "ODPR Recipe Workflow Helpers",
+            "list_recipes",
+            "validate_recipe",
+            "plan_recipe_run",
+            "execute_recipe_run",
+            "recipes.defaultRecipe",
+            "recipeSelection",
         ):
             assert expected in content
 
@@ -337,6 +359,17 @@ class TestAgentManifest:
             "explore-vocabulary",
             "inspect-product-contracts",
         }
+        workflows = {item["id"]: item for item in manifest["workflows"]}
+        assert workflows["configure-recipes"]["mcp_tools"] == [
+            "get_config",
+            "validate_config",
+        ]
+        assert workflows["plan-recipe-workflow"]["mcp_tools"] == [
+            "list_recipes",
+            "search_recipe_guidance",
+            "validate_recipe",
+            "plan_recipe_run",
+        ]
         assert manifest["interfaces"]["cli"]["command"] == "open-data-products"
         assert manifest["interfaces"]["mcp"]["command"] == "open-data-products serve"
         assert manifest["interfaces"]["manifest"]["command"] == (

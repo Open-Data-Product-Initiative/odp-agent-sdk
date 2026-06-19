@@ -190,8 +190,8 @@ def _capabilities() -> List[Dict[str, Any]]:
             "id": "recipe-workflows",
             "title": "ODPR recipe workflow planning",
             "standards": ["odpr", "odps", "odpc", "odpg"],
-            "interfaces": ["cli", "python"],
-            "lifecycle": ["list", "validate", "dry-run"],
+            "interfaces": ["cli", "python", "mcp"],
+            "lifecycle": ["list", "validate", "dry-run", "execute-guarded"],
             "step_commands": [
                 "generate",
                 "odpc.build",
@@ -207,8 +207,9 @@ def _capabilities() -> List[Dict[str, Any]]:
                 "explain",
             ],
             "summary": (
-                "List, validate, and dry-run ODPR-style workflow recipes with "
-                "structured agent-readable resolved step parameters."
+                "List, validate, dry-run, and guarded-execute ODPR-style "
+                "workflow recipes with structured agent-readable resolved step "
+                "parameters and run manifests."
             ),
         },
         {
@@ -325,7 +326,7 @@ def _workflows() -> List[Dict[str, Any]]:
                 "open-data-products config recipes --copy-to recipes.config.yaml",
                 "open-data-products config recipes --config recipes.config.yaml --check --json",
             ],
-            "mcp_tools": [],
+            "mcp_tools": ["get_config", "validate_config"],
         },
         {
             "id": "discover-resources",
@@ -397,8 +398,14 @@ def _workflows() -> List[Dict[str, Any]]:
                 "open-data-products recipe catalog --config recipes.config.yaml --output recipes/catalog.yaml --json",
                 "open-data-products recipe run recipes/release-portfolio-review.yaml --dry-run --json",
                 "open-data-products recipe run recipes/ci-validate.yaml --execute --json",
+                "open-data-products recipe run recipes/release-portfolio-review.yaml --execute --allow-llm --approve-review --json",
             ],
-            "mcp_tools": [],
+            "mcp_tools": [
+                "list_recipes",
+                "search_recipe_guidance",
+                "validate_recipe",
+                "plan_recipe_run",
+            ],
         },
         {
             "id": "build-portfolio",

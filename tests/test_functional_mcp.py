@@ -15,6 +15,7 @@ ODPS_PRODUCT = (
     REPO_ROOT / "examples" / "apps" / "pricing_402_builder" / "priced_product.yaml"
 )
 ODPG_GRAPH = REPO_ROOT / "open_data_products" / "odpg" / "data" / "graph" / "graph.yaml"
+RECIPE_CONFIG = REPO_ROOT / "examples" / "recipes" / "config" / "recipes.config.yaml"
 
 
 def _call_tool(name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
@@ -72,6 +73,10 @@ def test_mcp_initialize_and_list_tools() -> None:
         "validate_data_contract",
         "summarize_data_contract",
         "extract_data_contract_schema",
+        "list_recipes",
+        "validate_recipe",
+        "plan_recipe_run",
+        "search_recipe_guidance",
     }
 
 
@@ -83,9 +88,7 @@ def test_mcp_manifest_is_json_serializable_and_preserves_tool_contracts() -> Non
     json.dumps(manifest)
 
     manifest_tools = manifest["tools"]
-    assert [tool["name"] for tool in manifest_tools] == [
-        tool["name"] for tool in TOOLS
-    ]
+    assert [tool["name"] for tool in manifest_tools] == [tool["name"] for tool in TOOLS]
     assert all(tool["class"] == "safe" for tool in manifest_tools)
     assert all("handler" not in tool for tool in manifest_tools)
     assert all(tool["inputSchema"]["type"] == "object" for tool in manifest_tools)
@@ -93,6 +96,7 @@ def test_mcp_manifest_is_json_serializable_and_preserves_tool_contracts() -> Non
         "validate_document",
         "generate_product_contract_report",
         "extract_data_contract_schema",
+        "plan_recipe_run",
     }
 
 
@@ -105,7 +109,13 @@ def test_mcp_manifest_is_json_serializable_and_preserves_tool_contracts() -> Non
         ("list_resources", {}),
         ("get_resource", {"id": "odpv.terms"}),
         ("get_config", {"domain": "generation"}),
+        ("get_config", {"domain": "recipes", "path": str(RECIPE_CONFIG)}),
         ("validate_config", {"domain": "generation"}),
+        ("validate_config", {"domain": "recipes", "path": str(RECIPE_CONFIG)}),
+        ("list_recipes", {"config_path": str(RECIPE_CONFIG)}),
+        ("validate_recipe", {"config_path": str(RECIPE_CONFIG)}),
+        ("plan_recipe_run", {"config_path": str(RECIPE_CONFIG)}),
+        ("search_recipe_guidance", {"query": "localization", "limit": 1}),
         ("load_summary", {"path": str(ODPS_PRODUCT)}),
         ("catalog_artifacts", {}),
         ("search_terms", {"query": "data product", "limit": 1}),
@@ -147,6 +157,20 @@ def test_mcp_load_summary_exposes_context_sidecar_references(tmp_path: Path) -> 
     assert payload["context_artifacts"][0]["format"] == "gcf"
     assert payload["context_artifacts"][0]["path"] == str(graph.with_suffix(".gcf"))
     assert "content" not in result["content"][0]["text"]
+
+
+def test_mcp_recipe_plan_uses_default_recipe_from_config() -> None:
+    result = _call_tool("plan_recipe_run", {"config_path": str(RECIPE_CONFIG)})
+    payload = json.loads(result["content"][0]["text"])
+
+    assert payload["mode"] == "dry-run"
+    assert payload["canRun"] is True
+    assert payload["recipe"]["id"] == "RCP-CI-VALIDATE-001"
+    assert payload["recipeSelection"] == {
+        "source": "config-default",
+        "path": "workflows/ci-validate-catalog.yaml",
+        "defaultRecipe": "workflows/ci-validate-catalog.yaml",
+    }
 
 
 def test_mcp_unknown_tool_returns_json_rpc_error() -> None:

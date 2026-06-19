@@ -6,8 +6,7 @@ These examples show the three main recipe workflow shapes:
 - `portfolio-sync-render.yaml`: deterministic portfolio sync, render, and
   explain flow that writes only under `workspace/`.
 - `release-portfolio-localize.yaml`: LLM-backed release localization that is
-  useful for dry-run planning but is blocked by guarded execute in the current
-  SDK.
+  guarded by provider readiness, explicit LLM permission, and review approval.
 
 Run from the repository root:
 

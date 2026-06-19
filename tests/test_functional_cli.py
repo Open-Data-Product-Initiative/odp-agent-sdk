@@ -1,5 +1,7 @@
 """Functional tests for the unified command line interface."""
 
+import json
+import shutil
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
@@ -17,6 +19,31 @@ ODPS_PRODUCT = (
 )
 ODPG_GRAPH = REPO_ROOT / "open_data_products" / "odpg" / "data" / "graph" / "graph.yaml"
 GENERATION_SOURCE_DOCS = REPO_ROOT / "open_data_products" / "generation" / "source_docs"
+EXAMPLE_RECIPES = REPO_ROOT / "examples" / "recipes"
+
+
+def _fake_localization_client(prompt: str, model: str) -> str:
+    if "Target language: fi" in prompt:
+        return """
+language: fi
+translations:
+  Open Data Products Portfolio: Open Data Products Portfolio FI
+  Generated workspace summary: Generated workspace summary FI
+  Overview: Overview FI
+  Products: Products FI
+  Customer Product: Customer Product FI
+  Full product details from product discussions.: Full product details from product discussions FI.
+"""
+    return """
+language: sv
+translations:
+  Open Data Products Portfolio: Open Data Products Portfolio SV
+  Generated workspace summary: Generated workspace summary SV
+  Overview: Overview SV
+  Products: Products SV
+  Customer Product: Customer Product SV
+  Full product details from product discussions.: Full product details from product discussions SV.
+"""
 
 
 def _json_output(capsys: pytest.CaptureFixture[str]) -> Dict[str, Any]:
@@ -400,10 +427,197 @@ recipe:
     assert payload["canRun"] is False
     assert payload["steps"][0]["status"] == "blocked"
     assert any(
-        reason["code"] == "llm_execution_not_supported"
+        reason["code"] == "llm_execution_requires_allow_llm"
         for reason in payload["blockingReasons"]
     )
+    assert any(
+        reason["code"] == "review_approval_required"
+        for reason in payload["blockingReasons"]
+    )
+    assert payload["executionPolicy"] == {
+        "allowLlm": False,
+        "reviewApproved": False,
+    }
     assert (tmp_path / payload["manifest"]["path"]).is_file()
+
+
+def test_recipe_cli_execute_requires_review_approval_after_allowing_llm(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    recipe_path = tmp_path / "recipe.yaml"
+    workspace = tmp_path / "generated" / "portfolio"
+    workspace.mkdir(parents=True)
+    recipe_path.write_text(
+        """
+schema: https://opendataproducts.org/odpr-v1.0/schema/odpr.yaml
+version: "1.0"
+kind: Recipe
+recipe:
+  metadata:
+    id: RCP-LOCALIZE-001
+    name:
+      en: Localize Portfolio
+  version: "1.0.0"
+  type: localization
+  steps:
+    - id: localize
+      command: portfolio.localize
+      providerRef: claude
+      model: claude-sonnet-4-5
+      with:
+        workspace: generated/portfolio/
+        languages:
+          - fi
+""",
+        encoding="utf-8",
+    )
+
+    assert (
+        main(
+            [
+                "recipe",
+                "run",
+                str(recipe_path),
+                "--execute",
+                "--allow-llm",
+                "--provider-ref",
+                "ollama",
+                "--model",
+                "test-model",
+                "--json",
+            ]
+        )
+        == 1
+    )
+    payload = _json_output(capsys)
+
+    assert payload["status"] == "blocked"
+    assert payload["executionPolicy"] == {"allowLlm": True, "reviewApproved": False}
+    assert [reason["code"] for reason in payload["blockingReasons"]] == [
+        "review_approval_required"
+    ]
+
+
+def test_recipe_cli_execute_localizes_portfolio_after_llm_and_review_approval(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from open_data_products import generation
+
+    recipe_path = tmp_path / "recipe.yaml"
+    workspace = tmp_path / "generated" / "portfolio"
+    shutil.copytree(EXAMPLE_RECIPES / "workspace", workspace)
+    recipe_path.write_text(
+        """
+schema: https://opendataproducts.org/odpr-v1.0/schema/odpr.yaml
+version: "1.0"
+kind: Recipe
+recipe:
+  metadata:
+    id: RCP-LOCALIZE-001
+    name:
+      en: Localize Portfolio
+  version: "1.0.0"
+  type: localization
+  steps:
+    - id: localize
+      command: portfolio.localize
+      providerRef: claude
+      model: claude-sonnet-4-5
+      with:
+        workspace: generated/portfolio/
+        languages:
+          - fi
+        """,
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        generation,
+        "create_generation_client",
+        lambda settings: _fake_localization_client,
+    )
+
+    assert (
+        main(
+            [
+                "recipe",
+                "run",
+                str(recipe_path),
+                "--execute",
+                "--allow-llm",
+                "--approve-review",
+                "--provider-ref",
+                "ollama",
+                "--model",
+                "test-model",
+                "--json",
+            ]
+        )
+        == 0
+    )
+    payload = _json_output(capsys)
+
+    assert payload["status"] == "passed"
+    assert payload["canRun"] is True
+    assert payload["blockingReasons"] == []
+    assert payload["executionPolicy"] == {"allowLlm": True, "reviewApproved": True}
+    assert payload["steps"][0]["review"]["decision"] == "approved-by-cli-flag"
+    assert payload["steps"][0]["status"] == "passed"
+    assert (workspace / "portfolio-i18n.yaml").is_file()
+    assert (workspace / "index.fi.html").is_file()
+
+
+def test_recipe_cli_execute_returns_failure_for_failed_deterministic_step(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    recipe_path = tmp_path / "recipe.yaml"
+    catalog_path = tmp_path / "catalog.yaml"
+    recipe_path.write_text(
+        """
+schema: https://opendataproducts.org/odpr-v1.0/schema/odpr.yaml
+version: "1.0"
+kind: Recipe
+recipe:
+  metadata:
+    id: RCP-VALIDATE-001
+    name:
+      en: Validate Catalog
+  version: "1.0.0"
+  type: ci
+  steps:
+    - id: validate-catalog
+      command: validate
+      with:
+        document: catalog.yaml
+""",
+        encoding="utf-8",
+    )
+    catalog_path.write_text(
+        """
+schema: https://opendataproducts.org/odpc-v1.0/schema/odpc.yaml
+version: "1.0"
+kind: Catalog
+catalog: {}
+""",
+        encoding="utf-8",
+    )
+
+    assert main(["recipe", "run", str(recipe_path), "--execute", "--json"]) == 1
+    payload = _json_output(capsys)
+
+    assert payload["mode"] == "execute"
+    assert payload["status"] == "failed"
+    assert payload["canRun"] is True
+    assert payload["steps"][0]["status"] == "failed"
+    assert payload["steps"][0]["issues"]
+    manifest_path = tmp_path / payload["manifest"]["path"]
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert manifest["status"] == "failed"
+    assert manifest["exitCode"] == 1
+    assert manifest["steps"][0]["issues"]
 
 
 def test_recipe_cli_execute_blocks_state_changing_step_outside_allow_writes(

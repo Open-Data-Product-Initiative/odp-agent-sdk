@@ -372,6 +372,8 @@ def execute_recipe_run(
     project_root: Optional[PathLike] = None,
     provider_ref: Optional[str] = None,
     model: Optional[str] = None,
+    allow_llm: bool = False,
+    approve_review: bool = False,
 ) -> Dict[str, object]:
     """Execute deterministic and report-only recipe steps with a run manifest."""
     config = _load_optional_recipe_config(config_path)
@@ -393,18 +395,52 @@ def execute_recipe_run(
     )
     plan["mode"] = "execute"
     blocking = list(plan["blockingReasons"])
+    execution_policy = {
+        "allowLlm": allow_llm,
+        "reviewApproved": approve_review,
+    }
     for issue in _execution_config_issues(config_path):
         blocking.append({"code": "config_invalid", "message": issue, "blocking": True})
     for step in plan["steps"]:
         if not isinstance(step, dict):
             continue
-        if step.get("classification") == "llm-backed":
+        if step.get("classification") == "llm-backed" and not allow_llm:
             blocking.append(
                 {
-                    "code": "llm_execution_not_supported",
+                    "code": "llm_execution_requires_allow_llm",
                     "message": (
                         f"{step.get('id', '')} uses {step.get('command', '')}; "
-                        "LLM-backed recipe execution is not enabled yet."
+                        "rerun with --allow-llm to permit provider calls."
+                    ),
+                    "blocking": True,
+                }
+            )
+    if allow_llm:
+        for provider in plan["providers"]:
+            if not isinstance(provider, dict):
+                continue
+            if provider.get("readiness") != "ready":
+                blocking.append(
+                    {
+                        "code": "provider_not_ready",
+                        "message": (
+                            f"Provider {provider.get('ref', '')} is "
+                            f"{provider.get('readiness', 'not ready')}."
+                        ),
+                        "blocking": True,
+                    }
+                )
+    for step in plan["steps"]:
+        if not isinstance(step, dict):
+            continue
+        review = _mapping(step.get("review"))
+        if review.get("status") == "review-needed" and not approve_review:
+            blocking.append(
+                {
+                    "code": "review_approval_required",
+                    "message": (
+                        f"{step.get('id', '')} requires review approval; "
+                        "rerun with --approve-review after approval."
                     ),
                     "blocking": True,
                 }
@@ -420,7 +456,12 @@ def execute_recipe_run(
         for step in plan["steps"]:
             if not isinstance(step, dict):
                 continue
-            result = _execute_step(step, root)
+            execution_step = _execution_step(step, approve_review)
+            result = _execute_step(
+                execution_step,
+                root,
+                _execution_generation_config(plan, root),
+            )
             step_results.append(result)
             if result["status"] == "failed":
                 status = "failed"
@@ -428,7 +469,9 @@ def execute_recipe_run(
                 break
     else:
         step_results = [
-            _blocked_step(step) for step in plan["steps"] if isinstance(step, dict)
+            _blocked_step(_execution_step(step, approve_review))
+            for step in plan["steps"]
+            if isinstance(step, dict)
         ]
 
     completed_at = _utc_now()
@@ -440,6 +483,7 @@ def execute_recipe_run(
         "startedAt": started_at,
         "completedAt": completed_at,
         "recipeSelection": recipe_selection,
+        "executionPolicy": execution_policy,
         "recipe": plan["recipe"],
         "config": plan["config"],
         "blockingReasons": blocking,
@@ -450,6 +494,7 @@ def execute_recipe_run(
     return {
         "mode": "execute",
         "recipeSelection": recipe_selection,
+        "executionPolicy": execution_policy,
         "runId": run_id,
         "status": status,
         "exitCode": exit_code,
@@ -754,8 +799,11 @@ def _planned_writes(
         workspace = values.get("workspace")
         languages = values.get("languages")
         if isinstance(workspace, str):
+            workspace_root = workspace.rstrip("/")
+            paths.append(f"{workspace_root}/portfolio-i18n.yaml")
+            paths.append(f"{workspace_root}/index.html")
             for language in _language_list(languages):
-                paths.append(f"{workspace.rstrip('/')}/index.{language}.html")
+                paths.append(f"{workspace_root}/index.{language}.html")
     elif command == "portfolio.sync":
         _append_string(paths, values.get("workspace"))
     elif command == "portfolio.render":
@@ -982,7 +1030,25 @@ def _execution_config_issues(config_path: Optional[PathLike]) -> List[str]:
     return list(report["errors"])
 
 
-def _execute_step(step: Mapping[str, object], root: Path) -> Dict[str, object]:
+def _execution_generation_config(
+    plan: Mapping[str, object],
+    root: Path,
+) -> Optional[Path]:
+    config = _mapping(plan.get("config"))
+    generation_config = _string(config.get("generationConfig"))
+    if not generation_config:
+        return None
+    path = Path(generation_config)
+    if path.is_absolute():
+        return path
+    return root / path
+
+
+def _execute_step(
+    step: Mapping[str, object],
+    root: Path,
+    generation_config: Optional[Path] = None,
+) -> Dict[str, object]:
     command = str(step.get("command", ""))
     parameters = _mapping(_mapping(step.get("resolved")).get("parameters"))
     started_at = _utc_now()
@@ -1044,6 +1110,28 @@ def _execute_step(step: Mapping[str, object], root: Path) -> Dict[str, object]:
             workspace = _required_path(parameters, "workspace", root)
             output = _optional_path(parameters, "output", root)
             result = render_portfolio(workspace, output_path=output)
+            return _portfolio_step_result(step, started_at, root, result)
+        if command == "portfolio.localize":
+            from ..generation import create_generation_client
+            from ..generation import resolve_generation_settings
+            from ..portfolio import localize_portfolio
+
+            workspace = _required_path(parameters, "workspace", root)
+            languages = _language_list(parameters.get("languages"))
+            default_language = _string(parameters.get("defaultLanguage")) or "en"
+            settings = resolve_generation_settings(
+                config_path=generation_config,
+                provider=_string(parameters.get("providerRef")),
+                model=_string(parameters.get("model")),
+            )
+            client = create_generation_client(settings)
+            result = localize_portfolio(
+                workspace,
+                languages=languages,
+                default_language=default_language,
+                client=client,
+                model=settings.model,
+            )
             return _portfolio_step_result(step, started_at, root, result)
         if command == "portfolio.explain":
             from ..portfolio import explain_portfolio
@@ -1134,6 +1222,19 @@ def _blocked_step(step: Mapping[str, object]) -> Dict[str, object]:
         "artifacts": [],
         "issues": [],
     }
+
+
+def _execution_step(
+    step: Mapping[str, object],
+    approve_review: bool,
+) -> Dict[str, object]:
+    execution_step = dict(step)
+    review = _mapping(step.get("review"))
+    if review.get("status") == "review-needed" and approve_review:
+        review = dict(review)
+        review["decision"] = "approved-by-cli-flag"
+        execution_step["review"] = review
+    return execution_step
 
 
 def _step_result(

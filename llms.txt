@@ -81,13 +81,16 @@ Use the top-level API when the input spec is unknown:
 ODPR recipe workflow helpers:
 
 - `load_recipe(path)`
-- `validate_recipe(path)`
-- `plan_recipe_run(path, config_path=None)`
-- `execute_recipe_run(path, config_path=None)`
+- `list_recipes(config_path=None)`
+- `validate_recipe(path=None, config_path=None)`
+- `plan_recipe_run(path=None, config_path=None)`
+- `execute_recipe_run(path=None, config_path=None, allow_llm=False, approve_review=False)`
 
 The cross-spec document helpers support ODPS, ODPC, ODPG, and ODPV documents
 through one consistent agent-facing surface. ODPR recipe helpers validate and
-plan workflow recipes around those SDK commands.
+plan workflow recipes around those SDK commands. In guarded execute mode,
+`portfolio.localize` is the first supported LLM-backed recipe command and
+requires both `allow_llm=True` and `approve_review=True`.
 
 Data Contract functions are product-oriented. The SDK resolves native ODPS
 `/product/contract` entries (`$ref`, `contractURL`, inline `spec`) and
@@ -136,6 +139,7 @@ Use these commands for machine-readable workflows:
 - `open-data-products recipe validate <recipe.yaml> --json`
 - `open-data-products recipe run <recipe.yaml> --config recipes.config.yaml --dry-run --json`
 - `open-data-products recipe run <recipe.yaml> --config recipes.config.yaml --execute --json`
+- `open-data-products recipe run <recipe.yaml> --config recipes.config.yaml --execute --allow-llm --approve-review --json`
 
 ODPG graph reasoning commands:
 
@@ -178,6 +182,10 @@ The MCP server exposes safe, read-only tools:
 - `validate_data_contract`
 - `summarize_data_contract`
 - `extract_data_contract_schema`
+- `list_recipes`
+- `validate_recipe`
+- `plan_recipe_run`
+- `search_recipe_guidance`
 
 Tool responses should stay compact and structured. Do not return full document
 bodies from MCP handlers; use `load_summary` for lightweight artifact

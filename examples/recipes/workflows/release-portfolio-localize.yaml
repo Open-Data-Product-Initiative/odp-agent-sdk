@@ -7,7 +7,7 @@ recipe:
     name:
       en: Release Portfolio Localization
     description:
-      en: Plan release localization for the example portfolio. Dry-run is supported; execute blocks LLM-backed steps in the current SDK.
+      en: Localize the example portfolio after provider readiness, explicit LLM permission, and review approval.
     tags:
       - portfolio
       - release

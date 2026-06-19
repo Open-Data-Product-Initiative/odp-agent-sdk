@@ -10,8 +10,9 @@ An AI-agent-first Python SDK for the OpenDataProducts.org standards family. It g
 
 * [Open Data Product Specification (ODPS)](https://opendataproducts.org/v4.1/), 
 * [Open Data Product Catalog (ODPC)](https://opendataproducts.org/odpc-v1.0/), 
-* [Open Data Product Graphs (ODPG)](https://opendataproducts.org/odpg-v1.0/), and
-* [Open Data Product Vocabulary (ODPV)](https://opendataproducts.org/odpv-v1.0/).
+* [Open Data Product Graphs (ODPG)](https://opendataproducts.org/odpg-v1.0/),
+* [Open Data Product Vocabulary (ODPV)](https://opendataproducts.org/odpv-v1.0/), and
+* [Open Data Product Recipes (ODPR)](https://opendataproducts.org/odpr-v1.0/).
 
 The package still includes developer-facing Python helpers, but the primary contract is agent-ready: structured validation results, lightweight artifact summaries, reference discovery, Data Contract orchestration, bundled retrieval resources, a unified CLI, an MCP stdio server, and an ARWS agent manifest.
 
@@ -41,6 +42,7 @@ pip install "open-data-products[dev]"
 - **Agent-ready ODPC and ODPV helpers**: Catalog building, catalog artifact checks, vocabulary term resolution, canonical term packets, relationship compatibility checks, and term context packets are available through Python, CLI, and MCP surfaces where safe.
 - **Graph reasoning for agents**: ODPG helpers support graph summaries, traversal, strategic analysis, and trusted focus-node context extraction.
 - **Data Contract orchestration**: Optional `datacontract-cli` integration validates external contracts while the SDK resolves ODPS contract references, extracts schemas, checks static product-contract alignment, and returns agent-ready reports.
+- **Recipe workflow planning**: ODPR recipes can be listed, validated, dry-run, and guarded-executed through CLI/Python, with safe MCP tools for recipe discovery and dry-run planning.
 - **Host integration**: MCP-capable tools can launch `open-data-products serve`, while ARWS-compatible systems can read the generated manifest.
 
 ### Unified Agent API
@@ -138,6 +140,7 @@ Use `open_data_products.<spec>` namespaces for every standard:
 | `open_data_products.odpc` | Open Data Product Catalog | Catalog helpers implemented |
 | `open_data_products.odpg` | Open Data Product Graph | Graph helpers implemented |
 | `open_data_products.odpv` | Open Data Product Vocabulary | Vocabulary tools implemented |
+| `open_data_products.odpr` | Open Data Product Recipes | Recipe workflow helpers implemented |
 
 ## Capabilities at a Glance
 
@@ -153,6 +156,7 @@ Use `open_data_products.<spec>` namespaces for every standard:
 | ODPC | Build catalogs from fragments and ODPS products, render HTML, create TOON/GCF context, search object guidance, and check derived artifacts |
 | ODPG | Build and validate graphs, infer relationships from catalog fragments, render graph explorers, traverse paths, analyze governance signals, and extract agent context |
 | ODPV | Search vocabulary terms, resolve aliases, explain canonical packets, check relationship compatibility, and produce agent-ready term context |
+| ODPR | List, validate, dry-run, and guarded-execute recipe workflows with config defaults, provider readiness checks, planned writes, review status, and run manifests |
 | Data Contracts | Resolve ODPS contract references, validate external contracts through optional `datacontract-cli`, extract schemas, check static alignment, export contracts, and generate product reports |
 | Portfolio workspaces | Build, refresh, sync, render, localize, and explain connected ODPC/ODPS/ODPG portfolio workspaces from objectives, use cases, signals, and product source lanes |
 | Bundled resources and docs | Discover schemas, prompts, examples, vocabularies, object guidance, graph records, and organized user/developer documentation |

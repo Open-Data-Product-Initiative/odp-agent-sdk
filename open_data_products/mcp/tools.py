@@ -36,7 +36,8 @@ from ..contracts import (
     summarize_contract,
     validate_contract,
 )
-from ..generation import get_config, validate_config
+from ..generation import get_config as get_generation_config
+from ..generation import validate_config as validate_generation_config
 from ..odpc import (
     build_catalog_artifacts,
     load_object_records,
@@ -52,6 +53,14 @@ from ..odpg import (
     validate_graph as _validate_graph,
 )
 from ..okf import summarize_okf_bundle, validate_okf_bundle
+from ..odpr import (
+    get_recipe_config,
+    list_recipes as _list_recipes,
+    plan_recipe_run as _plan_recipe_run,
+    search_recipe_guidance as _search_recipe_guidance,
+    validate_recipe as _validate_recipe,
+    validate_recipe_config,
+)
 from ..odpv import (
     agent_vocabulary_context as _agent_vocabulary_context,
     check_vocabulary_relationship as _check_vocabulary_relationship,
@@ -125,13 +134,28 @@ def _h_get_resource(args: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _h_get_config(args: Dict[str, Any]) -> Dict[str, Any]:
-    return _json_envelope(get_config(args.get("domain", "generation")))
+    domain = args.get("domain", "generation")
+    config_path = args.get("path")
+    if domain == "recipes":
+        return _json_envelope(get_recipe_config(config_path))
+    return _json_envelope(get_generation_config(domain, config_path))
 
 
 def _h_validate_config(args: Dict[str, Any]) -> Dict[str, Any]:
-    return _json_envelope(
-        validate_config(args.get("domain", "generation"), args.get("path"))
-    )
+    domain = args.get("domain", "generation")
+    if domain == "recipes":
+        path = args.get("path")
+        if path is None:
+            return _json_envelope(
+                {
+                    "domain": "recipes",
+                    "valid": False,
+                    "errors": ["path is required for recipe config validation"],
+                    "warnings": [],
+                }
+            )
+        return _json_envelope(validate_recipe_config(path))
+    return _json_envelope(validate_generation_config(domain, args.get("path")))
 
 
 def _h_load_summary(args: Dict[str, Any]) -> Dict[str, Any]:
@@ -329,6 +353,47 @@ def _h_extract_data_contract_schema(args: Dict[str, Any]) -> Dict[str, Any]:
     return _json_envelope(extract_contract_schema(args["contract"]).to_dict())
 
 
+def _h_list_recipes(args: Dict[str, Any]) -> Dict[str, Any]:
+    return _json_envelope(
+        _list_recipes(
+            config_path=args.get("config_path"),
+            project_root=args.get("project_root"),
+        )
+    )
+
+
+def _h_validate_recipe(args: Dict[str, Any]) -> Dict[str, Any]:
+    return _json_envelope(
+        _validate_recipe(
+            args.get("path"),
+            config_path=args.get("config_path"),
+            project_root=args.get("project_root"),
+        )
+    )
+
+
+def _h_plan_recipe_run(args: Dict[str, Any]) -> Dict[str, Any]:
+    return _json_envelope(
+        _plan_recipe_run(
+            args.get("path"),
+            mode="dry-run",
+            config_path=args.get("config_path"),
+            project_root=args.get("project_root"),
+            provider_ref=args.get("provider_ref"),
+            model=args.get("model"),
+        )
+    )
+
+
+def _h_search_recipe_guidance(args: Dict[str, Any]) -> Dict[str, Any]:
+    return _json_envelope(
+        _search_recipe_guidance(
+            args["query"],
+            limit=_int_arg(args, "limit", 5),
+        )
+    )
+
+
 # --- registry ---------------------------------------------------------------
 
 _PATH_PROP = {
@@ -359,6 +424,29 @@ _TERM_PROP = {"type": "string", "description": "ODPV term id."}
 _OKF_BUNDLE_PROP = {
     "type": "string",
     "description": "Filesystem path to an OKF bundle directory.",
+}
+_RECIPE_PATH_PROP = {
+    "type": "string",
+    "description": (
+        "Optional filesystem path to an ODPR Recipe. If omitted, "
+        "recipes.defaultRecipe from config_path is used."
+    ),
+}
+_RECIPE_CONFIG_PROP = {
+    "type": "string",
+    "description": "Optional filesystem path to recipes.config.yaml.",
+}
+_PROJECT_ROOT_PROP = {
+    "type": "string",
+    "description": "Optional project root for resolving recipe paths.",
+}
+_PROVIDER_REF_PROP = {
+    "type": "string",
+    "description": "Optional provider reference override for recipe dry-runs.",
+}
+_MODEL_PROP = {
+    "type": "string",
+    "description": "Optional model override for recipe dry-runs.",
 }
 
 TOOLS: List[Dict[str, Any]] = [
@@ -415,9 +503,13 @@ TOOLS: List[Dict[str, Any]] = [
             {
                 "domain": {
                     "type": "string",
-                    "description": "Config domain to inspect. Currently supports generation.",
+                    "description": "Config domain to inspect. Supports generation or recipes.",
                     "default": "generation",
-                }
+                },
+                "path": {
+                    "type": "string",
+                    "description": "Optional user-owned config file path.",
+                },
             }
         ),
         "handler": _h_get_config,
@@ -430,7 +522,7 @@ TOOLS: List[Dict[str, Any]] = [
             {
                 "domain": {
                     "type": "string",
-                    "description": "Config domain to validate. Currently supports generation.",
+                    "description": "Config domain to validate. Supports generation or recipes.",
                     "default": "generation",
                 },
                 "path": {
@@ -662,6 +754,55 @@ TOOLS: List[Dict[str, Any]] = [
         "class": "safe",
         "inputSchema": _object_schema({"contract": _CONTRACT_PROP}, ["contract"]),
         "handler": _h_extract_data_contract_schema,
+    },
+    {
+        "name": "list_recipes",
+        "description": "List configured ODPR recipes without executing workflow steps.",
+        "class": "safe",
+        "inputSchema": _object_schema(
+            {
+                "config_path": _RECIPE_CONFIG_PROP,
+                "project_root": _PROJECT_ROOT_PROP,
+            }
+        ),
+        "handler": _h_list_recipes,
+    },
+    {
+        "name": "validate_recipe",
+        "description": "Validate one ODPR Recipe, using recipes.defaultRecipe when path is omitted.",
+        "class": "safe",
+        "inputSchema": _object_schema(
+            {
+                "path": _RECIPE_PATH_PROP,
+                "config_path": _RECIPE_CONFIG_PROP,
+                "project_root": _PROJECT_ROOT_PROP,
+            }
+        ),
+        "handler": _h_validate_recipe,
+    },
+    {
+        "name": "plan_recipe_run",
+        "description": "Dry-run an ODPR Recipe and return resolved steps, providers, and write checks.",
+        "class": "safe",
+        "inputSchema": _object_schema(
+            {
+                "path": _RECIPE_PATH_PROP,
+                "config_path": _RECIPE_CONFIG_PROP,
+                "project_root": _PROJECT_ROOT_PROP,
+                "provider_ref": _PROVIDER_REF_PROP,
+                "model": _MODEL_PROP,
+            }
+        ),
+        "handler": _h_plan_recipe_run,
+    },
+    {
+        "name": "search_recipe_guidance",
+        "description": "Search bundled ODPR recipe guidance records by keyword.",
+        "class": "safe",
+        "inputSchema": _object_schema(
+            {"query": _QUERY_PROP, "limit": _LIMIT_PROP}, ["query"]
+        ),
+        "handler": _h_search_recipe_guidance,
     },
 ]
 

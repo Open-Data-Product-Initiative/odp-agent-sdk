@@ -40,7 +40,7 @@ The repository includes starter recipes under `examples/recipes/`:
 | --- | --- |
 | `examples/recipes/workflows/ci-validate-catalog.yaml` | Deterministic catalog validation that can dry-run and execute. |
 | `examples/recipes/workflows/portfolio-sync-render.yaml` | Deterministic portfolio sync, render, and explain steps with writes limited to `workspace/`. |
-| `examples/recipes/workflows/release-portfolio-localize.yaml` | LLM-backed release localization that dry-runs with provider readiness and review status, then blocks in guarded execute mode. |
+| `examples/recipes/workflows/release-portfolio-localize.yaml` | LLM-backed release localization that dry-runs with provider readiness and review status, then executes only with explicit LLM and review approval. |
 
 The example runner config is `examples/recipes/config/recipes.config.yaml`.
 The example provider config is `examples/recipes/config/generation.config.yaml`.
@@ -79,8 +79,8 @@ open-data-products recipe run examples/recipes/workflows/release-portfolio-local
 ```
 
 If `ANTHROPIC_API_KEY` is not set, the dry-run reports provider readiness as
-`missing-env`. Execute mode blocks this recipe because LLM-backed recipe
-execution is not enabled yet.
+`missing-env`. Execute mode also blocks provider-backed steps until the selected
+provider is ready.
 
 The SDK keeps three files separate:
 
@@ -293,7 +293,10 @@ Important JSON fields:
         }
       },
       "plannedWrites": [
-        {"path": "generated/portfolio/index.fi.html", "allowed": true}
+        {"path": "generated/portfolio/portfolio-i18n.yaml", "allowed": true},
+        {"path": "generated/portfolio/index.html", "allowed": true},
+        {"path": "generated/portfolio/index.fi.html", "allowed": true},
+        {"path": "generated/portfolio/index.sv.html", "allowed": true}
       ],
       "review": {
         "status": "review-needed",
@@ -328,6 +331,23 @@ open-data-products recipe run recipes/ci-validate.yaml \
   --json
 ```
 
+LLM and review gates are separate. A command can be allowed to call an LLM only
+after an explicit LLM permission flag, and a review-needed step can run only
+after an explicit review approval flag:
+
+```bash
+open-data-products recipe run recipes/release-portfolio-review.yaml \
+  --config recipes.config.yaml \
+  --execute \
+  --allow-llm \
+  --approve-review \
+  --json
+```
+
+Use `--allow-llm` to permit provider calls. Use `--approve-review` only after
+the dry-run has been reviewed and approved. If an LLM-backed step is also
+review-needed, both flags are required.
+
 The current guarded executor runs deterministic and report-only commands such
 as:
 
@@ -338,14 +358,32 @@ as:
 - `portfolio.render`
 - `portfolio.explain`
 
-LLM-backed commands are blocked in execute mode until provider execution,
-prompt audit, and review-gate behavior are enabled:
+LLM-backed commands pass the policy gates only when `--allow-llm` is set.
+Commands marked `review-needed` also require `--approve-review`. Execute mode
+also blocks LLM-backed steps when provider readiness is not `ready`.
+
+The first implemented LLM-backed recipe command is:
+
+- `portfolio.localize`
+
+These LLM-backed commands still fail after approval until provider execution is
+implemented for each command:
 
 - `generate`
 - `odpg.build`
 - `portfolio.build`
 - `portfolio.refresh`
-- `portfolio.localize`
+
+Exit codes are intentionally simple:
+
+| Command | Exit code | Meaning |
+| --- | ---: | --- |
+| `recipe validate ...` | `0` | The recipe, provider, or catalog is valid. |
+| `recipe validate ...` | `1` | Validation failed. |
+| `recipe run ... --dry-run` | `0` | The resolved plan has `canRun: true`. |
+| `recipe run ... --dry-run` | `1` | The resolved plan has blocking reasons. |
+| `recipe run ... --execute` | `0` | Execution completed with `status: passed`. |
+| `recipe run ... --execute` | `1` | Execution ended with `status: blocked` or `status: failed`. |
 
 Successful and blocked executions write a compact run manifest under
 `execution.manifestDir`, usually `.odp/runs/`. A run manifest is a JSON audit
@@ -426,6 +464,10 @@ The current manifest JSON has this shape:
   "exitCode": 0,
   "startedAt": "2026-06-19T09:00:00+00:00",
   "completedAt": "2026-06-19T09:00:01+00:00",
+  "executionPolicy": {
+    "allowLlm": false,
+    "reviewApproved": false
+  },
   "recipe": {
     "path": "recipes/ci-validate.yaml",
     "id": "RCP-CI-001",
@@ -507,6 +549,11 @@ Review status is currently advisory for deterministic/report execution. It is
 still included so humans, CI jobs, and AI agents can make approval decisions
 before publishing or continuing a workflow.
 
+When execute mode is run with `--approve-review`, step results and the run
+manifest record `review.decision: approved-by-cli-flag`. This records that the
+runner was explicitly instructed to proceed; it is not a substitute for the
+review itself.
+
 ## Agent Checklist
 
 Agents should use this order:
@@ -519,3 +566,14 @@ Agents should use this order:
    the intended step classes are supported.
 5. Read `manifest.path` for the audit result instead of scanning generated
    output folders directly.
+
+MCP agents can use the safe read-only tools before handing execution to the CLI
+or Python API:
+
+- `list_recipes`
+- `search_recipe_guidance`
+- `validate_recipe`
+- `plan_recipe_run`
+
+The MCP server does not execute recipes. Execute mode can write manifests and
+artifacts, so it remains a CLI/Python operation.

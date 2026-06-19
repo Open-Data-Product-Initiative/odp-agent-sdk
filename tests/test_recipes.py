@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 from pathlib import Path
 import yaml
 
@@ -23,6 +24,30 @@ from open_data_products.odpr import (
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 EXAMPLE_RECIPES = REPO_ROOT / "examples" / "recipes"
+
+
+def _fake_localization_client(prompt: str, model: str) -> str:
+    if "Target language: fi" in prompt:
+        return """
+language: fi
+translations:
+  Open Data Products Portfolio: Open Data Products Portfolio FI
+  Generated workspace summary: Generated workspace summary FI
+  Overview: Overview FI
+  Products: Products FI
+  Customer Product: Customer Product FI
+  Full product details from product discussions.: Full product details from product discussions FI.
+"""
+    return """
+language: sv
+translations:
+  Open Data Products Portfolio: Open Data Products Portfolio SV
+  Generated workspace summary: Generated workspace summary SV
+  Overview: Overview SV
+  Products: Products SV
+  Customer Product: Customer Product SV
+  Full product details from product discussions.: Full product details from product discussions SV.
+"""
 
 
 def _write_recipe(path: Path) -> None:
@@ -328,10 +353,12 @@ def test_plan_recipe_run_dry_run_returns_structured_parameters(
         },
     }
     assert step["inputs"] == [{"path": "generated/portfolio/", "exists": True}]
-    assert {
-        "path": "generated/portfolio/index.fi.html",
-        "allowed": True,
-    } in step["plannedWrites"]
+    assert step["plannedWrites"] == [
+        {"path": "generated/portfolio/portfolio-i18n.yaml", "allowed": True},
+        {"path": "generated/portfolio/index.html", "allowed": True},
+        {"path": "generated/portfolio/index.fi.html", "allowed": True},
+        {"path": "generated/portfolio/index.sv.html", "allowed": True},
+    ]
     assert step["review"]["status"] == "review-needed"
     assert step["review"]["reasons"] == [
         {
@@ -544,9 +571,155 @@ def test_execute_recipe_run_blocks_llm_backed_steps(tmp_path: Path) -> None:
     assert result["canRun"] is False
     assert result["steps"][0]["status"] == "blocked"
     assert any(
-        reason["code"] == "llm_execution_not_supported"
+        reason["code"] == "llm_execution_requires_allow_llm"
         for reason in result["blockingReasons"]
     )
+    assert any(
+        reason["code"] == "review_approval_required"
+        for reason in result["blockingReasons"]
+    )
+    assert result["executionPolicy"] == {"allowLlm": False, "reviewApproved": False}
+    manifest_path = tmp_path / result["manifest"]["path"]
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert manifest["status"] == "blocked"
+    assert manifest["exitCode"] == 1
+    assert manifest["executionPolicy"] == {
+        "allowLlm": False,
+        "reviewApproved": False,
+    }
+    assert manifest["blockingReasons"][0]["code"] == "llm_execution_requires_allow_llm"
+    assert manifest["steps"][0]["status"] == "blocked"
+    assert manifest["steps"][0]["review"]["status"] == "review-needed"
+
+
+def test_execute_recipe_run_requires_review_approval_after_allowing_llm(
+    tmp_path: Path,
+) -> None:
+    """Test allow_llm does not also approve review-needed steps."""
+    recipe_path = tmp_path / "recipe.yaml"
+    workspace = tmp_path / "generated" / "portfolio"
+    workspace.mkdir(parents=True)
+    _write_recipe(recipe_path)
+
+    result = execute_recipe_run(
+        recipe_path,
+        project_root=tmp_path,
+        provider_ref="ollama",
+        model="test-model",
+        allow_llm=True,
+    )
+
+    assert result["status"] == "blocked"
+    assert result["executionPolicy"] == {"allowLlm": True, "reviewApproved": False}
+    assert [reason["code"] for reason in result["blockingReasons"]] == [
+        "review_approval_required"
+    ]
+
+
+def test_execute_recipe_run_blocks_llm_when_provider_is_not_ready(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    """Test allow_llm still requires provider readiness."""
+    recipe_path = tmp_path / "recipe.yaml"
+    workspace = tmp_path / "generated" / "portfolio"
+    workspace.mkdir(parents=True)
+    _write_recipe(recipe_path)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+
+    result = execute_recipe_run(
+        recipe_path,
+        project_root=tmp_path,
+        allow_llm=True,
+        approve_review=True,
+    )
+
+    assert result["status"] == "blocked"
+    assert result["exitCode"] == 1
+    assert result["canRun"] is False
+    assert result["executionPolicy"] == {"allowLlm": True, "reviewApproved": True}
+    assert [reason["code"] for reason in result["blockingReasons"]] == [
+        "provider_not_ready"
+    ]
+
+
+def test_execute_recipe_run_localizes_portfolio_after_llm_and_review_approval(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    """Test portfolio.localize executes after explicit LLM and review approval."""
+    from open_data_products import generation
+
+    recipe_path = tmp_path / "recipe.yaml"
+    workspace = tmp_path / "generated" / "portfolio"
+    shutil.copytree(EXAMPLE_RECIPES / "workspace", workspace)
+    _write_recipe(recipe_path)
+    monkeypatch.setattr(
+        generation,
+        "create_generation_client",
+        lambda settings: _fake_localization_client,
+    )
+
+    result = execute_recipe_run(
+        recipe_path,
+        project_root=tmp_path,
+        provider_ref="ollama",
+        model="test-model",
+        allow_llm=True,
+        approve_review=True,
+    )
+
+    assert result["status"] == "passed"
+    assert result["exitCode"] == 0
+    assert result["canRun"] is True
+    assert result["executionPolicy"] == {"allowLlm": True, "reviewApproved": True}
+    assert result["blockingReasons"] == []
+    assert result["steps"][0]["status"] == "passed"
+    assert result["steps"][0]["review"]["decision"] == "approved-by-cli-flag"
+    assert (workspace / "portfolio-i18n.yaml").is_file()
+    assert (workspace / "index.fi.html").is_file()
+    assert (workspace / "index.sv.html").is_file()
+    manifest_path = tmp_path / result["manifest"]["path"]
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert manifest["executionPolicy"] == {
+        "allowLlm": True,
+        "reviewApproved": True,
+    }
+    assert manifest["status"] == "passed"
+    assert manifest["steps"][0]["review"]["decision"] == "approved-by-cli-flag"
+
+
+def test_execute_recipe_run_records_failed_deterministic_step(
+    tmp_path: Path,
+) -> None:
+    """Test execute mode records failed deterministic validation in the manifest."""
+    recipe_path = tmp_path / "recipe.yaml"
+    catalog_path = tmp_path / "catalog.yaml"
+    _write_validate_recipe(recipe_path)
+    catalog_path.write_text(
+        """
+schema: https://opendataproducts.org/odpc-v1.0/schema/odpc.yaml
+version: "1.0"
+kind: Catalog
+catalog: {}
+""",
+        encoding="utf-8",
+    )
+
+    result = execute_recipe_run(recipe_path, project_root=tmp_path)
+
+    assert result["status"] == "failed"
+    assert result["exitCode"] == 1
+    assert result["canRun"] is True
+    assert result["steps"][0]["status"] == "failed"
+    assert result["steps"][0]["issues"]
+    manifest_path = tmp_path / result["manifest"]["path"]
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert manifest["status"] == "failed"
+    assert manifest["exitCode"] == 1
+    assert manifest["blockingReasons"] == []
+    assert manifest["steps"][0]["status"] == "failed"
+    assert manifest["steps"][0]["issues"]
 
 
 def test_execute_recipe_run_blocks_portfolio_sync_outside_allow_writes(

@@ -561,7 +561,17 @@ def main(argv: Optional[List[str]] = None) -> int:
     recipe_run_parser.add_argument(
         "--execute",
         action="store_true",
-        help="Run state-changing steps. Execution is not implemented in the first slice.",
+        help="Run supported state-changing steps and write a run manifest.",
+    )
+    recipe_run_parser.add_argument(
+        "--allow-llm",
+        action="store_true",
+        help="Permit LLM-backed recipe steps to call configured providers.",
+    )
+    recipe_run_parser.add_argument(
+        "--approve-review",
+        action="store_true",
+        help="Permit steps marked review-needed to execute after approval.",
     )
     recipe_run_parser.add_argument(
         "--provider-ref",
@@ -1450,6 +1460,8 @@ def main(argv: Optional[List[str]] = None) -> int:
                             config_path=args.config,
                             provider_ref=args.provider_ref,
                             model=args.model,
+                            allow_llm=args.allow_llm,
+                            approve_review=args.approve_review,
                         )
                         exit_code = int(payload["exitCode"])
                     else:
