@@ -25,3 +25,7 @@
   guarded portfolio build and refresh from source lanes, and guarded release
   localization. Dry-run plans now expose list-valued source lane inputs so
   agents can verify portfolio prerequisites before execution.
+- Replaced the old course wrap-up guide with a seven-part ODPR recipe guide
+  sequence covering recipe purpose, validation, dry-runs, config, execution
+  policy, deterministic runs, LLM-backed runs, portfolio workflows, and
+  agent/CI usage.

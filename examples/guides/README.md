@@ -1,15 +1,16 @@
 # SDK Guides
 
 These course-aligned guides follow the Udemy lecture structure for the Open
-Data Products SDK section and final portfolio section. The only extra guide is
-`00`, which gives new learners a Python and SDK setup path before Lecture 6.
+Data Products SDK section, the final portfolio section, and the ODPR recipe
+workflow section. Guide `00` gives new learners a Python and SDK setup path
+before Lecture 6.
 
 ```bash
 pip install open-data-products
 ```
 
 Start with the setup guide if you have never worked with Python, `pip`, PyPI,
-or virtual environments before. Then follow the Udemy lecture numbers.
+or virtual environments before. Then follow the lecture numbers.
 
 ## Getting Started
 
@@ -36,4 +37,13 @@ or virtual environments before. Then follow the Udemy lecture numbers.
 19. [Update the portfolio and review version history](19-update-portfolio-and-review-version-history/)
 20. [How to localize a portfolio](20-how-to-localize-portfolio/)
 21. [Final review: human view and agent-ready YAML](21-final-review-human-view-and-agent-ready-yaml/)
-22. [Wrap-up and next steps](22-wrap-up-and-next-steps/)
+
+## Section 5: ODPR Recipe Workflows
+
+22. [Why recipes matter and what they run](22-why-recipes-and-what-they-run/)
+23. [Validate, list, and dry-run recipes](23-validate-list-and-dry-run-recipes/)
+24. [Recipe config and execution policy](24-recipe-config-and-execution-policy/)
+25. [Run deterministic recipes](25-run-deterministic-recipes/)
+26. [Run LLM-backed recipes](26-run-llm-backed-recipes/)
+27. [Portfolio recipes end to end](27-portfolio-recipes-end-to-end/)
+28. [Recipes for agents and CI](28-recipes-for-agents-and-ci/)

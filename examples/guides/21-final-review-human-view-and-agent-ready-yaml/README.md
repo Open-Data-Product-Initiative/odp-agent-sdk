@@ -69,4 +69,4 @@ when automation should fail on schema errors.
 
 ## Next Lesson
 
-Continue to [Lecture 22: Wrap-up and next steps](../22-wrap-up-and-next-steps/).
+Continue to [Lecture 22: Why recipes matter and what they run](../22-why-recipes-and-what-they-run/).

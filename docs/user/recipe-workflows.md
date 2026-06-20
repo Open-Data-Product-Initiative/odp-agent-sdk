@@ -98,7 +98,7 @@ open-data-products recipe run examples/recipes/workflows/portfolio-refresh.yaml 
   --json
 ```
 
-Execute either workflow only after reviewing the dry-run plan:
+Execute any workflow only after reviewing the dry-run plan:
 
 ```bash
 open-data-products recipe run examples/recipes/workflows/odpg-build.yaml \
