@@ -29,3 +29,18 @@
   sequence covering recipe purpose, validation, dry-runs, config, execution
   policy, deterministic runs, LLM-backed runs, portfolio workflows, and
   agent/CI usage.
+
+## Intentionally Left Out
+
+- Recipes are not a full workflow scheduler: there is no background execution,
+  retry engine, queue, cron support, or distributed state store.
+- Recipes do not yet wrap every SDK CLI command. The first supported step set
+  focuses on validation, explanation, generation, ODPG builds/renders, and
+  portfolio workflows.
+- Recipe steps remain inline in v1 examples. Reusable step fragments, shared
+  step libraries, and fragment versioning are deferred.
+- LLM-backed outputs are still drafts. The runner records review approval and
+  write checks, but it does not replace human acceptance of generated YAML,
+  graphs, localized pages, or portfolio content.
+- CI examples intentionally favor deterministic recipes. Hosted LLM execution
+  in CI remains an explicit project policy decision, not the default path.
