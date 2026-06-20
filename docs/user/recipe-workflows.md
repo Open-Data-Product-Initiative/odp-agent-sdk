@@ -40,6 +40,8 @@ The repository includes starter recipes under `examples/recipes/`:
 | --- | --- |
 | `examples/recipes/workflows/ci-validate-catalog.yaml` | Deterministic catalog validation that can dry-run and execute. |
 | `examples/recipes/workflows/portfolio-sync-render.yaml` | Deterministic portfolio sync, render, and explain steps with writes limited to `workspace/`. |
+| `examples/recipes/workflows/portfolio-build.yaml` | LLM-backed portfolio build from source lane notes, guarded by provider readiness, explicit LLM permission, and review approval. |
+| `examples/recipes/workflows/portfolio-refresh.yaml` | LLM-backed portfolio refresh from source lane notes, guarded by provider readiness, explicit LLM permission, and review approval. |
 | `examples/recipes/workflows/release-portfolio-localize.yaml` | LLM-backed release localization that dry-runs with provider readiness and review status, then executes only with explicit LLM and review approval. |
 
 The example runner config is `examples/recipes/config/recipes.config.yaml`.
@@ -75,6 +77,36 @@ Dry-run the LLM-backed release example:
 open-data-products recipe run examples/recipes/workflows/release-portfolio-localize.yaml \
   --config examples/recipes/config/recipes.config.yaml \
   --dry-run \
+  --json
+```
+
+Dry-run the LLM-backed portfolio examples:
+
+```bash
+open-data-products recipe run examples/recipes/workflows/portfolio-build.yaml \
+  --config examples/recipes/config/recipes.config.yaml \
+  --dry-run \
+  --json
+open-data-products recipe run examples/recipes/workflows/portfolio-refresh.yaml \
+  --config examples/recipes/config/recipes.config.yaml \
+  --dry-run \
+  --json
+```
+
+Execute either workflow only after reviewing the dry-run plan:
+
+```bash
+open-data-products recipe run examples/recipes/workflows/portfolio-build.yaml \
+  --config examples/recipes/config/recipes.config.yaml \
+  --execute \
+  --allow-llm \
+  --approve-review \
+  --json
+open-data-products recipe run examples/recipes/workflows/portfolio-refresh.yaml \
+  --config examples/recipes/config/recipes.config.yaml \
+  --execute \
+  --allow-llm \
+  --approve-review \
   --json
 ```
 
@@ -362,17 +394,65 @@ LLM-backed commands pass the policy gates only when `--allow-llm` is set.
 Commands marked `review-needed` also require `--approve-review`. Execute mode
 also blocks LLM-backed steps when provider readiness is not `ready`.
 
-The first implemented LLM-backed recipe command is:
-
-- `portfolio.localize`
-
-These LLM-backed commands still fail after approval until provider execution is
-implemented for each command:
+The implemented LLM-backed recipe commands are:
 
 - `generate`
-- `odpg.build`
 - `portfolio.build`
+- `portfolio.localize`
 - `portfolio.refresh`
+
+`generate` maps to the SDK generation workflow and requires:
+
+```yaml
+with:
+  input: source_docs/
+  kind: signal
+  output: fragments/
+```
+
+The output is usually a directory. In run manifests, `writeCheck` treats files
+created inside that planned output directory as matching artifacts.
+
+`portfolio.build` maps to the portfolio build workflow and uses `output` for
+the workspace to create:
+
+```yaml
+with:
+  output: generated/portfolio/
+  objectives:
+    - source-lanes/objectives/
+  useCases:
+    - source-lanes/use-cases/
+  signals:
+    - source-lanes/signals/
+  products:
+    - source-lanes/products/
+```
+
+`portfolio.refresh` maps to the portfolio refresh workflow and uses `workspace`
+for the workspace to update:
+
+```yaml
+with:
+  workspace: generated/portfolio/
+  objectives:
+    - source-lanes/objectives/
+  useCases:
+    - source-lanes/use-cases/
+  signals:
+    - source-lanes/signals/
+  products:
+    - source-lanes/products/
+```
+
+It uses saved source lane paths from the portfolio workspace unless optional
+lane overrides are supplied. Set `allSources: true` when the refresh should
+process all saved sources instead of only new or changed source documents.
+
+These remaining LLM-backed commands still fail after approval until provider
+execution is implemented for each command:
+
+- `odpg.build`
 
 Exit codes are intentionally simple:
 

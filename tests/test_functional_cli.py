@@ -569,6 +569,289 @@ recipe:
     assert (workspace / "index.fi.html").is_file()
 
 
+def test_recipe_cli_execute_generate_writes_artifact_after_approval(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from open_data_products import generation
+
+    recipe_path = tmp_path / "recipe.yaml"
+    source_dir = tmp_path / "source_docs"
+    source_dir.mkdir()
+    source_dir.joinpath("signal.md").write_text(
+        "# Turnaround Delay Signal\n\n" "Turnaround delay increased at Terminal 2.",
+        encoding="utf-8",
+    )
+    recipe_path.write_text(
+        """
+schema: https://opendataproducts.org/odpr-v1.0/schema/odpr.yaml
+version: "1.0"
+kind: Recipe
+recipe:
+  metadata:
+    id: RCP-GENERATE-001
+    name:
+      en: Generate Signal
+  version: "1.0.0"
+  type: dev
+  steps:
+    - id: generate-signal
+      command: generate
+      providerRef: ollama
+      model: test-model
+      with:
+        input: source_docs/
+        kind: signal
+        output: fragments/
+""",
+        encoding="utf-8",
+    )
+
+    def fake_client(prompt: str, model: str) -> str:
+        return """signals:
+- id: turnaround-delay-spike
+  name:
+    en: Turnaround Delay Spike
+  description:
+    en: Turnaround delay increased at Terminal 2.
+  type: operational
+  source:
+    origin: internal
+    method: event log
+  observedAt: "2026-05-20T00:00:00Z"
+"""
+
+    monkeypatch.setattr(
+        generation,
+        "create_generation_client",
+        lambda settings: fake_client,
+    )
+
+    assert (
+        main(
+            [
+                "recipe",
+                "run",
+                str(recipe_path),
+                "--execute",
+                "--allow-llm",
+                "--approve-review",
+                "--json",
+            ]
+        )
+        == 0
+    )
+    payload = _json_output(capsys)
+
+    artifact = tmp_path / "fragments" / "signal_turnaround-delay-spike.yaml"
+    assert payload["status"] == "passed"
+    assert artifact.is_file()
+    assert payload["steps"][0]["artifacts"] == [
+        "fragments/signal_turnaround-delay-spike.yaml"
+    ]
+    assert payload["steps"][0]["summary"]["writeCheck"]["status"] == "matched"
+
+
+def test_recipe_cli_execute_refreshes_portfolio_after_approval(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from open_data_products import generation
+    from open_data_products import portfolio
+
+    recipe_path = tmp_path / "recipe.yaml"
+    workspace = tmp_path / "generated" / "portfolio"
+    workspace.mkdir(parents=True)
+    recipe_path.write_text(
+        """
+schema: https://opendataproducts.org/odpr-v1.0/schema/odpr.yaml
+version: "1.0"
+kind: Recipe
+recipe:
+  metadata:
+    id: RCP-REFRESH-001
+    name:
+      en: Refresh Portfolio
+  version: "1.0.0"
+  type: dev
+  steps:
+    - id: refresh
+      command: portfolio.refresh
+      providerRef: ollama
+      model: test-model
+      with:
+        workspace: generated/portfolio/
+        allSources: true
+""",
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(
+        generation,
+        "create_generation_client",
+        lambda settings: "fake-client",
+    )
+
+    def fake_refresh_portfolio(
+        workspace_path,
+        *,
+        objectives=None,
+        use_cases=None,
+        signals=None,
+        products=None,
+        title=None,
+        client=None,
+        model="",
+        all_sources=False,
+    ):
+        assert workspace_path == workspace
+        assert client == "fake-client"
+        assert model == "test-model"
+        assert all_sources is True
+        return {
+            "kind": "PortfolioRefresh",
+            "valid": True,
+            "workspace": str(workspace),
+            "html": str(workspace / "index.html"),
+            "snapshot": None,
+            "created": [str(workspace / "portfolio-state.yaml")],
+            "updated": [],
+            "unchanged": [],
+            "warnings": [],
+            "validationResults": [],
+        }
+
+    monkeypatch.setattr(portfolio, "refresh_portfolio", fake_refresh_portfolio)
+
+    assert (
+        main(
+            [
+                "recipe",
+                "run",
+                str(recipe_path),
+                "--execute",
+                "--allow-llm",
+                "--approve-review",
+                "--json",
+            ]
+        )
+        == 0
+    )
+    payload = _json_output(capsys)
+
+    assert payload["status"] == "passed"
+    assert payload["steps"][0]["status"] == "passed"
+    assert payload["steps"][0]["summary"]["kind"] == "PortfolioRefresh"
+    assert payload["steps"][0]["summary"]["writeCheck"]["status"] == "matched"
+
+
+def test_recipe_cli_execute_builds_portfolio_after_approval(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from open_data_products import generation
+    from open_data_products import portfolio
+
+    recipe_path = tmp_path / "recipe.yaml"
+    workspace = tmp_path / "generated" / "portfolio"
+    source_root = tmp_path / "sources"
+    for lane in ("objectives", "use-cases", "signals", "products"):
+        (source_root / lane).mkdir(parents=True)
+    recipe_path.write_text(
+        """
+schema: https://opendataproducts.org/odpr-v1.0/schema/odpr.yaml
+version: "1.0"
+kind: Recipe
+recipe:
+  metadata:
+    id: RCP-BUILD-001
+    name:
+      en: Build Portfolio
+  version: "1.0.0"
+  type: dev
+  steps:
+    - id: build
+      command: portfolio.build
+      providerRef: ollama
+      model: test-model
+      with:
+        output: generated/portfolio/
+        objectives:
+          - sources/objectives/
+        useCases:
+          - sources/use-cases/
+        signals:
+          - sources/signals/
+        products:
+          - sources/products/
+""",
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(
+        generation,
+        "create_generation_client",
+        lambda settings: "fake-client",
+    )
+
+    def fake_build_portfolio(
+        workspace_path,
+        *,
+        objectives=None,
+        use_cases=None,
+        signals=None,
+        products=None,
+        title=None,
+        client=None,
+        model="",
+    ):
+        assert workspace_path == workspace
+        assert objectives == source_root / "objectives"
+        assert use_cases == source_root / "use-cases"
+        assert signals == source_root / "signals"
+        assert products == source_root / "products"
+        assert client == "fake-client"
+        assert model == "test-model"
+        return {
+            "kind": "PortfolioBuild",
+            "valid": True,
+            "workspace": str(workspace),
+            "html": str(workspace / "index.html"),
+            "snapshot": None,
+            "created": [str(workspace / "portfolio-state.yaml")],
+            "updated": [],
+            "unchanged": [],
+            "warnings": [],
+            "validationResults": [],
+        }
+
+    monkeypatch.setattr(portfolio, "build_portfolio", fake_build_portfolio)
+
+    assert (
+        main(
+            [
+                "recipe",
+                "run",
+                str(recipe_path),
+                "--execute",
+                "--allow-llm",
+                "--approve-review",
+                "--json",
+            ]
+        )
+        == 0
+    )
+    payload = _json_output(capsys)
+
+    assert payload["status"] == "passed"
+    assert payload["steps"][0]["status"] == "passed"
+    assert payload["steps"][0]["summary"]["kind"] == "PortfolioBuild"
+    assert payload["steps"][0]["summary"]["writeCheck"]["status"] == "matched"
+
+
 def test_recipe_cli_execute_returns_failure_for_failed_deterministic_step(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],

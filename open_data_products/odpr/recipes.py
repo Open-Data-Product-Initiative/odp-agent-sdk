@@ -780,6 +780,10 @@ def _step_inputs(
         value = values.get(key)
         if isinstance(value, str):
             inputs.append({"path": value, "exists": (root / value).exists()})
+        elif isinstance(value, list):
+            for item in value:
+                if isinstance(item, str):
+                    inputs.append({"path": item, "exists": (root / item).exists()})
     return inputs
 
 
@@ -804,7 +808,7 @@ def _planned_writes(
             paths.append(f"{workspace_root}/index.html")
             for language in _language_list(languages):
                 paths.append(f"{workspace_root}/index.{language}.html")
-    elif command == "portfolio.sync":
+    elif command in {"portfolio.refresh", "portfolio.sync"}:
         _append_string(paths, values.get("workspace"))
     elif command == "portfolio.render":
         output = values.get("output")
@@ -1086,6 +1090,61 @@ def _execute_step(
                     "characterCount": len(explanation),
                 },
             )
+        if command == "generate":
+            from ..generation import create_generation_client
+            from ..generation import generate_local_artifacts_for_kind
+            from ..generation import resolve_generation_settings
+
+            source = _required_path(parameters, "input", root)
+            output = _required_path(parameters, "output", root)
+            kind = _required_string(parameters, "kind")
+            profile = _string(parameters.get("profile")) or "minimal"
+            include_components = _string_sequence(parameters.get("includeComponents"))
+            max_source_chars = _optional_int(parameters.get("maxSourceChars"))
+            prompt_dir = _optional_path(parameters, "prompts", root)
+            settings = resolve_generation_settings(
+                config_path=generation_config,
+                input_path=source,
+                output_path=output,
+                provider=_string(parameters.get("providerRef")),
+                model=_string(parameters.get("model")),
+                prompt_dir=prompt_dir,
+            )
+            client = create_generation_client(settings)
+            artifacts = generate_local_artifacts_for_kind(
+                kind,
+                source,
+                output,
+                model=settings.model,
+                client=client,
+                prompt_dir=settings.prompt_path,
+                profile=profile,
+                include_components=include_components,
+                max_source_chars=max_source_chars,
+            )
+            artifact_paths = [
+                _relative_path(artifact.output_path, root) for artifact in artifacts
+            ]
+            return _step_result(
+                step,
+                "passed",
+                started_at,
+                artifacts=artifact_paths,
+                summary={
+                    "kind": "Generate",
+                    "artifactKind": kind,
+                    "artifactCount": len(artifacts),
+                    "artifacts": [
+                        {
+                            "name": artifact.name,
+                            "promptName": artifact.prompt_name,
+                            "path": _relative_path(artifact.output_path, root),
+                            "validYaml": artifact.valid_yaml,
+                        }
+                        for artifact in artifacts
+                    ],
+                },
+            )
         if command == "odpg.render":
             from ..odpg import generate_graph_explorer
 
@@ -1103,6 +1162,59 @@ def _execute_step(
 
             workspace = _required_path(parameters, "workspace", root)
             result = sync_portfolio(workspace)
+            return _portfolio_step_result(step, started_at, root, result)
+        if command == "portfolio.build":
+            from ..generation import create_generation_client
+            from ..generation import resolve_generation_settings
+            from ..portfolio import build_portfolio
+
+            workspace = _portfolio_workspace_path(parameters, root)
+            prompt_dir = _optional_path(parameters, "prompts", root)
+            settings = resolve_generation_settings(
+                config_path=generation_config,
+                provider=_string(parameters.get("providerRef")),
+                model=_string(parameters.get("model")),
+                ollama_url=_string(parameters.get("ollamaUrl")),
+                prompt_dir=prompt_dir,
+            )
+            client = create_generation_client(settings)
+            result = build_portfolio(
+                workspace,
+                objectives=_optional_lane_path(parameters, "objectives", root),
+                use_cases=_optional_lane_path(parameters, "useCases", root),
+                signals=_optional_lane_path(parameters, "signals", root),
+                products=_optional_lane_path(parameters, "products", root),
+                title=_string(parameters.get("title")),
+                client=client,
+                model=settings.model,
+            )
+            return _portfolio_step_result(step, started_at, root, result)
+        if command == "portfolio.refresh":
+            from ..generation import create_generation_client
+            from ..generation import resolve_generation_settings
+            from ..portfolio import refresh_portfolio
+
+            workspace = _required_path(parameters, "workspace", root)
+            prompt_dir = _optional_path(parameters, "prompts", root)
+            settings = resolve_generation_settings(
+                config_path=generation_config,
+                provider=_string(parameters.get("providerRef")),
+                model=_string(parameters.get("model")),
+                ollama_url=_string(parameters.get("ollamaUrl")),
+                prompt_dir=prompt_dir,
+            )
+            client = create_generation_client(settings)
+            result = refresh_portfolio(
+                workspace,
+                objectives=_optional_lane_path(parameters, "objectives", root),
+                use_cases=_optional_lane_path(parameters, "useCases", root),
+                signals=_optional_lane_path(parameters, "signals", root),
+                products=_optional_lane_path(parameters, "products", root),
+                title=_string(parameters.get("title")),
+                client=client,
+                model=settings.model,
+                all_sources=parameters.get("allSources") is True,
+            )
             return _portfolio_step_result(step, started_at, root, result)
         if command == "portfolio.render":
             from ..portfolio import render_portfolio
@@ -1151,7 +1263,7 @@ def _execute_step(
                     "graphEdgeCount": result.get("graphEdgeCount"),
                 },
             )
-    except (FileNotFoundError, ValueError, OSError) as exc:
+    except (FileNotFoundError, KeyError, RuntimeError, ValueError, OSError) as exc:
         return _step_result(step, "failed", started_at, issues=[str(exc)])
     return _step_result(
         step,
@@ -1286,10 +1398,30 @@ def _write_check(
     artifact_paths = [path for path in artifacts if path]
     if not planned and not artifact_paths:
         return None
+    planned_dirs = [path.rstrip("/") for path in planned if path.endswith("/")]
+    planned_files = [path for path in planned if not path.endswith("/")]
     planned_set = set(planned)
     artifact_set = set(artifact_paths)
-    missing = sorted(planned_set - artifact_set)
-    extra = sorted(artifact_set - planned_set)
+    matched_artifacts = {
+        path
+        for path in artifact_paths
+        if path in planned_files
+        or any(
+            path == directory or path.startswith(f"{directory}/")
+            for directory in planned_dirs
+        )
+    }
+    missing_files = set(planned_files) - artifact_set
+    missing_dirs = {
+        f"{directory}/"
+        for directory in planned_dirs
+        if not any(
+            path == directory or path.startswith(f"{directory}/")
+            for path in artifact_paths
+        )
+    }
+    missing = sorted(missing_files | missing_dirs)
+    extra = sorted(artifact_set - matched_artifacts)
     if missing and extra:
         status = "mismatch"
     elif missing:
@@ -1302,7 +1434,7 @@ def _write_check(
         "status": status,
         "planned": sorted(planned_set),
         "artifacts": sorted(artifact_set),
-        "matched": sorted(planned_set & artifact_set),
+        "matched": sorted(matched_artifacts),
         "missing": missing,
         "extra": extra,
     }
@@ -1328,6 +1460,54 @@ def _optional_path(
     if not isinstance(value, str) or not value:
         return None
     return root / value
+
+
+def _portfolio_workspace_path(parameters: Mapping[str, object], root: Path) -> Path:
+    output = parameters.get("output")
+    if isinstance(output, str) and output:
+        return root / output
+    return _required_path(parameters, "workspace", root)
+
+
+def _optional_lane_path(
+    parameters: Mapping[str, object],
+    key: str,
+    root: Path,
+) -> Optional[Path]:
+    value = parameters.get(key)
+    if isinstance(value, str) and value:
+        return root / value
+    if isinstance(value, list):
+        paths = [item for item in value if isinstance(item, str) and item]
+        if not paths:
+            return None
+        if len(paths) > 1:
+            raise ValueError(f"Recipe parameter {key} supports one path.")
+        return root / paths[0]
+    return None
+
+
+def _required_string(parameters: Mapping[str, object], key: str) -> str:
+    value = parameters.get(key)
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"Missing required string parameter: {key}")
+    return value.strip()
+
+
+def _optional_int(value: object) -> Optional[int]:
+    if value is None:
+        return None
+    return int(value)
+
+
+def _string_sequence(value: object) -> Optional[List[str]]:
+    if value is None:
+        return None
+    if isinstance(value, str):
+        return [item.strip() for item in value.split(",") if item.strip()]
+    if isinstance(value, list):
+        return [str(item).strip() for item in value if str(item).strip()]
+    return None
 
 
 def _write_run_manifest(

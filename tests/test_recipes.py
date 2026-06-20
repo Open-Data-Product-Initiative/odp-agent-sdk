@@ -103,6 +103,100 @@ recipe:
     )
 
 
+def _write_generate_recipe(path: Path) -> None:
+    path.write_text(
+        """
+schema: https://opendataproducts.org/odpr-v1.0/schema/odpr.yaml
+version: "1.0"
+kind: Recipe
+recipe:
+  metadata:
+    id: RCP-GENERATE-001
+    name:
+      en: Generate Signal
+  version: "1.0.0"
+  type: dev
+  steps:
+    - id: generate-signal
+      command: generate
+      providerRef: ollama
+      model: test-model
+      with:
+        input: source_docs/
+        kind: signal
+        output: fragments/
+""",
+        encoding="utf-8",
+    )
+
+
+def _write_refresh_recipe(path: Path) -> None:
+    path.write_text(
+        """
+schema: https://opendataproducts.org/odpr-v1.0/schema/odpr.yaml
+version: "1.0"
+kind: Recipe
+recipe:
+  metadata:
+    id: RCP-REFRESH-001
+    name:
+      en: Refresh Portfolio
+  version: "1.0.0"
+  type: dev
+  steps:
+    - id: refresh
+      command: portfolio.refresh
+      providerRef: ollama
+      model: test-model
+      with:
+        workspace: generated/portfolio/
+        objectives:
+          - sources/objectives/
+        useCases:
+          - sources/use-cases/
+        signals:
+          - sources/signals/
+        products:
+          - sources/products/
+        allSources: true
+""",
+        encoding="utf-8",
+    )
+
+
+def _write_build_recipe(path: Path) -> None:
+    path.write_text(
+        """
+schema: https://opendataproducts.org/odpr-v1.0/schema/odpr.yaml
+version: "1.0"
+kind: Recipe
+recipe:
+  metadata:
+    id: RCP-BUILD-001
+    name:
+      en: Build Portfolio
+  version: "1.0.0"
+  type: dev
+  steps:
+    - id: build
+      command: portfolio.build
+      providerRef: ollama
+      model: test-model
+      with:
+        output: generated/portfolio/
+        objectives:
+          - sources/objectives/
+        useCases:
+          - sources/use-cases/
+        signals:
+          - sources/signals/
+        products:
+          - sources/products/
+""",
+        encoding="utf-8",
+    )
+
+
 def _write_portfolio_sync_recipe(path: Path) -> None:
     path.write_text(
         """
@@ -206,6 +300,8 @@ def test_example_recipes_validate_and_list() -> None:
 
     for recipe_name in (
         "ci-validate-catalog.yaml",
+        "portfolio-build.yaml",
+        "portfolio-refresh.yaml",
         "portfolio-sync-render.yaml",
         "release-portfolio-localize.yaml",
     ):
@@ -216,6 +312,8 @@ def test_example_recipes_validate_and_list() -> None:
     recipes = catalog["recipeCatalog"]["recipes"]
     assert [recipe["path"] for recipe in recipes] == [
         "workflows/ci-validate-catalog.yaml",
+        "workflows/portfolio-build.yaml",
+        "workflows/portfolio-refresh.yaml",
         "workflows/portfolio-sync-render.yaml",
         "workflows/release-portfolio-localize.yaml",
     ]
@@ -233,6 +331,18 @@ def test_example_recipes_validate_and_list() -> None:
     assert plan["providers"][0]["source"] == str(
         EXAMPLE_RECIPES / "config" / "generation.config.yaml"
     )
+
+    refresh_plan = plan_recipe_run(
+        EXAMPLE_RECIPES / "workflows" / "portfolio-refresh.yaml",
+        config_path=config_path,
+    )
+    assert refresh_plan["steps"][0]["inputs"] == [
+        {"path": "workspace/", "exists": True},
+        {"path": "source-lanes/objectives/", "exists": True},
+        {"path": "source-lanes/use-cases/", "exists": True},
+        {"path": "source-lanes/signals/", "exists": True},
+        {"path": "source-lanes/products/", "exists": True},
+    ]
 
 
 def test_recipe_api_uses_config_default_recipe_when_path_is_omitted() -> None:
@@ -717,6 +827,254 @@ def test_execute_recipe_run_localizes_portfolio_after_llm_and_review_approval(
     assert manifest["steps"][0]["review"]["decision"] == "approved-by-cli-flag"
     assert manifest["steps"][0]["summary"]["localizationQa"] == qa
     assert manifest["steps"][0]["summary"]["writeCheck"] == write_check
+
+
+def test_execute_recipe_run_generates_artifacts_after_llm_and_review_approval(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    """Test generate executes through recipe policy gates and records artifacts."""
+    from open_data_products import generation
+
+    recipe_path = tmp_path / "recipe.yaml"
+    source_dir = tmp_path / "source_docs"
+    source_dir.mkdir()
+    source_dir.joinpath("signal.md").write_text(
+        "# Turnaround Delay Signal\n\n" "Turnaround delay increased at Terminal 2.",
+        encoding="utf-8",
+    )
+    _write_generate_recipe(recipe_path)
+
+    def fake_client(prompt: str, model: str) -> str:
+        assert model == "test-model"
+        assert "Turnaround Delay Signal" in prompt
+        return """signals:
+- id: turnaround-delay-spike
+  name:
+    en: Turnaround Delay Spike
+  description:
+    en: Turnaround delay increased at Terminal 2.
+  type: operational
+  source:
+    origin: internal
+    method: event log
+  observedAt: "2026-05-20T00:00:00Z"
+"""
+
+    monkeypatch.setattr(
+        generation,
+        "create_generation_client",
+        lambda settings: fake_client,
+    )
+
+    result = execute_recipe_run(
+        recipe_path,
+        project_root=tmp_path,
+        allow_llm=True,
+        approve_review=True,
+    )
+
+    artifact = tmp_path / "fragments" / "signal_turnaround-delay-spike.yaml"
+    assert result["status"] == "passed"
+    assert result["exitCode"] == 0
+    assert artifact.is_file()
+    step = result["steps"][0]
+    assert step["status"] == "passed"
+    assert step["artifacts"] == ["fragments/signal_turnaround-delay-spike.yaml"]
+    assert step["summary"]["artifactKind"] == "signal"
+    assert step["summary"]["artifactCount"] == 1
+    assert step["summary"]["writeCheck"] == {
+        "status": "matched",
+        "planned": ["fragments/"],
+        "artifacts": ["fragments/signal_turnaround-delay-spike.yaml"],
+        "matched": ["fragments/signal_turnaround-delay-spike.yaml"],
+        "missing": [],
+        "extra": [],
+    }
+
+
+def test_execute_recipe_run_refreshes_portfolio_after_llm_and_review_approval(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    """Test portfolio.refresh maps recipe parameters into portfolio execution."""
+    from open_data_products import generation
+    from open_data_products import portfolio
+
+    recipe_path = tmp_path / "recipe.yaml"
+    workspace = tmp_path / "generated" / "portfolio"
+    workspace.mkdir(parents=True)
+    source_root = tmp_path / "sources"
+    for lane in ("objectives", "use-cases", "signals", "products"):
+        (source_root / lane).mkdir(parents=True)
+    _write_refresh_recipe(recipe_path)
+
+    monkeypatch.setattr(
+        generation,
+        "create_generation_client",
+        lambda settings: "fake-client",
+    )
+
+    def fake_refresh_portfolio(
+        workspace_path,
+        *,
+        objectives=None,
+        use_cases=None,
+        signals=None,
+        products=None,
+        title=None,
+        client=None,
+        model="",
+        all_sources=False,
+    ):
+        assert workspace_path == workspace
+        assert objectives == source_root / "objectives"
+        assert use_cases == source_root / "use-cases"
+        assert signals == source_root / "signals"
+        assert products == source_root / "products"
+        assert title is None
+        assert client == "fake-client"
+        assert model == "test-model"
+        assert all_sources is True
+        return {
+            "kind": "PortfolioRefresh",
+            "valid": True,
+            "workspace": str(workspace),
+            "html": str(workspace / "index.html"),
+            "snapshot": str(workspace / "versions" / "snapshot"),
+            "created": [str(workspace / "odpc" / "fragments" / "use_case.yaml")],
+            "updated": [str(workspace / "portfolio-state.yaml")],
+            "unchanged": [],
+            "warnings": [],
+            "validationResults": [],
+        }
+
+    monkeypatch.setattr(portfolio, "refresh_portfolio", fake_refresh_portfolio)
+
+    result = execute_recipe_run(
+        recipe_path,
+        project_root=tmp_path,
+        allow_llm=True,
+        approve_review=True,
+    )
+
+    assert result["status"] == "passed"
+    assert result["exitCode"] == 0
+    step = result["steps"][0]
+    assert step["status"] == "passed"
+    assert step["artifacts"] == [
+        "generated/portfolio/index.html",
+        "generated/portfolio/odpc/fragments/use_case.yaml",
+        "generated/portfolio/portfolio-state.yaml",
+        "generated/portfolio/versions/snapshot",
+    ]
+    assert step["summary"]["kind"] == "PortfolioRefresh"
+    assert step["summary"]["workspace"] == "generated/portfolio"
+    assert step["summary"]["writeCheck"] == {
+        "status": "matched",
+        "planned": ["generated/portfolio/"],
+        "artifacts": [
+            "generated/portfolio/index.html",
+            "generated/portfolio/odpc/fragments/use_case.yaml",
+            "generated/portfolio/portfolio-state.yaml",
+            "generated/portfolio/versions/snapshot",
+        ],
+        "matched": [
+            "generated/portfolio/index.html",
+            "generated/portfolio/odpc/fragments/use_case.yaml",
+            "generated/portfolio/portfolio-state.yaml",
+            "generated/portfolio/versions/snapshot",
+        ],
+        "missing": [],
+        "extra": [],
+    }
+
+
+def test_execute_recipe_run_builds_portfolio_after_llm_and_review_approval(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    """Test portfolio.build maps source lanes and output into portfolio execution."""
+    from open_data_products import generation
+    from open_data_products import portfolio
+
+    recipe_path = tmp_path / "recipe.yaml"
+    workspace = tmp_path / "generated" / "portfolio"
+    source_root = tmp_path / "sources"
+    for lane in ("objectives", "use-cases", "signals", "products"):
+        (source_root / lane).mkdir(parents=True)
+    _write_build_recipe(recipe_path)
+
+    monkeypatch.setattr(
+        generation,
+        "create_generation_client",
+        lambda settings: "fake-client",
+    )
+
+    def fake_build_portfolio(
+        workspace_path,
+        *,
+        objectives=None,
+        use_cases=None,
+        signals=None,
+        products=None,
+        title=None,
+        client=None,
+        model="",
+    ):
+        assert workspace_path == workspace
+        assert objectives == source_root / "objectives"
+        assert use_cases == source_root / "use-cases"
+        assert signals == source_root / "signals"
+        assert products == source_root / "products"
+        assert title is None
+        assert client == "fake-client"
+        assert model == "test-model"
+        return {
+            "kind": "PortfolioBuild",
+            "valid": True,
+            "workspace": str(workspace),
+            "html": str(workspace / "index.html"),
+            "snapshot": None,
+            "created": [str(workspace / "portfolio-state.yaml")],
+            "updated": [],
+            "unchanged": [],
+            "warnings": [],
+            "validationResults": [],
+        }
+
+    monkeypatch.setattr(portfolio, "build_portfolio", fake_build_portfolio)
+
+    result = execute_recipe_run(
+        recipe_path,
+        project_root=tmp_path,
+        allow_llm=True,
+        approve_review=True,
+    )
+
+    assert result["status"] == "passed"
+    assert result["exitCode"] == 0
+    step = result["steps"][0]
+    assert step["status"] == "passed"
+    assert step["artifacts"] == [
+        "generated/portfolio/index.html",
+        "generated/portfolio/portfolio-state.yaml",
+    ]
+    assert step["summary"]["kind"] == "PortfolioBuild"
+    assert step["summary"]["writeCheck"] == {
+        "status": "matched",
+        "planned": ["generated/portfolio/"],
+        "artifacts": [
+            "generated/portfolio/index.html",
+            "generated/portfolio/portfolio-state.yaml",
+        ],
+        "matched": [
+            "generated/portfolio/index.html",
+            "generated/portfolio/portfolio-state.yaml",
+        ],
+        "missing": [],
+        "extra": [],
+    }
 
 
 def test_execute_recipe_run_records_failed_deterministic_step(

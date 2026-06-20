@@ -138,8 +138,9 @@ config_report = validate_recipe_config(config_path)
   allow_llm=False, approve_review=False, ...)`: execute currently supported
   deterministic/report steps and write a compact run manifest. LLM-backed steps
   require `allow_llm=True`; review-needed steps require `approve_review=True`.
-  `portfolio.localize` is the first provider-backed recipe command supported;
-  other LLM-backed commands still fail after the policy gates until implemented.
+  `generate`, `portfolio.build`, `portfolio.localize`, and
+  `portfolio.refresh` are the provider-backed recipe commands supported; other
+  LLM-backed commands still fail after the policy gates until implemented.
 - `search_recipe_guidance(query, limit=5)`: search bundled ODPR guidance
   records.
 

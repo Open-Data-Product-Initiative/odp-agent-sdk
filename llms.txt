@@ -89,8 +89,9 @@ ODPR recipe workflow helpers:
 The cross-spec document helpers support ODPS, ODPC, ODPG, and ODPV documents
 through one consistent agent-facing surface. ODPR recipe helpers validate and
 plan workflow recipes around those SDK commands. In guarded execute mode,
-`portfolio.localize` is the first supported LLM-backed recipe command and
-requires both `allow_llm=True` and `approve_review=True`.
+`generate`, `portfolio.build`, `portfolio.localize`, and `portfolio.refresh`
+are the supported LLM-backed recipe commands and require both `allow_llm=True`
+and `approve_review=True`.
 
 Data Contract functions are product-oriented. The SDK resolves native ODPS
 `/product/contract` entries (`$ref`, `contractURL`, inline `spec`) and
