@@ -1,4 +1,4 @@
-# Release Summary: 0.2.5
+# Release Summary: 0.3.0
 
 - Added the hosted `zai` provider preset for the general Z.ai GLM
   OpenAI-compatible API, including config, manifest metadata, tests, a dedicated
