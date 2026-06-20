@@ -5,6 +5,8 @@ These examples show the main recipe workflow shapes:
 - `ci-validate-catalog.yaml`: deterministic validation that can execute.
 - `portfolio-sync-render.yaml`: deterministic portfolio sync, render, and
   explain flow that writes only under `workspace/`.
+- `odpg-build.yaml`: LLM-backed ODPG graph build from ODPC fragments with
+  provider readiness, explicit LLM permission, and review approval.
 - `portfolio-build.yaml`: LLM-backed portfolio build from source lane notes
   with provider readiness, explicit LLM permission, and review approval.
 - `portfolio-refresh.yaml`: LLM-backed portfolio refresh from source lane notes
@@ -46,9 +48,13 @@ open-data-products recipe run examples/recipes/workflows/release-portfolio-local
   --json
 ```
 
-For the LLM-backed portfolio examples, inspect the dry-run first:
+For the LLM-backed graph and portfolio examples, inspect the dry-run first:
 
 ```bash
+open-data-products recipe run examples/recipes/workflows/odpg-build.yaml \
+  --config examples/recipes/config/recipes.config.yaml \
+  --dry-run \
+  --json
 open-data-products recipe run examples/recipes/workflows/portfolio-build.yaml \
   --config examples/recipes/config/recipes.config.yaml \
   --dry-run \
@@ -62,6 +68,12 @@ open-data-products recipe run examples/recipes/workflows/portfolio-refresh.yaml 
 Execute either workflow only after reviewing the dry-run plan:
 
 ```bash
+open-data-products recipe run examples/recipes/workflows/odpg-build.yaml \
+  --config examples/recipes/config/recipes.config.yaml \
+  --execute \
+  --allow-llm \
+  --approve-review \
+  --json
 open-data-products recipe run examples/recipes/workflows/portfolio-build.yaml \
   --config examples/recipes/config/recipes.config.yaml \
   --execute \

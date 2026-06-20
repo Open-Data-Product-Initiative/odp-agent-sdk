@@ -40,6 +40,7 @@ The repository includes starter recipes under `examples/recipes/`:
 | --- | --- |
 | `examples/recipes/workflows/ci-validate-catalog.yaml` | Deterministic catalog validation that can dry-run and execute. |
 | `examples/recipes/workflows/portfolio-sync-render.yaml` | Deterministic portfolio sync, render, and explain steps with writes limited to `workspace/`. |
+| `examples/recipes/workflows/odpg-build.yaml` | LLM-backed ODPG graph build from ODPC fragments, guarded by provider readiness, explicit LLM permission, and review approval. |
 | `examples/recipes/workflows/portfolio-build.yaml` | LLM-backed portfolio build from source lane notes, guarded by provider readiness, explicit LLM permission, and review approval. |
 | `examples/recipes/workflows/portfolio-refresh.yaml` | LLM-backed portfolio refresh from source lane notes, guarded by provider readiness, explicit LLM permission, and review approval. |
 | `examples/recipes/workflows/release-portfolio-localize.yaml` | LLM-backed release localization that dry-runs with provider readiness and review status, then executes only with explicit LLM and review approval. |
@@ -80,9 +81,13 @@ open-data-products recipe run examples/recipes/workflows/release-portfolio-local
   --json
 ```
 
-Dry-run the LLM-backed portfolio examples:
+Dry-run the LLM-backed graph and portfolio examples:
 
 ```bash
+open-data-products recipe run examples/recipes/workflows/odpg-build.yaml \
+  --config examples/recipes/config/recipes.config.yaml \
+  --dry-run \
+  --json
 open-data-products recipe run examples/recipes/workflows/portfolio-build.yaml \
   --config examples/recipes/config/recipes.config.yaml \
   --dry-run \
@@ -96,6 +101,12 @@ open-data-products recipe run examples/recipes/workflows/portfolio-refresh.yaml 
 Execute either workflow only after reviewing the dry-run plan:
 
 ```bash
+open-data-products recipe run examples/recipes/workflows/odpg-build.yaml \
+  --config examples/recipes/config/recipes.config.yaml \
+  --execute \
+  --allow-llm \
+  --approve-review \
+  --json
 open-data-products recipe run examples/recipes/workflows/portfolio-build.yaml \
   --config examples/recipes/config/recipes.config.yaml \
   --execute \
@@ -397,6 +408,7 @@ also blocks LLM-backed steps when provider readiness is not `ready`.
 The implemented LLM-backed recipe commands are:
 
 - `generate`
+- `odpg.build`
 - `portfolio.build`
 - `portfolio.localize`
 - `portfolio.refresh`
@@ -412,6 +424,17 @@ with:
 
 The output is usually a directory. In run manifests, `writeCheck` treats files
 created inside that planned output directory as matching artifacts.
+
+`odpg.build` maps to graph edge inference and writes graph YAML plus optional
+TOON and GCF context sidecars:
+
+```yaml
+with:
+  input: graph-fragments/
+  output: generated/graph.yaml
+  toon: generated/graph.toon
+  gcf: generated/graph.gcf
+```
 
 `portfolio.build` maps to the portfolio build workflow and uses `output` for
 the workspace to create:
@@ -448,11 +471,6 @@ with:
 It uses saved source lane paths from the portfolio workspace unless optional
 lane overrides are supplied. Set `allSources: true` when the refresh should
 process all saved sources instead of only new or changed source documents.
-
-These remaining LLM-backed commands still fail after approval until provider
-execution is implemented for each command:
-
-- `odpg.build`
 
 Exit codes are intentionally simple:
 

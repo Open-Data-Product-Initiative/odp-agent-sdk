@@ -130,6 +130,36 @@ recipe:
     )
 
 
+def _write_odpg_build_recipe(path: Path) -> None:
+    path.write_text(
+        """
+schema: https://opendataproducts.org/odpr-v1.0/schema/odpr.yaml
+version: "1.0"
+kind: Recipe
+recipe:
+  metadata:
+    id: RCP-ODPG-BUILD-001
+    name:
+      en: Build Graph
+  version: "1.0.0"
+  type: dev
+  steps:
+    - id: build-graph
+      command: odpg.build
+      providerRef: ollama
+      model: test-model
+      with:
+        input: fragments/
+        output: generated/graph.yaml
+        toon: generated/graph.toon
+        gcf: generated/graph.gcf
+        id: customer-graph
+        name: Customer Graph
+""",
+        encoding="utf-8",
+    )
+
+
 def _write_refresh_recipe(path: Path) -> None:
     path.write_text(
         """
@@ -300,6 +330,7 @@ def test_example_recipes_validate_and_list() -> None:
 
     for recipe_name in (
         "ci-validate-catalog.yaml",
+        "odpg-build.yaml",
         "portfolio-build.yaml",
         "portfolio-refresh.yaml",
         "portfolio-sync-render.yaml",
@@ -312,6 +343,7 @@ def test_example_recipes_validate_and_list() -> None:
     recipes = catalog["recipeCatalog"]["recipes"]
     assert [recipe["path"] for recipe in recipes] == [
         "workflows/ci-validate-catalog.yaml",
+        "workflows/odpg-build.yaml",
         "workflows/portfolio-build.yaml",
         "workflows/portfolio-refresh.yaml",
         "workflows/portfolio-sync-render.yaml",
@@ -888,6 +920,108 @@ def test_execute_recipe_run_generates_artifacts_after_llm_and_review_approval(
         "planned": ["fragments/"],
         "artifacts": ["fragments/signal_turnaround-delay-spike.yaml"],
         "matched": ["fragments/signal_turnaround-delay-spike.yaml"],
+        "missing": [],
+        "extra": [],
+    }
+
+
+def test_execute_recipe_run_builds_odpg_graph_after_llm_and_review_approval(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    """Test odpg.build executes graph inference and records graph sidecars."""
+    from open_data_products import generation
+
+    recipe_path = tmp_path / "recipe.yaml"
+    fragments = tmp_path / "fragments"
+    fragments.mkdir()
+    fragments.joinpath("product.yaml").write_text(
+        """
+productReference:
+  id: customer-analytics-product
+  name:
+    en: Customer Analytics Product
+  description:
+    en: Trusted customer analytics for retention decisions.
+""",
+        encoding="utf-8",
+    )
+    fragments.joinpath("use-case.yaml").write_text(
+        """
+useCase:
+  id: customer-retention
+  name:
+    en: Customer Retention
+  description:
+    en: Improve retention decisions with trusted customer analytics.
+""",
+        encoding="utf-8",
+    )
+    _write_odpg_build_recipe(recipe_path)
+
+    def fake_client(prompt: str, model: str) -> str:
+        assert model == "test-model"
+        assert "customer-retention" in prompt
+        return """
+edges:
+  - from: customer-retention
+    to: customer-analytics-product
+    type: dependsOn
+    confidence: high
+"""
+
+    monkeypatch.setattr(
+        generation,
+        "create_generation_client",
+        lambda settings: fake_client,
+    )
+
+    result = execute_recipe_run(
+        recipe_path,
+        project_root=tmp_path,
+        allow_llm=True,
+        approve_review=True,
+    )
+
+    output = tmp_path / "generated" / "graph.yaml"
+    toon = tmp_path / "generated" / "graph.toon"
+    gcf = tmp_path / "generated" / "graph.gcf"
+    assert result["status"] == "passed"
+    assert result["exitCode"] == 0
+    assert output.is_file()
+    assert toon.is_file()
+    assert gcf.is_file()
+    graph = yaml.safe_load(output.read_text(encoding="utf-8"))
+    assert graph["graph"]["metadata"]["id"] == "customer-graph"
+    assert graph["graph"]["edges"][0]["type"] == "dependsOn"
+    step = result["steps"][0]
+    assert step["status"] == "passed"
+    assert step["artifacts"] == [
+        "generated/graph.gcf",
+        "generated/graph.toon",
+        "generated/graph.yaml",
+    ]
+    assert step["summary"]["kind"] == "Graph"
+    assert step["summary"]["valid"] is True
+    assert step["summary"]["nodeCount"] == 2
+    assert step["summary"]["edgeCount"] == 1
+    assert step["summary"]["writeCheck"] == {
+        "status": "matched",
+        "planned": [
+            "generated/graph.gcf",
+            "generated/graph.toon",
+            "generated/graph.yaml",
+        ],
+        "artifacts": [
+            "generated/graph.gcf",
+            "generated/graph.toon",
+            "generated/graph.yaml",
+        ],
+        "matched": [
+            "generated/graph.gcf",
+            "generated/graph.toon",
+            "generated/graph.yaml",
+        ],
         "missing": [],
         "extra": [],
     }

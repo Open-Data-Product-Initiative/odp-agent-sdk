@@ -1145,6 +1145,81 @@ def _execute_step(
                     ],
                 },
             )
+        if command == "odpg.build":
+            from ..generation import create_generation_client
+            from ..generation import resolve_generation_settings
+            from ..odpg import build_graph
+            from ..odpg import summarize_graph
+            from ..odpg import validate_graph
+            from ..odpg import write_graph
+            from ..odpg import write_graph_gcf
+            from ..odpg import write_graph_toon
+
+            source = _required_path(parameters, "input", root)
+            output = _required_path(parameters, "output", root)
+            toon_output = _optional_path(parameters, "toon", root)
+            gcf_output = _optional_path(parameters, "gcf", root)
+            prompt_dir = _optional_path(parameters, "prompts", root)
+            context_graph = _optional_path(parameters, "contextGraph", root)
+            settings = resolve_generation_settings(
+                config_path=generation_config,
+                input_path=source,
+                output_path=output,
+                provider=_string(parameters.get("providerRef")),
+                model=_string(parameters.get("model")),
+                ollama_url=_string(parameters.get("ollamaUrl")),
+                prompt_dir=prompt_dir,
+            )
+            client = create_generation_client(settings)
+            document = build_graph(
+                source,
+                recursive=parameters.get("recursive") is not False,
+                output_path=output,
+                graph_id=_string(parameters.get("id")),
+                name=_string(parameters.get("name")),
+                description=_string(parameters.get("description")),
+                client=client,
+                model=settings.model,
+                prompt_dir=settings.prompt_path,
+                context_graph=context_graph,
+            )
+            validation = (
+                validate_graph(document)
+                if parameters.get("validate") is not False
+                else None
+            )
+            write_graph(output, document)
+            artifact_paths = [_relative_path(output, root)]
+            if toon_output is not None:
+                write_graph_toon(toon_output, document)
+                artifact_paths.append(_relative_path(toon_output, root))
+            if gcf_output is not None:
+                write_graph_gcf(gcf_output, document)
+                artifact_paths.append(_relative_path(gcf_output, root))
+            summary = summarize_graph(document)
+            return _step_result(
+                step,
+                "passed",
+                started_at,
+                artifacts=sorted(artifact_paths),
+                summary={
+                    "kind": "Graph",
+                    "valid": validation.valid if validation is not None else None,
+                    "nodeCount": summary.get("nodeCount"),
+                    "edgeCount": summary.get("edgeCount"),
+                    "path": _relative_path(output, root),
+                    "toon": (
+                        _relative_path(toon_output, root)
+                        if toon_output is not None
+                        else None
+                    ),
+                    "gcf": (
+                        _relative_path(gcf_output, root)
+                        if gcf_output is not None
+                        else None
+                    ),
+                },
+            )
         if command == "odpg.render":
             from ..odpg import generate_graph_explorer
 

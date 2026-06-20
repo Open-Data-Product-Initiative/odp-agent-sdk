@@ -17,11 +17,11 @@
 - Added supported recipe execution for deterministic/report commands
   (`validate`, `explain`, `odpg.render`, `portfolio.sync`,
   `portfolio.render`, `portfolio.explain`) and LLM-backed commands
-  (`generate`, `portfolio.build`, `portfolio.localize`,
+  (`generate`, `odpg.build`, `portfolio.build`, `portfolio.localize`,
   `portfolio.refresh`). Executed steps now include `writeCheck`, and
   localization runs include objective QA coverage counters.
 - Added the recipe workflow user guide plus starter examples for CI validation,
-  deterministic portfolio sync/render/explain, guarded portfolio build and
-  refresh from source lanes, and guarded release localization. Dry-run plans now
-  expose list-valued source lane inputs so agents can verify portfolio
-  prerequisites before execution.
+  deterministic portfolio sync/render/explain, guarded ODPG graph builds,
+  guarded portfolio build and refresh from source lanes, and guarded release
+  localization. Dry-run plans now expose list-valued source lane inputs so
+  agents can verify portfolio prerequisites before execution.

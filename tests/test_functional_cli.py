@@ -653,6 +653,107 @@ recipe:
     assert payload["steps"][0]["summary"]["writeCheck"]["status"] == "matched"
 
 
+def test_recipe_cli_execute_builds_odpg_graph_after_approval(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from open_data_products import generation
+
+    recipe_path = tmp_path / "recipe.yaml"
+    fragments = tmp_path / "fragments"
+    fragments.mkdir()
+    fragments.joinpath("product.yaml").write_text(
+        """
+productReference:
+  id: customer-analytics-product
+  name:
+    en: Customer Analytics Product
+  description:
+    en: Trusted customer analytics for retention decisions.
+""",
+        encoding="utf-8",
+    )
+    fragments.joinpath("use-case.yaml").write_text(
+        """
+useCase:
+  id: customer-retention
+  name:
+    en: Customer Retention
+  description:
+    en: Improve retention decisions with trusted customer analytics.
+""",
+        encoding="utf-8",
+    )
+    recipe_path.write_text(
+        """
+schema: https://opendataproducts.org/odpr-v1.0/schema/odpr.yaml
+version: "1.0"
+kind: Recipe
+recipe:
+  metadata:
+    id: RCP-ODPG-BUILD-001
+    name:
+      en: Build Graph
+  version: "1.0.0"
+  type: dev
+  steps:
+    - id: build-graph
+      command: odpg.build
+      providerRef: ollama
+      model: test-model
+      with:
+        input: fragments/
+        output: generated/graph.yaml
+        toon: generated/graph.toon
+        gcf: generated/graph.gcf
+""",
+        encoding="utf-8",
+    )
+
+    def fake_client(prompt: str, model: str) -> str:
+        assert model == "test-model"
+        assert "customer-retention" in prompt
+        return """
+edges:
+  - from: customer-retention
+    to: customer-analytics-product
+    type: dependsOn
+    confidence: high
+"""
+
+    monkeypatch.setattr(
+        generation,
+        "create_generation_client",
+        lambda settings: fake_client,
+    )
+
+    assert (
+        main(
+            [
+                "recipe",
+                "run",
+                str(recipe_path),
+                "--execute",
+                "--allow-llm",
+                "--approve-review",
+                "--json",
+            ]
+        )
+        == 0
+    )
+    payload = _json_output(capsys)
+
+    assert payload["status"] == "passed"
+    assert payload["steps"][0]["status"] == "passed"
+    assert payload["steps"][0]["summary"]["kind"] == "Graph"
+    assert payload["steps"][0]["summary"]["edgeCount"] == 1
+    assert payload["steps"][0]["summary"]["writeCheck"]["status"] == "matched"
+    assert (tmp_path / "generated" / "graph.yaml").is_file()
+    assert (tmp_path / "generated" / "graph.toon").is_file()
+    assert (tmp_path / "generated" / "graph.gcf").is_file()
+
+
 def test_recipe_cli_execute_refreshes_portfolio_after_approval(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
