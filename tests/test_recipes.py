@@ -330,6 +330,7 @@ def test_example_recipes_validate_and_list() -> None:
 
     for recipe_name in (
         "ci-validate-catalog.yaml",
+        "generate-signal.yaml",
         "odpg-build.yaml",
         "portfolio-build.yaml",
         "portfolio-refresh.yaml",
@@ -343,6 +344,7 @@ def test_example_recipes_validate_and_list() -> None:
     recipes = catalog["recipeCatalog"]["recipes"]
     assert [recipe["path"] for recipe in recipes] == [
         "workflows/ci-validate-catalog.yaml",
+        "workflows/generate-signal.yaml",
         "workflows/odpg-build.yaml",
         "workflows/portfolio-build.yaml",
         "workflows/portfolio-refresh.yaml",

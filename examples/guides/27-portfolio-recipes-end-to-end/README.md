@@ -22,6 +22,17 @@ export ANTHROPIC_API_KEY="your-key"
 
 ## 1. Build A Portfolio Workspace
 
+Dry-run first:
+
+```bash
+open-data-products recipe run workflows/portfolio-build.yaml \
+  --config config/recipes.config.yaml \
+  --dry-run \
+  --json
+```
+
+Execute only after the dry-run plan is clean and reviewed:
+
 ```bash
 open-data-products recipe run workflows/portfolio-build.yaml \
   --config config/recipes.config.yaml \
@@ -40,6 +51,17 @@ sed -n '1,180p' workspace/portfolio.yaml
 
 ## 2. Refresh The Workspace
 
+Dry-run first:
+
+```bash
+open-data-products recipe run workflows/portfolio-refresh.yaml \
+  --config config/recipes.config.yaml \
+  --dry-run \
+  --json
+```
+
+Execute only after the dry-run plan is clean and reviewed:
+
 ```bash
 open-data-products recipe run workflows/portfolio-refresh.yaml \
   --config config/recipes.config.yaml \
@@ -53,6 +75,17 @@ Refresh is useful when source lane notes change and the workspace already
 exists.
 
 ## 3. Localize The Release View
+
+Dry-run first:
+
+```bash
+open-data-products recipe run workflows/release-portfolio-localize.yaml \
+  --config config/recipes.config.yaml \
+  --dry-run \
+  --json
+```
+
+Execute only after the dry-run plan is clean and reviewed:
 
 ```bash
 open-data-products recipe run workflows/release-portfolio-localize.yaml \

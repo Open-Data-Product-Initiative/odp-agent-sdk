@@ -50,6 +50,19 @@ open-data-products recipe run \
 The JSON includes `recipeSelection`. This tells a script or agent whether the
 recipe came from a command argument or from config.
 
+If both are present, the command argument wins:
+
+```bash
+open-data-products recipe run \
+  examples/recipes/workflows/portfolio-build.yaml \
+  --config examples/recipes/config/recipes.config.yaml \
+  --dry-run \
+  --json
+```
+
+In that case, `recipeSelection.source` is `argument`. The config default is
+only used when the command does not include a recipe path.
+
 ## 4. Write Policy
 
 Dry-run the portfolio build recipe:

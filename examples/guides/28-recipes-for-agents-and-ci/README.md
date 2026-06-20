@@ -20,19 +20,25 @@ An AI agent should follow this order:
 Use deterministic recipes for CI:
 
 ```bash
+repo="$(pwd)"
+tmpdir="$(mktemp -d)"
+cp -R "$repo/examples/recipes" "$tmpdir/recipes"
+cd "$tmpdir/recipes"
+
 open-data-products recipe validate \
-  examples/recipes/workflows/ci-validate-catalog.yaml \
+  workflows/ci-validate-catalog.yaml \
   --json
 
 open-data-products recipe run \
-  examples/recipes/workflows/ci-validate-catalog.yaml \
-  --config examples/recipes/config/recipes.config.yaml \
+  workflows/ci-validate-catalog.yaml \
+  --config config/recipes.config.yaml \
   --execute \
   --json
 ```
 
-CI should usually avoid hosted LLM calls unless the project explicitly permits
-them.
+The temporary copy keeps `.odp/runs` and any generated files out of the
+repository checkout. CI should usually avoid hosted LLM calls unless the
+project explicitly permits them.
 
 ## 3. Agent Pattern
 

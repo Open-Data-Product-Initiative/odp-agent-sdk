@@ -38,9 +38,41 @@ open-data-products recipe run \
   --json
 ```
 
-If the key is missing, provider readiness reports `missing-env`.
+If the key is missing, provider readiness reports `missing-env`. Stop there.
+Do not execute when dry-run reports missing provider readiness, blocking
+reasons, disallowed writes, or a review requirement you have not approved.
 
-## 2. Execute With Both Gates
+## 2. Generate A Signal Fragment
+
+Dry-run the generation recipe:
+
+```bash
+open-data-products recipe run \
+  workflows/generate-signal.yaml \
+  --config config/recipes.config.yaml \
+  --dry-run \
+  --json
+```
+
+Execute only after the dry-run is clean and reviewed:
+
+```bash
+open-data-products recipe run \
+  workflows/generate-signal.yaml \
+  --config config/recipes.config.yaml \
+  --execute \
+  --allow-llm \
+  --approve-review \
+  --json
+```
+
+Inspect the generated fragment:
+
+```bash
+find workspace/generated-fragments -maxdepth 1 -type f | sort
+```
+
+## 3. Execute With Both Gates
 
 Run the graph build recipe only after review:
 
@@ -57,7 +89,7 @@ open-data-products recipe run \
 `--allow-llm` permits provider calls. `--approve-review` records that a
 review-needed plan was approved before execution.
 
-## 3. Inspect Graph Artifacts
+## 4. Inspect Graph Artifacts
 
 ```bash
 sed -n '1,220p' workspace/odpg/graph.yaml
@@ -68,7 +100,7 @@ sed -n '1,80p' workspace/odpg/graph.gcf
 The YAML is the canonical ODPG graph. TOON and GCF are compact context sidecars
 for review, prompts, and agents.
 
-## 4. Other LLM-Backed Recipe Commands
+## 5. Other LLM-Backed Recipe Commands
 
 The implemented provider-backed recipe commands are:
 

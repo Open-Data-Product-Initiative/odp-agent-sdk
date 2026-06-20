@@ -57,12 +57,18 @@ open-data-products recipe run \
 
 Look for these fields:
 
-- `canRun`
-- `blockingReasons`
-- `providers`
-- `steps[].inputs`
-- `steps[].plannedWrites`
-- `steps[].review`
+- `canRun`: should be `true` for a runnable plan.
+- `blockingReasons`: should be empty before execution.
+- `providers`: provider-backed recipes should show ready providers or explain
+  missing environment variables.
+- `steps[].inputs`: each required input path should exist.
+- `steps[].plannedWrites`: each planned write should be allowed by policy.
+- `steps[].review`: review status should be understood before execution.
+
+Do not treat a dry-run as approval. It is the plan that tells you whether
+execution is possible and what still needs human or policy approval.
+For LLM-backed recipes, execution still requires provider readiness and explicit
+approval flags even when dry-run can produce a plan.
 
 ## 4. Agent Reading Pattern
 

@@ -5,6 +5,8 @@ These examples show the main recipe workflow shapes:
 - `ci-validate-catalog.yaml`: deterministic validation that can execute.
 - `portfolio-sync-render.yaml`: deterministic portfolio sync, render, and
   explain flow that writes only under `workspace/`.
+- `generate-signal.yaml`: LLM-backed ODPC signal fragment generation with
+  provider readiness, explicit LLM permission, and review approval.
 - `odpg-build.yaml`: LLM-backed ODPG graph build from ODPC fragments with
   provider readiness, explicit LLM permission, and review approval.
 - `portfolio-build.yaml`: LLM-backed portfolio build from source lane notes
@@ -51,6 +53,10 @@ open-data-products recipe run examples/recipes/workflows/release-portfolio-local
 For the LLM-backed graph and portfolio examples, inspect the dry-run first:
 
 ```bash
+open-data-products recipe run examples/recipes/workflows/generate-signal.yaml \
+  --config examples/recipes/config/recipes.config.yaml \
+  --dry-run \
+  --json
 open-data-products recipe run examples/recipes/workflows/odpg-build.yaml \
   --config examples/recipes/config/recipes.config.yaml \
   --dry-run \
