@@ -1933,6 +1933,75 @@ product:
     assert document["product"]["license"]["scopeOfUse"] == "internal partner use only"
 
 
+def test_generate_odps_product_normalizes_common_hosted_llm_schema_drift(tmp_path):
+    """Test common hosted LLM ODPS schema drift is normalized before validation."""
+    source = tmp_path / "customer-retention.md"
+    source.write_text(
+        "Customer retention analytics for internal lifecycle teams.",
+        encoding="utf-8",
+    )
+
+    def fake_client(prompt, model):
+        if prompt.startswith("# Extract ODPS Product Facts"):
+            return """product:
+  productID: customer-retention-analytics
+  name: Customer Retention Analytics
+"""
+        if prompt.startswith("# Generate Minimal ODPS Product YAML"):
+            return """schema: https://opendataproducts.org/v4.1/schema/odps.json
+version: "4.1"
+product:
+  details:
+    en:
+      productID: customer-retention-analytics
+      name: Customer Retention Analytics
+      visibility: internal
+      status: draft
+      type: dataset
+      useCases:
+        - Identify customers at renewal risk
+        - Prioritize customer-success interventions
+  dataAccess:
+    API:
+      outputPorttype: API
+      format: warehouse-table
+      authenticationMethod: API key
+    API-2:
+      outputPorttype: API
+      format: semantic-model
+      authenticationMethod: API key
+"""
+        raise AssertionError(f"unexpected prompt: {prompt[:80]}")
+
+    artifact = generate_local_artifacts_for_kind(
+        "odps-product",
+        source,
+        tmp_path / "products",
+        client=fake_client,
+    )[0]
+
+    assert artifact.valid_yaml is True
+    assert artifact.errors == []
+    document = yaml.safe_load(artifact.output_path.read_text(encoding="utf-8"))
+    assert validate_document(document).valid is True
+    english = document["product"]["details"]["en"]
+    assert english["visibility"] == "organisation"
+    assert english["useCases"] == [
+        {
+            "useCase": {
+                "useCaseTitle": "Identify customers at renewal risk",
+            },
+        },
+        {
+            "useCase": {
+                "useCaseTitle": "Prioritize customer-success interventions",
+            },
+        },
+    ]
+    assert "format" not in document["product"]["dataAccess"]["API"]
+    assert "format" not in document["product"]["dataAccess"]["API-2"]
+
+
 def test_generate_odps_product_truncates_overlong_license_restrictions(tmp_path):
     """Test generated license text is shortened to ODPS schema limits."""
     source = tmp_path / "license-notes.md"

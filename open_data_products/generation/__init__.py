@@ -78,6 +78,40 @@ ODPS_PRODUCT_TYPE_ALIASES = {
     "dashboard": "reports",
     "report": "reports",
 }
+ODPS_VISIBILITY_ALIASES = {
+    "internal": "organisation",
+    "organization": "organisation",
+    "org": "organisation",
+    "restricted": "invitation",
+}
+ODPS_DATA_ACCESS_FORMATS = {
+    "TOON",
+    "JSON",
+    "XML",
+    "CSV",
+    "Excel",
+    "zip",
+    "plain text",
+    "GraphQL",
+    "MCP",
+}
+ODPS_DATA_ACCESS_FORMAT_ALIASES = {
+    "api": "JSON",
+    "json-api": "JSON",
+    "rest": "JSON",
+    "rest-api": "JSON",
+    "graphql": "GraphQL",
+    "mcp": "MCP",
+    "csv": "CSV",
+    "excel": "Excel",
+    "xlsx": "Excel",
+    "xml": "XML",
+    "text": "plain text",
+    "plain-text": "plain text",
+    "txt": "plain text",
+    "toon": "TOON",
+    "zip": "zip",
+}
 ODPS_GENERATION_PROFILES = ("minimal", "complete-draft")
 ODPS_COMPLETE_DRAFT_COMPONENTS = ("SLA", "dataQuality", "pricingPlans")
 ODPS_PRODUCT_COMPONENTS = (
@@ -1875,6 +1909,9 @@ def _normalize_odps_product_document(document: dict) -> None:
 def _normalize_odps_v41_details(product: Dict[str, Any]) -> None:
     details = product.get("details")
     if isinstance(details, dict) and details:
+        for detail in details.values():
+            if isinstance(detail, dict):
+                _normalize_odps_detail_block(detail)
         return
     flat_detail_keys = (
         "name",
@@ -1905,11 +1942,25 @@ def _normalize_odps_v41_details(product: Dict[str, Any]) -> None:
         if key in product and product.get(key) is not None
     }
     if detail_block:
-        product_type = detail_block.get("type")
-        normalized_type = _normalize_odps_product_type(product_type)
-        if normalized_type:
-            detail_block["type"] = normalized_type
+        _normalize_odps_detail_block(detail_block)
         product["details"] = {"en": detail_block}
+
+
+def _normalize_odps_detail_block(detail: Dict[str, Any]) -> None:
+    product_type = detail.get("type")
+    normalized_type = _normalize_odps_product_type(product_type)
+    if normalized_type:
+        detail["type"] = normalized_type
+    visibility = _normalize_odps_visibility(detail.get("visibility"))
+    if visibility:
+        detail["visibility"] = visibility
+    use_cases = detail.get("useCases")
+    if isinstance(use_cases, list):
+        detail["useCases"] = [
+            normalized
+            for normalized in (_normalize_odps_use_case(item) for item in use_cases)
+            if normalized
+        ]
 
 
 def _normalize_odps_product_type(value: object) -> Optional[str]:
@@ -1920,6 +1971,24 @@ def _normalize_odps_product_type(value: object) -> Optional[str]:
         return stripped
     compact = re.sub(r"[^a-z0-9]+", "-", stripped.lower()).strip("-")
     return ODPS_PRODUCT_TYPE_ALIASES.get(compact)
+
+
+def _normalize_odps_visibility(value: object) -> Optional[str]:
+    if not isinstance(value, str):
+        return None
+    stripped = value.strip()
+    if stripped in {"private", "invitation", "organisation", "dataspace", "public"}:
+        return stripped
+    compact = re.sub(r"[^a-z0-9]+", "-", stripped.lower()).strip("-")
+    return ODPS_VISIBILITY_ALIASES.get(compact)
+
+
+def _normalize_odps_use_case(value: object) -> Optional[Dict[str, Dict[str, str]]]:
+    if isinstance(value, dict):
+        return value
+    if isinstance(value, str) and value.strip():
+        return {"useCase": {"useCaseTitle": value.strip()}}
+    return None
 
 
 def _normalize_odps_sla(sla: object) -> None:
@@ -2279,7 +2348,22 @@ def _normalize_odps_data_access_item(item: Dict[str, Any]) -> Dict[str, Any]:
     output_port_type = normalized.pop("outputPorttype", None)
     if output_port_type is not None and "outputPortType" not in normalized:
         normalized["outputPortType"] = output_port_type
+    access_format = _normalize_odps_data_access_format(normalized.get("format"))
+    if access_format:
+        normalized["format"] = access_format
+    else:
+        normalized.pop("format", None)
     return normalized
+
+
+def _normalize_odps_data_access_format(value: object) -> Optional[str]:
+    if not isinstance(value, str):
+        return None
+    stripped = value.strip()
+    if stripped in ODPS_DATA_ACCESS_FORMATS:
+        return stripped
+    compact = re.sub(r"[^a-z0-9]+", "-", stripped.lower()).strip("-")
+    return ODPS_DATA_ACCESS_FORMAT_ALIASES.get(compact)
 
 
 def _normalize_objective_fragments(document: dict) -> None:
