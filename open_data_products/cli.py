@@ -489,6 +489,10 @@ def main(argv: Optional[List[str]] = None) -> int:
         "--config",
         help="Recipe runner config YAML. Defaults to recipes.config.yaml when present.",
     )
+    recipe_list_parser.add_argument(
+        "--group",
+        help="Assign listed recipes to this RecipeCatalog group id.",
+    )
     recipe_list_parser.add_argument("--json", action="store_true", help="Emit JSON")
     recipe_validate_parser = recipe_subparsers.add_parser(
         "validate",
@@ -517,6 +521,10 @@ def main(argv: Optional[List[str]] = None) -> int:
         "-o",
         required=True,
         help="Output RecipeCatalog YAML path.",
+    )
+    recipe_catalog_parser.add_argument(
+        "--group",
+        help="Assign catalog recipes to this RecipeCatalog group id.",
     )
     recipe_catalog_parser.add_argument("--json", action="store_true", help="Emit JSON")
     recipe_search_parser = recipe_subparsers.add_parser(
@@ -1419,7 +1427,10 @@ def main(argv: Optional[List[str]] = None) -> int:
 
             try:
                 if args.recipe_command == "list":
-                    payload = list_recipes(config_path=args.config)
+                    payload = list_recipes(
+                        config_path=args.config,
+                        group=args.group,
+                    )
                     exit_code = 0
                 elif args.recipe_command == "validate":
                     if args.recipe is None:
@@ -1438,6 +1449,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                     output_path = write_recipe_catalog(
                         args.output,
                         config_path=args.config,
+                        group=args.group,
                     )
                     payload = validate_odpr_document(output_path)
                     payload["output"] = str(output_path)

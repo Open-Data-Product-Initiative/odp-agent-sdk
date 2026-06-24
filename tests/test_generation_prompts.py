@@ -158,7 +158,7 @@ def test_generation_config_summary_exposes_template_and_resolved_settings():
     summary = get_config("generation")
 
     assert summary["domain"] == "generation"
-    assert summary["template_path"] == str(DEFAULT_GENERATION_CONFIG)
+    assert summary["template_path"] == DEFAULT_GENERATION_CONFIG.as_posix()
     assert summary["editable"] is False
     assert summary["copy_hint"].startswith("Copy this template")
     assert summary["selected_provider"] == "ollama"

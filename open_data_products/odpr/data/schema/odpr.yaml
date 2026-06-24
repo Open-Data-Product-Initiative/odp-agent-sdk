@@ -824,6 +824,9 @@ $defs:
         minLength: 1
       name:
         $ref: "#/$defs/LocalizedText"
+      groupRef:
+        type: string
+        minLength: 1
       description:
         $ref: "#/$defs/LocalizedText"
       tags:
@@ -856,6 +859,22 @@ $defs:
         items:
           type: string
           minLength: 1
+  RecipeCatalogGroup:
+    type: object
+    additionalProperties: false
+    patternProperties:
+      "^x-": {}
+    required:
+      - id
+      - name
+    properties:
+      id:
+        type: string
+        minLength: 1
+      name:
+        $ref: "#/$defs/LocalizedText"
+      description:
+        $ref: "#/$defs/LocalizedText"
   RecipeCatalog:
     type: object
     additionalProperties: false
@@ -863,10 +882,18 @@ $defs:
       "^x-": {}
     required:
       - metadata
+      - version
       - recipes
     properties:
       metadata:
         $ref: "#/$defs/Metadata"
+      version:
+        type: string
+        pattern: "^[0-9]+\\.[0-9]+\\.[0-9]+([A-Za-z0-9.+-]*)?$"
+      groups:
+        type: array
+        items:
+          $ref: "#/$defs/RecipeCatalogGroup"
       recipes:
         type: array
         minItems: 1

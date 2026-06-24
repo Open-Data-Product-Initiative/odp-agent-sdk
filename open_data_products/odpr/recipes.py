@@ -17,6 +17,7 @@ from .validation import load_odpr_data, validate_odpr_document
 PathLike = Union[str, Path]
 DEFAULT_RECIPE_CONFIG = Path(__file__).resolve().parent / "recipes.config.yaml"
 ODPR_SCHEMA_URI = "https://opendataproducts.org/odpr-v1.0/schema/odpr.yaml"
+DEFAULT_RECIPE_CATALOG_VERSION = "1.0.0"
 
 
 LLM_BACKED_COMMANDS = {
@@ -237,8 +238,8 @@ def get_recipe_config(config_path: Optional[PathLike] = None) -> Dict[str, objec
     execution = _mapping(config.get("execution"))
     return {
         "domain": "recipes",
-        "template_path": str(DEFAULT_RECIPE_CONFIG),
-        "config_path": str(source_path),
+        "template_path": DEFAULT_RECIPE_CONFIG.as_posix(),
+        "config_path": source_path.as_posix(),
         "projectRoot": config.get("projectRoot"),
         "editable": config_path is not None,
         "copy_hint": (
@@ -511,6 +512,7 @@ def list_recipes(
     *,
     config_path: Optional[PathLike] = None,
     project_root: Optional[PathLike] = None,
+    group: Optional[str] = None,
 ) -> Dict[str, object]:
     """Return a RecipeCatalog-style listing for configured recipe paths."""
     config = _load_optional_recipe_config(config_path)
@@ -535,11 +537,24 @@ def list_recipes(
                 for step in report["steps"]
                 if isinstance(step, dict) and isinstance(step.get("command"), str)
             ]
+            if group:
+                summary["groupRef"] = group
             recipes.append(summary)
+    catalog: Dict[str, object] = {
+        "version": DEFAULT_RECIPE_CATALOG_VERSION,
+        "recipes": recipes,
+    }
+    if group:
+        catalog["groups"] = [
+            {
+                "id": group,
+                "name": _localized_text(group),
+            }
+        ]
     return {
         "mode": "list",
         "kind": "RecipeCatalog",
-        "recipeCatalog": {"recipes": recipes},
+        "recipeCatalog": catalog,
         "warnings": warnings,
     }
 
@@ -551,9 +566,16 @@ def build_recipe_catalog(
     catalog_id: str = "RCP-CATALOG-001",
     name: Optional[Mapping[str, object]] = None,
     description: Optional[Mapping[str, object]] = None,
+    group: Optional[str] = None,
+    group_name: Optional[Mapping[str, object]] = None,
+    group_description: Optional[Mapping[str, object]] = None,
 ) -> Dict[str, object]:
     """Build a metadata-only ODPR RecipeCatalog from configured recipe files."""
-    listing = list_recipes(config_path=config_path, project_root=project_root)
+    listing = list_recipes(
+        config_path=config_path,
+        project_root=project_root,
+        group=group,
+    )
     listing_catalog = _mapping(listing.get("recipeCatalog"))
     entries = listing_catalog.get("recipes")
     recipes = [
@@ -567,14 +589,24 @@ def build_recipe_catalog(
     }
     if description is not None:
         metadata["description"] = description
+    recipe_catalog: Dict[str, object] = {
+        "metadata": metadata,
+        "version": DEFAULT_RECIPE_CATALOG_VERSION,
+        "recipes": recipes,
+    }
+    if group:
+        group_entry: Dict[str, object] = {
+            "id": group,
+            "name": group_name or _localized_text(group),
+        }
+        if group_description is not None:
+            group_entry["description"] = group_description
+        recipe_catalog["groups"] = [group_entry]
     return {
         "schema": ODPR_SCHEMA_URI,
         "version": "1.0",
         "kind": "RecipeCatalog",
-        "recipeCatalog": {
-            "metadata": metadata,
-            "recipes": recipes,
-        },
+        "recipeCatalog": recipe_catalog,
     }
 
 
@@ -583,10 +615,15 @@ def write_recipe_catalog(
     *,
     config_path: Optional[PathLike] = None,
     project_root: Optional[PathLike] = None,
+    group: Optional[str] = None,
 ) -> Path:
     """Write a metadata-only ODPR RecipeCatalog YAML file."""
     output_path = Path(output)
-    catalog = build_recipe_catalog(config_path=config_path, project_root=project_root)
+    catalog = build_recipe_catalog(
+        config_path=config_path,
+        project_root=project_root,
+        group=group,
+    )
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(_dump_yaml(catalog), encoding="utf-8")
     return output_path
@@ -599,6 +636,7 @@ def _catalog_entry(entry: Mapping[str, object]) -> Dict[str, object]:
         "version",
         "type",
         "name",
+        "groupRef",
         "description",
         "tags",
         "environment",
@@ -609,6 +647,10 @@ def _catalog_entry(entry: Mapping[str, object]) -> Dict[str, object]:
         "commands",
     )
     return {key: entry[key] for key in allowed if key in entry and entry[key] != []}
+
+
+def _localized_text(value: str) -> Dict[str, str]:
+    return {"en": value.replace("-", " ").replace("_", " ").title()}
 
 
 def _dump_yaml(data: Mapping[str, object]) -> str:
@@ -1705,9 +1747,9 @@ def _write_allowed(path: str, root: Path, allow_writes: Sequence[Path]) -> bool:
 
 def _relative_path(path: Path, root: Path) -> str:
     try:
-        return str(path.relative_to(root))
+        return path.relative_to(root).as_posix()
     except ValueError:
-        return str(path)
+        return path.as_posix()
 
 
 def _project_root(

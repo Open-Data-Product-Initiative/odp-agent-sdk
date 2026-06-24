@@ -1417,6 +1417,7 @@ recipeCatalog:
     id: RCP-CATALOG-001
     name:
       en: Catalog
+  version: "1.0.0"
   recipes:
     - path: recipes/release.yaml
       id: RCP-RELEASE-001
@@ -1440,6 +1441,49 @@ recipeCatalog:
     assert "recipeCatalog.recipes[0].runId must not be included" in report["errors"]
 
 
+def test_validate_odpr_document_checks_catalog_group_refs(tmp_path: Path) -> None:
+    """Test RecipeCatalog group references resolve against declared groups."""
+    catalog_path = tmp_path / "catalog.yaml"
+    catalog_path.write_text(
+        """
+schema: https://opendataproducts.org/odpr-v1.0/schema/odpr.yaml
+version: "1.0"
+kind: RecipeCatalog
+recipeCatalog:
+  metadata:
+    id: RCP-CATALOG-001
+    name:
+      en: Catalog
+  version: "1.0.0"
+  groups:
+    - id: starters
+      name:
+        en: Starters
+    - id: starters
+      name:
+        en: Starter Duplicates
+  recipes:
+    - path: recipes/release.yaml
+      id: RCP-RELEASE-001
+      version: "1.0.0"
+      type: release
+      name:
+        en: Release
+      groupRef: missing
+""",
+        encoding="utf-8",
+    )
+
+    report = validate_odpr_document(catalog_path)
+
+    assert report["valid"] is False
+    assert "recipeCatalog.groups[1].id must be unique" in report["errors"]
+    assert (
+        "recipeCatalog.recipes[0].groupRef must match a declared group"
+        in report["errors"]
+    )
+
+
 def test_build_recipe_catalog_is_metadata_only(tmp_path: Path) -> None:
     """Test project recipes can be rendered as a standard RecipeCatalog."""
     recipes_dir = tmp_path / "recipes"
@@ -1457,11 +1501,17 @@ recipes:
         encoding="utf-8",
     )
 
-    catalog = build_recipe_catalog(config_path=config_path)
+    catalog = build_recipe_catalog(config_path=config_path, group="project")
 
     assert catalog["kind"] == "RecipeCatalog"
-    entry = catalog["recipeCatalog"]["recipes"][0]
+    recipe_catalog = catalog["recipeCatalog"]
+    assert recipe_catalog["version"] == "1.0.0"
+    assert recipe_catalog["groups"] == [
+        {"id": "project", "name": {"en": "Project"}},
+    ]
+    entry = recipe_catalog["recipes"][0]
     assert entry["path"] == "recipes/release.yaml"
+    assert entry["groupRef"] == "project"
     assert entry["commands"] == ["portfolio.localize"]
     assert "steps" not in entry
     assert "plannedWrites" not in entry

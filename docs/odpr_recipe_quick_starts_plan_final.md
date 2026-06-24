@@ -96,10 +96,42 @@ decisions are settled for this quick-start implementation:
    - `https://opendataproducts.org/odpr-v1.0/schema/odpr.json`
    - `https://opendataproducts.org/odpr-v1.0/schema/odpr.yaml`
 2. The SDK already vendors the ODPR schema locally under `open_data_products/odpr/data/schema/`. Quick-start work should reuse that existing package structure instead of introducing a parallel schema location.
-3. The SDK already has ODPR recipe validation, listing through `recipes.config.yaml`, dry-run planning, guarded execution, and safe MCP recipe tools. Quick-start work should extend those surfaces rather than replace them.
+3. The SDK already has ODPR recipe validation, listing through `recipes.config.yaml`, grouped catalog generation, dry-run planning, guarded execution, and safe MCP recipe tools. Quick-start work should extend those surfaces rather than replace them.
 4. The quick-start implementation should start with starter discovery, workspace initialization, and explanation. It should not redesign existing `recipe run --dry-run` or `recipe run --execute` behavior.
 5. Starter `recipe.yaml` files should be authored as executable ODPR `Recipe` contracts compatible with the existing recipe runner.
 6. Recipe quick-start support should be available through both the CLI and MCP/agent surface. Discovery and explanation MCP tools are `safe`. Workspace initialization creates files and must be classified as `state-changing`. Existing MCP dry-run planning remains `safe`; execution tools, if added to MCP later, must be classified as `state-changing` or stricter according to the ARWS tool taxonomy.
+
+## 2.2 Completed Foundation: RecipeCatalog Grouping Support
+
+The SDK foundation for grouped ODPR `RecipeCatalog` support is already in
+place. Future quick-start phases should build on it instead of adding a
+parallel grouping model.
+
+Completed SDK support:
+
+- vendored ODPR schemas under `open_data_products/odpr/data/schema/` include
+  `recipeCatalog.version`, `recipeCatalog.groups[]`,
+  `RecipeCatalogGroup`, and `recipeCatalog.recipes[].groupRef`
+- `RecipeCatalog` validation requires `recipeCatalog.version`
+- catalog validation rejects duplicate group ids
+- catalog validation rejects duplicate recipe ids
+- catalog validation rejects `groupRef` values that do not match a declared
+  group
+- `build_recipe_catalog()` and `write_recipe_catalog()` emit
+  `recipeCatalog.version`
+- `list_recipes()`, `build_recipe_catalog()`, and `write_recipe_catalog()`
+  can assign emitted recipe entries to a group
+- `open-data-products recipe list --group <id>` returns grouped
+  `RecipeCatalog`-style JSON for configured project recipes
+- `open-data-products recipe catalog --group <id>` writes grouped
+  metadata-only catalogs for configured project recipes
+- MCP `list_recipes` accepts an optional `group` argument
+- recipe and catalog paths are emitted with portable forward slashes in
+  SDK-facing recipe outputs
+
+This foundation supports starter discovery, but it is not the starter discovery
+feature itself. The next phases still need packaged starter resources,
+starter-scoped list commands, catalog checks, init, and explain.
 
 First-release user path:
 
@@ -1063,15 +1095,23 @@ Goal:
 
 Verify the ODPR support already present in the repository before adding starter quick starts.
 
+Status:
+
+Completed for the current SDK baseline. Keep this phase as a regression check
+when resuming the work.
+
 Codex tasks:
 
 - confirm vendored ODPR v1.0 schemas exist under `open_data_products/odpr/data/schema/`
+- confirm vendored ODPR schemas include RecipeCatalog grouping fields
 - confirm package data includes ODPR schemas, recipe config, and recipe guidance resources
 - confirm `recipe validate` validates `Recipe`, `Provider`, and `RecipeCatalog`
 - confirm `recipe list` reads configured recipes through `recipes.config.yaml`
+- confirm `recipe list --group <id>` and `recipe catalog --group <id>` preserve ODPR `RecipeCatalog` grouping structure
 - confirm `recipe run --dry-run` returns an agent-facing plan without writes or provider calls
 - confirm `recipe run --execute` remains guarded by review and LLM approval options
 - confirm MCP tools `list_recipes`, `validate_recipe`, `plan_recipe_run`, and `search_recipe_guidance` remain safe
+- confirm MCP `list_recipes` accepts optional `group`
 - identify whether generic top-level `validate` should also detect ODPR documents, or whether ODPR validation intentionally stays under `recipe validate`
 
 Acceptance checks:
@@ -1086,18 +1126,29 @@ open-data-products resources --json
 Expected:
 
 - ODPR documents validate through the existing recipe validation path
-- `Recipe`, `Provider`, and `RecipeCatalog` validation uses the existing vendored ODPR schema
+- `Recipe`, `Provider`, and grouped `RecipeCatalog` validation uses the existing vendored ODPR schema
 - packaged schema resources work from an installed package, not only from a source checkout
 
-## Phase 1: ODPR RecipeCatalog Support for Starter Discovery
+## Phase 1: Packaged Starter Catalog Discovery
 
 Goal:
 
-Use ODPR `RecipeCatalog` as the source of truth for packaged starter recipe discovery without breaking existing `recipe list` behavior for configured project recipes.
+Use a packaged grouped ODPR `RecipeCatalog` as the source of truth for starter
+recipe discovery without breaking existing `recipe list` behavior for
+configured project recipes.
+
+Starting point:
+
+The SDK already understands grouped `RecipeCatalog` documents and can generate
+grouped project catalogs. Phase 1 should add packaged starter discovery on top
+of that foundation.
 
 Codex tasks:
 
 - add packaged starter `catalog.yaml`
+- include `recipeCatalog.version`
+- define a starter group in `recipeCatalog.groups[]`
+- assign starter entries with `groupRef: starters`
 - validate `catalog.yaml` as `kind: RecipeCatalog`
 - add parser helper for catalog loading if missing
 - add catalog entry resolution by id, normalized English name, and folder name from `path`
@@ -1489,6 +1540,14 @@ These can follow after the SDK quick start model proves useful.
 Resolved:
 
 - The ODPR schema is already vendored locally from the official ODPR v1.0 JSON and YAML schema URLs.
+- The vendored ODPR schema includes grouped `RecipeCatalog` support:
+  `recipeCatalog.version`, `recipeCatalog.groups[]`, and
+  `recipeCatalog.recipes[].groupRef`.
+- The SDK already validates grouped catalogs and rejects duplicate group ids,
+  duplicate recipe ids, and unresolved `groupRef` values.
+- The SDK already supports grouped project catalog output through
+  `recipe list --group <id>`, `recipe catalog --group <id>`, and MCP
+  `list_recipes(group=...)`.
 - The quick-start implementation should add starter discovery, init, and explain on top of existing ODPR validation, dry-run planning, and guarded execution.
 - Starter recipes should be executable ODPR contracts compatible with the current recipe runner.
 - Recipe quick-start support should exist in both CLI and MCP surfaces. MCP discovery and explanation are safe; MCP init is state-changing because it creates a workspace.
@@ -1499,8 +1558,11 @@ Resolved:
 
 Use this checklist before opening a PR.
 
+- [x] The SDK reuses the existing packaged official ODPR v1.0 schema.
+- [x] The vendored ODPR schema supports grouped `RecipeCatalog` documents.
+- [x] The SDK validates grouped catalog references.
+- [x] Project recipe catalog output can assign entries to a group.
 - [ ] The SDK uses `catalog.yaml` for starter discovery.
-- [ ] The SDK reuses the existing packaged official ODPR v1.0 schema.
 - [ ] The catalog root object is `kind: RecipeCatalog`.
 - [ ] The catalog validates against ODPR v1.0 schema.
 - [ ] Starter discovery JSON derives output from `RecipeCatalog`.

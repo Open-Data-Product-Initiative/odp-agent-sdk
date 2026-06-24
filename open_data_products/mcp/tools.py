@@ -358,6 +358,7 @@ def _h_list_recipes(args: Dict[str, Any]) -> Dict[str, Any]:
         _list_recipes(
             config_path=args.get("config_path"),
             project_root=args.get("project_root"),
+            group=args.get("group"),
         )
     )
 
@@ -763,6 +764,10 @@ TOOLS: List[Dict[str, Any]] = [
             {
                 "config_path": _RECIPE_CONFIG_PROP,
                 "project_root": _PROJECT_ROOT_PROP,
+                "group": {
+                    "type": "string",
+                    "description": "Optional RecipeCatalog group id to assign listed recipes.",
+                },
             }
         ),
         "handler": _h_list_recipes,

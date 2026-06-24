@@ -631,8 +631,8 @@ def get_config(
     providers = providers if isinstance(providers, dict) else {}
     return {
         "domain": "generation",
-        "template_path": str(DEFAULT_GENERATION_CONFIG),
-        "config_path": str(source_path),
+        "template_path": DEFAULT_GENERATION_CONFIG.as_posix(),
+        "config_path": source_path.as_posix(),
         "editable": config_path is not None,
         "copy_hint": (
             "Copy this template to your project, edit provider/model settings, "

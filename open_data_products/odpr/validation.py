@@ -170,10 +170,13 @@ def _validate_catalog_root(data: Mapping[str, object], errors: List[str]) -> Non
     _require_string(metadata, "id", "recipeCatalog.metadata.id", errors)
     if "name" not in metadata:
         errors.append("recipeCatalog.metadata.name is required")
+    _require_string(catalog, "version", "recipeCatalog.version", errors)
+    group_ids = _catalog_group_ids(catalog.get("groups"), errors)
     recipes = catalog.get("recipes")
     if not isinstance(recipes, list) or not recipes:
         errors.append("recipeCatalog.recipes must contain at least one entry")
         return
+    recipe_ids: set[str] = set()
     forbidden = {"steps", "status", "runId", "logs", "plannedWrites"}
     for index, entry in enumerate(recipes):
         if not isinstance(entry, dict):
@@ -184,6 +187,39 @@ def _validate_catalog_root(data: Mapping[str, object], errors: List[str]) -> Non
         for required in ("path", "id", "version", "type", "name"):
             if required not in entry:
                 errors.append(f"recipeCatalog.recipes[{index}].{required} is required")
+        entry_id = entry.get("id")
+        if isinstance(entry_id, str):
+            if entry_id in recipe_ids:
+                errors.append(f"recipeCatalog.recipes[{index}].id must be unique")
+            recipe_ids.add(entry_id)
+        group_ref = entry.get("groupRef")
+        if isinstance(group_ref, str) and group_ref not in group_ids:
+            errors.append(
+                f"recipeCatalog.recipes[{index}].groupRef must match a declared group"
+            )
+
+
+def _catalog_group_ids(value: object, errors: List[str]) -> set[str]:
+    if value is None:
+        return set()
+    if not isinstance(value, list):
+        errors.append("recipeCatalog.groups must be an array")
+        return set()
+    group_ids: set[str] = set()
+    for index, group in enumerate(value):
+        if not isinstance(group, dict):
+            errors.append(f"recipeCatalog.groups[{index}] must be a mapping")
+            continue
+        group_id = group.get("id")
+        if not isinstance(group_id, str) or not group_id.strip():
+            errors.append(f"recipeCatalog.groups[{index}].id is required")
+            continue
+        if group_id in group_ids:
+            errors.append(f"recipeCatalog.groups[{index}].id must be unique")
+        group_ids.add(group_id)
+        if "name" not in group:
+            errors.append(f"recipeCatalog.groups[{index}].name is required")
+    return group_ids
 
 
 def _mapping(value: object) -> Mapping[str, object]:

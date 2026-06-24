@@ -1341,6 +1341,8 @@ recipes:
                 str(config_path),
                 "--output",
                 str(output),
+                "--group",
+                "project",
                 "--json",
             ]
         )
@@ -1351,7 +1353,10 @@ recipes:
     entry = catalog["recipeCatalog"]["recipes"][0]
     assert payload["kind"] == "RecipeCatalog"
     assert payload["output"] == str(output)
+    assert catalog["recipeCatalog"]["version"] == "1.0.0"
+    assert catalog["recipeCatalog"]["groups"][0]["id"] == "project"
     assert entry["path"] == "recipes/release.yaml"
+    assert entry["groupRef"] == "project"
     assert "steps" not in entry
     assert "plannedWrites" not in entry
 
