@@ -153,6 +153,84 @@ def test_odps_generation_prompts_include_named_v41_component_example():
     assert "#/product/dataQuality/declarative/0" not in prompts
 
 
+def test_generation_prompts_keep_defaults_out_of_fact_extraction():
+    """Test fact prompts separate source evidence from defaults."""
+    system_prompt = load_generation_prompt("system.md")
+    facts_prompt = load_generation_prompt("odps_product_facts.md")
+    merge_prompt = load_generation_prompt("odps_product_merge_facts.md")
+    required_shapes = "\n".join(
+        prompt.split("Contrast examples:", 1)[0]
+        for prompt in (facts_prompt, merge_prompt)
+    )
+
+    assert "closest valid minimal structure" not in system_prompt
+    assert "task-specific defaults" in system_prompt
+    assert "inferredDefaults:" in facts_prompt
+    assert "inferredDefaults:" in merge_prompt
+    assert "visibility: public" not in required_shapes
+    assert "status: draft" not in required_shapes
+    assert "type: dataset" not in required_shapes
+
+
+def test_generation_prompts_skip_unsupported_optional_components():
+    """Test component drafting prompt avoids placeholder component guesses."""
+    prompt = load_generation_prompt("odps_product_component_draft.md")
+
+    assert "draft conservative review-needed values" not in prompt
+    assert "Do not create placeholder component objects" in prompt
+    assert "components: {}" in prompt
+
+
+def test_generation_prompts_define_signal_and_graph_evidence_boundaries():
+    """Test signal and graph prompts avoid invented dates and graph nodes."""
+    signal_prompt = load_generation_prompt("odpc_signal_fragment.md")
+    graph_prompt = load_generation_prompt("odpg_graph_yaml.md")
+
+    assert "If no observation date or time is supported" in signal_prompt
+    assert "return `signals: []`" in signal_prompt
+    assert "invent an `observedAt` value" in signal_prompt
+    assert "The generated fragment context is the authority for graph nodes" in (
+        graph_prompt
+    )
+    assert "Do not create graph nodes that are absent from the generated fragments" in (
+        graph_prompt
+    )
+
+
+def test_generation_prompts_include_compact_contrast_examples():
+    """Test prompts include small examples for common accuracy failure modes."""
+    facts_prompt = load_generation_prompt("odps_product_facts.md")
+    component_prompt = load_generation_prompt("odps_product_component_draft.md")
+    signal_prompt = load_generation_prompt("odpc_signal_fragment.md")
+    graph_prompt = load_generation_prompt("odpg_graph_yaml.md")
+
+    assert "Unsupported visibility stays null" in facts_prompt
+    assert "visibility: null" in facts_prompt
+    assert "Supported component" in component_prompt
+    assert "Unsupported requested component" in component_prompt
+    assert "No supported observation time" in signal_prompt
+    assert "signals: []" in signal_prompt
+    assert "Generated fragment context example" in graph_prompt
+    assert "Do not add an objective node unless an objective fragment is present" in (
+        graph_prompt
+    )
+
+
+def test_generation_prompts_include_complete_draft_component_example():
+    """Test complete-draft prompts show the default component set together."""
+    component_prompt = load_generation_prompt("odps_product_component_draft.md")
+    assemble_prompt = load_generation_prompt("odps_product_assemble_yaml.md")
+
+    for prompt in (component_prompt, assemble_prompt):
+        assert "Complete-draft example" in prompt
+        assert "SLA:" in prompt
+        assert "dataQuality:" in prompt
+        assert "pricingPlans:" in prompt
+        assert "#/product/dataQuality/declarative/default" in prompt
+        assert "#/product/SLA/declarative/default" in prompt
+        assert "license:" not in prompt.split("Complete-draft example", 1)[1]
+
+
 def test_generation_config_summary_exposes_template_and_resolved_settings():
     """Test that users can discover the editable generation config template."""
     summary = get_config("generation")
@@ -522,6 +600,7 @@ def test_bundled_generation_config_includes_common_compatible_providers():
     assert "gemini" in config["providers"]
     assert "xai" in config["providers"]
     assert "zai" in config["providers"]
+    assert "sakana-fugu" in config["providers"]
     assert "claude" in config["providers"]
     assert "lmstudio" in config["providers"]
     assert "vllm" in config["providers"]
@@ -599,6 +678,14 @@ def test_bundled_generation_config_includes_common_compatible_providers():
     assert zai.base_url == "https://api.z.ai/api/paas/v4"
     assert zai.model == "glm-5.2"
     assert zai.api_key_env == "ZAI_API_KEY"
+    sakana_fugu = resolve_generation_settings(
+        DEFAULT_GENERATION_CONFIG,
+        provider="sakana-fugu",
+    )
+    assert sakana_fugu.provider_type == "openai"
+    assert sakana_fugu.base_url == "https://api.sakana.ai/v1"
+    assert sakana_fugu.model == "fugu"
+    assert sakana_fugu.api_key_env == "SAKANA_API_KEY"
     lmstudio = resolve_generation_settings(
         DEFAULT_GENERATION_CONFIG,
         provider="lmstudio",
@@ -772,6 +859,13 @@ def test_resolve_generation_settings_supports_claude_without_config():
             "glm-5.2",
             "https://api.z.ai/api/paas/v4",
             "ZAI_API_KEY",
+        ),
+        (
+            "sakana-fugu",
+            "openai",
+            "fugu",
+            "https://api.sakana.ai/v1",
+            "SAKANA_API_KEY",
         ),
         (
             "lmstudio",
@@ -1664,6 +1758,80 @@ product:
     }
 
 
+def test_generate_odps_product_minimal_profile_prunes_optional_output(tmp_path):
+    """Test minimal ODPS generation strips optional structures from model output."""
+    source = tmp_path / "airport-operations-product.md"
+    source.write_text(
+        "# Airport Operations Performance\n\n"
+        "A public draft dataset for airport operations performance.",
+        encoding="utf-8",
+    )
+
+    def fake_client(prompt, model):
+        if prompt.startswith("# Extract ODPS Product Facts"):
+            return """product:
+  productID: airport-operations-performance
+  name: Airport Operations Performance
+evidenceGaps: []
+"""
+        if prompt.startswith("# Generate Minimal ODPS Product YAML"):
+            return """schema: https://opendataproducts.org/v4.1/schema/odps.json
+version: "4.1"
+product:
+  details:
+    en:
+      productID: airport-operations-performance
+      name: Airport Operations Performance
+      visibility: public
+      status: draft
+      type: dataset
+      useCases:
+        - Monitor operational performance
+  dataAccess:
+    API:
+      outputPorttype: API
+      authenticationMethod: API key
+  SLA:
+    declarative:
+      default:
+        name:
+          en: Default SLA
+        dimensions:
+          - dimension: uptime
+            objective: 99
+            unit: percent
+            weight: 50
+"""
+        raise AssertionError(f"unexpected prompt: {prompt[:80]}")
+
+    artifact = generate_local_artifacts_for_kind(
+        "odps-product",
+        source,
+        tmp_path / "products",
+        client=fake_client,
+        profile="minimal",
+    )[0]
+
+    assert artifact.valid_yaml is True
+    assert artifact.errors == []
+    document = yaml.safe_load(artifact.output_path.read_text(encoding="utf-8"))
+    assert document == {
+        "schema": "https://opendataproducts.org/v4.1/schema/odps.json",
+        "version": "4.1",
+        "product": {
+            "details": {
+                "en": {
+                    "productID": "airport-operations-performance",
+                    "name": "Airport Operations Performance",
+                    "visibility": "public",
+                    "status": "draft",
+                    "type": "dataset",
+                }
+            },
+        },
+    }
+
+
 def test_generate_odps_product_complete_draft_uses_component_pipeline(tmp_path):
     """Test complete-draft ODPS generation drafts components in separate calls."""
     source = tmp_path / "customer-analytics-email.txt"
@@ -1785,6 +1953,150 @@ product:
     assert artifact.evidence_gaps == ["No pricing terms were provided."]
     document = yaml.safe_load(artifact.output_path.read_text(encoding="utf-8"))
     assert {"SLA", "dataQuality", "pricingPlans"} <= set(document["product"])
+
+
+def test_generate_odps_product_complete_draft_prunes_non_schema_content(tmp_path):
+    """Test complete-draft output removes unsupported ODPS keys before writing."""
+    source = tmp_path / "customer-analytics-email.txt"
+    source.write_text(
+        "Email thread: we need a customer analytics dataset for retention teams.",
+        encoding="utf-8",
+    )
+
+    def fake_client(prompt, model):
+        if prompt.startswith("# Extract ODPS Product Facts"):
+            return """product:
+  productID: customer-analytics
+  name: Customer Analytics
+evidenceGaps: []
+"""
+        if prompt.startswith("# Generate Minimal ODPS Product YAML"):
+            return """schema: https://opendataproducts.org/v4.1/schema/odps.json
+version: "4.1"
+product:
+  details:
+    en:
+      productID: customer-analytics
+      name: Customer Analytics
+      visibility: public
+      status: draft
+      type: dataset
+"""
+        if prompt.startswith("# Draft ODPS Product Components"):
+            return """components:
+  SLA:
+    declarative:
+      default:
+        dimensions:
+          - dimension: uptime
+            objective: 99
+            unit: percent
+            monitoring:
+              tool: invented monitor
+        unsupportedPackageField: remove me
+  dataQuality:
+    declarative:
+      default:
+        dimensions:
+          - dimension: completeness
+            objective: 95
+            unit: percentage
+            validationRules:
+              - invented rule
+  pricingPlans:
+    declarative:
+      en:
+        - name: Review Needed Starter
+          priceCurrency: EUR
+          price: 0
+          billingDuration: month
+          unit: On-request
+          hallucinatedPlanField: remove me
+draftedComponents:
+  - SLA
+  - dataQuality
+  - pricingPlans
+reviewNotes: []
+evidenceGaps: []
+"""
+        if prompt.startswith("# Assemble ODPS Product YAML"):
+            return """schema: https://opendataproducts.org/v4.1/schema/odps.json
+version: "4.1"
+notSchemaRoot: remove me
+product:
+  details:
+    en:
+      productID: customer-analytics
+      name: Customer Analytics
+      visibility: public
+      status: draft
+      type: dataset
+      hallucinatedDetail: remove me
+  hallucinatedProductSection:
+    value: remove me
+  SLA:
+    declarative:
+      default:
+        unsupportedPackageField: remove me
+        dimensions:
+          - dimension: uptime
+            objective: 99
+            unit: percent
+            monitoring:
+              tool: invented monitor
+  dataQuality:
+    declarative:
+      default:
+        dimensions:
+          - dimension: completeness
+            objective: 95
+            unit: percentage
+            validationRules:
+              - invented rule
+  pricingPlans:
+    declarative:
+      en:
+        - name: Review Needed Starter
+          priceCurrency: EUR
+          price: 0
+          billingDuration: month
+          unit: On-request
+          hallucinatedPlanField: remove me
+"""
+        raise AssertionError(f"unexpected prompt: {prompt[:80]}")
+
+    artifact = generate_local_artifacts_for_kind(
+        "odps-product",
+        source,
+        tmp_path / "products",
+        client=fake_client,
+        profile="complete-draft",
+    )[0]
+
+    assert artifact.valid_yaml is True
+    assert artifact.errors == []
+    document = yaml.safe_load(artifact.output_path.read_text(encoding="utf-8"))
+    assert validate_document(document).valid is True
+    assert set(document) == {"schema", "version", "product"}
+    assert set(document["product"]) == {
+        "details",
+        "SLA",
+        "dataQuality",
+        "pricingPlans",
+    }
+    english = document["product"]["details"]["en"]
+    assert "hallucinatedDetail" not in english
+    sla_dimension = document["product"]["SLA"]["declarative"]["default"]["dimensions"][0]
+    dq_dimension = document["product"]["dataQuality"]["declarative"]["default"][
+        "dimensions"
+    ][0]
+    pricing_plan = document["product"]["pricingPlans"]["declarative"]["en"][0]
+    assert "monitoring" not in sla_dimension
+    assert "unsupportedPackageField" not in document["product"]["SLA"]["declarative"][
+        "default"
+    ]
+    assert "validationRules" not in dq_dimension
+    assert "hallucinatedPlanField" not in pricing_plan
 
 
 def test_generate_odps_product_include_components_controls_component_prompt(tmp_path):
@@ -1934,7 +2246,7 @@ product:
 
 
 def test_generate_odps_product_normalizes_common_hosted_llm_schema_drift(tmp_path):
-    """Test common hosted LLM ODPS schema drift is normalized before validation."""
+    """Test minimal ODPS output normalizes required fields and drops extras."""
     source = tmp_path / "customer-retention.md"
     source.write_text(
         "Customer retention analytics for internal lifecycle teams.",
@@ -1985,21 +2297,14 @@ product:
     document = yaml.safe_load(artifact.output_path.read_text(encoding="utf-8"))
     assert validate_document(document).valid is True
     english = document["product"]["details"]["en"]
-    assert english["visibility"] == "organisation"
-    assert english["useCases"] == [
-        {
-            "useCase": {
-                "useCaseTitle": "Identify customers at renewal risk",
-            },
-        },
-        {
-            "useCase": {
-                "useCaseTitle": "Prioritize customer-success interventions",
-            },
-        },
-    ]
-    assert "format" not in document["product"]["dataAccess"]["API"]
-    assert "format" not in document["product"]["dataAccess"]["API-2"]
+    assert english == {
+        "productID": "customer-retention-analytics",
+        "name": "Customer Retention Analytics",
+        "visibility": "organisation",
+        "status": "draft",
+        "type": "dataset",
+    }
+    assert set(document["product"]) == {"details"}
 
 
 def test_generate_odps_product_truncates_overlong_license_restrictions(tmp_path):

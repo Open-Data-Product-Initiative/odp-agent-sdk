@@ -10,8 +10,9 @@ Rules:
   relationships that are not supported by the source documents.
 - Prefer stable identifiers in kebab-case.
 - Keep descriptions short and traceable to the input.
-- If required information is missing, use the closest valid minimal structure
-  and add a short note field where the target fragment supports one.
+- If required information is missing, use task-specific defaults only where the
+  task prompt explicitly permits them; otherwise omit optional fields and record
+  the gap where the target fragment supports notes or evidence gaps.
 - The generated artifact must be suitable for validation by the SDK before it is
   accepted.
 
@@ -20,4 +21,3 @@ Source documents:
 ```text
 {source_documents}
 ```
-

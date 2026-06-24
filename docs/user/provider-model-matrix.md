@@ -28,6 +28,7 @@ These presets are available by provider name through `--provider <name>`.
 | `gemini` | `openai-chat` | `gemini-3.5-flash` | `https://generativelanguage.googleapis.com/v1beta/openai` | `GEMINI_API_KEY` |
 | `xai` | `openai-chat` | `grok-4.3` | `https://api.x.ai/v1` | `XAI_API_KEY` |
 | `zai` | `openai-chat` | `glm-5.2` | `https://api.z.ai/api/paas/v4` | `ZAI_API_KEY` |
+| `sakana-fugu` | `openai` | `fugu` | `https://api.sakana.ai/v1` | `SAKANA_API_KEY` |
 | `claude` | `anthropic` | `claude-sonnet-4-5` | `https://api.anthropic.com/v1` | `ANTHROPIC_API_KEY` |
 | `anthropic` | `anthropic` | `claude-sonnet-4-5` | `https://api.anthropic.com/v1` | `ANTHROPIC_API_KEY` |
 
@@ -51,13 +52,15 @@ Hosted provider columns use API-backed inference outside your machine.
 | Mistral Large | - | - | `mistral-large-latest` |
 | Other provider models | use provider model ID | use provider model ID | use provider model ID |
 
-| Model or family | Gemini `gemini` | xAI `xai` | Z.ai `zai` | Anthropic `claude` |
-|-----------------|-----------------|-----------|-------------|--------------------|
-| Gemini Flash | `gemini-3.5-flash` | - | - | - |
-| Grok | - | `grok-4.3` | - | - |
-| GLM | - | - | `glm-5.2` | - |
-| Claude Sonnet | - | - | - | `claude-sonnet-4-5` |
-| Other provider models | use Gemini model ID | use xAI model ID | use GLM model ID | use Anthropic model ID |
+| Model or family | Gemini `gemini` | xAI `xai` | Z.ai `zai` | Sakana Fugu `sakana-fugu` | Anthropic `claude` |
+|-----------------|-----------------|-----------|-------------|-----------------------------|--------------------|
+| Gemini Flash | `gemini-3.5-flash` | - | - | - | - |
+| Grok | - | `grok-4.3` | - | - | - |
+| GLM | - | - | `glm-5.2` | - | - |
+| Fugu | - | - | - | `fugu` | - |
+| Fugu Ultra | - | - | - | `fugu-ultra` | - |
+| Claude Sonnet | - | - | - | - | `claude-sonnet-4-5` |
+| Other provider models | use Gemini model ID | use xAI model ID | use GLM model ID | use Sakana model ID | use Anthropic model ID |
 
 ## Local Provider Presets
 

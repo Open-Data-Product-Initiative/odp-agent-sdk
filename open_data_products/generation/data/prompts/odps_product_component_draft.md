@@ -12,7 +12,10 @@ Output rules:
   Never return scalar strings for components such as `license`, `dataHolder`,
   `contract`, `SLA`, `dataQuality`, `pricingPlans`, `dataAccess`,
   `paymentGateways`, or `productStrategy`.
-- If the source lacks details, draft conservative review-needed values.
+- If a requested optional component lacks enough source evidence for a useful
+  schema-shaped draft, omit that component from `components` and record the gap
+  in `evidenceGaps`. Do not create placeholder component objects only to satisfy
+  the request.
 - Put uncertainty in `reviewNotes` and `evidenceGaps`, not as YAML comments.
 - Do not return a full OpenDataProduct document from this step.
 - For `license`, use ODPS v4.1 `scope`, `termination`, and `governance`.
@@ -64,6 +67,43 @@ reviewNotes:
   - SLA drafted because no service-level targets were provided.
 evidenceGaps:
   - Missing support hours and escalation process.
+```
+
+If none of the requested optional components are supported by source evidence,
+return an empty component packet:
+
+```yaml
+components: {}
+draftedComponents: []
+reviewNotes: []
+evidenceGaps:
+  - Requested components were not supported by the source documents.
+```
+
+Contrast examples:
+
+```yaml
+# Supported component: source names API access and API-key authentication.
+components:
+  dataAccess:
+    API:
+      name:
+        en: API
+      outputPortType: API
+      authenticationMethod: API key
+draftedComponents:
+  - dataAccess
+reviewNotes: []
+evidenceGaps: []
+```
+
+```yaml
+# Unsupported requested component: source has no pricing terms.
+components: {}
+draftedComponents: []
+reviewNotes: []
+evidenceGaps:
+  - pricingPlans requested, but the source does not state pricing or billing terms.
 ```
 
 Pricing plans can link to named generated packages:
@@ -191,6 +231,70 @@ components:
             $ref: "#/product/SLA/declarative/default"
           access:
             $ref: "#/product/dataAccess/API"
+```
+
+Complete-draft example for the default component set:
+
+```yaml
+components:
+  SLA:
+    declarative:
+      default:
+        name:
+          en: Standard SLA
+        description:
+          en: Review-needed service level package based on source evidence.
+        dimensions:
+          - dimension: uptime
+            displaytitle:
+              en: Uptime
+            objective: 99
+            unit: percent
+            weight: 60
+          - dimension: updateFrequency
+            displaytitle:
+              en: Update Frequency
+            objective: 24
+            unit: hours
+            weight: 40
+  dataQuality:
+    declarative:
+      default:
+        description: Review-needed data quality package based on source evidence.
+        dimensions:
+          - dimension: completeness
+            displayTitle: Completeness
+            objective: 95
+            unit: percentage
+            weight: 50
+            description: Required fields are populated.
+          - dimension: timeliness
+            displayTitle: Timeliness
+            objective: 24
+            unit: hours
+            weight: 50
+            description: Data is refreshed within the stated reporting window.
+  pricingPlans:
+    declarative:
+      en:
+        - name: Review Needed Starter
+          priceCurrency: EUR
+          price: "0"
+          billingDuration: month
+          unit: On-request
+          notes: Pricing needs human review before publication.
+          dataQuality:
+            $ref: "#/product/dataQuality/declarative/default"
+          SLA:
+            $ref: "#/product/SLA/declarative/default"
+draftedComponents:
+  - SLA
+  - dataQuality
+  - pricingPlans
+reviewNotes:
+  - pricingPlans require human review because the source did not state commercial terms.
+evidenceGaps:
+  - Missing explicit pricing terms.
 ```
 
 Requested ODPS product components:

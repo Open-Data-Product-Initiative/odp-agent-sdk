@@ -35,6 +35,12 @@ providers:
     apiKeyEnv: ANTHROPIC_API_KEY
     version: "2023-06-01"
     maxTokens: 4096
+
+  sakana-fugu:
+    type: openai
+    model: fugu
+    baseUrl: https://api.sakana.ai/v1
+    apiKeyEnv: SAKANA_API_KEY
 YAML
 ```
 
@@ -50,6 +56,12 @@ For Claude, change `provider: claude` in the config and export:
 
 ```bash
 export ANTHROPIC_API_KEY="your-api-key"
+```
+
+For Sakana Fugu, change `provider: sakana-fugu` in the config and export:
+
+```bash
+export SAKANA_API_KEY="your-api-key"
 ```
 
 Do not store API keys in YAML files.

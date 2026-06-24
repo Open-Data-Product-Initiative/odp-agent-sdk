@@ -135,6 +135,7 @@ def _capabilities() -> List[Dict[str, Any]]:
                 "gemini",
                 "xai",
                 "zai",
+                "sakana-fugu",
                 "claude",
             ],
             "provider_types": [

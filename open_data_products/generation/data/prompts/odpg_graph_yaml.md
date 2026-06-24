@@ -13,8 +13,10 @@ Output rules:
   `version: "1.0"`.
 - Include `graph.metadata.id`, `graph.metadata.name.en`, and
   `graph.metadata.description.en`.
-- Generate graph nodes for all data products, use cases, business objectives,
-  and signals when they are supported by the source documents.
+- The generated fragment context is the authority for graph nodes. Generate
+  graph nodes only for data products, use cases, business objectives, and
+  signals present in the generated fragments.
+- Do not create graph nodes that are absent from the generated fragments.
 - Every node must use `id`, `type`, and `$ref`. Do not use `label` instead of
   `type`.
 - Use `$ref` values that point to the generated artifact files:
@@ -58,6 +60,22 @@ graph:
       type: dependsOn
       confidence: high
 ```
+
+Generated fragment context example:
+
+```yaml
+# If only these two fragments exist, only these two nodes are allowed.
+nodes:
+  - id: airport-operations-performance
+    type: DataProduct
+    $ref: product_reference_airport-operations-performance.yaml
+  - id: flight-delay-risk-monitoring
+    type: UseCase
+    $ref: use_case_flight-delay-risk-monitoring.yaml
+```
+
+Do not add an objective node unless an objective fragment is present in the
+generated fragment context.
 
 Source documents:
 

@@ -13,8 +13,8 @@ Granite, Nemotron, Vicuna, WizardLM, and other compatible models.
 
 Online providers can also be selected through the generation config, including
 OpenAI-compatible providers such as Together AI, Cerebras, SambaNova, Mistral,
-Gemini, xAI, and Z.ai, plus Claude through the Anthropic Messages API. This
-workflow stops before catalog
+Gemini, xAI, Z.ai, and Sakana Fugu, plus Claude through the Anthropic Messages
+API. This workflow stops before catalog
 publishing: it produces source-backed fragment files and a graph file that can
 be validated, inspected, and used by the existing ODPC/ODPG helpers.
 
@@ -222,6 +222,20 @@ matching artifacts, depending on what the model can extract:
 Use `--kind product-reference` for ODPC catalog references and
 `--kind odps-product` for full ODPS product YAML documents.
 
+For `--kind odps-product`, the default `--profile minimal` writes only the
+mandatory ODPS product shell: `schema`, `version`, and
+`product.details.en.productID`, `name`, `visibility`, `status`, and `type`.
+The SDK strips optional ODPS structures from the minimal model response before
+validation and writing. Use `--profile complete-draft` or
+`--include-components` when you want optional components such as `SLA`,
+`dataQuality`, `pricingPlans`, `license`, `dataAccess`, `dataHolder`,
+`contract`, `paymentGateways`, or `productStrategy`.
+
+For all ODPS product profiles, generated YAML is normalized and pruned against
+the bundled ODPS schema before it is written. Unsupported root, product, and
+detail fields are removed deterministically instead of being accepted as model
+output.
+
 ## Provider Configuration
 
 Use a generation config file when you want to select a provider, model, input
@@ -313,6 +327,14 @@ open-data-products generate \
   --prompts prompts/ \
   --provider zai \
   --model glm-5.2 \
+  --kind signal \
+  --json
+
+open-data-products generate \
+  --config my-generation.config.yaml \
+  --prompts prompts/ \
+  --provider sakana-fugu \
+  --model fugu-ultra \
   --kind signal \
   --json
 ```
@@ -462,6 +484,12 @@ providers:
     baseUrl: https://api.groq.com/openai/v1
     apiKeyEnv: GROQ_API_KEY
 
+  sakana-fugu:
+    type: openai
+    model: fugu
+    baseUrl: https://api.sakana.ai/v1
+    apiKeyEnv: SAKANA_API_KEY
+
   together:
     type: openai-chat
     model: meta-llama/Llama-3.3-70B-Instruct-Turbo
@@ -535,7 +563,7 @@ Python certificate-store issues without disabling TLS verification.
 Provider entries with `type: openai` use the OpenAI Responses request shape,
 Bearer token authentication, and `baseUrl + /responses`. That supports OpenAI
 and providers that expose a compatible Responses API endpoint, such as
-OpenRouter and Groq.
+OpenRouter, Groq, and Sakana Fugu.
 
 Provider entries with `type: openai-chat` use the Chat Completions request
 shape, `baseUrl + /chat/completions`. Hosted providers such as Together AI,
@@ -639,8 +667,9 @@ Prompt templates are plain Markdown files under
 
 `--kind odps-product` uses a multi-call prompt pipeline: extract facts,
 optionally chunk and merge facts for long sources with `--max-source-chars`,
-generate minimal ODPS YAML, optionally draft requested components, assemble the
-final document, validate locally, and repair once when validation fails.
+generate minimal ODPS YAML, enforce the mandatory-only minimal product shape,
+optionally draft requested components, assemble the final document, validate
+locally, and repair once when validation fails.
 Contributor-facing implementation notes for this pipeline live in
 [`generation-development.md`](../development/generation.md).
 

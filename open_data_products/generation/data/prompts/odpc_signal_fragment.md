@@ -27,6 +27,8 @@ Output rules:
   product, or domain.
 - Generate at most one signal for each source document that describes a signal.
 - Preserve the source signal name when it is present.
+- If no observation date or time is supported by the source text, return `signals: []`
+  for that source instead of guessing. Do not invent an `observedAt` value.
 - `impact` must be an object. Use `impact.affectedDomains` for related use
   cases, objectives, domains, or affected operational areas.
 - For `strength`, `confidence`, `impact.valuePotential`, and `impact.urgency`,
@@ -76,6 +78,13 @@ signals:
         en: Turnaround delays increased by 18 percent.
     recommendedAction:
       en: Review high-risk departures and coordinate with handling agents.
+```
+
+Contrast example:
+
+```yaml
+# No supported observation time, so no signal is emitted.
+signals: []
 ```
 
 Source documents:

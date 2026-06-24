@@ -269,6 +269,9 @@ startup, readiness checks, model discovery, and SDK command shape.
 The bundled `zai` preset targets the general Z.ai GLM OpenAI-compatible API at
 `https://api.z.ai/api/paas/v4` with `ZAI_API_KEY` and default model `glm-5.2`.
 For Z.ai setup and SDK command examples, read `docs/user/zai-glm.md`.
+The bundled `sakana-fugu` preset targets Sakana Fugu's OpenAI-compatible
+Responses API at `https://api.sakana.ai/v1` with `SAKANA_API_KEY` and default
+model `fugu`; use `--model fugu-ultra` for heavier multi-step tasks.
 For a direct lookup table of provider presets and example model IDs, read
 `docs/user/provider-model-matrix.md`.
 

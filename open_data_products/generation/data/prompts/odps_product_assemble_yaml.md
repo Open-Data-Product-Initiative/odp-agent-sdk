@@ -129,6 +129,71 @@ product:
             $ref: "#/product/dataAccess/API"
 ```
 
+Complete-draft example for the default component set:
+
+```yaml
+schema: https://opendataproducts.org/v4.1/schema/odps.json
+version: "4.1"
+product:
+  details:
+    en:
+      productID: airport-operations-performance
+      name: Airport Operations Performance
+      visibility: organisation
+      status: draft
+      type: dataset
+  SLA:
+    declarative:
+      default:
+        name:
+          en: Standard SLA
+        description:
+          en: Review-needed service level package based on source evidence.
+        dimensions:
+          - dimension: uptime
+            displaytitle:
+              en: Uptime
+            objective: 99
+            unit: percent
+            weight: 60
+          - dimension: updateFrequency
+            displaytitle:
+              en: Update Frequency
+            objective: 24
+            unit: hours
+            weight: 40
+  dataQuality:
+    declarative:
+      default:
+        description: Review-needed data quality package based on source evidence.
+        dimensions:
+          - dimension: completeness
+            displayTitle: Completeness
+            objective: 95
+            unit: percentage
+            weight: 50
+            description: Required fields are populated.
+          - dimension: timeliness
+            displayTitle: Timeliness
+            objective: 24
+            unit: hours
+            weight: 50
+            description: Data is refreshed within the stated reporting window.
+  pricingPlans:
+    declarative:
+      en:
+        - name: Review Needed Starter
+          priceCurrency: EUR
+          price: "0"
+          billingDuration: month
+          unit: On-request
+          notes: Pricing needs human review before publication.
+          dataQuality:
+            $ref: "#/product/dataQuality/declarative/default"
+          SLA:
+            $ref: "#/product/SLA/declarative/default"
+```
+
 Minimal ODPS document:
 
 ```yaml

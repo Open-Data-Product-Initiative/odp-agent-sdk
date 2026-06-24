@@ -54,6 +54,7 @@ DEFAULT_OLLAMA_GENERATE_TIMEOUT = 300
 DEFAULT_OPENAI_GENERATE_TIMEOUT = 300
 DEFAULT_OPENAI_USER_AGENT = "open-data-products-python/0.2"
 DEFAULT_GENERATION_CONFIG = Path(__file__).resolve().parent / "generation.config.yaml"
+ODPS_SCHEMA_PATH = Path(__file__).resolve().parent.parent / "odps/data/schema/odps.json"
 ODPS_PRODUCT_TYPES = {
     "raw data",
     "derived data",
@@ -125,6 +126,8 @@ ODPS_PRODUCT_COMPONENTS = (
     "paymentGateways",
     "productStrategy",
 )
+ODPS_MINIMAL_DETAIL_FIELDS = ("productID", "name", "visibility", "status", "type")
+_ODPS_SCHEMA_CACHE: Optional[Dict[str, Any]] = None
 ODPS_PRODUCT_COMPONENT_ALIASES = {
     "contract": "contract",
     "sla": "SLA",
@@ -211,6 +214,12 @@ BUILT_IN_PROVIDERS: Dict[str, Dict[str, Any]] = {
         "model": "glm-5.2",
         "baseUrl": "https://api.z.ai/api/paas/v4",
         "apiKeyEnv": "ZAI_API_KEY",
+    },
+    "sakana-fugu": {
+        "type": "openai",
+        "model": "fugu",
+        "baseUrl": "https://api.sakana.ai/v1",
+        "apiKeyEnv": "SAKANA_API_KEY",
     },
     "lmstudio": {
         "type": "openai-chat",
@@ -1376,6 +1385,7 @@ def _generate_one_odps_product(
             _strip_markdown_fence(model_client(minimal_prompt, model)).strip(),
         ),
     )
+    final_yaml = _enforce_minimal_odps_product_yaml(final_yaml)
 
     review_notes: List[str] = []
     drafted_components: List[str] = []
@@ -1568,6 +1578,37 @@ def _load_mapping_or_empty(text: str) -> Dict[str, Any]:
     except yaml.YAMLError:
         return {}
     return document if isinstance(document, dict) else {}
+
+
+def _enforce_minimal_odps_product_yaml(text: str) -> str:
+    try:
+        document = yaml.safe_load(text)
+    except yaml.YAMLError:
+        return text
+    if not isinstance(document, dict):
+        return text
+    _enforce_minimal_odps_product_document(document)
+    return yaml.safe_dump(document, sort_keys=False, allow_unicode=True).strip()
+
+
+def _enforce_minimal_odps_product_document(document: Dict[str, Any]) -> None:
+    product = document.get("product")
+    if not isinstance(product, dict):
+        return
+    details = product.get("details")
+    english = details.get("en") if isinstance(details, dict) else None
+    source = english if isinstance(english, dict) else product
+    minimal_details = {
+        field: source[field] for field in ODPS_MINIMAL_DETAIL_FIELDS if field in source
+    }
+    minimal_document: Dict[str, Any] = {}
+    if "schema" in document:
+        minimal_document["schema"] = document["schema"]
+    if "version" in document:
+        minimal_document["version"] = document["version"]
+    minimal_document["product"] = {"details": {"en": minimal_details}}
+    document.clear()
+    document.update(minimal_document)
 
 
 def _string_list(value: object) -> List[str]:
@@ -1904,6 +1945,67 @@ def _normalize_odps_product_document(document: dict) -> None:
     _normalize_odps_pricing_plans(product.get("pricingPlans"))
     _normalize_odps_data_access(product)
     _normalize_odps_license(product.get("license"))
+    _prune_odps_non_schema_content(document)
+
+
+def _prune_odps_non_schema_content(document: Dict[str, Any]) -> None:
+    _keep_keys(document, _odps_root_fields())
+    product = document.get("product")
+    if not isinstance(product, dict):
+        return
+    _keep_keys(product, _odps_product_fields())
+    details = product.get("details")
+    if isinstance(details, dict):
+        detail_fields = _odps_detail_fields()
+        for detail in details.values():
+            if isinstance(detail, dict):
+                _keep_keys(detail, detail_fields)
+
+
+def _keep_keys(mapping: Dict[str, Any], allowed: Sequence[str]) -> None:
+    allowed_set = set(allowed)
+    for key in list(mapping):
+        if key not in allowed_set:
+            del mapping[key]
+
+
+def _odps_root_fields() -> Sequence[str]:
+    return tuple(_odps_schema().get("properties", {}).keys())
+
+
+def _odps_product_fields() -> Sequence[str]:
+    product = _odps_schema().get("properties", {}).get("product", {})
+    if not isinstance(product, dict):
+        return ()
+    properties = product.get("properties", {})
+    return tuple(properties.keys()) if isinstance(properties, dict) else ()
+
+
+def _odps_detail_fields() -> Sequence[str]:
+    product = _odps_schema().get("properties", {}).get("product", {})
+    details = product.get("properties", {}).get("details", {})
+    if not isinstance(details, dict):
+        return ()
+    pattern_properties = details.get("patternProperties", {})
+    if not isinstance(pattern_properties, dict):
+        return ()
+    for detail_schema in pattern_properties.values():
+        if isinstance(detail_schema, dict):
+            properties = detail_schema.get("properties", {})
+            if isinstance(properties, dict):
+                return tuple(properties.keys())
+    return ()
+
+
+def _odps_schema() -> Dict[str, Any]:
+    global _ODPS_SCHEMA_CACHE
+    if _ODPS_SCHEMA_CACHE is None:
+        try:
+            with ODPS_SCHEMA_PATH.open(encoding="utf-8") as schema_file:
+                _ODPS_SCHEMA_CACHE = json.load(schema_file)
+        except (OSError, json.JSONDecodeError):
+            _ODPS_SCHEMA_CACHE = {}
+    return _ODPS_SCHEMA_CACHE
 
 
 def _normalize_odps_v41_details(product: Dict[str, Any]) -> None:
