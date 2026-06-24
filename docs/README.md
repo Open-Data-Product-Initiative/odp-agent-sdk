@@ -5,6 +5,14 @@ This folder is organized by audience and purpose.
 ## User Guides
 
 - [Command guide](user/commands.md): common CLI workflows and outputs.
+- [ODPR recipe quick start](recipes/quick-start.md): create a project-local
+  recipe workspace from packaged starters.
+- [ODPR recipe agent usage](recipes/agent-usage.md): safe agent flow for
+  discovery, explanation, planning, and guarded execution.
+- [ODPR RecipeCatalog](recipes/catalog.md): metadata-only recipe discovery,
+  starter catalogs, and project catalogs.
+- [ODPR recipe examples](recipes/examples.md): example workspace map and
+  commands.
 - [LLM generation](user/generation.md): source documents, providers, prompts, and generated artifacts.
 - [ODPR recipe workflows](user/recipe-workflows.md): recipe files, runner config, provider readiness, dry-run planning, guarded execution, review status, and run manifests.
 - [Provider and model matrix](user/provider-model-matrix.md): direct hosted and local provider/model lookup.
@@ -41,6 +49,8 @@ This folder is organized by audience and purpose.
 - [Portfolio workflow plan](planning/portfolio-workflow-plan.md)
 - [SDK workflow profiles plan](planning/sdk-workflow-profiles-plan.md)
 - [SDK workflow recipes GUI plan](planning/sdk-workflow-recipes-gui-plan.md)
+- [ODPR RecipeCatalog grouping spec update](planning/odpr-recipe-catalog-grouping-spec-update.md)
+- [ODPR recipe quick starts plan](planning/odpr_recipe_quick_starts_plan_final.md)
 - [Tooling development model](planning/tooling-development-model.md)
 - [Online LLM generation story](planning/online-llm-generation-story.md)
 

@@ -178,6 +178,10 @@ below for implementation details:
 - [API reference](docs/user/API.md): Agent API, spec helper namespaces, ODPS models, validators, serialization, and examples.
 - [Agent surface](docs/user/agent-surface.md): MCP server, ARWS manifest, and bundled skills for agent hosts.
 - [Command guide](docs/user/commands.md): what each common CLI command does, what it reads, and what it writes.
+- [ODPR recipe quick start](docs/recipes/quick-start.md): create a project-local recipe workspace from packaged starters.
+- [ODPR recipe agent usage](docs/recipes/agent-usage.md): safe discovery, explanation, dry-run planning, and guarded execution flow for agents.
+- [ODPR RecipeCatalog](docs/recipes/catalog.md): metadata-only starter and project recipe discovery.
+- [ODPR recipe examples](docs/recipes/examples.md): complete example workspace map.
 - [LLM generation](docs/user/generation.md): Ollama, embedded llama.cpp, or configured external LLM source-doc to ODPC fragment and ODPG graph workflow.
 - [ODPR recipe workflows](docs/user/recipe-workflows.md): recipe files, runner config, provider readiness, dry-run planning, guarded execution, review status, and run manifests.
 - [Provider and model matrix](docs/user/provider-model-matrix.md): direct hosted and local provider/model lookup.

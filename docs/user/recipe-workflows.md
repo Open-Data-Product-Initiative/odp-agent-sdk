@@ -32,6 +32,13 @@ Use recipes for workflows that need to be repeated, reviewed, delegated, or
 automated. For a one-off local experiment, direct SDK commands are often
 simpler.
 
+For starter-based onboarding, begin with the
+[ODPR recipe quick start](../recipes/quick-start.md). The pages on
+[agent usage](../recipes/agent-usage.md),
+[RecipeCatalog](../recipes/catalog.md), and
+[examples](../recipes/examples.md) cover the packaged starter flow separately
+from the lower-level runner configuration described here.
+
 ## Starter Examples
 
 The repository includes starter recipes under `examples/recipes/`:

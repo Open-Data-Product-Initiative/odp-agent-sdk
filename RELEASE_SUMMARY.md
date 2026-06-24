@@ -64,6 +64,9 @@
   explanation are `safe`; workspace initialization is `state-changing`.
 - Updated the ARWS manifest and development architecture docs to describe ODPR
   quick starts, `RecipeCatalog` discovery, and the MCP tool classification.
+- Added Phase 10 user-facing recipe docs for quick starts, agent usage,
+  `RecipeCatalog` behavior, and example workspaces, and linked them from the
+  docs index, command guide, root README, and full recipe workflow guide.
 - Added tests for packaged starter catalog validation, referenced recipe
   validation, lookup by id/name/folder, CLI starter commands, MCP starter
   commands, recipe explanation, overwrite protection, and manifest

@@ -80,6 +80,27 @@ before choosing a more specific command.
 ## ODPR Recipe Workflows
 
 ```bash
+open-data-products recipe list
+open-data-products recipe init build-data-product-portfolio
+cd recipes/build-data-product-portfolio
+open-data-products recipe explain recipe.yaml
+open-data-products recipe plan
+open-data-products recipe run --allow-llm --approve-review
+```
+
+Quick starts create project-local recipe workspaces from packaged starters.
+Bare `recipe list` shows packaged starters when no local `recipes.config.yaml`
+exists. `recipe init` defaults to `./recipes/<starter-folder>/`, and commands
+run from inside an initialized workspace can use the local `recipe.yaml`.
+
+See [ODPR recipe quick start](../recipes/quick-start.md),
+[agent usage](../recipes/agent-usage.md),
+[RecipeCatalog](../recipes/catalog.md), and
+[recipe examples](../recipes/examples.md) for starter-focused docs.
+
+Configured project recipe catalogs remain available:
+
+```bash
 open-data-products config recipes --copy-to recipes.config.yaml
 open-data-products config recipes --config recipes.config.yaml --check --json
 open-data-products recipe list --config recipes.config.yaml --json
