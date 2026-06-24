@@ -388,13 +388,14 @@
         <h1>Open Data Products SDK Architecture</h1>
         <p class="lead">
           A developer-facing map of the Python package, command line surface,
-          MCP tools, bundled resources, and standards-specific modules.
+          MCP tools, bundled resources, standards-specific modules, and ODPR
+          recipe workflows.
         </p>
         <div class="hero-meta" aria-label="SDK capability areas">
           <span class="pill">Python API</span>
           <span class="pill">Unified CLI</span>
           <span class="pill">MCP server</span>
-          <span class="pill">ODPS / ODPC / ODPG / ODPV</span>
+          <span class="pill">ODPS / ODPC / ODPG / ODPV / ODPR</span>
         </div>
       </div>
       <div class="panel hero-card">
@@ -415,7 +416,12 @@
           </div>
           <div class="mini-row">
             <div class="mini-box">ODPV<small>vocabulary</small></div>
+            <div class="mini-box">ODPR<small>recipes</small></div>
+            <div class="mini-box">Starters<small>catalog.yaml</small></div>
+          </div>
+          <div class="mini-row">
             <div class="mini-box">Generation<small>prompts</small></div>
+            <div class="mini-box">Portfolio<small>workspaces</small></div>
             <div class="mini-box">Resources<small>schemas</small></div>
           </div>
         </div>
@@ -453,8 +459,8 @@
           <small>shared entry points, lightweight summaries, resources, and result shapes</small>
         </div>
         <div class="map-column">
-          <div class="node">Spec modules<small>odps, odpc, odpg, odpv</small></div>
-          <div class="node">Workflows<small>generation, contracts, portfolio</small></div>
+          <div class="node">Spec modules<small>odps, odpc, odpg, odpv, odpr</small></div>
+          <div class="node">Workflows<small>generation, contracts, portfolio, recipes</small></div>
           <div class="node">Bundled data<small>schemas, prompts, indexes</small></div>
         </div>
       </div>
@@ -463,8 +469,8 @@
     <section class="panel">
       <h2>Cross-Spec Layer</h2>
       <p>
-        This layer sits between consumer surfaces and the ODPS, ODPC, ODPG, and
-        ODPV namespaces. It lets Python users, CLI commands, MCP tools, and
+        This layer sits between consumer surfaces and the ODPS, ODPC, ODPG,
+        ODPV, and ODPR namespaces. It lets Python users, CLI commands, MCP tools, and
         tests ask common questions without reimplementing document detection or
         response formatting.
       </p>
@@ -528,6 +534,10 @@
           <span>Vocabulary loading, term search, alias resolution, relationship checks, and context packets.</span>
         </div>
         <div class="tile">
+          <strong>odpr</strong>
+          <span>Recipe, Provider, and RecipeCatalog validation, starter discovery, workspace init, dry-run planning, and guarded execution.</span>
+        </div>
+        <div class="tile">
           <strong>generation</strong>
           <span>Prompts, source documents, provider config, LLM calls, artifact normalization, validation, and repair.</span>
         </div>
@@ -537,7 +547,7 @@
         </div>
         <div class="tile">
           <strong>mcp</strong>
-          <span>Tool registry, stdio JSON-RPC server, safe-class tool policy, and ARWS manifest integration.</span>
+          <span>Tool registry, stdio JSON-RPC server, ARWS manifest integration, and explicit safe or state-changing tool classes.</span>
         </div>
       </div>
       <p class="caption" style="margin-top: 16px;">
@@ -563,15 +573,15 @@
           <div class="layer green">
             <h3>Spec namespaces</h3>
             <p class="caption">
-              ODPS models and validation, ODPC catalogs, ODPG graphs, and ODPV
-              vocabulary logic live in their own folders.
+              ODPS models and validation, ODPC catalogs, ODPG graphs, ODPV
+              vocabulary logic, and ODPR recipes live in their own folders.
             </p>
           </div>
           <div class="layer amber">
             <h3>Workflow modules</h3>
             <p class="caption">
-              Generation, Data Contracts, portfolio workspaces, TOON, and GCF
-              compose the spec modules into larger workflows.
+              Generation, Data Contracts, portfolio workspaces, ODPR recipes,
+              TOON, and GCF compose the spec modules into larger workflows.
             </p>
           </div>
         </div>
@@ -580,7 +590,8 @@
             <h3>Agent surfaces</h3>
             <p class="caption">
               CLI, MCP tools, and the ARWS manifest reuse the same SDK functions
-              that Python users call directly.
+              that Python users call directly. File-creating MCP tools are
+              classified as state-changing.
             </p>
           </div>
           <div class="layer">
@@ -612,7 +623,7 @@
         <div class="step">
           <span class="num">2</span>
           <h3>Detect</h3>
-          <p class="caption">Identify ODPS, ODPC, ODPG, or ODPV from schema and shape.</p>
+          <p class="caption">Identify ODPS, ODPC, ODPG, ODPV, or ODPR from schema and shape.</p>
         </div>
         <div class="step">
           <span class="num">3</span>
@@ -632,6 +643,49 @@
       </div>
     </section>
 
+    <section class="panel">
+      <h2>ODPR Recipe Workflows</h2>
+      <p>
+        ODPR adds the workflow layer. `RecipeCatalog` documents are
+        metadata-only discovery records, while full `Recipe` files remain the
+        executable workflow contracts. Packaged starter recipes live under
+        `open_data_products/odpr/data/starters/` and are discovered from the
+        bundled `catalog.yaml`.
+      </p>
+      <div class="flow" style="margin-top: 18px;">
+        <div class="step">
+          <span class="num">1</span>
+          <h3>Discover</h3>
+          <p class="caption">List starter entries with `recipe list --starters` or the safe MCP discovery tool.</p>
+        </div>
+        <div class="step">
+          <span class="num">2</span>
+          <h3>Resolve</h3>
+          <p class="caption">Match by catalog id, English name, or starter folder name.</p>
+        </div>
+        <div class="step">
+          <span class="num">3</span>
+          <h3>Initialize</h3>
+          <p class="caption">Copy README, AGENTS, and recipe.yaml, then create inputs/ and outputs/.</p>
+        </div>
+        <div class="step">
+          <span class="num">4</span>
+          <h3>Plan</h3>
+          <p class="caption">Use `recipe run recipe.yaml --dry-run` to inspect steps, writes, providers, and gates.</p>
+        </div>
+        <div class="step">
+          <span class="num">5</span>
+          <h3>Execute</h3>
+          <p class="caption">Run only through guarded execution with explicit approval flags.</p>
+        </div>
+      </div>
+      <p class="caption" style="margin-top: 16px;">
+        MCP `list_starter_recipes` and `check_starter_catalog` are safe.
+        MCP `init_starter_recipe` is state-changing because it creates a local
+        workspace and refuses existing output unless force is explicit.
+      </p>
+    </section>
+
     <section>
       <h2>Where New Work Usually Goes</h2>
       <div class="grid cols-4">
@@ -639,9 +693,10 @@
         <div class="tile"><strong>ODPC</strong><span>Catalog fragments, catalog build, HTML, TOON, GCF, and object guidance.</span></div>
         <div class="tile"><strong>ODPG</strong><span>Graph build, validation, traversal, conversion, analysis, and explorer output.</span></div>
         <div class="tile"><strong>ODPV</strong><span>Vocabulary search, aliases, term packets, relationship checks, and context.</span></div>
+        <div class="tile"><strong>ODPR</strong><span>Recipe validation, RecipeCatalog discovery, starter init, dry-run planning, and guarded execution.</span></div>
         <div class="tile"><strong>agent.py</strong><span>Cross-spec load, detect, validate, explain, and reference behavior.</span></div>
         <div class="tile"><strong>generation/</strong><span>LLM config, providers, prompts, artifact normalization, validation, and repair.</span></div>
-        <div class="tile"><strong>mcp/</strong><span>Safe tool registry, stdio server, content envelopes, and manifest integration.</span></div>
+        <div class="tile"><strong>mcp/</strong><span>Tool registry, stdio server, content envelopes, manifest integration, and ARWS tool classes.</span></div>
         <div class="tile"><strong>docs/</strong><span>User guides for workflows, development notes for internals, planning for future work.</span></div>
       </div>
     </section>
@@ -651,7 +706,8 @@
       <p>
         Behavior changes often touch more than one public surface. Update the
         owning module first, then add public exports, CLI wiring, MCP tools,
-        docs, and tests only when the behavior is part of those contracts.
+        ARWS classification, docs, and tests only when the behavior is part of
+        those contracts.
       </p>
       <p class="caption" style="margin-top: 14px;">
         Companion Markdown with Mermaid diagrams:

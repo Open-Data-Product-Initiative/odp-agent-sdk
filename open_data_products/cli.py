@@ -100,6 +100,7 @@ ODPR recipe commands:
   recipe list           List workflow recipe metadata
   recipe validate       Validate an ODPR Recipe, Provider, or RecipeCatalog
   recipe catalog        Build a metadata-only RecipeCatalog
+  recipe init           Create a workspace from a packaged starter recipe
   resources --id odpr.schema.yaml          Return the bundled ODPR YAML schema
   resources --id odpr.recipe-config-template  Return the recipe runner config template
   resources --id odpr.recipes              Return bundled ODPR recipe guidance records
@@ -165,6 +166,7 @@ Examples:
   open-data-products resources --id odpr.recipe-config-template --json
   open-data-products recipe search localization --json
   open-data-products recipe search --id RecipeCatalog --json
+  open-data-products recipe init build-data-product-portfolio --output my-workflow --json
   open-data-products recipe list --config recipes.config.yaml --json
   open-data-products recipe validate recipes/release-portfolio-review.yaml --json
   open-data-products recipe run recipes/release-portfolio-review.yaml --dry-run --json
@@ -493,6 +495,15 @@ def main(argv: Optional[List[str]] = None) -> int:
         "--group",
         help="Assign listed recipes to this RecipeCatalog group id.",
     )
+    recipe_list_parser.add_argument(
+        "--starters",
+        action="store_true",
+        help="List packaged starter recipes from the ODPR RecipeCatalog.",
+    )
+    recipe_list_parser.add_argument(
+        "--catalog",
+        help="Starter RecipeCatalog YAML path for --starters.",
+    )
     recipe_list_parser.add_argument("--json", action="store_true", help="Emit JSON")
     recipe_validate_parser = recipe_subparsers.add_parser(
         "validate",
@@ -527,6 +538,42 @@ def main(argv: Optional[List[str]] = None) -> int:
         help="Assign catalog recipes to this RecipeCatalog group id.",
     )
     recipe_catalog_parser.add_argument("--json", action="store_true", help="Emit JSON")
+    recipe_starter_check_parser = recipe_subparsers.add_parser(
+        "starter-catalog-check",
+        help="Validate the packaged starter RecipeCatalog and referenced recipes.",
+    )
+    recipe_starter_check_parser.add_argument(
+        "--catalog",
+        help="Starter RecipeCatalog YAML path. Defaults to the packaged catalog.",
+    )
+    recipe_starter_check_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Emit JSON",
+    )
+    recipe_init_parser = recipe_subparsers.add_parser(
+        "init",
+        help="Create a workspace from a packaged starter recipe",
+    )
+    recipe_init_parser.add_argument(
+        "starter",
+        help="Starter recipe id, English name, or folder name.",
+    )
+    recipe_init_parser.add_argument(
+        "--output",
+        "-o",
+        help="Output workspace directory. Defaults to the starter folder name.",
+    )
+    recipe_init_parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Allow copying into an existing workspace directory.",
+    )
+    recipe_init_parser.add_argument(
+        "--catalog",
+        help="Starter RecipeCatalog YAML path. Defaults to the packaged catalog.",
+    )
+    recipe_init_parser.add_argument("--json", action="store_true", help="Emit JSON")
     recipe_search_parser = recipe_subparsers.add_parser(
         "search",
         help="Search bundled ODPR recipe guidance",
@@ -1417,20 +1464,26 @@ def main(argv: Optional[List[str]] = None) -> int:
         if args.command == "recipe":
             from .odpr import (
                 list_recipes,
+                list_starter_recipes,
                 plan_recipe_run,
+                init_starter_recipe,
                 validate_odpr_document,
                 validate_recipe,
                 write_recipe_catalog,
+                check_starter_catalog,
                 get_recipe_guidance,
                 search_recipe_guidance,
             )
 
             try:
                 if args.recipe_command == "list":
-                    payload = list_recipes(
-                        config_path=args.config,
-                        group=args.group,
-                    )
+                    if args.starters:
+                        payload = list_starter_recipes(catalog_path=args.catalog)
+                    else:
+                        payload = list_recipes(
+                            config_path=args.config,
+                            group=args.group,
+                        )
                     exit_code = 0
                 elif args.recipe_command == "validate":
                     if args.recipe is None:
@@ -1454,6 +1507,17 @@ def main(argv: Optional[List[str]] = None) -> int:
                     payload = validate_odpr_document(output_path)
                     payload["output"] = str(output_path)
                     exit_code = 0 if payload["valid"] else 1
+                elif args.recipe_command == "starter-catalog-check":
+                    payload = check_starter_catalog(catalog_path=args.catalog)
+                    exit_code = 0 if payload["valid"] else 1
+                elif args.recipe_command == "init":
+                    payload = init_starter_recipe(
+                        args.starter,
+                        output=args.output,
+                        force=args.force,
+                        catalog_path=args.catalog,
+                    )
+                    exit_code = 0
                 elif args.recipe_command == "search":
                     if args.guidance_id:
                         payload = get_recipe_guidance(args.guidance_id)
@@ -1520,6 +1584,19 @@ def main(argv: Optional[List[str]] = None) -> int:
                     print(f"Valid: {payload.get('valid')}")
                     for error in payload.get("errors", []):
                         print(f"Error: {error}")
+                elif args.recipe_command == "starter-catalog-check":
+                    print(f"Starter RecipeCatalog: {payload.get('catalog')}")
+                    print(f"Valid: {payload.get('valid')}")
+                    for error in payload.get("errors", []):
+                        print(f"Error: {error}")
+                    for warning in payload.get("warnings", []):
+                        print(f"Warning: {warning}")
+                elif args.recipe_command == "init":
+                    print(f"Recipe workspace: {payload.get('workspace')}")
+                    print(f"Recipe: {payload.get('recipe')}")
+                    print("Next commands:")
+                    for command in payload.get("nextCommands", []):
+                        print(f"- {command}")
                 elif args.recipe_command == "search":
                     records = payload if isinstance(payload, list) else [payload]
                     print(f"Guidance records: {len(records)}")

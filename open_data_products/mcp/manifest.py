@@ -191,7 +191,14 @@ def _capabilities() -> List[Dict[str, Any]]:
             "title": "ODPR recipe workflow planning",
             "standards": ["odpr", "odps", "odpc", "odpg"],
             "interfaces": ["cli", "python", "mcp"],
-            "lifecycle": ["list", "validate", "dry-run", "execute-guarded"],
+            "lifecycle": [
+                "list",
+                "starter-discovery",
+                "init",
+                "validate",
+                "dry-run",
+                "execute-guarded",
+            ],
             "step_commands": [
                 "generate",
                 "odpc.build",
@@ -392,6 +399,8 @@ def _workflows() -> List[Dict[str, Any]]:
             "id": "plan-recipe-workflow",
             "title": "List, validate, and dry-run workflow recipes",
             "commands": [
+                "open-data-products recipe list --starters --json",
+                "open-data-products recipe init build-data-product-portfolio --output portfolio-recipe --json",
                 "open-data-products recipe list --config recipes.config.yaml --json",
                 "open-data-products recipe search localization --json",
                 "open-data-products recipe validate recipes/release-portfolio-review.yaml --json",
@@ -402,6 +411,8 @@ def _workflows() -> List[Dict[str, Any]]:
             ],
             "mcp_tools": [
                 "list_recipes",
+                "list_starter_recipes",
+                "init_starter_recipe",
                 "search_recipe_guidance",
                 "validate_recipe",
                 "plan_recipe_run",
@@ -559,11 +570,12 @@ def _resources() -> List[Dict[str, str]]:
 
 def _safety() -> Dict[str, Any]:
     return {
-        "mcp_tool_class": "safe",
-        "mcp_is_read_only": True,
+        "mcp_tool_class": "mixed",
+        "mcp_is_read_only": False,
+        "mcp_state_changing_tools": ["init_starter_recipe"],
         "mcp_note": (
-            "MCP tools expose read-only inspection, validation, search, and "
-            "summary behavior."
+            "MCP tools are safe/read-only except explicit workspace "
+            "initialization tools classified as state-changing."
         ),
         "cli_note": (
             "Some CLI workflows are state-changing because they write generated "

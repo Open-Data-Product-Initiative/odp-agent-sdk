@@ -8,7 +8,7 @@ import json
 import os
 from pathlib import Path
 import shutil
-from typing import Dict, List, Mapping, Optional, Sequence, Tuple, Union
+from typing import Dict, List, Mapping, Optional, Sequence, Set, Tuple, Union
 
 import yaml
 
@@ -16,8 +16,12 @@ from .validation import load_odpr_data, validate_odpr_document
 
 PathLike = Union[str, Path]
 DEFAULT_RECIPE_CONFIG = Path(__file__).resolve().parent / "recipes.config.yaml"
+DEFAULT_STARTER_CATALOG = (
+    Path(__file__).resolve().parent / "data" / "starters" / "catalog.yaml"
+)
 ODPR_SCHEMA_URI = "https://opendataproducts.org/odpr-v1.0/schema/odpr.yaml"
 DEFAULT_RECIPE_CATALOG_VERSION = "1.0.0"
+STARTER_GROUP_ID = "starters"
 
 
 LLM_BACKED_COMMANDS = {
@@ -629,6 +633,185 @@ def write_recipe_catalog(
     return output_path
 
 
+def load_recipe_catalog(catalog_path: Optional[PathLike] = None) -> Dict[str, object]:
+    """Load an ODPR RecipeCatalog document."""
+    path = Path(catalog_path) if catalog_path is not None else DEFAULT_STARTER_CATALOG
+    data = dict(load_odpr_data(path))
+    if data.get("kind") != "RecipeCatalog":
+        raise ValueError(f"ODPR document is not a RecipeCatalog: {path}")
+    return data
+
+
+def list_starter_recipes(
+    *,
+    catalog_path: Optional[PathLike] = None,
+) -> Dict[str, object]:
+    """Return packaged starter recipes from the ODPR RecipeCatalog."""
+    path = Path(catalog_path) if catalog_path is not None else DEFAULT_STARTER_CATALOG
+    data = load_recipe_catalog(path)
+    catalog = _mapping(data.get("recipeCatalog"))
+    recipes = [
+        dict(entry)
+        for entry in _catalog_entries(catalog)
+        if entry.get("groupRef") == STARTER_GROUP_ID
+    ]
+    recipe_catalog: Dict[str, object] = {
+        "metadata": dict(_mapping(catalog.get("metadata"))),
+        "version": catalog.get("version", DEFAULT_RECIPE_CATALOG_VERSION),
+        "recipes": recipes,
+    }
+    groups = catalog.get("groups")
+    if isinstance(groups, list):
+        recipe_catalog["groups"] = [
+            dict(group)
+            for group in groups
+            if isinstance(group, dict) and group.get("id") == STARTER_GROUP_ID
+        ]
+    return {
+        "mode": "list",
+        "source": "starters",
+        "kind": "RecipeCatalog",
+        "catalog": _relative_path(path, path.parent),
+        "recipeCatalog": recipe_catalog,
+        "warnings": [],
+    }
+
+
+def check_starter_catalog(
+    *,
+    catalog_path: Optional[PathLike] = None,
+) -> Dict[str, object]:
+    """Validate the packaged starter catalog and referenced recipes."""
+    path = Path(catalog_path) if catalog_path is not None else DEFAULT_STARTER_CATALOG
+    report = validate_odpr_document(path)
+    root = path.parent
+    errors = list(report.get("errors", []))
+    warnings = list(report.get("warnings", []))
+    checked_recipes: List[Dict[str, object]] = []
+    try:
+        data = load_recipe_catalog(path)
+    except (FileNotFoundError, ValueError) as exc:
+        errors.append(str(exc))
+        data = {}
+    catalog = _mapping(data.get("recipeCatalog"))
+    for entry in _catalog_entries(catalog):
+        entry_path = _string(entry.get("path"))
+        entry_id = _string(entry.get("id")) or entry_path
+        if not entry_path:
+            continue
+        recipe_path = root / entry_path
+        recipe_result: Dict[str, object] = {
+            "id": entry_id,
+            "path": entry_path,
+            "exists": recipe_path.is_file(),
+            "valid": False,
+        }
+        if not recipe_path.is_file():
+            errors.append(f"starter recipe not found: {entry_path}")
+            checked_recipes.append(recipe_result)
+            continue
+        recipe_report = validate_recipe(recipe_path)
+        recipe_result["valid"] = bool(recipe_report.get("valid"))
+        recipe_result["errors"] = recipe_report.get("errors", [])
+        if not recipe_report.get("valid"):
+            errors.append(f"starter recipe is invalid: {entry_path}")
+        workspace = recipe_path.parent
+        for required_name in ("README.md", "AGENTS.md"):
+            required_path = workspace / required_name
+            if not required_path.is_file():
+                errors.append(f"starter {entry_path} is missing {required_name}")
+        checked_recipes.append(recipe_result)
+    return {
+        "mode": "starter-catalog-check",
+        "valid": not errors,
+        "catalog": _relative_path(path, root),
+        "errors": errors,
+        "warnings": warnings,
+        "recipes": checked_recipes,
+    }
+
+
+def resolve_starter_recipe(
+    identifier: str,
+    *,
+    catalog_path: Optional[PathLike] = None,
+) -> Dict[str, object]:
+    """Resolve a starter catalog entry by id, name, or folder name."""
+    needle = _normalize_lookup(identifier)
+    listing = list_starter_recipes(catalog_path=catalog_path)
+    catalog = _mapping(listing.get("recipeCatalog"))
+    matches = [
+        entry
+        for entry in _catalog_entries(catalog)
+        if needle in _starter_entry_lookup_keys(entry)
+    ]
+    if not matches:
+        raise ValueError(f"Starter recipe not found: {identifier}")
+    if len(matches) > 1:
+        raise ValueError(f"Starter recipe lookup is ambiguous: {identifier}")
+    return dict(matches[0])
+
+
+def init_starter_recipe(
+    identifier: str,
+    *,
+    output: Optional[PathLike] = None,
+    force: bool = False,
+    catalog_path: Optional[PathLike] = None,
+) -> Dict[str, object]:
+    """Create a recipe workspace from a packaged starter."""
+    catalog = Path(catalog_path) if catalog_path is not None else DEFAULT_STARTER_CATALOG
+    entry = resolve_starter_recipe(identifier, catalog_path=catalog)
+    entry_path = _string(entry.get("path"))
+    if not entry_path:
+        raise ValueError(f"Starter recipe has no path: {identifier}")
+    if _is_unsafe_relative_path(entry_path):
+        raise ValueError(f"Starter recipe path must be catalog-relative: {entry_path}")
+
+    source_recipe = catalog.parent / entry_path
+    source_dir = source_recipe.parent
+    if not source_dir.is_dir():
+        raise FileNotFoundError(f"Starter recipe workspace not found: {source_dir}")
+
+    target = Path(output) if output is not None else Path(source_dir.name)
+    if target.exists() and not force:
+        raise FileExistsError(f"Recipe workspace already exists: {target}")
+
+    target.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copytree(source_dir, target, dirs_exist_ok=force)
+    inputs_dir = target / "inputs"
+    outputs_dir = target / "outputs"
+    inputs_dir.mkdir(exist_ok=True)
+    outputs_dir.mkdir(exist_ok=True)
+
+    recipe_path = target / "recipe.yaml"
+    if not recipe_path.is_file():
+        raise FileNotFoundError(f"Initialized workspace missing recipe.yaml: {target}")
+
+    target_text = target.as_posix()
+    recipe_text = recipe_path.as_posix()
+    inputs_text = inputs_dir.as_posix()
+    outputs_text = outputs_dir.as_posix()
+    return {
+        "mode": "init",
+        "source": "starters",
+        "catalog": _relative_path(catalog, catalog.parent),
+        "starter": entry,
+        "workspace": target_text,
+        "recipe": recipe_text,
+        "created": {
+            "inputs": inputs_text,
+            "outputs": outputs_text,
+        },
+        "force": force,
+        "nextCommands": [
+            f"cd {target_text}",
+            "open-data-products recipe run recipe.yaml --dry-run",
+            "open-data-products recipe run recipe.yaml --execute --approve-review",
+        ],
+    }
+
+
 def _catalog_entry(entry: Mapping[str, object]) -> Dict[str, object]:
     allowed = (
         "path",
@@ -647,6 +830,30 @@ def _catalog_entry(entry: Mapping[str, object]) -> Dict[str, object]:
         "commands",
     )
     return {key: entry[key] for key in allowed if key in entry and entry[key] != []}
+
+
+def _catalog_entries(catalog: Mapping[str, object]) -> List[Mapping[str, object]]:
+    entries = catalog.get("recipes")
+    if not isinstance(entries, list):
+        return []
+    return [entry for entry in entries if isinstance(entry, dict)]
+
+
+def _starter_entry_lookup_keys(entry: Mapping[str, object]) -> Set[str]:
+    keys = set()
+    for value in (entry.get("id"), entry.get("path")):
+        if isinstance(value, str):
+            keys.add(_normalize_lookup(value))
+            keys.add(_normalize_lookup(Path(value).parent.name))
+    name = _mapping(entry.get("name"))
+    english_name = name.get("en")
+    if isinstance(english_name, str):
+        keys.add(_normalize_lookup(english_name))
+    return {key for key in keys if key}
+
+
+def _normalize_lookup(value: str) -> str:
+    return "".join(char.lower() for char in value if char.isalnum())
 
 
 def _localized_text(value: str) -> Dict[str, str]:

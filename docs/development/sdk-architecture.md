@@ -14,6 +14,7 @@ agent surface for the OpenDataProducts.org standards family:
 - ODPC: data product catalogs
 - ODPG: data product graphs
 - ODPV: vocabulary and term context
+- ODPR: workflow recipes and recipe catalogs
 
 The architecture has two layers. Spec-specific modules know the details of one
 standard. Cross-spec modules expose common workflows such as load, detect,
@@ -39,12 +40,14 @@ flowchart TB
         ODPC[odpc/ catalog helpers]
         ODPG[odpg/ graph helpers]
         ODPV[odpv/ vocabulary helpers]
+        ODPR[odpr/ recipe helpers]
     end
 
     subgraph WorkflowModules[Workflow modules]
         Generation[generation/ LLM prompts and providers]
         Contracts[contracts/ Data Contract orchestration]
         Portfolio[portfolio.py workspace orchestration]
+        Recipes[ODPR quick starts and guarded runs]
         Context[TOON, GCF, context metrics]
     end
 
@@ -68,13 +71,14 @@ flowchart TB
 | --- | --- | --- |
 | Public API | Stable imports for SDK users. New public exports are listed explicitly. | `open_data_products/__init__.py` |
 | Cross-spec layer | Load, detect, validate, explain, summarize, resolve references, and describe bundled resources without callers needing to choose the spec namespace first. | `agent.py`, `summary.py`, `resources.py`, `results.py` |
-| Spec namespaces | Implementation details for ODPS, ODPC, ODPG, and ODPV. | `odps/`, `odpc/`, `odpg/`, `odpv/` |
+| Spec namespaces | Implementation details for ODPS, ODPC, ODPG, ODPV, and ODPR. | `odps/`, `odpc/`, `odpg/`, `odpv/`, `odpr/` |
 | CLI surface | Human-readable default commands plus `--json` for scripts and agents. | `cli.py`, `cli_core.py`, `cli_product.py`, spec `cli.py` files |
 | MCP and manifest | Safe local agent tools and ARWS manifest output. | `mcp/tools.py`, `mcp/server.py`, `mcp/manifest.py` |
 | Bundled resources | Schemas, prompts, examples, vocabulary records, and guidance indexes. | `resources.py`, package `data/` folders |
 | Generation | Prompt rendering, provider resolution, local/hosted LLM calls, YAML normalization, and repair loops. | `generation/` |
 | Data Contracts | Optional external contract validation plus ODPS contract reference and alignment workflows. | `contracts/` |
 | Portfolio workflows | Multi-artifact ODPC, ODPS, and ODPG workspace build, refresh, sync, render, localize, and explain flows. | `portfolio.py`, `portfolio_sources.py` |
+| ODPR recipes | Recipe validation, RecipeCatalog discovery, starter workspace initialization, dry-run planning, and guarded execution. | `odpr/`, `odpr/data/starters/` |
 
 ## Import And Boundary Rules
 
@@ -117,6 +121,7 @@ import path.
 | `open_data_products.odpc` | Catalog loading, fragment collection, catalog building, rendered catalog artifacts, and object guidance. | The behavior is about ODPC catalogs or catalog-derived outputs. |
 | `open_data_products.odpg` | Graph loading, building, conversion, validation, traversal, analysis, context extraction, and graph explorer output. | The behavior is about ODPG graph documents or graph reasoning. |
 | `open_data_products.odpv` | Vocabulary loading, validation, term search, alias resolution, relationship checks, and term context packets. | The behavior is about canonical vocabulary terms or term relationships. |
+| `open_data_products.odpr` | Recipe, Provider, and RecipeCatalog validation; configured recipe listing; packaged starter discovery; starter workspace initialization; dry-run planning; and guarded execution. | The behavior is about ODPR workflow contracts or recipe quick starts. |
 | `open_data_products.generation` | Prompt loading, source document handling, provider configuration, LLM calls, generated artifact normalization, validation, and repair. | The behavior turns source notes into ODPC, ODPG, or ODPS YAML. |
 | `open_data_products.contracts` | Data Contract loading, optional `datacontract-cli` adapter use, contract references, schema summaries, alignment, exports, and reports. | The behavior connects ODPS products to external or inline Data Contracts. |
 | `open_data_products.mcp` | Tool registry, stdio JSON-RPC server, and ARWS manifest. | The behavior exposes SDK capabilities to agent hosts. |
@@ -146,12 +151,14 @@ flowchart TB
         ODPC[odpc]
         ODPG[odpg]
         ODPV[odpv]
+        ODPR[odpr]
     end
 
     subgraph WorkflowNamespaces[Workflow namespaces]
         Generation[generation]
         Contracts[contracts]
         Portfolio[portfolio.py]
+        Recipes[recipe quick starts]
     end
 ```
 
@@ -165,8 +172,8 @@ metadata in `resources.py`, and expose stable user imports through
 The cross-spec layer is the SDK's thin translation layer between consumer
 surfaces and spec-specific implementations. It exists so Python users, CLI
 commands, MCP handlers, tests, and agent hosts can ask the same questions of
-ODPS, ODPC, ODPG, and ODPV artifacts without duplicating detection or response
-formatting logic.
+ODPS, ODPC, ODPG, ODPV, and ODPR artifacts without duplicating detection or
+response formatting logic.
 
 The four files in this layer have different responsibilities:
 
@@ -233,6 +240,43 @@ sequenceDiagram
 artifact references without returning the full document body. Use it when an
 agent or workflow needs to pass around a reference cheaply.
 
+## ODPR Recipe Workflows
+
+ODPR adds a workflow layer on top of the document namespaces. A `Recipe` is the
+executable workflow contract, a `Provider` describes model or runtime defaults,
+and a `RecipeCatalog` is metadata-only discovery that points to full recipe
+files. The SDK keeps those roles separate: catalog entries list intent and
+commands, while recipe files keep step bodies and execution policy.
+
+Packaged starters live under `open_data_products/odpr/data/starters/` and are
+listed through the bundled `catalog.yaml`. `recipe init` resolves a catalog
+entry by id, English name, or folder name, copies the referenced starter folder,
+creates `inputs/` and `outputs/`, and refuses existing output unless `--force`
+is explicit. Dry-run planning and guarded execution continue to flow through
+the existing recipe runner.
+
+```mermaid
+sequenceDiagram
+    participant User as Python, CLI, or MCP caller
+    participant Catalog as ODPR RecipeCatalog
+    participant Starter as Packaged starter folder
+    participant Workspace as Local recipe workspace
+    participant Runner as Recipe runner
+
+    User->>Catalog: list_starter_recipes()
+    User->>Catalog: init_starter_recipe(id/name/folder)
+    Catalog->>Starter: resolve path to recipe.yaml
+    Starter-->>Workspace: copy README, AGENTS, recipe.yaml
+    Workspace->>Workspace: ensure inputs/ and outputs/
+    User->>Runner: recipe run recipe.yaml --dry-run
+    Runner-->>User: planned steps, providers, writes, gates
+```
+
+The public ODPR helpers are exported explicitly from the package root when
+they are part of the supported SDK API. MCP discovery and catalog-check tools
+are safe. MCP starter initialization is classified as `state-changing` because
+it creates a workspace on disk.
+
 ## Agent Surfaces
 
 The SDK exposes agent behavior in three related forms:
@@ -241,9 +285,12 @@ The SDK exposes agent behavior in three related forms:
 - CLI commands for people, scripts, CI, and local workflows
 - MCP tools for agent hosts that can call local tools over stdio
 
-The MCP server is safe-class today. Tool handlers live in `mcp/tools.py`,
-return MCP content envelopes, and delegate to the same facades used by Python
-and CLI workflows.
+Most MCP tools are safe-class inspection, validation, search, or planning
+tools. Tools that create local files must be classified explicitly. Today
+`init_starter_recipe` is `state-changing`; it initializes a recipe workspace
+from a packaged starter. Tool handlers live in `mcp/tools.py`, return MCP
+content envelopes, and delegate to the same facades used by Python and CLI
+workflows.
 
 ```mermaid
 flowchart TB
@@ -304,6 +351,8 @@ Start from the smallest module that owns the behavior:
   rendering belong under `odpg/`.
 - ODPV vocabulary search, resolution, relationship, and context behavior belong
   under `odpv/`.
+- ODPR recipe validation, RecipeCatalog discovery, starter initialization,
+  dry-run planning, and guarded execution belong under `odpr/`.
 - Cross-spec load, detect, validate, explain, and references belong in
   `agent.py`.
 - Shared result shapes belong in `results.py`.
@@ -311,7 +360,9 @@ Start from the smallest module that owns the behavior:
 - CLI wiring belongs in `cli.py`, `cli_core.py`, `cli_product.py`, or a
   spec-specific CLI module.
 - MCP tools belong in `mcp/tools.py`; server protocol behavior belongs in
-  `mcp/server.py`; manifest behavior belongs in `mcp/manifest.py`.
+  `mcp/server.py`; manifest behavior belongs in `mcp/manifest.py`. Set the
+  tool `class` to `safe`, `state-changing`, or `destructive` according to the
+  actual side effects.
 
 Avoid creating parallel validation or helper modules when an existing namespace
 already owns the behavior. The repo already has some historical splits, so new
@@ -329,7 +380,7 @@ flowchart TD
     Owner[Smallest owning module]
     Public[Public export if supported API]
     CLI[CLI command or help if user-facing]
-    MCP[MCP tool if agent-facing and safe]
+    MCP[MCP tool if agent-facing]
     Docs[User or development docs]
     Tests[Focused tests]
 

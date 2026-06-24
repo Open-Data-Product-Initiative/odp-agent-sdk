@@ -74,6 +74,9 @@ def test_mcp_initialize_and_list_tools() -> None:
         "summarize_data_contract",
         "extract_data_contract_schema",
         "list_recipes",
+        "list_starter_recipes",
+        "check_starter_catalog",
+        "init_starter_recipe",
         "validate_recipe",
         "plan_recipe_run",
         "search_recipe_guidance",
@@ -89,7 +92,13 @@ def test_mcp_manifest_is_json_serializable_and_preserves_tool_contracts() -> Non
 
     manifest_tools = manifest["tools"]
     assert [tool["name"] for tool in manifest_tools] == [tool["name"] for tool in TOOLS]
-    assert all(tool["class"] == "safe" for tool in manifest_tools)
+    classes = {tool["name"]: tool["class"] for tool in manifest_tools}
+    assert classes["init_starter_recipe"] == "state-changing"
+    assert all(
+        tool_class == "safe"
+        for tool_name, tool_class in classes.items()
+        if tool_name != "init_starter_recipe"
+    )
     assert all("handler" not in tool for tool in manifest_tools)
     assert all(tool["inputSchema"]["type"] == "object" for tool in manifest_tools)
     assert {tool["name"] for tool in manifest_tools} >= {
@@ -113,6 +122,8 @@ def test_mcp_manifest_is_json_serializable_and_preserves_tool_contracts() -> Non
         ("validate_config", {"domain": "generation"}),
         ("validate_config", {"domain": "recipes", "path": str(RECIPE_CONFIG)}),
         ("list_recipes", {"config_path": str(RECIPE_CONFIG)}),
+        ("list_starter_recipes", {}),
+        ("check_starter_catalog", {}),
         ("validate_recipe", {"config_path": str(RECIPE_CONFIG)}),
         ("plan_recipe_run", {"config_path": str(RECIPE_CONFIG)}),
         ("search_recipe_guidance", {"query": "localization", "limit": 1}),
@@ -171,6 +182,25 @@ def test_mcp_recipe_plan_uses_default_recipe_from_config() -> None:
         "path": "workflows/ci-validate-catalog.yaml",
         "defaultRecipe": "workflows/ci-validate-catalog.yaml",
     }
+
+
+def test_mcp_init_starter_recipe_creates_workspace(tmp_path: Path) -> None:
+    output = tmp_path / "portfolio-recipe"
+
+    result = _call_tool(
+        "init_starter_recipe",
+        {
+            "identifier": "build-data-product-portfolio",
+            "output": str(output),
+        },
+    )
+    payload = json.loads(result["content"][0]["text"])
+
+    assert payload["mode"] == "init"
+    assert payload["starter"]["id"] == "RCP-SDK-PORTFOLIO-BUILD"
+    assert (output / "recipe.yaml").is_file()
+    assert (output / "README.md").is_file()
+    assert (output / "AGENTS.md").is_file()
 
 
 def test_mcp_unknown_tool_returns_json_rpc_error() -> None:

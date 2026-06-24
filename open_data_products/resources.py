@@ -60,6 +60,13 @@ _RESOURCE_DEFINITIONS: Tuple[ResourceDefinition, ...] = (
         "Bundled ODPR recipe guidance records for search and agent context.",
     ),
     (
+        "odpr.starter-catalog",
+        "odpr",
+        "catalog",
+        "odpr/data/starters/catalog.yaml",
+        "Bundled ODPR RecipeCatalog for SDK starter recipes.",
+    ),
+    (
         "odpc.schema.yaml",
         "odpc",
         "schema",

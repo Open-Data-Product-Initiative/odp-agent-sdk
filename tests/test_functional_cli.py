@@ -1294,6 +1294,94 @@ recipes:
     assert recipes[0]["commands"] == ["portfolio.explain"]
 
 
+def test_recipe_cli_list_starters_uses_packaged_catalog(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    assert main(["recipe", "list", "--starters", "--json"]) == 0
+
+    payload = _json_output(capsys)
+    recipes = payload["recipeCatalog"]["recipes"]
+
+    assert payload["source"] == "starters"
+    assert payload["recipeCatalog"]["groups"][0]["id"] == "starters"
+    assert len(recipes) == 5
+    assert recipes[0]["path"] == "build-data-product-portfolio/recipe.yaml"
+    assert recipes[0]["groupRef"] == "starters"
+
+
+def test_recipe_cli_starter_catalog_check_validates_packaged_catalog(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    assert main(["recipe", "starter-catalog-check", "--json"]) == 0
+
+    payload = _json_output(capsys)
+
+    assert payload["mode"] == "starter-catalog-check"
+    assert payload["valid"] is True
+    assert payload["errors"] == []
+    assert len(payload["recipes"]) == 5
+
+
+def test_recipe_cli_init_creates_starter_workspace(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    output = tmp_path / "portfolio-recipe"
+
+    assert (
+        main(
+            [
+                "recipe",
+                "init",
+                "build-data-product-portfolio",
+                "--output",
+                str(output),
+                "--json",
+            ]
+        )
+        == 0
+    )
+
+    payload = _json_output(capsys)
+
+    assert payload["mode"] == "init"
+    assert payload["starter"]["id"] == "RCP-SDK-PORTFOLIO-BUILD"
+    assert payload["workspace"] == output.as_posix()
+    assert (output / "recipe.yaml").is_file()
+    assert (output / "README.md").is_file()
+    assert (output / "AGENTS.md").is_file()
+    assert (output / "inputs").is_dir()
+    assert (output / "outputs").is_dir()
+
+
+def test_recipe_cli_init_refuses_existing_output(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    output = tmp_path / "portfolio-recipe"
+    output.mkdir()
+
+    assert (
+        main(
+            [
+                "recipe",
+                "init",
+                "build-data-product-portfolio",
+                "--output",
+                str(output),
+                "--json",
+            ]
+        )
+        == 1
+    )
+
+    payload = _json_output(capsys)
+
+    assert payload["valid"] is False
+    assert payload["kind"] == "Error"
+    assert "Recipe workspace already exists" in payload["error"]
+
+
 def test_recipe_cli_catalog_writes_metadata_only_catalog(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],

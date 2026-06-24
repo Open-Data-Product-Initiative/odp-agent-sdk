@@ -138,6 +138,9 @@ packages = [
 ]
 "open_data_products.odpr" = [
     "recipes.config.yaml",
+    "data/starters/*.yaml",
+    "data/starters/*/*.yaml",
+    "data/starters/*/*.md",
 ]
 "open_data_products.odpr.data.schema" = [
     "*.yaml",

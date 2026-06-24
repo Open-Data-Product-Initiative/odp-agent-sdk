@@ -8,14 +8,19 @@ from pathlib import Path
 import yaml
 
 from open_data_products.odpr import (
+    DEFAULT_STARTER_CATALOG,
     build_recipe_catalog,
+    check_starter_catalog,
     execute_recipe_run,
     get_recipe_guidance,
+    init_starter_recipe,
     list_recipes,
+    list_starter_recipes,
     load_odpr_schema,
     load_recipe,
     load_recipe_guidance,
     plan_recipe_run,
+    resolve_starter_recipe,
     search_recipe_guidance,
     validate_odpr_document,
     validate_recipe,
@@ -1516,3 +1521,108 @@ recipes:
     assert "steps" not in entry
     assert "plannedWrites" not in entry
     assert "parseStatus" not in entry
+
+
+def test_packaged_starter_catalog_validates_and_lists() -> None:
+    """Test bundled starter discovery is backed by a valid RecipeCatalog."""
+    report = validate_odpr_document(DEFAULT_STARTER_CATALOG)
+
+    assert report["valid"] is True
+
+    listing = list_starter_recipes()
+    catalog = listing["recipeCatalog"]
+    recipes = catalog["recipes"]
+
+    assert listing["source"] == "starters"
+    assert catalog["version"] == "1.0.0"
+    assert catalog["groups"] == [
+        {
+            "id": "starters",
+            "name": {"en": "Starter Recipes"},
+            "description": {
+                "en": "Recipes intended for workspace initialization and first-run workflows."
+            },
+        }
+    ]
+    assert [recipe["groupRef"] for recipe in recipes] == ["starters"] * 5
+    assert [recipe["path"] for recipe in recipes] == [
+        "build-data-product-portfolio/recipe.yaml",
+        "source-to-product-fragments/recipe.yaml",
+        "fragments-to-odpc-catalog/recipe.yaml",
+        "fragments-to-odpg-graph/recipe.yaml",
+        "generate-agent-context/recipe.yaml",
+    ]
+
+
+def test_packaged_starter_catalog_check_validates_referenced_recipes() -> None:
+    """Test bundled starter catalog entries resolve to valid recipe files."""
+    result = check_starter_catalog()
+
+    assert result["valid"] is True
+    assert result["catalog"] == "catalog.yaml"
+    assert result["errors"] == []
+    assert len(result["recipes"]) == 5
+    assert {recipe["valid"] for recipe in result["recipes"]} == {True}
+
+
+def test_resolve_starter_recipe_by_id_name_and_folder() -> None:
+    """Test starter lookup supports catalog id, English name, and folder name."""
+    by_id = resolve_starter_recipe("RCP-SDK-PORTFOLIO-BUILD")
+    by_name = resolve_starter_recipe("Build Data Product Portfolio")
+    by_folder = resolve_starter_recipe("build-data-product-portfolio")
+
+    assert by_id["path"] == "build-data-product-portfolio/recipe.yaml"
+    assert by_name == by_id
+    assert by_folder == by_id
+
+
+def test_init_starter_recipe_creates_workspace(tmp_path: Path) -> None:
+    """Test starter init copies the selected recipe workspace."""
+    target = tmp_path / "portfolio-recipe"
+
+    result = init_starter_recipe(
+        "build-data-product-portfolio",
+        output=target,
+    )
+
+    assert result["mode"] == "init"
+    assert result["starter"]["id"] == "RCP-SDK-PORTFOLIO-BUILD"
+    assert result["workspace"] == target.as_posix()
+    assert (target / "recipe.yaml").is_file()
+    assert (target / "README.md").is_file()
+    assert (target / "AGENTS.md").is_file()
+    assert (target / "inputs").is_dir()
+    assert (target / "outputs").is_dir()
+    assert result["nextCommands"] == [
+        f"cd {target.as_posix()}",
+        "open-data-products recipe run recipe.yaml --dry-run",
+        "open-data-products recipe run recipe.yaml --execute --approve-review",
+    ]
+
+
+def test_init_starter_recipe_refuses_existing_output(tmp_path: Path) -> None:
+    """Test starter init never overwrites an existing workspace by default."""
+    target = tmp_path / "portfolio-recipe"
+    target.mkdir()
+
+    try:
+        init_starter_recipe("build-data-product-portfolio", output=target)
+    except FileExistsError as exc:
+        assert "Recipe workspace already exists" in str(exc)
+    else:
+        raise AssertionError("init_starter_recipe should refuse existing output")
+
+
+def test_init_starter_recipe_force_allows_existing_output(tmp_path: Path) -> None:
+    """Test explicit force allows copying into an existing workspace."""
+    target = tmp_path / "portfolio-recipe"
+    target.mkdir()
+
+    result = init_starter_recipe(
+        "build-data-product-portfolio",
+        output=target,
+        force=True,
+    )
+
+    assert result["force"] is True
+    assert (target / "recipe.yaml").is_file()

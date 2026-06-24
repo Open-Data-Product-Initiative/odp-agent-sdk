@@ -6,7 +6,7 @@ from pathlib import Path
 from functools import lru_cache
 import json
 import re
-from typing import Dict, List, Mapping, Optional, Sequence, Tuple, Union
+from typing import Dict, List, Mapping, Optional, Sequence, Set, Tuple, Union
 
 import yaml
 from jsonschema import Draft202012Validator
@@ -176,7 +176,7 @@ def _validate_catalog_root(data: Mapping[str, object], errors: List[str]) -> Non
     if not isinstance(recipes, list) or not recipes:
         errors.append("recipeCatalog.recipes must contain at least one entry")
         return
-    recipe_ids: set[str] = set()
+    recipe_ids: Set[str] = set()
     forbidden = {"steps", "status", "runId", "logs", "plannedWrites"}
     for index, entry in enumerate(recipes):
         if not isinstance(entry, dict):
@@ -199,13 +199,13 @@ def _validate_catalog_root(data: Mapping[str, object], errors: List[str]) -> Non
             )
 
 
-def _catalog_group_ids(value: object, errors: List[str]) -> set[str]:
+def _catalog_group_ids(value: object, errors: List[str]) -> Set[str]:
     if value is None:
         return set()
     if not isinstance(value, list):
         errors.append("recipeCatalog.groups must be an array")
         return set()
-    group_ids: set[str] = set()
+    group_ids: Set[str] = set()
     for index, group in enumerate(value):
         if not isinstance(group, dict):
             errors.append(f"recipeCatalog.groups[{index}] must be a mapping")

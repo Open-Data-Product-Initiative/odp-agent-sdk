@@ -98,6 +98,9 @@ EXPECTED_TOOLS = {
     "summarize_data_contract",
     "extract_data_contract_schema",
     "list_recipes",
+    "list_starter_recipes",
+    "check_starter_catalog",
+    "init_starter_recipe",
     "validate_recipe",
     "plan_recipe_run",
     "search_recipe_guidance",
@@ -366,6 +369,8 @@ class TestAgentManifest:
         ]
         assert workflows["plan-recipe-workflow"]["mcp_tools"] == [
             "list_recipes",
+            "list_starter_recipes",
+            "init_starter_recipe",
             "search_recipe_guidance",
             "validate_recipe",
             "plan_recipe_run",
@@ -565,8 +570,9 @@ class TestAgentManifest:
 
         safety = generate_agent_manifest()["safety"]
 
-        assert safety["mcp_tool_class"] == "safe"
-        assert safety["mcp_is_read_only"] is True
+        assert safety["mcp_tool_class"] == "mixed"
+        assert safety["mcp_is_read_only"] is False
+        assert safety["mcp_state_changing_tools"] == ["init_starter_recipe"]
         assert "state-changing" in safety["cli_note"]
 
 
@@ -644,6 +650,8 @@ class TestLoadSummary:
         toon = path.with_suffix(".toon")
         gcf.write_text("gcf body", encoding="utf-8")
         toon.write_text("toon body\nline two", encoding="utf-8")
+        gcf_bytes = gcf.read_bytes()
+        toon_bytes = toon.read_bytes()
 
         summary = load_summary(path)
 
@@ -651,17 +659,17 @@ class TestLoadSummary:
             {
                 "format": "gcf",
                 "path": str(gcf),
-                "byte_size": 8,
+                "byte_size": len(gcf_bytes),
                 "line_count": 1,
-                "sha256": hashlib.sha256(b"gcf body").hexdigest(),
+                "sha256": hashlib.sha256(gcf_bytes).hexdigest(),
                 "preferred": True,
             },
             {
                 "format": "toon",
                 "path": str(toon),
-                "byte_size": 18,
+                "byte_size": len(toon_bytes),
                 "line_count": 2,
-                "sha256": hashlib.sha256(b"toon body\nline two").hexdigest(),
+                "sha256": hashlib.sha256(toon_bytes).hexdigest(),
                 "preferred": False,
             },
         ]

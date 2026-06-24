@@ -54,8 +54,11 @@ from ..odpg import (
 )
 from ..okf import summarize_okf_bundle, validate_okf_bundle
 from ..odpr import (
+    check_starter_catalog as _check_starter_catalog,
     get_recipe_config,
+    init_starter_recipe as _init_starter_recipe,
     list_recipes as _list_recipes,
+    list_starter_recipes as _list_starter_recipes,
     plan_recipe_run as _plan_recipe_run,
     search_recipe_guidance as _search_recipe_guidance,
     validate_recipe as _validate_recipe,
@@ -359,6 +362,33 @@ def _h_list_recipes(args: Dict[str, Any]) -> Dict[str, Any]:
             config_path=args.get("config_path"),
             project_root=args.get("project_root"),
             group=args.get("group"),
+        )
+    )
+
+
+def _h_list_starter_recipes(args: Dict[str, Any]) -> Dict[str, Any]:
+    return _json_envelope(
+        _list_starter_recipes(
+            catalog_path=args.get("catalog_path"),
+        )
+    )
+
+
+def _h_check_starter_catalog(args: Dict[str, Any]) -> Dict[str, Any]:
+    return _json_envelope(
+        _check_starter_catalog(
+            catalog_path=args.get("catalog_path"),
+        )
+    )
+
+
+def _h_init_starter_recipe(args: Dict[str, Any]) -> Dict[str, Any]:
+    return _json_envelope(
+        _init_starter_recipe(
+            args["identifier"],
+            output=args.get("output"),
+            force=bool(args.get("force", False)),
+            catalog_path=args.get("catalog_path"),
         )
     )
 
@@ -771,6 +801,62 @@ TOOLS: List[Dict[str, Any]] = [
             }
         ),
         "handler": _h_list_recipes,
+    },
+    {
+        "name": "list_starter_recipes",
+        "description": "List packaged ODPR starter recipes from the bundled RecipeCatalog.",
+        "class": "safe",
+        "inputSchema": _object_schema(
+            {
+                "catalog_path": {
+                    "type": "string",
+                    "description": "Optional starter RecipeCatalog YAML path.",
+                },
+            }
+        ),
+        "handler": _h_list_starter_recipes,
+    },
+    {
+        "name": "check_starter_catalog",
+        "description": "Validate the starter RecipeCatalog and referenced recipe files.",
+        "class": "safe",
+        "inputSchema": _object_schema(
+            {
+                "catalog_path": {
+                    "type": "string",
+                    "description": "Optional starter RecipeCatalog YAML path.",
+                },
+            }
+        ),
+        "handler": _h_check_starter_catalog,
+    },
+    {
+        "name": "init_starter_recipe",
+        "description": "Create a local ODPR recipe workspace from a starter catalog entry.",
+        "class": "state-changing",
+        "inputSchema": _object_schema(
+            {
+                "identifier": {
+                    "type": "string",
+                    "description": "Starter recipe id, English name, or folder name.",
+                },
+                "output": {
+                    "type": "string",
+                    "description": "Output workspace directory.",
+                },
+                "force": {
+                    "type": "boolean",
+                    "description": "Allow copying into an existing workspace directory.",
+                    "default": False,
+                },
+                "catalog_path": {
+                    "type": "string",
+                    "description": "Optional starter RecipeCatalog YAML path.",
+                },
+            },
+            ["identifier"],
+        ),
+        "handler": _h_init_starter_recipe,
     },
     {
         "name": "validate_recipe",
