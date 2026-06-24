@@ -1,46 +1,45 @@
-# Release Summary: 0.3.0
+# Release Summary: ODPR Recipe Quick Starts
 
-- Added the hosted `zai` provider preset for the general Z.ai GLM
-  OpenAI-compatible API, including config, manifest metadata, tests, a dedicated
-  user guide, and complete provider-matrix coverage for bundled presets.
-- Added ODPR recipe workflows as a first-class SDK surface:
-  `open_data_products.odpr`, bundled ODPR schemas, Draft 2020-12 validation,
-  secret checks, metadata-only `RecipeCatalog` generation, recipe guidance
-  search, resource-registry discovery, Python helpers, MCP/ARWS dry-run
-  discovery, and the `recipe list`, `recipe validate`, `recipe catalog`,
-  `recipe search`, and `recipe run` CLI commands.
-- Added guarded recipe execution with dry-run planning, explicit
-  `--allow-llm` and `--approve-review` gates, provider readiness checks from
-  generation config and environment variables, `executionPolicy` reporting,
-  default recipe selection via `recipes.defaultRecipe`, config-root support via
-  `projectRoot`, and compact run manifests under `.odp/runs/`.
-- Added supported recipe execution for deterministic/report commands
-  (`validate`, `explain`, `odpg.render`, `portfolio.sync`,
-  `portfolio.render`, `portfolio.explain`) and LLM-backed commands
-  (`generate`, `odpg.build`, `portfolio.build`, `portfolio.localize`,
-  `portfolio.refresh`). Executed steps now include `writeCheck`, and
-  localization runs include objective QA coverage counters.
-- Added the recipe workflow user guide plus starter examples for CI validation,
-  deterministic portfolio sync/render/explain, guarded ODPG graph builds,
-  guarded portfolio build and refresh from source lanes, and guarded release
-  localization. Dry-run plans now expose list-valued source lane inputs so
-  agents can verify portfolio prerequisites before execution.
-- Replaced the old course wrap-up guide with a seven-part ODPR recipe guide
-  sequence covering recipe purpose, validation, dry-runs, config, execution
-  policy, deterministic runs, LLM-backed runs, portfolio workflows, and
-  agent/CI usage.
+- Confirmed the SDK quick-start work reuses the existing vendored ODPR v1.0
+  schema and the existing `open_data_products.odpr` package structure.
+- Added grouped `RecipeCatalog` foundation support: `recipeCatalog.version`,
+  `recipeCatalog.groups[]`, `recipeCatalog.recipes[].groupRef`, duplicate
+  group and recipe id checks, unresolved `groupRef` checks, and grouped catalog
+  output for project recipes.
+- Added grouped project recipe catalog output through
+  `open-data-products recipe list --group <id>`,
+  `open-data-products recipe catalog --group <id>`, and the MCP
+  `list_recipes` group argument.
+- Added packaged ODPR starter recipe discovery backed by the bundled
+  `RecipeCatalog` at `open_data_products/odpr/data/starters/catalog.yaml`.
+- Added bundled starter catalog resource registration under
+  `odpr.starter-catalog`.
+- Added five starter recipe workspaces with `recipe.yaml`, `README.md`, and
+  `AGENTS.md` files for portfolio build, source-to-fragments,
+  fragments-to-ODPC catalog, fragments-to-ODPG graph, and agent context
+  generation workflows.
+- Added starter catalog resolution by catalog id, normalized English name, and
+  folder name derived from catalog `path`.
+- Added `open-data-products recipe list --starters` and
+  `open-data-products recipe starter-catalog-check` for starter discovery and
+  validation.
+- Added `open-data-products recipe init <id-or-name>` to create a local starter
+  workspace, with `--output`, `--force`, `--catalog`, and `--json` support.
+- Added Python helpers for starter listing, catalog checking, starter
+  resolution, and workspace initialization.
+- Added MCP tools for starter recipe discovery, catalog checking, and starter
+  initialization. Discovery and catalog checks are `safe`; workspace
+  initialization is `state-changing`.
+- Updated the ARWS manifest and development architecture docs to describe ODPR
+  quick starts, `RecipeCatalog` discovery, and the MCP tool classification.
+- Added tests for packaged starter catalog validation, referenced recipe
+  validation, lookup by id/name/folder, CLI starter commands, MCP starter
+  commands, overwrite protection, and manifest classification.
 
-## Intentionally Left Out
+## Not Included Yet
 
-- Recipes are not a full workflow scheduler: there is no background execution,
-  retry engine, queue, cron support, or distributed state store.
-- Recipes do not yet wrap every SDK CLI command. The first supported step set
-  focuses on validation, explanation, generation, ODPG builds/renders, and
-  portfolio workflows.
-- Recipe steps remain inline in v1 examples. Reusable step fragments, shared
-  step libraries, and fragment versioning are deferred.
-- LLM-backed outputs are still drafts. The runner records review approval and
-  write checks, but it does not replace human acceptance of generated YAML,
-  graphs, localized pages, or portfolio content.
-- CI examples intentionally favor deterministic recipes. Hosted LLM execution
-  in CI remains an explicit project policy decision, not the default path.
+- `recipe explain <id-or-path>` is not implemented yet.
+- Parameterized starter mode is not implemented yet.
+- Example workspaces separate from starters are not implemented yet.
+- Dry-run planning and guarded execution were reused as existing recipe runner
+  surfaces, not redesigned in this quick-start phase.
