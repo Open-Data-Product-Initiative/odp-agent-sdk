@@ -1141,10 +1141,12 @@ providers:
             "model": "gpt-test",
             "type": "openai",
             "readiness": "missing-env",
+            "requiredEnv": ["TEST_ODPR_OPENAI_API_KEY"],
             "missingEnv": ["TEST_ODPR_OPENAI_API_KEY"],
             "source": str(generation_path),
         }
     ]
+    assert payload["requiredEnv"] == ["TEST_ODPR_OPENAI_API_KEY"]
 
 
 def test_recipe_cli_uses_config_default_recipe_when_path_is_omitted(
@@ -1213,7 +1215,7 @@ def test_recipe_cli_requires_path_without_config_default(
     assert (
         payload["error"]
         == "recipe path is required unless recipes.defaultRecipe is set in "
-        "recipes.config.yaml"
+        "recipes.config.yaml or recipe.yaml exists in the current directory"
     )
 
 
@@ -1309,6 +1311,23 @@ def test_recipe_cli_list_starters_uses_packaged_catalog(
     assert recipes[0]["groupRef"] == "starters"
 
 
+def test_recipe_cli_list_defaults_to_starters_without_local_config(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.chdir(tmp_path)
+
+    assert main(["recipe", "list", "--json"]) == 0
+
+    payload = _json_output(capsys)
+
+    assert payload["source"] == "starters"
+    assert payload["recipeCatalog"]["recipes"][0]["path"] == (
+        "build-data-product-portfolio/recipe.yaml"
+    )
+
+
 def test_recipe_cli_starter_catalog_check_validates_packaged_catalog(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
@@ -1354,6 +1373,63 @@ def test_recipe_cli_init_creates_starter_workspace(
     assert (output / "outputs").is_dir()
 
 
+def test_recipe_cli_init_defaults_to_recipes_directory(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.chdir(tmp_path)
+
+    assert (
+        main(["recipe", "init", "build-data-product-portfolio", "--json"])
+        == 0
+    )
+
+    payload = _json_output(capsys)
+    output = tmp_path / "recipes" / "build-data-product-portfolio"
+
+    assert payload["workspace"] == "recipes/build-data-product-portfolio"
+    assert payload["recipe"] == "recipes/build-data-product-portfolio/recipe.yaml"
+    assert (output / "recipe.yaml").is_file()
+    assert payload["nextCommands"] == [
+        "cd recipes/build-data-product-portfolio",
+        "open-data-products recipe plan",
+        "open-data-products recipe run --allow-llm --approve-review",
+    ]
+
+
+def test_recipe_cli_init_parameterized_creates_values_files(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    output = tmp_path / "portfolio-template"
+
+    assert (
+        main(
+            [
+                "recipe",
+                "init",
+                "build-data-product-portfolio",
+                "--output",
+                str(output),
+                "--parameterized",
+                "--json",
+            ]
+        )
+        == 0
+    )
+
+    payload = _json_output(capsys)
+
+    assert payload["parameterized"] is True
+    assert (output / "recipe.values.yaml").is_file()
+    assert (output / "values.schema.yaml").is_file()
+    assert payload["created"]["values"] == (output / "recipe.values.yaml").as_posix()
+    assert payload["created"]["valuesSchema"] == (
+        output / "values.schema.yaml"
+    ).as_posix()
+
+
 def test_recipe_cli_init_refuses_existing_output(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
@@ -1380,6 +1456,307 @@ def test_recipe_cli_init_refuses_existing_output(
     assert payload["valid"] is False
     assert payload["kind"] == "Error"
     assert "Recipe workspace already exists" in payload["error"]
+
+
+def test_recipe_cli_initialized_starter_execute_requires_llm_and_review(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    output = tmp_path / "portfolio-recipe"
+    assert (
+        main(
+            [
+                "recipe",
+                "init",
+                "build-data-product-portfolio",
+                "--output",
+                str(output),
+                "--json",
+            ]
+        )
+        == 0
+    )
+    _json_output(capsys)
+
+    assert (
+        main(["recipe", "run", str(output / "recipe.yaml"), "--execute", "--json"])
+        == 1
+    )
+    payload = _json_output(capsys)
+
+    assert payload["status"] == "blocked"
+    assert payload["executionPolicy"] == {
+        "allowLlm": False,
+        "reviewApproved": False,
+    }
+    assert [reason["code"] for reason in payload["blockingReasons"]] == [
+        "llm_execution_requires_allow_llm",
+        "review_approval_required",
+    ]
+    assert payload["steps"][0]["status"] == "blocked"
+    assert (output / payload["manifest"]["path"]).is_file()
+
+
+def test_recipe_cli_initialized_starter_review_does_not_allow_llm(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    output = tmp_path / "portfolio-recipe"
+    assert (
+        main(
+            [
+                "recipe",
+                "init",
+                "build-data-product-portfolio",
+                "--output",
+                str(output),
+                "--json",
+            ]
+        )
+        == 0
+    )
+    _json_output(capsys)
+
+    assert (
+        main(
+            [
+                "recipe",
+                "run",
+                str(output / "recipe.yaml"),
+                "--execute",
+                "--approve-review",
+                "--json",
+            ]
+        )
+        == 1
+    )
+    payload = _json_output(capsys)
+
+    assert payload["status"] == "blocked"
+    assert payload["executionPolicy"] == {"allowLlm": False, "reviewApproved": True}
+    assert [reason["code"] for reason in payload["blockingReasons"]] == [
+        "llm_execution_requires_allow_llm"
+    ]
+    assert payload["steps"][0]["review"]["decision"] == "approved-by-cli-flag"
+
+
+def test_recipe_cli_explain_starter_uses_packaged_catalog(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    assert (
+        main(["recipe", "explain", "build-data-product-portfolio", "--json"])
+        == 0
+    )
+
+    payload = _json_output(capsys)
+
+    assert payload["mode"] == "explain"
+    assert payload["source"] == "starters"
+    assert payload["valid"] is True
+    assert payload["starter"]["id"] == "RCP-SDK-PORTFOLIO-BUILD"
+    assert payload["recipe"]["id"] == "RCP-SDK-PORTFOLIO-BUILD"
+    assert payload["steps"][0]["command"] == "portfolio.build"
+
+
+def test_recipe_cli_explain_local_recipe_path(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    recipe_path = tmp_path / "recipe.yaml"
+    recipe_path.write_text(
+        """
+schema: https://opendataproducts.org/odpr-v1.0/schema/odpr.yaml
+version: "1.0"
+kind: Recipe
+recipe:
+  metadata:
+    id: RCP-EXPLAIN-LOCAL
+    name:
+      en: Explain Local
+  version: "1.0.0"
+  type: ci
+  steps:
+    - id: validate
+      command: validate
+      with:
+        document: catalog.yaml
+""",
+        encoding="utf-8",
+    )
+
+    assert main(["recipe", "explain", str(recipe_path), "--json"]) == 0
+
+    payload = _json_output(capsys)
+
+    assert payload["source"] == "local"
+    assert payload["recipe"]["id"] == "RCP-EXPLAIN-LOCAL"
+    assert payload["steps"][0]["command"] == "validate"
+
+
+def test_recipe_cli_plan_alias_matches_run_dry_run(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    recipe_path = tmp_path / "recipe.yaml"
+    recipe_path.write_text(
+        """
+schema: https://opendataproducts.org/odpr-v1.0/schema/odpr.yaml
+version: "1.0"
+kind: Recipe
+recipe:
+  metadata:
+    id: RCP-PLAN-ALIAS
+    name:
+      en: Plan Alias
+  version: "1.0.0"
+  type: ci
+  steps:
+    - id: validate
+      command: validate
+      with:
+        document: catalog.yaml
+""",
+        encoding="utf-8",
+    )
+
+    assert main(["recipe", "run", str(recipe_path), "--dry-run", "--json"]) == 0
+    run_payload = _json_output(capsys)
+
+    assert main(["recipe", "plan", str(recipe_path), "--json"]) == 0
+    plan_payload = _json_output(capsys)
+
+    assert plan_payload == run_payload
+    assert not (tmp_path / ".odp").exists()
+
+
+def test_recipe_cli_dry_run_alias_matches_run_dry_run(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    recipe_path = tmp_path / "recipe.yaml"
+    recipe_path.write_text(
+        """
+schema: https://opendataproducts.org/odpr-v1.0/schema/odpr.yaml
+version: "1.0"
+kind: Recipe
+recipe:
+  metadata:
+    id: RCP-DRY-RUN-ALIAS
+    name:
+      en: Dry Run Alias
+  version: "1.0.0"
+  type: agent
+  steps:
+    - id: build-portfolio
+      command: portfolio.build
+      with:
+        products:
+          - inputs/products
+        workspace: outputs/portfolio
+""",
+        encoding="utf-8",
+    )
+
+    assert main(["recipe", "run", str(recipe_path), "--dry-run", "--json"]) == 0
+    run_payload = _json_output(capsys)
+
+    assert main(["recipe", "dry-run", str(recipe_path), "--json"]) == 0
+    alias_payload = _json_output(capsys)
+
+    assert alias_payload == run_payload
+    assert alias_payload["dryRun"] == {"writes": False, "providerCalls": False}
+    assert not (tmp_path / "outputs").exists()
+
+
+def test_recipe_cli_plan_uses_current_directory_recipe_yaml(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    recipe_path = tmp_path / "recipe.yaml"
+    recipe_path.write_text(
+        """
+schema: https://opendataproducts.org/odpr-v1.0/schema/odpr.yaml
+version: "1.0"
+kind: Recipe
+recipe:
+  metadata:
+    id: RCP-CWD-PLAN
+    name:
+      en: Current Directory Plan
+  version: "1.0.0"
+  type: ci
+  steps:
+    - id: validate
+      command: validate
+      with:
+        document: catalog.yaml
+""",
+        encoding="utf-8",
+    )
+    monkeypatch.chdir(tmp_path)
+
+    assert main(["recipe", "plan", "--json"]) == 0
+    payload = _json_output(capsys)
+
+    assert payload["recipe"]["id"] == "RCP-CWD-PLAN"
+    assert payload["recipeSelection"] == {
+        "source": "cwd-default",
+        "path": "recipe.yaml",
+        "defaultRecipe": None,
+    }
+
+
+def test_recipe_cli_run_approval_executes_current_directory_recipe_yaml(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    (tmp_path / "catalog.yaml").write_text(
+        """
+schema: https://opendataproducts.org/odpc-v1.0/schema/odpc.yaml
+version: "1.0"
+kind: Catalog
+catalog:
+  metadata:
+    id: CAT-001
+    name:
+      en: Customer Data Product Catalog
+    description:
+      en: Catalog for customer-facing data products.
+  productReferences: []
+""",
+        encoding="utf-8",
+    )
+    (tmp_path / "recipe.yaml").write_text(
+        """
+schema: https://opendataproducts.org/odpr-v1.0/schema/odpr.yaml
+version: "1.0"
+kind: Recipe
+recipe:
+  metadata:
+    id: RCP-CWD-RUN
+    name:
+      en: Current Directory Run
+  version: "1.0.0"
+  type: ci
+  steps:
+    - id: validate
+      command: validate
+      with:
+        document: catalog.yaml
+""",
+        encoding="utf-8",
+    )
+    monkeypatch.chdir(tmp_path)
+
+    assert main(["recipe", "run", "--approve-review", "--json"]) == 0
+    payload = _json_output(capsys)
+
+    assert payload["mode"] == "execute"
+    assert payload["status"] == "passed"
+    assert payload["recipeSelection"]["source"] == "cwd-default"
+    assert (tmp_path / payload["manifest"]["path"]).is_file()
 
 
 def test_recipe_cli_catalog_writes_metadata_only_catalog(

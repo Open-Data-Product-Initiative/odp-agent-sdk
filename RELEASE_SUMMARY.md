@@ -25,21 +25,51 @@
   validation.
 - Added `open-data-products recipe init <id-or-name>` to create a local starter
   workspace, with `--output`, `--force`, `--catalog`, and `--json` support.
+- Simplified the starter CLI flow: bare `recipe list` shows packaged starters
+  when no local `recipes.config.yaml` is present, starter init now defaults to
+  `./recipes/<starter-folder>/`, and initialized workspaces can be planned with
+  `recipe plan` from the workspace directory.
+- Added `open-data-products recipe explain <id-or-path>` to explain packaged
+  starters or local recipe files without executing steps or calling providers.
+- Hardened `recipe run --dry-run` planning with explicit no-write and
+  no-provider-call guarantees, top-level planned reads and writes, gate and
+  review summaries, execution/context policy summaries, required environment
+  variable reporting, and corrected `portfolio.build` workspace write
+  detection.
+- Added `open-data-products recipe plan` and
+  `open-data-products recipe dry-run` as compatibility aliases for
+  `recipe run --dry-run`; both reuse the same dry-run payload and no-write
+  behavior.
+- Added current-directory recipe discovery for `recipe.yaml`, so `recipe plan`,
+  `recipe dry-run`, `recipe validate`, and guarded execution can run from
+  inside an initialized recipe workspace without repeating the recipe path.
+- Aligned initialized starter recipes with the guarded execution model:
+  LLM-backed starter steps stay blocked without `--allow-llm`, review-needed
+  steps stay blocked without `--approve-review`, and approving review does not
+  implicitly permit provider calls.
+- Simplified guarded execution approval ergonomics: `recipe run --approve-review`
+  or `recipe run --allow-llm --approve-review` executes the current recipe,
+  while `--dry-run` still forces planning.
+- Added workspace-style ODPR examples under `examples/recipes/workspaces/`,
+  separate from packaged starters, covering portfolio build, source document
+  fragment generation, hosted and local LLM generation, catalog assembly, graph
+  build, and graph-to-agent-context rendering.
+- Added advanced `recipe init --parameterized` support that generates
+  `recipe.values.yaml` and `values.schema.yaml` alongside the initialized
+  starter workspace while keeping the default init path self-contained.
 - Added Python helpers for starter listing, catalog checking, starter
-  resolution, and workspace initialization.
+  resolution, workspace initialization, and recipe explanation.
 - Added MCP tools for starter recipe discovery, catalog checking, and starter
-  initialization. Discovery and catalog checks are `safe`; workspace
-  initialization is `state-changing`.
+  initialization plus recipe explanation. Discovery, catalog checks, and
+  explanation are `safe`; workspace initialization is `state-changing`.
 - Updated the ARWS manifest and development architecture docs to describe ODPR
   quick starts, `RecipeCatalog` discovery, and the MCP tool classification.
 - Added tests for packaged starter catalog validation, referenced recipe
   validation, lookup by id/name/folder, CLI starter commands, MCP starter
-  commands, overwrite protection, and manifest classification.
+  commands, recipe explanation, overwrite protection, and manifest
+  classification.
 
 ## Not Included Yet
 
-- `recipe explain <id-or-path>` is not implemented yet.
-- Parameterized starter mode is not implemented yet.
-- Example workspaces separate from starters are not implemented yet.
-- Dry-run planning and guarded execution were reused as existing recipe runner
-  surfaces, not redesigned in this quick-start phase.
+- Guarded execution was reused as an existing recipe runner surface, with
+  starter-specific regression coverage added rather than a new execution model.

@@ -55,6 +55,7 @@ from ..odpg import (
 from ..okf import summarize_okf_bundle, validate_okf_bundle
 from ..odpr import (
     check_starter_catalog as _check_starter_catalog,
+    explain_recipe as _explain_recipe,
     get_recipe_config,
     init_starter_recipe as _init_starter_recipe,
     list_recipes as _list_recipes,
@@ -388,6 +389,16 @@ def _h_init_starter_recipe(args: Dict[str, Any]) -> Dict[str, Any]:
             args["identifier"],
             output=args.get("output"),
             force=bool(args.get("force", False)),
+            parameterized=bool(args.get("parameterized", False)),
+            catalog_path=args.get("catalog_path"),
+        )
+    )
+
+
+def _h_explain_recipe(args: Dict[str, Any]) -> Dict[str, Any]:
+    return _json_envelope(
+        _explain_recipe(
+            args["identifier"],
             catalog_path=args.get("catalog_path"),
         )
     )
@@ -849,6 +860,11 @@ TOOLS: List[Dict[str, Any]] = [
                     "description": "Allow copying into an existing workspace directory.",
                     "default": False,
                 },
+                "parameterized": {
+                    "type": "boolean",
+                    "description": "Generate recipe.values.yaml and values.schema.yaml.",
+                    "default": False,
+                },
                 "catalog_path": {
                     "type": "string",
                     "description": "Optional starter RecipeCatalog YAML path.",
@@ -857,6 +873,25 @@ TOOLS: List[Dict[str, Any]] = [
             ["identifier"],
         ),
         "handler": _h_init_starter_recipe,
+    },
+    {
+        "name": "explain_recipe",
+        "description": "Explain a starter or local ODPR recipe without executing steps.",
+        "class": "safe",
+        "inputSchema": _object_schema(
+            {
+                "identifier": {
+                    "type": "string",
+                    "description": "Starter recipe id/name/folder or local recipe YAML path.",
+                },
+                "catalog_path": {
+                    "type": "string",
+                    "description": "Optional starter RecipeCatalog YAML path.",
+                },
+            },
+            ["identifier"],
+        ),
+        "handler": _h_explain_recipe,
     },
     {
         "name": "validate_recipe",

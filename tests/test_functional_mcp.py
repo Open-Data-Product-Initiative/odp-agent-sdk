@@ -77,6 +77,7 @@ def test_mcp_initialize_and_list_tools() -> None:
         "list_starter_recipes",
         "check_starter_catalog",
         "init_starter_recipe",
+        "explain_recipe",
         "validate_recipe",
         "plan_recipe_run",
         "search_recipe_guidance",
@@ -124,6 +125,7 @@ def test_mcp_manifest_is_json_serializable_and_preserves_tool_contracts() -> Non
         ("list_recipes", {"config_path": str(RECIPE_CONFIG)}),
         ("list_starter_recipes", {}),
         ("check_starter_catalog", {}),
+        ("explain_recipe", {"identifier": "build-data-product-portfolio"}),
         ("validate_recipe", {"config_path": str(RECIPE_CONFIG)}),
         ("plan_recipe_run", {"config_path": str(RECIPE_CONFIG)}),
         ("search_recipe_guidance", {"query": "localization", "limit": 1}),
@@ -201,6 +203,38 @@ def test_mcp_init_starter_recipe_creates_workspace(tmp_path: Path) -> None:
     assert (output / "recipe.yaml").is_file()
     assert (output / "README.md").is_file()
     assert (output / "AGENTS.md").is_file()
+
+
+def test_mcp_init_starter_recipe_can_generate_values_files(tmp_path: Path) -> None:
+    output = tmp_path / "portfolio-template"
+
+    result = _call_tool(
+        "init_starter_recipe",
+        {
+            "identifier": "build-data-product-portfolio",
+            "output": str(output),
+            "parameterized": True,
+        },
+    )
+    payload = json.loads(result["content"][0]["text"])
+
+    assert payload["parameterized"] is True
+    assert (output / "recipe.values.yaml").is_file()
+    assert (output / "values.schema.yaml").is_file()
+
+
+def test_mcp_explain_recipe_returns_starter_details() -> None:
+    result = _call_tool(
+        "explain_recipe",
+        {"identifier": "build-data-product-portfolio"},
+    )
+    payload = json.loads(result["content"][0]["text"])
+
+    assert payload["mode"] == "explain"
+    assert payload["source"] == "starters"
+    assert payload["valid"] is True
+    assert payload["starter"]["id"] == "RCP-SDK-PORTFOLIO-BUILD"
+    assert payload["steps"][0]["command"] == "portfolio.build"
 
 
 def test_mcp_unknown_tool_returns_json_rpc_error() -> None:

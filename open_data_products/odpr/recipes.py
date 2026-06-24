@@ -338,10 +338,17 @@ def plan_recipe_run(
                         f"{planned['id']} planned write outside allowWrites: "
                         f"{planned_write['path']}"
                     )
+    else:
+        recipe = {}
 
     can_run = not blocking
+    providers = _provider_readiness(steps, config, config_path, root)
     payload: Dict[str, object] = {
         "mode": mode,
+        "dryRun": {
+            "writes": False,
+            "providerCalls": False,
+        },
         "recipeSelection": recipe_selection,
         "recipe": validation["recipe"],
         "canRun": can_run,
@@ -354,7 +361,14 @@ def plan_recipe_run(
             "recipeConfig": str(config_path) if config_path else None,
             "generationConfig": _generation_config(config),
         },
-        "providers": _provider_readiness(steps, config, config_path, root),
+        "execution": _plan_execution_policy(recipe, config),
+        "context": _plan_context_policy(recipe),
+        "review": _plan_review_policy(recipe, steps),
+        "gates": _plan_gates(recipe),
+        "plannedReads": _plan_reads(steps),
+        "plannedWrites": _plan_writes(steps),
+        "requiredEnv": _plan_required_env(providers),
+        "providers": providers,
         "steps": steps,
     }
     if mode == "execute":
@@ -757,10 +771,13 @@ def init_starter_recipe(
     *,
     output: Optional[PathLike] = None,
     force: bool = False,
+    parameterized: bool = False,
     catalog_path: Optional[PathLike] = None,
 ) -> Dict[str, object]:
     """Create a recipe workspace from a packaged starter."""
-    catalog = Path(catalog_path) if catalog_path is not None else DEFAULT_STARTER_CATALOG
+    catalog = (
+        Path(catalog_path) if catalog_path is not None else DEFAULT_STARTER_CATALOG
+    )
     entry = resolve_starter_recipe(identifier, catalog_path=catalog)
     entry_path = _string(entry.get("path"))
     if not entry_path:
@@ -773,7 +790,8 @@ def init_starter_recipe(
     if not source_dir.is_dir():
         raise FileNotFoundError(f"Starter recipe workspace not found: {source_dir}")
 
-    target = Path(output) if output is not None else Path(source_dir.name)
+    target = Path(output) if output is not None else Path("recipes") / source_dir.name
+    _validate_user_recipe_workspace_target(target)
     if target.exists() and not force:
         raise FileExistsError(f"Recipe workspace already exists: {target}")
 
@@ -788,10 +806,31 @@ def init_starter_recipe(
     if not recipe_path.is_file():
         raise FileNotFoundError(f"Initialized workspace missing recipe.yaml: {target}")
 
+    created: Dict[str, str] = {
+        "inputs": inputs_dir.as_posix(),
+        "outputs": outputs_dir.as_posix(),
+    }
+    if parameterized:
+        values_path = target / "recipe.values.yaml"
+        schema_path = target / "values.schema.yaml"
+        if values_path.exists() and not force:
+            raise FileExistsError(f"Recipe values file already exists: {values_path}")
+        if schema_path.exists() and not force:
+            raise FileExistsError(f"Values schema file already exists: {schema_path}")
+        values_path.write_text(
+            _dump_yaml(_starter_values(entry, recipe_path)),
+            encoding="utf-8",
+        )
+        schema_path.write_text(
+            _dump_yaml(_starter_values_schema(entry)),
+            encoding="utf-8",
+        )
+        _append_parameterized_notes(target)
+        created["values"] = values_path.as_posix()
+        created["valuesSchema"] = schema_path.as_posix()
+
     target_text = target.as_posix()
     recipe_text = recipe_path.as_posix()
-    inputs_text = inputs_dir.as_posix()
-    outputs_text = outputs_dir.as_posix()
     return {
         "mode": "init",
         "source": "starters",
@@ -799,17 +838,252 @@ def init_starter_recipe(
         "starter": entry,
         "workspace": target_text,
         "recipe": recipe_text,
-        "created": {
-            "inputs": inputs_text,
-            "outputs": outputs_text,
-        },
+        "created": created,
         "force": force,
+        "parameterized": parameterized,
         "nextCommands": [
             f"cd {target_text}",
-            "open-data-products recipe run recipe.yaml --dry-run",
-            "open-data-products recipe run recipe.yaml --execute --approve-review",
+            "open-data-products recipe plan",
+            "open-data-products recipe run --allow-llm --approve-review",
         ],
     }
+
+
+def _validate_user_recipe_workspace_target(target: Path) -> None:
+    """Refuse starter init targets inside SDK-owned source folders."""
+    resolved = target.resolve()
+    package_root = Path(__file__).resolve().parents[1]
+    repo_root = package_root.parent
+    reserved = [package_root]
+    for name in ("docs", "examples", "tests"):
+        candidate = repo_root / name
+        if candidate.exists():
+            reserved.append(candidate)
+
+    for root in reserved:
+        if _is_relative_to(resolved, root.resolve()):
+            raise ValueError(
+                "Recipe workspaces should live in a user project folder. "
+                "Run `open-data-products recipe init <starter>` from your "
+                "project root, or pass `--output ./recipes/<starter>`."
+            )
+
+
+def _is_relative_to(path: Path, parent: Path) -> bool:
+    try:
+        path.relative_to(parent)
+    except ValueError:
+        return False
+    return True
+
+
+def explain_recipe(
+    identifier: PathLike,
+    *,
+    catalog_path: Optional[PathLike] = None,
+) -> Dict[str, object]:
+    """Explain a local recipe file or packaged starter recipe."""
+    value = Path(identifier)
+    source = "local"
+    catalog: Optional[Path] = None
+    starter: Optional[Dict[str, object]] = None
+    if value.is_file():
+        recipe_path = value
+    else:
+        catalog = (
+            Path(catalog_path)
+            if catalog_path is not None
+            else DEFAULT_STARTER_CATALOG
+        )
+        starter = resolve_starter_recipe(str(identifier), catalog_path=catalog)
+        entry_path = _string(starter.get("path"))
+        if not entry_path:
+            raise ValueError(f"Starter recipe has no path: {identifier}")
+        if _is_unsafe_relative_path(entry_path):
+            raise ValueError(
+                f"Starter recipe path must be catalog-relative: {entry_path}"
+            )
+        recipe_path = catalog.parent / entry_path
+        source = "starters"
+
+    validation = validate_recipe(recipe_path)
+    recipe_doc = load_recipe(recipe_path) if validation.get("valid") else None
+    data = recipe_doc.data if recipe_doc is not None else load_odpr_data(recipe_path)
+    recipe = _mapping(data.get("recipe"))
+    metadata = _mapping(recipe.get("metadata"))
+    execution = _mapping(recipe.get("execution"))
+    context = _mapping(recipe.get("context"))
+    review = _mapping(recipe.get("review"))
+    gates = recipe.get("gates")
+    steps = _steps(recipe.get("steps"))
+
+    recipe_summary = _recipe_summary(recipe_path, metadata, recipe)
+    recipe_summary["path"] = recipe_path.as_posix()
+    payload: Dict[str, object] = {
+        "mode": "explain",
+        "source": source,
+        "valid": bool(validation.get("valid")),
+        "errors": validation.get("errors", []),
+        "warnings": validation.get("warnings", []),
+        "recipe": recipe_summary,
+        "execution": {
+            "mode": execution.get("mode"),
+            "providerRef": execution.get("providerRef"),
+        },
+        "context": {
+            "format": context.get("format"),
+        },
+        "review": {
+            "required": review.get("required", False),
+        },
+        "steps": [_explain_step(step) for step in steps],
+        "gates": gates if isinstance(gates, list) else [],
+        "safetyNotes": [
+            "Explanation does not execute recipe steps.",
+            "Explanation does not call providers.",
+            "Run a dry-run before guarded execution.",
+        ],
+        "nextCommands": [
+            f"open-data-products recipe run {recipe_path.as_posix()} --dry-run",
+            (
+                f"open-data-products recipe run {recipe_path.as_posix()} "
+                "--execute --approve-review"
+            ),
+        ],
+    }
+    if catalog is not None and starter is not None:
+        payload["catalog"] = _relative_path(catalog, catalog.parent)
+        payload["starter"] = starter
+    return payload
+
+
+def _explain_step(step: Mapping[str, object]) -> Dict[str, object]:
+    summary = _step_summary(step)
+    with_values = _mapping(step.get("with"))
+    if with_values:
+        summary["with"] = dict(with_values)
+    provider_ref = _string(step.get("providerRef"))
+    if provider_ref:
+        summary["providerRef"] = provider_ref
+    model = _string(step.get("model"))
+    if model:
+        summary["model"] = model
+    return summary
+
+
+def _starter_values(
+    entry: Mapping[str, object],
+    recipe_path: Path,
+) -> Dict[str, object]:
+    recipe_doc = load_recipe(recipe_path)
+    recipe = _mapping(recipe_doc.data.get("recipe"))
+    execution = _mapping(recipe.get("execution"))
+    context = _mapping(recipe.get("context"))
+    first_step = _mapping(recipe_doc.steps[0]) if recipe_doc.steps else {}
+    with_values = _mapping(first_step.get("with"))
+    return {
+        "starter": {
+            "id": entry.get("id"),
+            "path": entry.get("path"),
+        },
+        "execution": {
+            "providerRef": first_step.get("providerRef")
+            or execution.get("providerRef"),
+            "model": first_step.get("model"),
+        },
+        "context": {
+            "format": context.get("format") or entry.get("contextFormat"),
+        },
+        "paths": _starter_path_values(with_values),
+    }
+
+
+def _starter_path_values(values: Mapping[str, object]) -> Dict[str, object]:
+    paths: Dict[str, object] = {}
+    for key in (
+        "input",
+        "output",
+        "workspace",
+        "objectives",
+        "useCases",
+        "signals",
+        "products",
+        "graph",
+    ):
+        value = values.get(key)
+        if isinstance(value, (str, list)):
+            paths[key] = value
+    return paths
+
+
+def _starter_values_schema(entry: Mapping[str, object]) -> Dict[str, object]:
+    return {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": f"{_localized_name(entry)} values",
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "starter": {"type": "object"},
+            "execution": {
+                "type": "object",
+                "additionalProperties": True,
+                "properties": {
+                    "providerRef": {"type": ["string", "null"]},
+                    "model": {"type": ["string", "null"]},
+                },
+            },
+            "context": {
+                "type": "object",
+                "additionalProperties": True,
+                "properties": {
+                    "format": {"type": ["string", "null"]},
+                },
+            },
+            "paths": {
+                "type": "object",
+                "additionalProperties": {
+                    "oneOf": [
+                        {"type": "string"},
+                        {"type": "array", "items": {"type": "string"}},
+                    ]
+                },
+            },
+        },
+    }
+
+
+def _append_parameterized_notes(target: Path) -> None:
+    readme = target / "README.md"
+    agents = target / "AGENTS.md"
+    readme_note = (
+        "\n## Parameterized Mode\n\n"
+        "`recipe.values.yaml` and `values.schema.yaml` are advanced reuse "
+        "files for teams that want to separate project-specific settings from "
+        "the workflow contract. The current recipe runner still executes "
+        "`recipe.yaml`; update it deliberately when applying values.\n"
+    )
+    agents_note = (
+        "\n## Parameterized Mode\n\n"
+        "Treat `recipe.values.yaml` as editable project settings and "
+        "`values.schema.yaml` as the expected shape. Do not store secrets in "
+        "either file, and do not write runtime results back into ODPR files.\n"
+    )
+    if readme.is_file():
+        readme.write_text(
+            readme.read_text(encoding="utf-8") + readme_note,
+            encoding="utf-8",
+        )
+    if agents.is_file():
+        agents.write_text(
+            agents.read_text(encoding="utf-8") + agents_note,
+            encoding="utf-8",
+        )
+
+
+def _localized_name(entry: Mapping[str, object]) -> str:
+    name = _mapping(entry.get("name"))
+    english = name.get("en")
+    return english if isinstance(english, str) else str(entry.get("id", "Recipe"))
 
 
 def _catalog_entry(entry: Mapping[str, object]) -> Dict[str, object]:
@@ -1003,13 +1277,7 @@ def _step_inputs(
         "odpc.build": ("input",),
         "odpg.build": ("input", "contextGraph"),
         "odpg.render": ("graph",),
-        "portfolio.build": (
-            "workspace",
-            "objectives",
-            "useCases",
-            "signals",
-            "products",
-        ),
+        "portfolio.build": ("objectives", "useCases", "signals", "products"),
         "portfolio.refresh": (
             "workspace",
             "objectives",
@@ -1045,6 +1313,8 @@ def _planned_writes(
     paths: List[str] = []
     if command in {"generate", "portfolio.build"}:
         _append_string(paths, values.get("output"))
+        if command == "portfolio.build":
+            _append_string(paths, values.get("workspace"))
     elif command in {"odpc.build", "odpg.build", "odpg.render"}:
         for key in ("output", "html", "toon", "gcf"):
             _append_string(paths, values.get(key))
@@ -1097,17 +1367,25 @@ def _resolve_recipe_path(
             "path": str(path),
             "defaultRecipe": default_recipe,
         }
+    if default_recipe:
+        root = _project_root(None, config_path, project_root, config)
+        return root / default_recipe, {
+            "source": "config-default",
+            "path": default_recipe,
+            "defaultRecipe": default_recipe,
+        }
+    cwd_recipe = Path("recipe.yaml")
+    if cwd_recipe.is_file():
+        return cwd_recipe, {
+            "source": "cwd-default",
+            "path": cwd_recipe.as_posix(),
+            "defaultRecipe": None,
+        }
     if not default_recipe:
         raise ValueError(
             "recipe path is required unless recipes.defaultRecipe is set in "
-            "recipes.config.yaml"
+            "recipes.config.yaml or recipe.yaml exists in the current directory"
         )
-    root = _project_root(None, config_path, project_root, config)
-    return root / default_recipe, {
-        "source": "config-default",
-        "path": default_recipe,
-        "defaultRecipe": default_recipe,
-    }
 
 
 def _default_recipe(config: Mapping[str, object]) -> Optional[str]:
@@ -1185,11 +1463,13 @@ def _provider_readiness(
                 "model": parameters.get("model"),
                 "type": None,
                 "readiness": "unknown-provider",
+                "requiredEnv": [],
                 "missingEnv": [],
                 "source": None,
             }
             continue
         api_key_env = _string(provider_config.get("apiKeyEnv"))
+        required_env = [api_key_env] if api_key_env else []
         missing_env = []
         if api_key_env and not os.environ.get(api_key_env):
             missing_env.append(api_key_env)
@@ -1198,10 +1478,86 @@ def _provider_readiness(
             "model": parameters.get("model") or provider_config.get("model"),
             "type": provider_config.get("type"),
             "readiness": "missing-env" if missing_env else "ready",
+            "requiredEnv": required_env,
             "missingEnv": missing_env,
             "source": source,
         }
     return list(providers.values())
+
+
+def _plan_execution_policy(
+    recipe: Mapping[str, object],
+    config: Mapping[str, object],
+) -> Dict[str, object]:
+    execution = _mapping(recipe.get("execution"))
+    return {
+        "mode": execution.get("mode"),
+        "providerRef": execution.get("providerRef") or _default_provider(config),
+    }
+
+
+def _plan_context_policy(recipe: Mapping[str, object]) -> Dict[str, object]:
+    context = _mapping(recipe.get("context"))
+    return {
+        "format": context.get("format"),
+    }
+
+
+def _plan_review_policy(
+    recipe: Mapping[str, object],
+    steps: Sequence[Mapping[str, object]],
+) -> Dict[str, object]:
+    review = _mapping(recipe.get("review"))
+    statuses = [
+        _mapping(step.get("review")).get("status")
+        for step in steps
+        if isinstance(step, dict)
+    ]
+    return {
+        "required": review.get("required", False),
+        "requiresApproval": "review-needed" in statuses,
+    }
+
+
+def _plan_gates(recipe: Mapping[str, object]) -> List[object]:
+    gates = recipe.get("gates")
+    return list(gates) if isinstance(gates, list) else []
+
+
+def _plan_reads(steps: Sequence[Mapping[str, object]]) -> List[Dict[str, object]]:
+    reads: List[Dict[str, object]] = []
+    for step in steps:
+        step_id = _string(step.get("id")) or ""
+        for item in step.get("inputs", []):
+            if isinstance(item, dict):
+                read = dict(item)
+                read["step"] = step_id
+                reads.append(read)
+    return reads
+
+
+def _plan_writes(steps: Sequence[Mapping[str, object]]) -> List[Dict[str, object]]:
+    writes: List[Dict[str, object]] = []
+    for step in steps:
+        step_id = _string(step.get("id")) or ""
+        for item in step.get("plannedWrites", []):
+            if isinstance(item, dict):
+                write = dict(item)
+                write["step"] = step_id
+                writes.append(write)
+    return writes
+
+
+def _plan_required_env(providers: Sequence[Mapping[str, object]]) -> List[str]:
+    env_names = set()
+    for provider in providers:
+        required = provider.get("requiredEnv")
+        if isinstance(required, list):
+            env_names.update(item for item in required if isinstance(item, str))
+        missing = provider.get("missingEnv")
+        if isinstance(missing, list):
+            env_names.update(item for item in missing if isinstance(item, str))
+    return sorted(env_names)
 
 
 def _generation_providers(

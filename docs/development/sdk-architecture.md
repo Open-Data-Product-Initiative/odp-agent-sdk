@@ -249,11 +249,38 @@ files. The SDK keeps those roles separate: catalog entries list intent and
 commands, while recipe files keep step bodies and execution policy.
 
 Packaged starters live under `open_data_products/odpr/data/starters/` and are
-listed through the bundled `catalog.yaml`. `recipe init` resolves a catalog
-entry by id, English name, or folder name, copies the referenced starter folder,
-creates `inputs/` and `outputs/`, and refuses existing output unless `--force`
-is explicit. Dry-run planning and guarded execution continue to flow through
-the existing recipe runner.
+listed through the bundled `catalog.yaml`. Bare `recipe list` shows those
+starters when no local `recipes.config.yaml` is present, while
+`recipe list --config` keeps the configured project catalog behavior.
+`recipe init` resolves a catalog entry by id, English name, or folder name,
+copies the referenced starter folder into `./recipes/<starter-folder>/` by
+default, creates `inputs/` and `outputs/`, and refuses existing output unless
+`--force` is explicit. Initialized workspaces are user-owned project folders,
+not SDK internals. `recipe explain` loads either a starter or local recipe file
+and summarizes metadata, execution policy, steps, gates, safety notes, and next
+commands without executing steps or calling providers. Dry-run planning and
+guarded execution continue to flow through the existing recipe runner.
+Dry-run payloads include explicit no-write and no-provider-call guarantees,
+top-level planned reads and writes, gate and review summaries, execution and
+context policy summaries, and required environment variables when provider
+configuration makes them knowable. `recipe plan` and `recipe dry-run` are CLI
+compatibility aliases for `recipe run --dry-run`; they must delegate to the
+same planner and preserve the same JSON shape. When `recipe.yaml` exists in
+the current directory, `recipe plan`, `recipe dry-run`, `recipe validate`, and
+`recipe run` can use it without repeating the path.
+Guarded execution remains explicit: LLM-backed steps require `--allow-llm`,
+review-needed steps require `--approve-review`, and review approval must never
+implicitly allow provider calls. `recipe run --approve-review` or
+`recipe run --allow-llm --approve-review` executes the selected recipe, while
+`--dry-run` keeps the command in planning mode.
+Complete example workspaces live under `examples/recipes/workspaces/`. They
+are documentation and test fixtures, not packaged starter templates, and each
+workspace carries its own `README.md`, `AGENTS.md`, `recipe.yaml`, `inputs/`,
+and `outputs-example/`.
+Parameterized starter initialization is advanced and opt-in:
+`recipe init <starter> --parameterized` adds `recipe.values.yaml` and
+`values.schema.yaml` while leaving the default initialized workspace
+self-contained around `recipe.yaml`.
 
 ```mermaid
 sequenceDiagram
@@ -263,19 +290,21 @@ sequenceDiagram
     participant Workspace as Local recipe workspace
     participant Runner as Recipe runner
 
-    User->>Catalog: list_starter_recipes()
+    User->>Catalog: recipe list
     User->>Catalog: init_starter_recipe(id/name/folder)
     Catalog->>Starter: resolve path to recipe.yaml
     Starter-->>Workspace: copy README, AGENTS, recipe.yaml
     Workspace->>Workspace: ensure inputs/ and outputs/
-    User->>Runner: recipe run recipe.yaml --dry-run
-    Runner-->>User: planned steps, providers, writes, gates
+    User->>Workspace: explain_recipe(recipe.yaml)
+    Workspace-->>User: metadata, steps, gates, safety notes
+    User->>Runner: recipe plan
+    Runner-->>User: planned reads/writes, providers, env, gates
 ```
 
 The public ODPR helpers are exported explicitly from the package root when
-they are part of the supported SDK API. MCP discovery and catalog-check tools
-are safe. MCP starter initialization is classified as `state-changing` because
-it creates a workspace on disk.
+they are part of the supported SDK API. MCP discovery, catalog-check, and
+explanation tools are safe. MCP starter initialization is classified as
+`state-changing` because it creates a workspace on disk.
 
 ## Agent Surfaces
 
@@ -285,12 +314,12 @@ The SDK exposes agent behavior in three related forms:
 - CLI commands for people, scripts, CI, and local workflows
 - MCP tools for agent hosts that can call local tools over stdio
 
-Most MCP tools are safe-class inspection, validation, search, or planning
-tools. Tools that create local files must be classified explicitly. Today
-`init_starter_recipe` is `state-changing`; it initializes a recipe workspace
-from a packaged starter. Tool handlers live in `mcp/tools.py`, return MCP
-content envelopes, and delegate to the same facades used by Python and CLI
-workflows.
+Most MCP tools are safe-class inspection, validation, search, explanation, or
+planning tools. Tools that create local files must be classified explicitly.
+Today `init_starter_recipe` is `state-changing`; it initializes a recipe
+workspace from a packaged starter. Tool handlers live in `mcp/tools.py`,
+return MCP content envelopes, and delegate to the same facades used by Python
+and CLI workflows.
 
 ```mermaid
 flowchart TB

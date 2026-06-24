@@ -195,6 +195,7 @@ def _capabilities() -> List[Dict[str, Any]]:
                 "list",
                 "starter-discovery",
                 "init",
+                "explain",
                 "validate",
                 "dry-run",
                 "execute-guarded",
@@ -401,6 +402,7 @@ def _workflows() -> List[Dict[str, Any]]:
             "commands": [
                 "open-data-products recipe list --starters --json",
                 "open-data-products recipe init build-data-product-portfolio --output portfolio-recipe --json",
+                "open-data-products recipe explain build-data-product-portfolio --json",
                 "open-data-products recipe list --config recipes.config.yaml --json",
                 "open-data-products recipe search localization --json",
                 "open-data-products recipe validate recipes/release-portfolio-review.yaml --json",
@@ -413,6 +415,7 @@ def _workflows() -> List[Dict[str, Any]]:
                 "list_recipes",
                 "list_starter_recipes",
                 "init_starter_recipe",
+                "explain_recipe",
                 "search_recipe_guidance",
                 "validate_recipe",
                 "plan_recipe_run",

@@ -16,6 +16,20 @@ These examples show the main recipe workflow shapes:
 - `release-portfolio-localize.yaml`: LLM-backed release localization that is
   guarded by provider readiness, explicit LLM permission, and review approval.
 
+Workspace-style examples live under `workspaces/`. These are separate from
+packaged starters and are intended as complete example folders:
+
+- `workspaces/basic-portfolio-build/`
+- `workspaces/source-documents-to-fragments/`
+- `workspaces/online-llm-fragment-generation/`
+- `workspaces/local-llm-fragment-generation/`
+- `workspaces/catalog-from-existing-fragments/`
+- `workspaces/graph-from-existing-fragments/`
+- `workspaces/graph-to-agent-context/`
+
+Each workspace contains `README.md`, `AGENTS.md`, `recipe.yaml`, `inputs/`, and
+`outputs-example/`.
+
 Run from the repository root:
 
 ```bash

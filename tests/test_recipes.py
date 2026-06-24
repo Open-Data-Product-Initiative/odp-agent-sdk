@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 import shutil
 from pathlib import Path
+
+import pytest
 import yaml
 
 from open_data_products.odpr import (
@@ -12,6 +14,7 @@ from open_data_products.odpr import (
     build_recipe_catalog,
     check_starter_catalog,
     execute_recipe_run,
+    explain_recipe,
     get_recipe_guidance,
     init_starter_recipe,
     list_recipes,
@@ -384,6 +387,30 @@ def test_example_recipes_validate_and_list() -> None:
     ]
 
 
+def test_example_recipe_workspaces_validate() -> None:
+    """Test workspace-style examples stay separate from starter templates."""
+    workspaces_root = EXAMPLE_RECIPES / "workspaces"
+    expected = [
+        "basic-portfolio-build",
+        "source-documents-to-fragments",
+        "online-llm-fragment-generation",
+        "local-llm-fragment-generation",
+        "catalog-from-existing-fragments",
+        "graph-from-existing-fragments",
+        "graph-to-agent-context",
+    ]
+
+    for name in expected:
+        workspace = workspaces_root / name
+        assert (workspace / "README.md").is_file()
+        assert (workspace / "AGENTS.md").is_file()
+        assert (workspace / "recipe.yaml").is_file()
+        assert (workspace / "inputs").is_dir()
+        assert (workspace / "outputs-example").is_dir()
+        report = validate_recipe(workspace / "recipe.yaml")
+        assert report["valid"] is True, report["errors"]
+
+
 def test_recipe_api_uses_config_default_recipe_when_path_is_omitted() -> None:
     """Test Python recipe APIs share CLI defaultRecipe behavior."""
     config_path = EXAMPLE_RECIPES / "config" / "recipes.config.yaml"
@@ -487,6 +514,7 @@ def test_plan_recipe_run_dry_run_returns_structured_parameters(
     plan = plan_recipe_run(recipe_path, mode="dry-run", project_root=tmp_path)
 
     assert plan["mode"] == "dry-run"
+    assert plan["dryRun"] == {"writes": False, "providerCalls": False}
     assert plan["canRun"] is True
     assert plan["recipe"]["id"] == "RCP-LOCALIZE-001"
     step = plan["steps"][0]
@@ -508,6 +536,36 @@ def test_plan_recipe_run_dry_run_returns_structured_parameters(
         {"path": "generated/portfolio/index.fi.html", "allowed": True},
         {"path": "generated/portfolio/index.sv.html", "allowed": True},
     ]
+    assert plan["plannedReads"] == [
+        {"path": "generated/portfolio/", "exists": True, "step": "localize"}
+    ]
+    assert plan["plannedWrites"] == [
+        {
+            "path": "generated/portfolio/portfolio-i18n.yaml",
+            "allowed": True,
+            "step": "localize",
+        },
+        {
+            "path": "generated/portfolio/index.html",
+            "allowed": True,
+            "step": "localize",
+        },
+        {
+            "path": "generated/portfolio/index.fi.html",
+            "allowed": True,
+            "step": "localize",
+        },
+        {
+            "path": "generated/portfolio/index.sv.html",
+            "allowed": True,
+            "step": "localize",
+        },
+    ]
+    assert plan["execution"] == {"mode": None, "providerRef": "claude"}
+    assert plan["context"] == {"format": None}
+    assert plan["review"] == {"required": False, "requiresApproval": True}
+    assert plan["gates"] == []
+    assert plan["requiredEnv"] == ["ANTHROPIC_API_KEY"]
     assert step["review"]["status"] == "review-needed"
     assert step["review"]["reasons"] == [
         {
@@ -593,10 +651,12 @@ def test_plan_recipe_run_reports_provider_ready_when_env_is_present(
             "model": "claude-sonnet-4-5",
             "type": "openai",
             "readiness": "ready",
+            "requiredEnv": ["TEST_ODPR_OPENAI_API_KEY"],
             "missingEnv": [],
             "source": str(generation_path),
         }
     ]
+    assert plan["requiredEnv"] == ["TEST_ODPR_OPENAI_API_KEY"]
 
 
 def test_plan_recipe_run_reports_missing_provider_env(
@@ -623,7 +683,9 @@ def test_plan_recipe_run_reports_missing_provider_env(
     )
 
     assert plan["providers"][0]["readiness"] == "missing-env"
+    assert plan["providers"][0]["requiredEnv"] == ["TEST_ODPR_OPENAI_API_KEY"]
     assert plan["providers"][0]["missingEnv"] == ["TEST_ODPR_OPENAI_API_KEY"]
+    assert plan["requiredEnv"] == ["TEST_ODPR_OPENAI_API_KEY"]
 
 
 def test_plan_recipe_run_reports_unknown_provider(tmp_path: Path) -> None:
@@ -651,6 +713,7 @@ def test_plan_recipe_run_reports_unknown_provider(tmp_path: Path) -> None:
             "model": "claude-sonnet-4-5",
             "type": None,
             "readiness": "unknown-provider",
+            "requiredEnv": [],
             "missingEnv": [],
             "source": None,
         }
@@ -678,7 +741,87 @@ def test_plan_recipe_run_reports_local_provider_ready(tmp_path: Path) -> None:
 
     assert plan["providers"][0]["type"] == "ollama"
     assert plan["providers"][0]["readiness"] == "ready"
+    assert plan["providers"][0]["requiredEnv"] == []
     assert plan["providers"][0]["missingEnv"] == []
+
+
+def test_plan_recipe_run_reports_portfolio_build_workspace_as_write(
+    tmp_path: Path,
+) -> None:
+    """Test portfolio.build workspace is planned as output, not input."""
+    recipe_path = tmp_path / "recipe.yaml"
+    recipe_path.write_text(
+        """
+schema: https://opendataproducts.org/odpr-v1.0/schema/odpr.yaml
+version: "1.0"
+kind: Recipe
+recipe:
+  metadata:
+    id: RCP-PORTFOLIO-BUILD-001
+    name:
+      en: Build Portfolio
+  version: "1.0.0"
+  type: agent
+  steps:
+    - id: build-portfolio
+      command: portfolio.build
+      with:
+        products:
+          - inputs/products
+        workspace: outputs/portfolio
+""",
+        encoding="utf-8",
+    )
+
+    plan = plan_recipe_run(recipe_path, project_root=tmp_path)
+
+    assert plan["steps"][0]["inputs"] == [
+        {"path": "inputs/products", "exists": False}
+    ]
+    assert plan["steps"][0]["plannedWrites"] == [
+        {"path": "outputs/portfolio", "allowed": True}
+    ]
+    assert plan["plannedWrites"] == [
+        {"path": "outputs/portfolio", "allowed": True, "step": "build-portfolio"}
+    ]
+    assert not (tmp_path / "outputs").exists()
+
+
+def test_plan_recipe_run_includes_gates_without_writing_outputs(
+    tmp_path: Path,
+) -> None:
+    """Test dry-run exposes gates and leaves output files untouched."""
+    recipe_path = tmp_path / "recipe.yaml"
+    recipe_path.write_text(
+        """
+schema: https://opendataproducts.org/odpr-v1.0/schema/odpr.yaml
+version: "1.0"
+kind: Recipe
+recipe:
+  metadata:
+    id: RCP-GATED-001
+    name:
+      en: Gated Recipe
+  version: "1.0.0"
+  type: ci
+  gates:
+    - id: validate-output
+      type: validation
+  steps:
+    - id: validate
+      command: validate
+      with:
+        document: outputs/catalog.yaml
+""",
+        encoding="utf-8",
+    )
+
+    plan = plan_recipe_run(recipe_path, project_root=tmp_path)
+
+    assert plan["dryRun"] == {"writes": False, "providerCalls": False}
+    assert plan["gates"] == [{"id": "validate-output", "type": "validation"}]
+    assert plan["plannedWrites"] == []
+    assert not (tmp_path / "outputs").exists()
 
 
 def test_execute_recipe_run_runs_deterministic_validate_and_writes_manifest(
@@ -1540,7 +1683,10 @@ def test_packaged_starter_catalog_validates_and_lists() -> None:
             "id": "starters",
             "name": {"en": "Starter Recipes"},
             "description": {
-                "en": "Recipes intended for workspace initialization and first-run workflows."
+                "en": (
+                    "Recipes intended for workspace initialization and "
+                    "first-run workflows."
+                )
             },
         }
     ]
@@ -1593,10 +1739,32 @@ def test_init_starter_recipe_creates_workspace(tmp_path: Path) -> None:
     assert (target / "AGENTS.md").is_file()
     assert (target / "inputs").is_dir()
     assert (target / "outputs").is_dir()
+    assert not (target / "recipe.values.yaml").exists()
+    assert not (target / "values.schema.yaml").exists()
     assert result["nextCommands"] == [
         f"cd {target.as_posix()}",
-        "open-data-products recipe run recipe.yaml --dry-run",
-        "open-data-products recipe run recipe.yaml --execute --approve-review",
+        "open-data-products recipe plan",
+        "open-data-products recipe run --allow-llm --approve-review",
+    ]
+
+
+def test_init_starter_recipe_defaults_to_recipes_directory(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test starter init defaults to a project-local recipes folder."""
+    monkeypatch.chdir(tmp_path)
+
+    result = init_starter_recipe("build-data-product-portfolio")
+    target = tmp_path / "recipes" / "build-data-product-portfolio"
+
+    assert result["workspace"] == "recipes/build-data-product-portfolio"
+    assert result["recipe"] == "recipes/build-data-product-portfolio/recipe.yaml"
+    assert (target / "recipe.yaml").is_file()
+    assert result["nextCommands"] == [
+        "cd recipes/build-data-product-portfolio",
+        "open-data-products recipe plan",
+        "open-data-products recipe run --allow-llm --approve-review",
     ]
 
 
@@ -1626,3 +1794,71 @@ def test_init_starter_recipe_force_allows_existing_output(tmp_path: Path) -> Non
 
     assert result["force"] is True
     assert (target / "recipe.yaml").is_file()
+
+
+def test_init_starter_recipe_parameterized_creates_values_files(
+    tmp_path: Path,
+) -> None:
+    """Test advanced parameterized init writes values files."""
+    target = tmp_path / "portfolio-template"
+
+    result = init_starter_recipe(
+        "build-data-product-portfolio",
+        output=target,
+        parameterized=True,
+    )
+
+    values_path = target / "recipe.values.yaml"
+    schema_path = target / "values.schema.yaml"
+    values = yaml.safe_load(values_path.read_text(encoding="utf-8"))
+    schema = yaml.safe_load(schema_path.read_text(encoding="utf-8"))
+
+    assert result["parameterized"] is True
+    assert result["created"]["values"] == values_path.as_posix()
+    assert result["created"]["valuesSchema"] == schema_path.as_posix()
+    assert values["starter"]["id"] == "RCP-SDK-PORTFOLIO-BUILD"
+    assert values["paths"] == {
+        "workspace": "outputs/portfolio",
+        "products": ["inputs/products"],
+    }
+    assert schema["type"] == "object"
+    assert "Parameterized Mode" in (target / "README.md").read_text(encoding="utf-8")
+    assert "Parameterized Mode" in (target / "AGENTS.md").read_text(encoding="utf-8")
+
+
+def test_explain_recipe_resolves_starter_and_loads_full_recipe() -> None:
+    """Test starter explanation includes catalog and recipe details."""
+    result = explain_recipe("build-data-product-portfolio")
+
+    assert result["mode"] == "explain"
+    assert result["source"] == "starters"
+    assert result["valid"] is True
+    assert result["catalog"] == "catalog.yaml"
+    assert result["starter"]["id"] == "RCP-SDK-PORTFOLIO-BUILD"
+    assert result["recipe"]["id"] == "RCP-SDK-PORTFOLIO-BUILD"
+    assert result["steps"] == [
+        {
+            "id": "build-portfolio",
+            "command": "portfolio.build",
+            "classification": "llm-backed",
+            "with": {
+                "products": ["inputs/products"],
+                "workspace": "outputs/portfolio",
+            },
+        }
+    ]
+    assert "Explanation does not execute recipe steps." in result["safetyNotes"]
+
+
+def test_explain_recipe_supports_local_recipe_path(tmp_path: Path) -> None:
+    """Test local recipe explanation does not require the starter catalog."""
+    recipe_path = tmp_path / "recipe.yaml"
+    _write_recipe(recipe_path)
+
+    result = explain_recipe(recipe_path)
+
+    assert result["source"] == "local"
+    assert result["valid"] is True
+    assert "starter" not in result
+    assert result["recipe"]["id"] == "RCP-LOCALIZE-001"
+    assert result["steps"][0]["command"] == "portfolio.localize"

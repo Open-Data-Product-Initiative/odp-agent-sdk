@@ -101,6 +101,9 @@ ODPR recipe commands:
   recipe validate       Validate an ODPR Recipe, Provider, or RecipeCatalog
   recipe catalog        Build a metadata-only RecipeCatalog
   recipe init           Create a workspace from a packaged starter recipe
+  recipe explain        Explain a starter or local recipe without executing it
+  recipe plan           Alias for recipe run --dry-run
+  recipe dry-run        Alias for recipe run --dry-run
   resources --id odpr.schema.yaml          Return the bundled ODPR YAML schema
   resources --id odpr.recipe-config-template  Return the recipe runner config template
   resources --id odpr.recipes              Return bundled ODPR recipe guidance records
@@ -166,10 +169,14 @@ Examples:
   open-data-products resources --id odpr.recipe-config-template --json
   open-data-products recipe search localization --json
   open-data-products recipe search --id RecipeCatalog --json
-  open-data-products recipe init build-data-product-portfolio --output my-workflow --json
+  open-data-products recipe list --json
+  open-data-products recipe init build-data-product-portfolio --json
+  open-data-products recipe init build-data-product-portfolio --parameterized --json
+  open-data-products recipe explain build-data-product-portfolio --json
+  open-data-products recipe plan --json
   open-data-products recipe list --config recipes.config.yaml --json
   open-data-products recipe validate recipes/release-portfolio-review.yaml --json
-  open-data-products recipe run recipes/release-portfolio-review.yaml --dry-run --json
+  open-data-products recipe run --allow-llm --approve-review --json
   open-data-products resources --json
   open-data-products generate --input source_docs/ --kind product-reference --output generated/
   open-data-products generate --input product.md --kind odps-product --output generated/
@@ -485,7 +492,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     )
     recipe_list_parser = recipe_subparsers.add_parser(
         "list",
-        help="List recipe metadata from recipes.config.yaml",
+        help="List packaged starters or recipe metadata from recipes.config.yaml",
     )
     recipe_list_parser.add_argument(
         "--config",
@@ -562,7 +569,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     recipe_init_parser.add_argument(
         "--output",
         "-o",
-        help="Output workspace directory. Defaults to the starter folder name.",
+        help="Output workspace directory. Defaults to recipes/<starter-folder>.",
     )
     recipe_init_parser.add_argument(
         "--force",
@@ -570,10 +577,28 @@ def main(argv: Optional[List[str]] = None) -> int:
         help="Allow copying into an existing workspace directory.",
     )
     recipe_init_parser.add_argument(
+        "--parameterized",
+        action="store_true",
+        help="Generate recipe.values.yaml and values.schema.yaml.",
+    )
+    recipe_init_parser.add_argument(
         "--catalog",
         help="Starter RecipeCatalog YAML path. Defaults to the packaged catalog.",
     )
     recipe_init_parser.add_argument("--json", action="store_true", help="Emit JSON")
+    recipe_explain_parser = recipe_subparsers.add_parser(
+        "explain",
+        help="Explain a starter or local recipe without executing it",
+    )
+    recipe_explain_parser.add_argument(
+        "recipe",
+        help="Starter recipe id/name/folder or local recipe YAML path.",
+    )
+    recipe_explain_parser.add_argument(
+        "--catalog",
+        help="Starter RecipeCatalog YAML path. Defaults to the packaged catalog.",
+    )
+    recipe_explain_parser.add_argument("--json", action="store_true", help="Emit JSON")
     recipe_search_parser = recipe_subparsers.add_parser(
         "search",
         help="Search bundled ODPR recipe guidance",
@@ -602,7 +627,10 @@ def main(argv: Optional[List[str]] = None) -> int:
     recipe_run_parser.add_argument(
         "recipe",
         nargs="?",
-        help="Recipe YAML file. Uses recipes.defaultRecipe when omitted.",
+        help=(
+            "Recipe YAML file. Uses ./recipe.yaml or recipes.defaultRecipe when "
+            "omitted."
+        ),
     )
     recipe_run_parser.add_argument(
         "--config",
@@ -637,6 +665,32 @@ def main(argv: Optional[List[str]] = None) -> int:
         help="Model override for compatible LLM-backed steps.",
     )
     recipe_run_parser.add_argument("--json", action="store_true", help="Emit JSON")
+    for alias_name in ("plan", "dry-run"):
+        recipe_plan_parser = recipe_subparsers.add_parser(
+            alias_name,
+            help="Alias for recipe run --dry-run",
+        )
+        recipe_plan_parser.add_argument(
+            "recipe",
+            nargs="?",
+            help=(
+                "Recipe YAML file. Uses ./recipe.yaml or recipes.defaultRecipe when "
+                "omitted."
+            ),
+        )
+        recipe_plan_parser.add_argument(
+            "--config",
+            help="Optional recipe runner config YAML.",
+        )
+        recipe_plan_parser.add_argument(
+            "--provider-ref",
+            help="Provider reference override for compatible LLM-backed steps.",
+        )
+        recipe_plan_parser.add_argument(
+            "--model",
+            help="Model override for compatible LLM-backed steps.",
+        )
+        recipe_plan_parser.add_argument("--json", action="store_true", help="Emit JSON")
 
     generate_parser = subparsers.add_parser(
         "generate",
@@ -1466,6 +1520,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                 list_recipes,
                 list_starter_recipes,
                 plan_recipe_run,
+                explain_recipe,
                 init_starter_recipe,
                 validate_odpr_document,
                 validate_recipe,
@@ -1477,7 +1532,16 @@ def main(argv: Optional[List[str]] = None) -> int:
 
             try:
                 if args.recipe_command == "list":
-                    if args.starters:
+                    default_config = Path("recipes.config.yaml")
+                    list_starters = (
+                        args.starters
+                        or (
+                            args.config is None
+                            and args.group is None
+                            and not default_config.is_file()
+                        )
+                    )
+                    if list_starters:
                         payload = list_starter_recipes(catalog_path=args.catalog)
                     else:
                         payload = list_recipes(
@@ -1515,9 +1579,16 @@ def main(argv: Optional[List[str]] = None) -> int:
                         args.starter,
                         output=args.output,
                         force=args.force,
+                        parameterized=args.parameterized,
                         catalog_path=args.catalog,
                     )
                     exit_code = 0
+                elif args.recipe_command == "explain":
+                    payload = explain_recipe(
+                        args.recipe,
+                        catalog_path=args.catalog,
+                    )
+                    exit_code = 0 if payload["valid"] else 1
                 elif args.recipe_command == "search":
                     if args.guidance_id:
                         payload = get_recipe_guidance(args.guidance_id)
@@ -1528,7 +1599,10 @@ def main(argv: Optional[List[str]] = None) -> int:
                         )
                     exit_code = 0
                 elif args.recipe_command == "run":
-                    if args.execute:
+                    execute_requested = args.execute or (
+                        not args.dry_run and (args.allow_llm or args.approve_review)
+                    )
+                    if execute_requested:
                         from .odpr import execute_recipe_run
 
                         payload = execute_recipe_run(
@@ -1549,10 +1623,20 @@ def main(argv: Optional[List[str]] = None) -> int:
                             model=args.model,
                         )
                         exit_code = 0 if payload["canRun"] else 1
+                elif args.recipe_command in {"plan", "dry-run"}:
+                    payload = plan_recipe_run(
+                        args.recipe,
+                        mode="dry-run",
+                        config_path=args.config,
+                        provider_ref=args.provider_ref,
+                        model=args.model,
+                    )
+                    exit_code = 0 if payload["canRun"] else 1
                 else:
                     raise ValueError(f"Unknown recipe command: {args.recipe_command}")
-            except (FileNotFoundError, ValueError) as exc:
+            except (FileExistsError, FileNotFoundError, ValueError) as exc:
                 payload = {
+                    "kind": "Error",
                     "mode": getattr(args, "recipe_command", "recipe"),
                     "valid": False,
                     "error": str(exc),
@@ -1597,6 +1681,17 @@ def main(argv: Optional[List[str]] = None) -> int:
                     print("Next commands:")
                     for command in payload.get("nextCommands", []):
                         print(f"- {command}")
+                elif args.recipe_command == "explain":
+                    recipe = payload.get("recipe", {})
+                    print(f"Recipe: {recipe.get('id') or args.recipe}")
+                    print(f"Valid: {payload.get('valid')}")
+                    print(f"Source: {payload.get('source')}")
+                    print(f"Steps: {len(payload.get('steps', []))}")
+                    for step in payload.get("steps", []):
+                        if isinstance(step, dict):
+                            print(f"- {step.get('id')}: {step.get('command')}")
+                    for note in payload.get("safetyNotes", []):
+                        print(f"Note: {note}")
                 elif args.recipe_command == "search":
                     records = payload if isinstance(payload, list) else [payload]
                     print(f"Guidance records: {len(records)}")
