@@ -647,6 +647,74 @@ signals:
 """
 
 
+def overbroad_signal_delta_portfolio_client(prompt: str, model: str) -> str:
+    """Return portfolio-wide objects even though only one signal changed."""
+    assert model == "test-model"
+    assert "Signal: regional retention pressure is rising" in prompt
+    assert "Business objective: Reduce churn risk and protect renewals" not in prompt
+    assert "Use case: Retention Workflow" not in prompt
+    assert "Product discussion: Customer Product" not in prompt
+    return """
+metadata:
+  id: generated-demo
+  name: Generated Demo Portfolio
+  description: Portfolio generated from source lanes.
+businessObjectives:
+  - id: OBJ-RETENTION-EXTRA
+    name:
+      en: Retention Portfolio Goal
+    description:
+      en: A duplicate objective returned during signal refresh.
+    status: active
+    priority: high
+useCases:
+  - id: UC-RETENTION-EXTRA
+    name:
+      en: Retention Intervention Workflow
+    description:
+      en: A duplicate use case returned during signal refresh.
+    status: active
+    priority: high
+signals:
+  - id: SIG-REGIONAL
+    name:
+      en: Regional Retention Pressure
+    description:
+      en: Regional retention pressure is rising.
+    type: operational
+    confidence: medium
+products:
+  - productReference:
+      id: PR-CUSTOMER-EXTRA
+      productID: customer-product-extra
+      productVersion: "4.1"
+      name:
+        en: Customer Product Duplicate
+      description:
+        en: A duplicate product returned during signal refresh.
+      status: production
+      visibility: internal
+      type: dataset
+    odpsProduct:
+      schema: https://opendataproducts.org/v4.1/schema/odps.json
+      version: "4.1"
+      product:
+        details:
+          en:
+            name: Customer Product Duplicate
+            productID: customer-product-extra
+            description: Duplicate product spec.
+            visibility: internal
+            status: production
+            type: dataset
+graphEdges:
+  - source: SIG-REGIONAL
+    target: PR-CUSTOMER
+    type: impacts
+    confidence: medium
+"""
+
+
 def fake_localization_client(prompt: str, model: str) -> str:
     """Return deterministic localized HTML string bundles."""
     assert model == "test-model"
@@ -1668,6 +1736,60 @@ def test_refresh_portfolio_does_not_duplicate_renamed_signal_from_changed_source
     signal_ids = [item["id"] for item in catalog["signals"]]
     assert "SIG-DAILY-RETENTION-BRIEFING" in signal_ids
     assert "SIG-REGIONAL" not in signal_ids
+
+
+def test_refresh_portfolio_ignores_overbroad_delta_objects_from_unchanged_lanes(
+    tmp_path: Path,
+) -> None:
+    sources = tmp_path / "sources"
+    workspace = tmp_path / "generated" / "portfolio"
+    write_source_lanes(sources)
+    build_portfolio(
+        workspace,
+        objectives=sources / "objectives",
+        use_cases=sources / "use-cases",
+        signals=sources / "signals",
+        products=sources / "products",
+        client=fake_portfolio_client,
+        model="test-model",
+    )
+    (sources / "signals" / "regional.txt").write_text(
+        "Signal: regional retention pressure is rising\n",
+        encoding="utf-8",
+    )
+
+    result = refresh_portfolio(
+        workspace,
+        client=overbroad_signal_delta_portfolio_client,
+        model="test-model",
+    )
+    localize_portfolio(
+        workspace,
+        languages=["fi"],
+        client=fake_localization_client,
+        model="test-model",
+    )
+
+    assert result["processedSourceCounts"]["objectives"] == 0
+    assert result["processedSourceCounts"]["useCases"] == 0
+    assert result["processedSourceCounts"]["signals"] == 1
+    assert result["processedSourceCounts"]["products"] == 0
+    assert result["artifactCounts"]["businessObjectives"] == 1
+    assert result["artifactCounts"]["useCases"] == 1
+    assert result["artifactCounts"]["signals"] == 2
+    assert result["artifactCounts"]["productReferences"] == 1
+
+    catalog = load_mapping(workspace / "odpc" / "catalog.yaml")["catalog"]
+    assert len(catalog["businessObjectives"]) == 1
+    assert len(catalog["useCases"]) == 1
+    assert len(catalog["signals"]) == 2
+    assert len(catalog["productReferences"]) == 1
+    assert "OBJ-RETENTION-EXTRA" not in (workspace / "index.html").read_text(
+        encoding="utf-8"
+    )
+    assert "Customer Product Duplicate" not in (workspace / "index.fi.html").read_text(
+        encoding="utf-8"
+    )
 
 
 def test_refresh_portfolio_reports_removed_sources_as_warnings(

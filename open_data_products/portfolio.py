@@ -214,7 +214,13 @@ def build_portfolio(
         plan = _parse_portfolio_plan_with_repair(raw_plan, client, model)
         plan = _reconcile_plan_identity(plan, previous_state)
         if not process_all_sources and has_previous_sources:
-            plan = _merge_portfolio_plans(_plan_from_workspace(root), plan)
+            existing_plan = _plan_from_workspace(root)
+            plan = _filter_delta_plan_by_changed_lanes(
+                plan,
+                process_lanes,
+                existing_plan,
+            )
+            plan = _merge_portfolio_plans(existing_plan, plan)
     else:
         plan = _plan_from_workspace(root)
     if has_previous_sources:
@@ -2324,6 +2330,77 @@ def _merge_portfolio_plans(
     if warnings:
         merged["warnings"] = list(dict.fromkeys(warnings))
     return merged
+
+
+def _filter_delta_plan_by_changed_lanes(
+    delta: Dict[str, Any],
+    process_lanes: Dict[str, List[Dict[str, str]]],
+    existing: Dict[str, Any],
+) -> Dict[str, Any]:
+    if not isinstance(delta, dict):
+        return {}
+    filtered: Dict[str, Any] = {}
+    for key in ("metadata", "warnings"):
+        value = delta.get(key)
+        if value is not None:
+            filtered[key] = value
+
+    lane_collections = (
+        ("objectives", "businessObjectives"),
+        ("useCases", "useCases"),
+        ("signals", "signals"),
+        ("products", "products"),
+    )
+    accepted_ids: Set[str] = set()
+    for lane, collection in lane_collections:
+        if process_lanes.get(lane):
+            items = _list(delta, collection)
+            if items:
+                filtered[collection] = items
+                accepted_ids.update(_plan_item_ids(collection, items))
+
+    existing_ids = _plan_ids(existing)
+    discarded_ids = _plan_ids(delta) - accepted_ids
+    graph_edges = []
+    for edge in _list(delta, "graphEdges"):
+        source = _text(edge.get("source") or edge.get("from"))
+        target = _text(edge.get("target") or edge.get("to"))
+        if not ({source, target} & accepted_ids):
+            continue
+        if ({source, target} & discarded_ids) - accepted_ids:
+            continue
+        if (
+            source in accepted_ids | existing_ids
+            and target in accepted_ids | existing_ids
+        ):
+            graph_edges.append(edge)
+    if graph_edges:
+        filtered["graphEdges"] = graph_edges
+    return filtered
+
+
+def _plan_ids(plan: Dict[str, Any]) -> Set[str]:
+    ids: Set[str] = set()
+    for collection in ("businessObjectives", "useCases", "signals", "products"):
+        ids.update(_plan_item_ids(collection, _list(plan, collection)))
+    return ids
+
+
+def _plan_item_ids(collection: str, items: List[Dict[str, Any]]) -> Set[str]:
+    ids: Set[str] = set()
+    for item in items:
+        if collection == "products":
+            reference = item.get("productReference")
+            if isinstance(reference, dict):
+                for key in ("id", "productID"):
+                    item_id = _text(reference.get(key))
+                    if item_id:
+                        ids.add(item_id)
+            continue
+        item_id = _text(item.get("id"))
+        if item_id:
+            ids.add(item_id)
+    return ids
 
 
 def _merge_items_by_id(
