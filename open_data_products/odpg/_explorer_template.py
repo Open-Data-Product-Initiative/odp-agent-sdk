@@ -74,6 +74,21 @@ def render_explorer(
       height: 100%;
     }}
 
+    .workspace:fullscreen {{
+      width: 100%;
+      height: 100%;
+      background: var(--canvas-bg);
+    }}
+
+    .workspace:fullscreen .workspace-main {{
+      flex: 1 1 auto;
+      min-height: 0;
+    }}
+
+    .workspace:fullscreen .odpg-footer {{
+      display: none;
+    }}
+
     .topbar {{
       flex-shrink: 0;
       display: grid;
@@ -792,6 +807,7 @@ def render_explorer(
         <button type="button" id="btn-zoom-out" title="Zoom out">−</button>
         <button type="button" id="btn-fit" title="Fit view">⊙</button>
         <button type="button" id="btn-physics" title="Toggle physics (layout)">◎</button>
+        <button type="button" id="btn-fullscreen-canvas" title="Fullscreen" aria-label="Fullscreen graph workspace">⛶</button>
       </nav>
       <div id="minimap" class="minimap" aria-label="Overview map"></div>
       <div id="graph"></div>
@@ -1415,7 +1431,24 @@ def render_explorer(
 
     applyFilters();
 
+    const fullscreenTarget = document.querySelector(".workspace");
+    const fullscreenButtons = [
+      document.getElementById("btn-fullscreen"),
+      document.getElementById("btn-fullscreen-canvas")
+    ].filter(Boolean);
+
+    function setFullscreenButtonState(isFullscreen) {{
+      fullscreenButtons.forEach(function (button) {{
+        const label = isFullscreen ? "Exit fullscreen" : "Fullscreen";
+        button.title = label;
+        button.setAttribute("aria-label", isFullscreen
+          ? "Exit graph workspace fullscreen"
+          : "Fullscreen graph workspace");
+      }});
+    }}
+
     document.addEventListener("fullscreenchange", function () {{
+      setFullscreenButtonState(document.fullscreenElement === fullscreenTarget);
       window.requestAnimationFrame(function () {{
         network.redraw();
         if (minimapNetwork) minimapNetwork.redraw();
@@ -1531,13 +1564,18 @@ def render_explorer(
       }}
     }});
 
-    document.getElementById("btn-fullscreen").addEventListener("click", function () {{
-      const el = document.documentElement;
+    function toggleFullscreen() {{
       if (!document.fullscreenElement) {{
-        if (el.requestFullscreen) el.requestFullscreen();
+        if (fullscreenTarget && fullscreenTarget.requestFullscreen) {{
+          fullscreenTarget.requestFullscreen();
+        }}
       }} else if (document.exitFullscreen) {{
         document.exitFullscreen();
       }}
+    }}
+
+    fullscreenButtons.forEach(function (button) {{
+      button.addEventListener("click", toggleFullscreen);
     }});
 
     const tabNode = document.getElementById("tab-node");

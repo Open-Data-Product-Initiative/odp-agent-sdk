@@ -81,6 +81,22 @@ def test_generate_graph_explorer_writes_html(tmp_path):
     assert 'id="filter-confidence"' in html
 
 
+def test_generate_graph_explorer_fullscreens_workspace_with_embedded_control(
+    tmp_path,
+):
+    output = tmp_path / "graph-explorer.html"
+
+    generate_graph_explorer(output_file=output)
+
+    html = output.read_text(encoding="utf-8")
+    assert 'id="btn-fullscreen-canvas"' in html
+    assert 'aria-label="Fullscreen graph workspace"' in html
+    assert 'const fullscreenTarget = document.querySelector(".workspace");' in html
+    assert "fullscreenTarget.requestFullscreen()" in html
+    assert ".workspace:fullscreen .odpg-footer" in html
+    assert 'setFullscreenButtonState(document.fullscreenElement === fullscreenTarget)' in html
+
+
 def test_generate_graph_explorer_creates_output_parent_directory(tmp_path):
     output = tmp_path / "output" / "graph-explorer.html"
 

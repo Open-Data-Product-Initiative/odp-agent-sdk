@@ -861,6 +861,13 @@ def test_render_portfolio_creates_missing_parent_and_artifact_detail_views(
     assert "workspace-main" in html
     assert "filter-panel" in html
     assert ".topbar{display:none!important;}" in html
+    assert "id=&quot;btn-fullscreen-canvas&quot;" in html
+    assert "aria-label=&quot;Fullscreen graph workspace&quot;" in html
+    assert (
+        "const fullscreenTarget = document.querySelector(&quot;.workspace&quot;);"
+        in html
+    )
+    assert "fullscreenTarget.requestFullscreen()" in html
     assert "Open Data Product Graphs Explorer" not in html
     assert "<footer" in html
     assert "Catalog YAML" in html
