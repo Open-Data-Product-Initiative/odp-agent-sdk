@@ -16,6 +16,13 @@ An AI-agent-first Python SDK for the OpenDataProducts.org standards family. It g
 
 The package still includes developer-facing Python helpers, but the primary contract is agent-ready: structured validation results, lightweight artifact summaries, reference discovery, Data Contract orchestration, bundled retrieval resources, a unified CLI, an MCP stdio server, and an ARWS agent manifest.
 
+## Learn Faster
+
+To move from installation to practical value creation faster, take the
+[Scalable Data Product Value Management with Agent Ready SDK Masterclass](https://www.udemy.com/course/scalable-data-product-value-management-with-agent-ready-sdk/?referralCode=DE23AF7C13D47E90B996)
+on Udemy. The course walks through the SDK workflows, portfolio building, graph
+review, and agent-ready data product practices step by step.
+
 ## Installation
 
 ```bash
