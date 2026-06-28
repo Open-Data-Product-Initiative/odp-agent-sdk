@@ -135,6 +135,7 @@ packages = [
 [tool.setuptools.package-data]
 "open_data_products" = [
     "okf_spec.md",
+    "data/portfolio/*.png",
 ]
 "open_data_products.odpr" = [
     "recipes.config.yaml",

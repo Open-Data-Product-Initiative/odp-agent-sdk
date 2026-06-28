@@ -4,7 +4,6 @@ import re
 from pathlib import Path
 import tomllib
 
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
 TESTPYPI_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "publish-testpypi.yml"
 PYPI_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "publish-pypi.yml"
@@ -54,6 +53,12 @@ def test_package_metadata_includes_mcp_package() -> None:
     content = PYPROJECT.read_text(encoding="utf-8")
 
     assert '"open_data_products.mcp",' in content
+
+
+def test_package_metadata_includes_portfolio_icon_assets() -> None:
+    content = PYPROJECT.read_text(encoding="utf-8")
+
+    assert '"data/portfolio/*.png"' in content
 
 
 def test_console_scripts_preserve_unified_and_legacy_entry_points() -> None:

@@ -1276,6 +1276,9 @@ def _copy_binary_asset(source: Path, target: Path) -> Tuple[Path, str]:
 
 
 def _portfolio_icon_source_dir() -> Path:
+    packaged = Path(__file__).resolve().parent / "data" / "portfolio"
+    if packaged.exists():
+        return packaged
     return Path(__file__).resolve().parent.parent / "images" / "portfolio"
 
 
