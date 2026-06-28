@@ -42,6 +42,11 @@ from .portfolio_sources import (
 )
 
 DEFAULT_PORTFOLIO_HTML = "index.html"
+DEFAULT_EXECUTIVE_SUMMARY = "executive-summary.yaml"
+EXECUTIVE_SUMMARY_SCHEMA = (
+    "https://opendataproducts.org/sdk/portfolio-executive-summary/v1"
+)
+PORTFOLIO_ICON_ASSET_DIR = Path("assets") / "executive_summary_icons"
 PORTFOLIO_LOCALIZATION_BATCH_CHARS = 3500
 PORTFOLIO_LOCALIZATION_BATCH_ITEMS = 50
 PortfolioBuildClient = Callable[[str, str], str]
@@ -165,6 +170,19 @@ ODPS_PRICING_UNIT_ALIASES = {
     "usage": "Pay-per-use",
     "request": "Pay-per-use",
 }
+EXECUTIVE_SUMMARY_CONFIDENCE_VALUES = {"high", "medium", "low"}
+EXECUTIVE_SUMMARY_SWOT_BUCKETS = (
+    "strengths",
+    "weaknesses",
+    "opportunities",
+    "threats",
+)
+EXECUTIVE_SUMMARY_CARD_ICONS = {
+    "primary-focus": "priority_1_trophy.png",
+    "secondary-focus": "priority_2_growth.png",
+    "risk-focus": "risk_warning.png",
+    "readiness-focus": "readiness_clipboard.png",
+}
 
 
 def build_portfolio(
@@ -206,12 +224,19 @@ def build_portfolio(
         if process_all_sources or not has_previous_sources
         else _changed_source_lanes(lanes, source_changes)
     )
+    llm_call_count = 0
+    llm_phases: List[str] = []
     if any(process_lanes.values()):
         if client is None:
             raise ValueError("A model client is required to build a portfolio.")
         prompt = render_portfolio_build_prompt(process_lanes)
+        llm_call_count += 1
+        llm_phases.append("portfolio")
         raw_plan = client(prompt, model)
-        plan = _parse_portfolio_plan_with_repair(raw_plan, client, model)
+        plan, repaired = _parse_portfolio_plan_with_repair(raw_plan, client, model)
+        if repaired:
+            llm_call_count += 1
+            llm_phases.append("portfolioRepair")
         plan = _reconcile_plan_identity(plan, previous_state)
         if not process_all_sources and has_previous_sources:
             existing_plan = _plan_from_workspace(root)
@@ -229,6 +254,20 @@ def build_portfolio(
     plan = _normalize_portfolio_plan(plan)
     workspace_title = _resolve_workspace_title(title, previous_state)
     plan = _apply_workspace_title(plan, workspace_title)
+    if any(process_lanes.values()):
+        if client is None:
+            raise ValueError("A model client is required to build a portfolio.")
+        summary_prompt = render_portfolio_executive_summary_prompt(plan)
+        llm_call_count += 1
+        llm_phases.append("executiveSummary")
+        raw_summary = client(summary_prompt, model)
+        executive_summary, repaired = _parse_executive_summary_with_repair(
+            raw_summary, client, model
+        )
+        if repaired:
+            llm_call_count += 1
+            llm_phases.append("executiveSummaryRepair")
+        plan["executiveSummary"] = executive_summary
     warnings = [str(item) for item in plan.get("warnings", []) if item]
     warnings.extend(_source_change_warnings(source_changes))
 
@@ -241,6 +280,7 @@ def build_portfolio(
         lanes,
         lane_paths=lane_paths,
         title=workspace_title,
+        model=model,
     )
     for path, state in written:
         if state == "created":
@@ -272,6 +312,8 @@ def build_portfolio(
         "snapshot": str(snapshot) if snapshot is not None else None,
         "sourceCounts": source_counts,
         "processedSourceCounts": processed_source_counts,
+        "llmCallCount": llm_call_count,
+        "llmPhases": llm_phases,
         "artifactCounts": artifact_counts,
         "validationResults": validation_results,
         "created": created,
@@ -695,6 +737,7 @@ def render_portfolio_build_prompt(lanes: Dict[str, List[Dict[str, str]]]) -> str
         "- Graph edge source and target values must use generated stable IDs from objectives, use cases, signals, or product references.",
         "- Prefer linking use cases to product references when the evidence supports the relationship.",
         "- Do not invent confident facts. If evidence is missing, use warnings and lower confidence.",
+        "- Do not emit executiveSummary in this phase. The SDK generates Executive Summary in a separate phase from normalized artifacts.",
         "- Keep all values schema-shaped YAML mappings, not narrative paragraphs at the root.",
         "- Use only facts supported by the source lanes. Draft minimal viable ODPS details when product evidence is sparse.",
         "",
@@ -726,13 +769,133 @@ def render_portfolio_build_prompt(lanes: Dict[str, List[Dict[str, str]]]) -> str
     return "\n".join(sections)
 
 
+def render_portfolio_executive_summary_prompt(plan: Dict[str, Any]) -> str:
+    """Render the Executive Summary prompt from normalized portfolio artifacts."""
+    context = deepcopy(plan)
+    context.pop("executiveSummary", None)
+    return "\n".join(
+        [
+            "# Create Portfolio Executive Summary",
+            "Create one PortfolioExecutiveSummary YAML document from the normalized portfolio evidence.",
+            "Return only YAML. Do not include markdown fences, prose, or comments.",
+            "",
+            "Use this exact top-level shape:",
+            "schema: https://opendataproducts.org/sdk/portfolio-executive-summary/v1",
+            "kind: PortfolioExecutiveSummary",
+            "portfolioPosition:",
+            "  headline: Retention is the clearest first funding decision; partner expansion is a second path to validate.",
+            "  narrative: Short business-facing narrative grounded in the portfolio evidence.",
+            "priorityBriefing:",
+            "  recommendation: Fund the strongest validated workflow first. Validate the next growth path. Strengthen weak evidence before final prioritization.",
+            "  primaryFocus:",
+            "    label: Priority 1",
+            "    title: 'Focus first: strongest workflow validation'",
+            "    dashboardTitle: Retention validation",
+            "    message: One sentence explaining why this is the clearest funding candidate.",
+            "    dashboardMessage: Retention is the strongest first funding candidate.",
+            "    action: One sentence stating what leadership should fund or validate first.",
+            "    dashboardAction: Fund validation first.",
+            "    rationaleTitle: Why this is first",
+            "    rationale:",
+            "      - Strongest objective, use case, and product alignment",
+            "    confidence: high",
+            "    evidenceType: direct",
+            "    evidence:",
+            "      - type: businessObjective",
+            "        label: Business-facing evidence label",
+            "        id: OBJ-STABLE-ID",
+            "  secondaryFocus:",
+            "    label: Priority 2",
+            "    title: 'Validate next: second growth path'",
+            "    dashboardTitle: Partner expansion",
+            "    message: One sentence explaining why this remains in discussion but is not first.",
+            "    dashboardMessage: Partner expansion is promising but not yet first priority.",
+            "    action: One sentence stating what leadership should validate next.",
+            "    dashboardAction: Validate the business case next.",
+            "    rationaleTitle: Why this is second",
+            "    rationale:",
+            "      - Has objective and use case alignment",
+            "    confidence: medium",
+            "    evidenceType: inferred",
+            "    evidence:",
+            "      - type: useCase",
+            "        label: Business-facing evidence label",
+            "        id: UC-STABLE-ID",
+            "  blocker:",
+            "    label: Risk",
+            "    title: 'Do not ignore: main prioritization risk'",
+            "    dashboardTitle: Signal coverage",
+            "    message: One sentence explaining what could distort the funding decision.",
+            "    dashboardMessage: Thin signal coverage may overstate prioritization confidence.",
+            "    action: One sentence stating what to strengthen before final prioritization.",
+            "    dashboardAction: Improve coverage before final prioritization.",
+            "    rationaleTitle: Why this matters",
+            "    rationale:",
+            "      - Weak evidence can distort funding decisions",
+            "    confidence: low",
+            "    evidenceType: inferred",
+            "    evidence:",
+            "      - type: signal",
+            "        label: Business-facing evidence label",
+            "        id: SIG-STABLE-ID",
+            "  readinessCheck:",
+            "    label: Readiness",
+            "    title: 'Before build starts: commercial readiness review'",
+            "    dashboardTitle: Commercial review",
+            "    message: One sentence explaining what still needs human review.",
+            "    dashboardMessage: The product still needs business readiness review.",
+            "    action: One sentence stating the readiness review leadership should require.",
+            "    dashboardAction: Confirm readiness before build.",
+            "    checklist:",
+            "      - Business owner confirmed",
+            "      - Value model reviewed",
+            "      - Delivery owner assigned",
+            "      - Operating model clear",
+            "      - Production readiness reviewed",
+            "    confidence: medium",
+            "    evidenceType: inferred",
+            "    evidence:",
+            "      - type: productReference",
+            "        label: Business-facing evidence label",
+            "        id: PR-STABLE-ID",
+            "leadershipDecisions:",
+            "  - id: DECIDE-STABLE-ID",
+            "    question: Leadership decision question grounded in evidence.",
+            "    decisionType: invest",
+            "    urgency: medium",
+            "    evidenceRefs:",
+            "      - type: businessObjective",
+            "        id: OBJ-STABLE-ID",
+            "evidenceGaps:",
+            "  - id: GAP-STABLE-ID",
+            "    statement: Missing evidence needed before a leadership decision.",
+            "    evidenceRefs:",
+            "      - type: productReference",
+            "        id: PR-STABLE-ID",
+            "confidenceNotes:",
+            "  - Priority items marked as inferred need human review before business action.",
+            "",
+            "Rules:",
+            "- Use only IDs and facts present in the normalized portfolio evidence below.",
+            "- Do not invent revenue, cost, customer, compliance, or risk claims.",
+            "- Keep dashboardTitle, dashboardMessage, and dashboardAction compact.",
+            "- Make priorityBriefing decision-support material, not an approved strategy.",
+            "- Every priorityBriefing evidence item must include type, label, and id.",
+            "- Prefer direct evidence only when objective, use case, and product alignment is explicit.",
+            "",
+            "Normalized portfolio evidence:",
+            yaml.safe_dump(context, sort_keys=False, allow_unicode=True),
+        ]
+    )
+
+
 def _parse_portfolio_plan_with_repair(
     raw_output: str,
     client: PortfolioBuildClient,
     model: str,
-) -> Dict[str, Any]:
+) -> Tuple[Dict[str, Any], bool]:
     try:
-        return parse_portfolio_plan(raw_output)
+        return parse_portfolio_plan(raw_output), False
     except ValueError as original_error:
         repair_prompt = _render_portfolio_plan_repair_prompt(
             raw_output, str(original_error)
@@ -747,7 +910,31 @@ def _parse_portfolio_plan_with_repair(
         warnings = plan.setdefault("warnings", [])
         if isinstance(warnings, list):
             warnings.append("Portfolio plan YAML required syntax repair.")
-        return plan
+        return plan, True
+
+
+def _parse_executive_summary_with_repair(
+    raw_output: str,
+    client: PortfolioBuildClient,
+    model: str,
+) -> Tuple[Dict[str, Any], bool]:
+    try:
+        return parse_executive_summary(raw_output), False
+    except ValueError as original_error:
+        repair_prompt = _render_executive_summary_repair_prompt(
+            raw_output, str(original_error)
+        )
+        repaired_output = client(repair_prompt, model)
+        try:
+            summary = parse_executive_summary(repaired_output)
+        except ValueError as repair_error:
+            raise ValueError(
+                f"{original_error}\nRepair attempt also failed: {repair_error}"
+            ) from repair_error
+        notes = summary.setdefault("confidenceNotes", [])
+        if isinstance(notes, list):
+            notes.append("Executive Summary YAML required syntax repair.")
+        return summary, True
 
 
 def _render_portfolio_plan_repair_prompt(raw_output: str, parser_error: str) -> str:
@@ -770,6 +957,26 @@ def _render_portfolio_plan_repair_prompt(raw_output: str, parser_error: str) -> 
     )
 
 
+def _render_executive_summary_repair_prompt(raw_output: str, parser_error: str) -> str:
+    return "\n".join(
+        [
+            "# Repair Portfolio Executive Summary YAML",
+            "Repair one PortfolioExecutiveSummary YAML document.",
+            "Return only YAML. Do not include markdown fences, prose, or comments.",
+            "Preserve the generated facts, evidence IDs, and leadership wording.",
+            "Fix only YAML syntax, indentation, incomplete keys, and malformed mappings.",
+            "Do not add unsupported facts. If a broken value cannot be recovered,",
+            "drop that broken field and preserve the rest of the summary.",
+            "",
+            "Parser error:",
+            parser_error,
+            "",
+            "Malformed executive summary YAML:",
+            raw_output,
+        ]
+    )
+
+
 def parse_portfolio_plan(raw_output: str) -> Dict[str, Any]:
     """Parse a model-generated portfolio plan YAML mapping."""
     text = _extract_yaml_text(raw_output)
@@ -783,6 +990,21 @@ def parse_portfolio_plan(raw_output: str) -> Dict[str, Any]:
         ) from exc
     if not isinstance(data, dict):
         raise ValueError("Portfolio plan must contain a YAML object at the root")
+    return data
+
+
+def parse_executive_summary(raw_output: str) -> Dict[str, Any]:
+    """Parse a model-generated portfolio executive summary YAML mapping."""
+    text = _extract_yaml_text(raw_output)
+    try:
+        data = yaml.safe_load(text)
+    except yaml.YAMLError as exc:
+        raise ValueError(f"Executive Summary YAML could not be parsed: {exc}") from exc
+    if not isinstance(data, dict):
+        raise ValueError("Executive Summary must contain a YAML object at the root")
+    if data.get("executiveSummary") and isinstance(data.get("executiveSummary"), dict):
+        data = data["executiveSummary"]
+    data.setdefault("kind", "PortfolioExecutiveSummary")
     return data
 
 
@@ -944,9 +1166,13 @@ def _write_portfolio_artifacts(
     lanes: Dict[str, List[Dict[str, str]]],
     lane_paths: Optional[Dict[str, str]] = None,
     title: Optional[str] = None,
+    model: Optional[str] = None,
 ) -> List[Tuple[Path, str]]:
     written: List[Tuple[Path, str]] = []
     written.append(_write_yaml(root / "portfolio.yaml", _portfolio_map(plan, lanes)))
+    executive_summary = _executive_summary_document(plan, title=title, model=model)
+    if executive_summary is not None:
+        written.append(_write_yaml(root / DEFAULT_EXECUTIVE_SUMMARY, executive_summary))
     written.append(
         _write_yaml(
             root / "portfolio-state.yaml",
@@ -1040,6 +1266,77 @@ def _write_text(path: Path, content: str) -> Tuple[Path, str]:
     return path, state
 
 
+def _copy_binary_asset(source: Path, target: Path) -> Tuple[Path, str]:
+    target.parent.mkdir(parents=True, exist_ok=True)
+    existed = target.exists()
+    if existed and target.read_bytes() == source.read_bytes():
+        return target, "unchanged"
+    shutil.copy2(source, target)
+    return target, "updated" if existed else "created"
+
+
+def _portfolio_icon_source_dir() -> Path:
+    return Path(__file__).resolve().parent.parent / "images" / "portfolio"
+
+
+def _copy_portfolio_icon_assets(output_dir: Path) -> List[Tuple[Path, str]]:
+    source_dir = _portfolio_icon_source_dir()
+    target_dir = output_dir / PORTFOLIO_ICON_ASSET_DIR
+    copied: List[Tuple[Path, str]] = []
+    for filename in EXECUTIVE_SUMMARY_CARD_ICONS.values():
+        source = source_dir / filename
+        if source.exists():
+            copied.append(_copy_binary_asset(source, target_dir / filename))
+    return copied
+
+
+def _executive_summary_document(
+    plan: Dict[str, Any],
+    *,
+    title: Optional[str],
+    model: Optional[str],
+) -> Optional[Dict[str, Any]]:
+    summary = plan.get("executiveSummary")
+    if not isinstance(summary, dict):
+        return None
+    metadata = (
+        summary.get("metadata") if isinstance(summary.get("metadata"), dict) else {}
+    )
+    plan_metadata = (
+        plan.get("metadata") if isinstance(plan.get("metadata"), dict) else {}
+    )
+    workspace_title = title or _text(plan_metadata.get("name"))
+    document: Dict[str, Any] = {
+        "schema": summary.get("schema") or EXECUTIVE_SUMMARY_SCHEMA,
+        "kind": summary.get("kind") or "PortfolioExecutiveSummary",
+        "metadata": {
+            "generatedAt": metadata.get("generatedAt")
+            or datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "generatedBy": metadata.get("generatedBy") or "open-data-products",
+            "sdkVersion": metadata.get("sdkVersion") or __version__,
+        },
+    }
+    if model:
+        document["metadata"]["model"] = model
+    elif metadata.get("model"):
+        document["metadata"]["model"] = metadata["model"]
+    if workspace_title:
+        document["metadata"]["workspaceTitle"] = workspace_title
+    for key in (
+        "portfolioPosition",
+        "priorityBriefing",
+        "swot",
+        "leadershipDecisions",
+        "evidenceGaps",
+        "confidenceNotes",
+        "leadershipSummary",
+    ):
+        value = summary.get(key)
+        if value is not None:
+            document[key] = value
+    return document
+
+
 def _group_written_paths(
     written: List[Tuple[Path, str]],
 ) -> Tuple[List[str], List[str], List[str]]:
@@ -1104,7 +1401,7 @@ def _portfolio_map(
     lanes: Dict[str, List[Dict[str, str]]],
 ) -> Dict[str, Any]:
     metadata = plan.get("metadata") if isinstance(plan.get("metadata"), dict) else {}
-    return {
+    portfolio = {
         "metadata": {
             "id": metadata.get("id", "generated-portfolio"),
             "name": metadata.get("name", "Generated Portfolio"),
@@ -1117,6 +1414,9 @@ def _portfolio_map(
         "sources": {name: {"count": len(files)} for name, files in lanes.items()},
         "warnings": [str(item) for item in plan.get("warnings", []) if item],
     }
+    if isinstance(plan.get("executiveSummary"), dict):
+        portfolio["artifacts"] = {"executiveSummary": DEFAULT_EXECUTIVE_SUMMARY}
+    return portfolio
 
 
 def _portfolio_state(
@@ -2313,6 +2613,9 @@ def _merge_portfolio_plans(
     metadata = delta.get("metadata")
     if isinstance(metadata, dict) and not isinstance(merged.get("metadata"), dict):
         merged["metadata"] = metadata
+    executive_summary = delta.get("executiveSummary")
+    if isinstance(executive_summary, dict):
+        merged["executiveSummary"] = executive_summary
     for collection in ("businessObjectives", "useCases", "signals"):
         merged[collection] = _merge_items_by_id(
             _list(merged, collection), _list(delta, collection)
@@ -2340,7 +2643,7 @@ def _filter_delta_plan_by_changed_lanes(
     if not isinstance(delta, dict):
         return {}
     filtered: Dict[str, Any] = {}
-    for key in ("metadata", "warnings"):
+    for key in ("metadata", "warnings", "executiveSummary"):
         value = delta.get(key)
         if value is not None:
             filtered[key] = value
@@ -2725,7 +3028,7 @@ def _graph_edge(edge: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _artifact_counts(plan: Dict[str, Any]) -> Dict[str, int]:
-    return {
+    counts = {
         "businessObjectives": len(_list(plan, "businessObjectives")),
         "useCases": len(_list(plan, "useCases")),
         "signals": len(_list(plan, "signals")),
@@ -2733,12 +3036,14 @@ def _artifact_counts(plan: Dict[str, Any]) -> Dict[str, int]:
         "odpsProducts": len(_list(plan, "products")),
         "graphEdges": len(_list(plan, "graphEdges")),
     }
+    counts.update(_executive_summary_counts(plan.get("executiveSummary")))
+    return counts
 
 
 def _workspace_artifact_counts(data: Dict[str, Any]) -> Dict[str, int]:
     catalog = data["catalog"].get("catalog", {})
     graph = data["graph"].get("graph", {})
-    return {
+    counts = {
         "businessObjectives": _count(catalog, "businessObjectives"),
         "useCases": _count(catalog, "useCases"),
         "signals": _count(catalog, "signals"),
@@ -2746,6 +3051,38 @@ def _workspace_artifact_counts(data: Dict[str, Any]) -> Dict[str, int]:
         "odpsProducts": len(data["products"]),
         "graphNodes": _count(graph, "nodes"),
         "graphEdges": _count(graph, "edges"),
+    }
+    counts.update(_executive_summary_counts(data.get("executive_summary")))
+    return counts
+
+
+def _executive_summary_counts(value: Any) -> Dict[str, int]:
+    if not isinstance(value, dict):
+        return {
+            "priorityItems": 0,
+            "swotItems": 0,
+            "leadershipDecisions": 0,
+            "evidenceGaps": 0,
+        }
+    briefing = (
+        value.get("priorityBriefing")
+        if isinstance(value.get("priorityBriefing"), dict)
+        else {}
+    )
+    priority_count = sum(
+        1
+        for key in ("primaryFocus", "secondaryFocus", "blocker", "readinessCheck")
+        if isinstance(briefing.get(key), dict)
+    )
+    swot = value.get("swot") if isinstance(value.get("swot"), dict) else {}
+    swot_count = sum(
+        len(_list(swot, bucket)) for bucket in EXECUTIVE_SUMMARY_SWOT_BUCKETS
+    )
+    return {
+        "priorityItems": priority_count,
+        "swotItems": swot_count,
+        "leadershipDecisions": len(_list(value, "leadershipDecisions")),
+        "evidenceGaps": len(_list(value, "evidenceGaps")),
     }
 
 
@@ -2798,19 +3135,21 @@ def render_portfolio(
     changed_key = (
         "unchanged" if previous == html_text else "updated" if existed else "created"
     )
+    icon_assets = _copy_portfolio_icon_assets(output.parent)
+    created, updated, unchanged = _group_written_paths(icon_assets)
     result: Dict[str, object] = {
         "spec": "portfolio",
         "kind": "PortfolioRender",
         "workspace": str(root),
         "html": str(output),
-        "created": [],
-        "updated": [],
-        "unchanged": [],
+        "created": created,
+        "updated": updated,
+        "unchanged": unchanged,
         "warnings": data["warnings"],
         "validationResults": validation_results,
         "valid": _valid_portfolio(validation_results),
     }
-    result[changed_key] = [str(output)]
+    result[changed_key] = [str(output), *result[changed_key]]
     return result
 
 
@@ -2821,6 +3160,7 @@ def explain_portfolio(workspace: Union[str, Path]) -> Dict[str, object]:
     catalog = data["catalog"].get("catalog", {})
     graph = data["graph"].get("graph", {})
     validation_results = _portfolio_validation_results(data)
+    executive_summary_counts = _executive_summary_counts(data.get("executive_summary"))
     return {
         "spec": "portfolio",
         "kind": "PortfolioExplain",
@@ -2834,6 +3174,11 @@ def explain_portfolio(workspace: Union[str, Path]) -> Dict[str, object]:
         "graphNodeCount": _count(graph, "nodes"),
         "graphEdgeCount": _count(graph, "edges"),
         "versionCount": len(data["versions"]),
+        "hasExecutiveSummary": bool(data.get("executive_summary")),
+        "priorityItemCount": executive_summary_counts["priorityItems"],
+        "swotItemCount": executive_summary_counts["swotItems"],
+        "leadershipDecisionCount": executive_summary_counts["leadershipDecisions"],
+        "evidenceGapCount": executive_summary_counts["evidenceGaps"],
         "warnings": data["warnings"],
         "validationResults": validation_results,
         "valid": _valid_portfolio(validation_results),
@@ -2846,9 +3191,15 @@ def load_portfolio_workspace(workspace: Union[str, Path]) -> Dict[str, Any]:
     catalog_path = root / "odpc" / "catalog.yaml"
     graph_path = root / "odpg" / "graph.yaml"
     portfolio_path = root / "portfolio.yaml"
+    executive_summary_path = root / DEFAULT_EXECUTIVE_SUMMARY
     i18n = _load_portfolio_i18n(root)
     warnings: List[str] = []
     portfolio = _load_optional_mapping(portfolio_path)
+    executive_summary = (
+        load_mapping(executive_summary_path, root_name="Portfolio executive summary")
+        if executive_summary_path.exists()
+        else {}
+    )
     catalog = load_catalog(catalog_path) if catalog_path.exists() else _empty_catalog()
     graph = load_graph(graph_path) if graph_path.exists() else _empty_graph()
     products = _load_product_specs(root)
@@ -2856,6 +3207,8 @@ def load_portfolio_workspace(workspace: Union[str, Path]) -> Dict[str, Any]:
     return {
         "workspace": root,
         "portfolio": portfolio,
+        "executive_summary": executive_summary,
+        "executive_summary_path": executive_summary_path,
         "catalog": catalog,
         "catalog_path": catalog_path,
         "graph": graph,
@@ -2899,6 +3252,7 @@ def _portfolio_validation_results(data: Dict[str, Any]) -> Dict[str, Any]:
         },
         "graph": graph_result.to_dict(),
         "products": product_results,
+        "executiveSummary": _validate_executive_summary(data.get("executive_summary")),
     }
 
 
@@ -2906,11 +3260,139 @@ def _valid_portfolio(validation_results: Dict[str, Any]) -> bool:
     catalog = validation_results.get("catalog", {})
     graph = validation_results.get("graph", {})
     products = validation_results.get("products", [])
+    executive_summary = validation_results.get("executiveSummary", {})
     return (
         bool(catalog.get("valid"))
         and bool(graph.get("valid"))
         and all(bool(product.get("valid")) for product in products)
+        and bool(executive_summary.get("valid", True))
     )
+
+
+def _validate_executive_summary(value: Any) -> Dict[str, Any]:
+    if not value:
+        return {
+            "valid": True,
+            "missing": True,
+            "warnings": ["executive-summary.yaml has not been generated."],
+            "errors": [],
+        }
+    errors: List[str] = []
+    warnings: List[str] = []
+    if not isinstance(value, dict):
+        return {
+            "valid": False,
+            "missing": False,
+            "warnings": [],
+            "errors": ["executive summary must be a mapping"],
+        }
+    for key in ("kind", "portfolioPosition", "priorityBriefing"):
+        if key not in value:
+            errors.append(f"{key} is required")
+    if value.get("kind") and value.get("kind") != "PortfolioExecutiveSummary":
+        errors.append("kind must be PortfolioExecutiveSummary")
+    position = value.get("portfolioPosition")
+    if isinstance(position, dict):
+        for key in ("headline", "narrative"):
+            if not _text(position.get(key)):
+                errors.append(f"portfolioPosition.{key} is required")
+    _validate_priority_briefing(value.get("priorityBriefing"), errors)
+    swot = value.get("swot")
+    if swot is not None:
+        if not isinstance(swot, dict):
+            errors.append("swot must be a mapping")
+        else:
+            _validate_legacy_swot(swot, errors)
+    for index, item in enumerate(_list(value, "leadershipDecisions")):
+        path = f"leadershipDecisions[{index}]"
+        for key in ("question", "decisionType", "urgency"):
+            if not _text(item.get(key)):
+                errors.append(f"{path}.{key} is required")
+        for ref_index, reference in enumerate(_list(item, "evidenceRefs")):
+            _validate_evidence_ref(
+                reference,
+                f"{path}.evidenceRefs[{ref_index}]",
+                errors,
+            )
+    for index, item in enumerate(_list(value, "evidenceGaps")):
+        path = f"evidenceGaps[{index}]"
+        if not _text(item.get("statement")):
+            errors.append(f"{path}.statement is required")
+        if not _list(item, "evidenceRefs"):
+            warnings.append(f"{path}.evidenceRefs is empty")
+    return {
+        "valid": not errors,
+        "missing": False,
+        "warnings": warnings,
+        "errors": errors,
+    }
+
+
+def _validate_priority_briefing(value: Any, errors: List[str]) -> None:
+    if not isinstance(value, dict):
+        errors.append("priorityBriefing must be a mapping")
+        return
+    if not _text(value.get("recommendation")):
+        errors.append("priorityBriefing.recommendation is required")
+    for key in ("primaryFocus", "secondaryFocus", "blocker", "readinessCheck"):
+        path = f"priorityBriefing.{key}"
+        item = value.get(key)
+        if not isinstance(item, dict):
+            errors.append(f"{path} must be a mapping")
+            continue
+        for required in ("title", "message", "action"):
+            if not _text(item.get(required)):
+                errors.append(f"{path}.{required} is required")
+        confidence = _text(item.get("confidence"))
+        if confidence and confidence not in EXECUTIVE_SUMMARY_CONFIDENCE_VALUES:
+            errors.append(f"{path}.confidence must be high, medium, or low")
+        evidence = item.get("evidence")
+        refs = _list(item, "evidenceRefs")
+        if isinstance(evidence, list):
+            if not evidence:
+                errors.append(f"{path}.evidence is required")
+            for index, reference in enumerate(evidence):
+                _validate_evidence_ref(reference, f"{path}.evidence[{index}]", errors)
+        elif refs:
+            for index, reference in enumerate(refs):
+                _validate_evidence_ref(
+                    reference, f"{path}.evidenceRefs[{index}]", errors
+                )
+        else:
+            errors.append(f"{path}.evidence is required")
+
+
+def _validate_legacy_swot(swot: Dict[str, Any], errors: List[str]) -> None:
+    for bucket in EXECUTIVE_SUMMARY_SWOT_BUCKETS:
+        for index, item in enumerate(_list(swot, bucket)):
+            path = f"swot.{bucket}[{index}]"
+            if not _text(item.get("statement")):
+                errors.append(f"{path}.statement is required")
+            if not _list(item, "evidenceRefs"):
+                errors.append(f"{path}.evidenceRefs is required")
+            confidence = _text(item.get("confidence"))
+            if confidence and confidence not in EXECUTIVE_SUMMARY_CONFIDENCE_VALUES:
+                errors.append(f"{path}.confidence must be high, medium, or low")
+            for ref_index, reference in enumerate(_list(item, "evidenceRefs")):
+                _validate_evidence_ref(
+                    reference,
+                    f"{path}.evidenceRefs[{ref_index}]",
+                    errors,
+                )
+
+
+def _validate_evidence_ref(
+    value: Any,
+    path: str,
+    errors: List[str],
+) -> None:
+    if not isinstance(value, dict):
+        errors.append(f"{path} must be a mapping")
+        return
+    if not _text(value.get("type")):
+        errors.append(f"{path}.type is required")
+    if not _text(value.get("id")):
+        errors.append(f"{path}.id is required")
 
 
 def _load_portfolio_i18n(root: Path) -> Dict[str, Any]:
@@ -3231,6 +3713,10 @@ def render_portfolio_html(data: Dict[str, Any]) -> str:
             data["versions"],
             data["warnings"],
         ),
+        _render_executive_summary(
+            data.get("executive_summary"),
+            _catalog_label_map(catalog_root),
+        ),
         _render_artifact_panel(
             "objectives",
             "Objectives",
@@ -3272,6 +3758,7 @@ def render_portfolio_html(data: Dict[str, Any]) -> str:
 def _render_tab_inputs() -> str:
     tabs = (
         "overview",
+        "executive-summary",
         "objectives",
         "use-cases",
         "products",
@@ -3312,6 +3799,7 @@ def _render_language_selector(data: Dict[str, Any], current_language: str) -> st
 def _render_tab_nav() -> str:
     tabs = [
         ("overview", "Overview"),
+        ("executive-summary", "Executive Summary"),
         ("objectives", "Objectives"),
         ("use-cases", "Use Cases"),
         ("products", "Products"),
@@ -3356,6 +3844,676 @@ def _render_overview(
         f"{_render_versions(versions)}"
         "</section>"
     )
+
+
+def _render_executive_summary(
+    summary: Any,
+    labels: Dict[str, str],
+) -> str:
+    if not isinstance(summary, dict) or not summary:
+        return (
+            '<section class="tab-panel executive-summary-panel" id="executive-summary">'
+            '<div class="section-head"><div>'
+            '<p class="eyebrow">Leadership Decision Support</p>'
+            "<h2>Executive Summary</h2>"
+            "</div></div>"
+            '<article class="action-card executive-empty">'
+            "<p>Executive summary has not been generated for this workspace yet. "
+            "Run a LLM-backed portfolio build or refresh to create "
+            "executive-summary.yaml.</p>"
+            "</article>"
+            "</section>"
+        )
+    position = summary.get("portfolioPosition")
+    position = position if isinstance(position, dict) else {}
+    headline = _text(position.get("headline"), "Current portfolio position")
+    narrative = _text(position.get("narrative"))
+    priority_briefing = _render_priority_briefing(summary, labels)
+    decisions = _render_executive_list(
+        "Leadership decisions",
+        _list(summary, "leadershipDecisions"),
+        labels,
+        primary_key="question",
+    )
+    evidence_gaps = _render_executive_list(
+        "Evidence gaps",
+        _list(summary, "evidenceGaps"),
+        labels,
+        primary_key="statement",
+    )
+    notes = "".join(
+        f"<li>{_escape(_text(note))}</li>"
+        for note in _string_list(summary.get("confidenceNotes"))
+    )
+    notes_html = (
+        '<section class="executive-list"><h3>Confidence notes</h3>'
+        f"<ul>{notes}</ul></section>"
+        if notes
+        else ""
+    )
+    return (
+        '<section class="tab-panel executive-summary-panel" id="executive-summary">'
+        '<div class="section-head"><div>'
+        '<p class="eyebrow">Leadership Decision Support</p>'
+        "<h2>Executive Summary</h2>"
+        "</div><p>Business-facing analysis grounded in portfolio evidence.</p></div>"
+        '<article class="executive-dashboard-intro">'
+        f"<h3>{_escape(headline)}</h3>"
+        f"<p>{_escape(narrative)}</p>"
+        "</article>"
+        f"{priority_briefing}"
+        f"{decisions}{evidence_gaps}{notes_html}"
+        "</section>"
+    )
+
+
+def _render_priority_briefing(summary: Dict[str, Any], labels: Dict[str, str]) -> str:
+    briefing = _priority_briefing(summary)
+    recommendation = _text(briefing.get("recommendation"))
+    recommendation_html = (
+        '<article class="leadership-recommendation">'
+        '<span class="recommendation-label">Recommended decision</span>'
+        f"<p>{_escape(recommendation)}</p>"
+        "</article>"
+        if recommendation
+        else ""
+    )
+    primary = _render_priority_card(
+        briefing.get("primaryFocus"),
+        labels,
+        class_name="primary-focus",
+        default_label="Priority 1",
+        default_rationale_title="Why this is first",
+    )
+    secondary = _render_priority_card(
+        briefing.get("secondaryFocus"),
+        labels,
+        class_name="secondary-focus",
+        default_label="Priority 2",
+        default_rationale_title="Why this is second",
+    )
+    blocker = _render_priority_card(
+        briefing.get("blocker"),
+        labels,
+        class_name="risk-focus",
+        default_label="Risk",
+        default_rationale_title="Why this matters",
+    )
+    readiness = _render_priority_card(
+        briefing.get("readinessCheck"),
+        labels,
+        class_name="readiness-focus",
+        default_label="Readiness check",
+        default_rationale_title="Checklist",
+    )
+    return (
+        f"{recommendation_html}"
+        f'<div class="decision-card-grid">{primary}{secondary}{blocker}{readiness}</div>'
+    )
+
+
+def _priority_briefing(summary: Dict[str, Any]) -> Dict[str, Any]:
+    briefing = summary.get("priorityBriefing")
+    if isinstance(briefing, dict) and briefing:
+        return briefing
+    return _priority_briefing_from_swot(summary)
+
+
+def _priority_briefing_from_swot(summary: Dict[str, Any]) -> Dict[str, Any]:
+    swot = summary.get("swot") if isinstance(summary.get("swot"), dict) else {}
+    leadership = (
+        summary.get("leadershipSummary")
+        if isinstance(summary.get("leadershipSummary"), dict)
+        else {}
+    )
+    strengths = _list(swot, "strengths")
+    opportunities = _list(swot, "opportunities")
+    threats = _list(swot, "threats")
+    weaknesses = _list(swot, "weaknesses")
+    return {
+        "recommendation": _fallback_recommendation(leadership),
+        "primaryFocus": _priority_item_from_swot(
+            strengths[:1],
+            label="Priority 1",
+            title="Focus first: strongest validated workflow",
+            rationale_title="Why this is first",
+        ),
+        "secondaryFocus": _priority_item_from_swot(
+            opportunities[:1],
+            label="Priority 2",
+            title="Validate next: second growth path",
+            rationale_title="Why this is second",
+        ),
+        "blocker": _priority_item_from_swot(
+            threats[:1],
+            label="Risk",
+            title="Do not ignore: main prioritization risk",
+            rationale_title="Why this matters",
+        ),
+        "readinessCheck": _priority_item_from_swot(
+            weaknesses[:1],
+            label="Readiness check",
+            title="Before build starts: commercial readiness review",
+            rationale_title="Checklist",
+        ),
+    }
+
+
+def _fallback_recommendation(leadership: Dict[str, Any]) -> str:
+    first = _text(leadership.get("recommendedFirstMove"))
+    second = _text(leadership.get("secondGrowthPath"))
+    risk = _text(leadership.get("mainRisk"))
+    parts = []
+    if first:
+        parts.append(first)
+    if second:
+        parts.append(second)
+    if risk:
+        parts.append(risk)
+    return ". ".join(parts)
+
+
+def _priority_item_from_swot(
+    items: List[Dict[str, Any]],
+    *,
+    label: str,
+    title: str,
+    rationale_title: str,
+) -> Dict[str, Any]:
+    item = items[0] if items else {}
+    return {
+        "label": label,
+        "title": title,
+        "message": _text(item.get("statement")),
+        "action": _text(item.get("decisionImplication")),
+        "rationaleTitle": rationale_title,
+        "rationale": [],
+        "confidence": item.get("confidence"),
+        "evidenceType": "inferred" if item.get("inference") is True else "direct",
+        "evidenceRefs": _list(item, "evidenceRefs"),
+    }
+
+
+def _render_priority_card(
+    value: Any,
+    labels: Dict[str, str],
+    *,
+    class_name: str,
+    default_label: str,
+    default_rationale_title: str,
+) -> str:
+    if not isinstance(value, dict):
+        return ""
+    title = _dashboard_card_title(value, class_name)
+    message = _dashboard_card_message(value, class_name)
+    action = _dashboard_card_action(value, class_name)
+    if not title and not message and not action:
+        return ""
+    label = _dashboard_card_label(value, class_name, default_label)
+    return (
+        f'<article class="decision-card {class_name}">'
+        f'<input class="decision-details-toggle" id="decision-details-{_escape(class_name)}" type="checkbox">'
+        '<div class="decision-card-head">'
+        f"{_render_decision_card_icon(class_name)}"
+        "<div>"
+        f'<span class="priority-label">{_escape(label)}</span>'
+        f"<h3>{_escape(title)}</h3>"
+        "</div>"
+        "</div>"
+        f'<p class="decision-insight">{_escape(message)}</p>'
+        f"{_render_priority_action(action)}"
+        '<div class="decision-card-footer">'
+        f"{_render_priority_meta(value)}"
+        f"{_render_priority_details_trigger(class_name)}"
+        "</div>"
+        f"{_render_priority_details_dropdown(value, labels, default_rationale_title)}"
+        "</article>"
+    )
+
+
+def _render_decision_card_icon(class_name: str) -> str:
+    filename = EXECUTIVE_SUMMARY_CARD_ICONS.get(class_name, "")
+    if not filename:
+        return '<span class="decision-card-icon" aria-hidden="true"></span>'
+    src = Path(PORTFOLIO_ICON_ASSET_DIR) / filename
+    return (
+        '<span class="decision-card-icon" aria-hidden="true">'
+        f'<img src="{_escape(src.as_posix())}" alt="" loading="lazy">'
+        "</span>"
+    )
+
+
+def _dashboard_card_title(item: Dict[str, Any], class_name: str) -> str:
+    title = _text(item.get("dashboardTitle") or item.get("shortTitle"))
+    if title:
+        return title
+    defaults = {
+        "primary-focus": "Retention validation",
+        "secondary-focus": "Partner expansion",
+        "risk-focus": "Signal coverage",
+        "readiness-focus": "Commercial review",
+    }
+    return defaults.get(class_name, _text(item.get("title")))
+
+
+def _dashboard_card_message(item: Dict[str, Any], class_name: str) -> str:
+    message = _text(item.get("dashboardMessage") or item.get("shortMessage"))
+    if message:
+        return message
+    defaults = {
+        "primary-focus": "Retention is the strongest first funding candidate.",
+        "secondary-focus": "Partner expansion is promising but not yet first priority.",
+        "risk-focus": "Thin signal coverage may overstate prioritization confidence.",
+        "readiness-focus": "The product still needs business readiness review.",
+    }
+    return defaults.get(class_name, _text(item.get("message")))
+
+
+def _dashboard_card_action(item: Dict[str, Any], class_name: str) -> str:
+    action = _text(item.get("dashboardAction") or item.get("shortAction"))
+    if action:
+        return action
+    defaults = {
+        "primary-focus": "Fund validation first.",
+        "secondary-focus": "Validate the business case next.",
+        "risk-focus": "Improve coverage before final prioritization.",
+        "readiness-focus": "Confirm readiness before build.",
+    }
+    return defaults.get(class_name, _text(item.get("action")))
+
+
+def _dashboard_card_label(
+    item: Dict[str, Any],
+    class_name: str,
+    default_label: str,
+) -> str:
+    label = _text(item.get("label"), default_label)
+    if class_name == "readiness-focus":
+        return "Readiness"
+    return label
+
+
+def _render_priority_action(action: str) -> str:
+    if not action:
+        return ""
+    return (
+        '<div class="priority-action">'
+        "<span>Action:</span>"
+        f"<p>{_escape(action)}</p>"
+        "</div>"
+    )
+
+
+def _render_priority_meta(item: Dict[str, Any]) -> str:
+    confidence = _confidence_label(item.get("confidence"))
+    evidence_type = _priority_evidence_type(item)
+    confidence_key = confidence.lower()
+    evidence_key = evidence_type.lower()
+    return (
+        '<div class="priority-meta">'
+        f'<span class="metadata-badge confidence-badge confidence-{_escape(confidence_key)}">'
+        '<span class="status-dot" aria-hidden="true"></span>'
+        f"{_escape(confidence)}"
+        "</span>"
+        f'<span class="metadata-badge evidence-badge evidence-{_escape(evidence_key)}">'
+        '<span class="evidence-icon" aria-hidden="true"></span>'
+        f"{_escape(evidence_type)}"
+        "</span>"
+        "</div>"
+    )
+
+
+def _priority_evidence_type(item: Dict[str, Any]) -> str:
+    evidence_type = _text(item.get("evidenceType")).lower()
+    if evidence_type == "direct":
+        return "Direct"
+    if evidence_type == "inferred":
+        return "Inferred"
+    return _evidence_type(item)
+
+
+def _render_priority_evidence(
+    item: Dict[str, Any],
+    labels: Dict[str, str],
+) -> str:
+    evidence = _priority_evidence_items(item, labels)
+    refs = _priority_technical_refs(item)
+    if not evidence:
+        return ""
+    rendered = "".join(
+        f"<li>{_escape(ref_type)}: {_escape(label)}</li>"
+        for ref_type, label in evidence
+    )
+    return (
+        '<div class="business-evidence priority-evidence"><h4>Evidence</h4>'
+        f"<ul>{rendered}</ul></div>"
+        f"{_render_technical_evidence(refs)}"
+    )
+
+
+def _render_priority_details_trigger(class_name: str) -> str:
+    return (
+        f'<label class="decision-details-trigger" for="decision-details-{_escape(class_name)}">'
+        '<span class="decision-details-label-closed">Show more</span>'
+        '<span class="decision-details-label-open">Show less</span>'
+        "</label>"
+    )
+
+
+def _render_priority_details_dropdown(
+    item: Dict[str, Any],
+    labels: Dict[str, str],
+    default_rationale_title: str,
+) -> str:
+    rationale_title = _text(item.get("rationaleTitle"), default_rationale_title)
+    rationale = _string_list(item.get("checklist")) or _string_list(
+        item.get("rationale")
+    )
+    sections = []
+    if rationale:
+        rendered = "".join(f"<li>{_escape(text)}</li>" for text in rationale)
+        sections.append(f"<h4>{_escape(rationale_title)}</h4><ul>{rendered}</ul>")
+    evidence = _priority_evidence_items(item, labels)
+    if evidence:
+        rendered = "".join(
+            f"<li>{_escape(ref_type)}: {_escape(label)}</li>"
+            for ref_type, label in evidence
+        )
+        sections.append(f"<h4>Evidence</h4><ul>{rendered}</ul>")
+    technical_refs = _priority_technical_refs(item)
+    if technical_refs:
+        rendered = "".join(
+            "<li>"
+            f"{_escape(_text(ref.get('type'), 'reference'))}: "
+            f"{_escape(_text(ref.get('id'), '(missing)'))}"
+            "</li>"
+            for ref in technical_refs
+        )
+        sections.append(f"<h4>Technical evidence</h4><ul>{rendered}</ul>")
+    if not sections:
+        return ""
+    return f'<div class="decision-details-dropdown">{"".join(sections)}</div>'
+
+
+def _priority_evidence_items(
+    item: Dict[str, Any],
+    labels: Dict[str, str],
+) -> List[Tuple[str, str]]:
+    evidence = item.get("evidence")
+    if isinstance(evidence, list):
+        items = []
+        for ref in evidence:
+            if not isinstance(ref, dict):
+                continue
+            ref_type = _business_evidence_type(_text(ref.get("type")))
+            label = _text(ref.get("label"))
+            ref_id = _text(ref.get("id"))
+            items.append((ref_type, label or labels.get(ref_id, ref_id)))
+        return items
+    refs = _list(item, "evidenceRefs")
+    return [
+        (
+            _business_evidence_type(_text(ref.get("type"))),
+            labels.get(_text(ref.get("id")), _text(ref.get("id"))),
+        )
+        for ref in refs
+    ]
+
+
+def _priority_technical_refs(item: Dict[str, Any]) -> List[Dict[str, Any]]:
+    evidence = item.get("evidence")
+    if isinstance(evidence, list):
+        return [ref for ref in evidence if isinstance(ref, dict)]
+    return _list(item, "evidenceRefs")
+
+
+def _render_swot_bucket(
+    bucket: str,
+    items: List[Dict[str, Any]],
+    labels: Dict[str, str],
+) -> str:
+    title = _swot_leadership_label(bucket)
+    if not items:
+        body = "<p>No entries.</p>"
+    else:
+        body = "".join(_render_swot_item(item, labels, bucket=bucket) for item in items)
+    return f'<section class="swot-card"><h3>{_escape(title)}</h3>{body}</section>'
+
+
+def _render_leadership_summary_bar(summary: Dict[str, Any]) -> str:
+    value = summary.get("leadershipSummary")
+    if not isinstance(value, dict):
+        return ""
+    items = [
+        ("Recommended first move", value.get("recommendedFirstMove")),
+        ("Second growth path", value.get("secondGrowthPath")),
+        ("Main risk", value.get("mainRisk")),
+    ]
+    cards = []
+    for label, text in items:
+        rendered = _text(text)
+        if rendered:
+            cards.append(
+                '<article class="leadership-summary-point">'
+                f"<span>{_escape(label)}</span>"
+                f"<strong>{_escape(rendered)}</strong>"
+                "</article>"
+            )
+    if not cards:
+        return ""
+    return f'<section class="leadership-summary-bar">{"".join(cards)}</section>'
+
+
+def _render_swot_item(
+    item: Dict[str, Any],
+    labels: Dict[str, str],
+    *,
+    bucket: str,
+) -> str:
+    statement = _text(item.get("statement"))
+    implication = _text(
+        item.get("decisionImplication"),
+        _default_decision_implication(bucket),
+    )
+    confidence = _confidence_label(item.get("confidence"))
+    evidence_type = _evidence_type(item)
+    basis = _confidence_basis(item)
+    refs = _list(item, "evidenceRefs")
+    return (
+        '<article class="executive-item swot-item">'
+        f'<p class="swot-finding">{_escape(statement)}</p>'
+        '<div class="decision-implication">'
+        "<span>Decision implication</span>"
+        f"<p>{_escape(implication)}</p>"
+        "</div>"
+        '<div class="executive-meta">'
+        f"<div><span>Confidence</span><strong>{_escape(confidence)}</strong></div>"
+        f"<div><span>Evidence type</span><strong>{_escape(evidence_type)}</strong></div>"
+        f"<div><span>Basis</span><strong>{_escape(basis)}</strong></div>"
+        "</div>"
+        f"{_render_business_evidence(refs, labels)}"
+        f"{_render_technical_evidence(refs)}"
+        "</article>"
+    )
+
+
+def _render_executive_list(
+    title: str,
+    items: List[Dict[str, Any]],
+    labels: Dict[str, str],
+    *,
+    primary_key: str,
+) -> str:
+    if not items:
+        return ""
+    body = "".join(
+        _render_executive_item(item, labels, primary_key=primary_key) for item in items
+    )
+    return f'<section class="executive-list"><h3>{_escape(title)}</h3>{body}</section>'
+
+
+def _render_executive_item(
+    item: Dict[str, Any],
+    labels: Dict[str, str],
+    *,
+    primary_key: str = "statement",
+) -> str:
+    statement = _text(item.get(primary_key), _text(item.get("statement")))
+    facts = [
+        ("Confidence", item.get("confidence")),
+        ("Urgency", item.get("urgency")),
+        ("Decision", item.get("decisionType")),
+        ("Inference", "yes" if item.get("inference") is True else None),
+    ]
+    return (
+        '<article class="executive-item">'
+        f"<p>{_escape(statement)}</p>"
+        f"{_render_facts(facts)}"
+        f"{_render_evidence_refs(_list(item, 'evidenceRefs'), labels)}"
+        "</article>"
+    )
+
+
+def _swot_leadership_label(bucket: str) -> str:
+    labels = {
+        "strengths": "What is working",
+        "weaknesses": "What needs attention",
+        "opportunities": "Where to invest next",
+        "threats": "What could block progress",
+    }
+    return labels.get(bucket, _title_from_text(bucket))
+
+
+def _default_decision_implication(bucket: str) -> str:
+    defaults = {
+        "strengths": "Use this as a candidate for first delivery funding.",
+        "weaknesses": "Resolve this before moving into delivery.",
+        "opportunities": "Validate this before assigning delivery capacity.",
+        "threats": "Reduce this risk before final prioritization.",
+    }
+    return defaults.get(bucket, "Review this before making a portfolio decision.")
+
+
+def _confidence_label(value: Any) -> str:
+    confidence = _text(value, "medium").lower()
+    if confidence == "high":
+        return "High"
+    if confidence == "low":
+        return "Low"
+    return "Medium"
+
+
+def _evidence_type(item: Dict[str, Any]) -> str:
+    return "Inferred" if item.get("inference") is True else "Direct"
+
+
+def _confidence_basis(item: Dict[str, Any]) -> str:
+    confidence = _text(item.get("confidence"), "medium").lower()
+    if confidence == "high" and item.get("inference") is not True:
+        return "Direct portfolio alignment"
+    refs = _list(item, "evidenceRefs")
+    types = [_business_evidence_type(_text(ref.get("type"))) for ref in refs]
+    if confidence == "low":
+        if any(label == "Signal" for label in types):
+            return "Thin signal coverage"
+        return "Limited portfolio evidence"
+    unique = []
+    for label in types:
+        plural = _basis_plural(label)
+        if plural and plural not in unique:
+            unique.append(plural)
+    if unique:
+        return f"Inferred from {_join_human_list(unique)}"
+    return "Inferred from portfolio evidence"
+
+
+def _basis_plural(label: str) -> str:
+    mapping = {
+        "Objective": "objectives",
+        "Use case": "use cases",
+        "Candidate product": "product references",
+        "Signal": "signals",
+    }
+    return mapping.get(label, "")
+
+
+def _join_human_list(items: List[str]) -> str:
+    if not items:
+        return ""
+    if len(items) == 1:
+        return items[0]
+    if len(items) == 2:
+        return f"{items[0]} and {items[1]}"
+    return f"{', '.join(items[:-1])}, and {items[-1]}"
+
+
+def _render_business_evidence(
+    refs: List[Dict[str, Any]],
+    labels: Dict[str, str],
+) -> str:
+    if not refs:
+        return (
+            '<div class="business-evidence"><h4>Evidence</h4>'
+            "<p>No evidence references.</p></div>"
+        )
+    items = []
+    for ref in refs:
+        ref_type = _business_evidence_type(_text(ref.get("type")))
+        ref_id = _text(ref.get("id"))
+        label = labels.get(ref_id, ref_id or "(missing)")
+        items.append(f"<li>{_escape(ref_type)}: {_escape(label)}</li>")
+    return (
+        '<div class="business-evidence"><h4>Evidence</h4>'
+        f"<ul>{''.join(items)}</ul></div>"
+    )
+
+
+def _business_evidence_type(value: str) -> str:
+    labels = {
+        "businessObjective": "Objective",
+        "useCase": "Use case",
+        "productReference": "Candidate product",
+        "signal": "Signal",
+        "graph": "Portfolio evidence",
+        "graphEdge": "Portfolio evidence",
+    }
+    return labels.get(value, _display_label(value) if value else "Portfolio evidence")
+
+
+def _render_technical_evidence(refs: List[Dict[str, Any]]) -> str:
+    if not refs:
+        return ""
+    items = []
+    for ref in refs:
+        ref_type = _text(ref.get("type"), "reference")
+        ref_id = _text(ref.get("id"), "(missing)")
+        items.append(f"<li>{_escape(ref_type)}: {_escape(ref_id)}</li>")
+    return (
+        '<details class="technical-evidence">'
+        "<summary>Technical evidence</summary>"
+        f"<ul>{''.join(items)}</ul>"
+        "</details>"
+    )
+
+
+def _render_evidence_refs(
+    refs: List[Dict[str, Any]],
+    labels: Dict[str, str],
+) -> str:
+    if not refs:
+        return '<div class="evidence-refs"><span class="chip warning">No evidence refs</span></div>'
+    chips = []
+    for ref in refs:
+        ref_type = _text(ref.get("type"), "reference")
+        ref_id = _text(ref.get("id"), "(missing)")
+        label = labels.get(ref_id, ref_id)
+        chips.append(
+            '<span class="chip evidence-ref">'
+            f"{_escape(ref_type)}: {_escape(label)}"
+            f" <small>{_escape(ref_id)}</small>"
+            "</span>"
+        )
+    return f'<div class="evidence-refs">{"".join(chips)}</div>'
 
 
 def _render_portfolio_changes(versions: List[Dict[str, Any]]) -> str:
@@ -4664,6 +5822,7 @@ main {
   font-weight: 700;
 }
 #tab-overview:checked ~ .tabs label[for="tab-overview"],
+#tab-executive-summary:checked ~ .tabs label[for="tab-executive-summary"],
 #tab-objectives:checked ~ .tabs label[for="tab-objectives"],
 #tab-use-cases:checked ~ .tabs label[for="tab-use-cases"],
 #tab-products:checked ~ .tabs label[for="tab-products"],
@@ -4679,6 +5838,7 @@ main {
   padding-top: 28px;
 }
 #tab-overview:checked ~ .panels .overview-panel,
+#tab-executive-summary:checked ~ .panels .executive-summary-panel,
 #tab-objectives:checked ~ .panels .objectives-panel,
 #tab-use-cases:checked ~ .panels .use-cases-panel,
 #tab-products:checked ~ .panels .products-panel,
@@ -4711,7 +5871,7 @@ main {
   border: 1px solid var(--odp-line);
   border-radius: 8px;
   background: #fff;
-  box-shadow: 0 12px 32px rgba(30, 10, 46, .06);
+  box-shadow: 0 16px 42px rgba(15, 23, 42, .09);
 }
 .metric {
   min-height: 104px;
@@ -4735,6 +5895,345 @@ main {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
+}
+.executive-dashboard-intro,
+.decision-card,
+.leadership-recommendation,
+.executive-list,
+.executive-empty {
+  border: 1px solid var(--odp-line);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 12px 32px rgba(30, 10, 46, .06);
+}
+.executive-dashboard-intro {
+  padding: 24px 28px;
+  margin-bottom: 24px;
+}
+.leadership-recommendation {
+  padding: 20px 24px;
+  margin: 0 0 28px;
+  border-color: #c4b5fd;
+  border-left: 6px solid #6d28d9;
+  background: #f5f3ff;
+  box-shadow: 0 18px 44px rgba(88, 28, 135, .12);
+}
+.recommendation-label,
+.priority-label,
+.priority-action span {
+  display: block;
+  color: var(--odp-muted);
+  font-size: .76rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+.leadership-recommendation p {
+  margin: 6px 0 0;
+  color: var(--odp-text);
+  font-size: 1.05rem;
+  font-weight: 800;
+  line-height: 1.35;
+}
+.executive-dashboard-intro p,
+.executive-empty p {
+  margin: 0;
+  color: var(--odp-muted);
+}
+.decision-card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 28px;
+  margin-bottom: 24px;
+}
+.decision-card,
+.executive-list,
+.executive-empty {
+  padding: 18px;
+}
+.decision-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 174px;
+  border-top: 6px solid #64748b;
+  box-shadow: 0 18px 44px rgba(15, 23, 42, .11);
+}
+.primary-focus {
+  border-color: #bfdbfe;
+  border-top-color: #2563eb;
+  background: linear-gradient(135deg, #eff6ff 0%, #f8fbff 100%);
+}
+.secondary-focus {
+  border-color: #bfdbfe;
+  border-top-color: #3b82f6;
+  background: linear-gradient(135deg, #f1f7ff 0%, #fbfdff 100%);
+}
+.risk-focus {
+  border-color: #fed7aa;
+  border-top-color: #d97706;
+  background: linear-gradient(135deg, #fff7ed 0%, #fffbf5 100%);
+}
+.readiness-focus {
+  border-color: #d8d6e4;
+  border-top-color: #6d5f9f;
+  background: linear-gradient(135deg, #f7f5fb 0%, #fcfbff 100%);
+}
+.decision-card-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.decision-card-icon {
+  flex: 0 0 44px;
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: #dbeafe;
+  border: 1px solid rgba(37, 99, 235, .18);
+  box-shadow: 0 12px 26px rgba(37, 99, 235, .24);
+}
+.decision-card-icon img {
+  width: 30px;
+  height: 30px;
+  display: block;
+  object-fit: contain;
+}
+.secondary-focus .decision-card-icon {
+  background: #eff6ff;
+  border-color: rgba(59, 130, 246, .18);
+  box-shadow: 0 12px 26px rgba(59, 130, 246, .2);
+}
+.risk-focus .decision-card-icon {
+  background: #ffedd5;
+  border-color: rgba(217, 119, 6, .22);
+  box-shadow: 0 12px 26px rgba(217, 119, 6, .22);
+}
+.readiness-focus .decision-card-icon {
+  background: #ede9fe;
+  border-color: rgba(109, 95, 159, .2);
+  box-shadow: 0 12px 26px rgba(109, 95, 159, .2);
+}
+.decision-card h3 {
+  margin: 5px 0 0;
+  font-size: 1.2rem;
+}
+.decision-insight {
+  margin: 14px 0 0;
+  color: var(--odp-muted);
+  font-size: .95rem;
+  line-height: 1.4;
+}
+.priority-action {
+  display: flex;
+  gap: 8px;
+  margin: 16px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--odp-line);
+}
+.priority-action p {
+  margin: 0;
+  color: var(--odp-text);
+  font-size: .92rem;
+}
+.primary-focus .priority-action span,
+.primary-focus .priority-label,
+.primary-focus .decision-details-trigger {
+  color: #1d4ed8;
+}
+.secondary-focus .priority-action span,
+.secondary-focus .priority-label,
+.secondary-focus .decision-details-trigger {
+  color: #2563eb;
+}
+.risk-focus .priority-action span,
+.risk-focus .priority-label,
+.risk-focus .decision-details-trigger {
+  color: #c2410c;
+}
+.readiness-focus .priority-action span,
+.readiness-focus .priority-label,
+.readiness-focus .decision-details-trigger {
+  color: #5b4f8a;
+}
+.decision-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: auto;
+  padding-top: 14px;
+}
+.priority-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+}
+.metadata-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 26px;
+  padding: 4px 10px;
+  border: 1px solid #d7deea;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, .72);
+  color: var(--odp-text);
+  font-size: .82rem;
+  font-weight: 800;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, .08);
+}
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #64748b;
+}
+.confidence-high .status-dot {
+  background: #059669;
+}
+.confidence-medium .status-dot {
+  background: #f59e0b;
+}
+.confidence-low .status-dot {
+  background: #e11d48;
+}
+.evidence-badge {
+  color: #1d4ed8;
+}
+.evidence-icon {
+  position: relative;
+  width: 12px;
+  height: 12px;
+  border: 2px solid currentColor;
+  border-radius: 999px;
+}
+.evidence-direct .evidence-icon::after {
+  content: "";
+  position: absolute;
+  left: 3px;
+  top: 3px;
+  width: 4px;
+  height: 4px;
+  border-radius: 999px;
+  background: currentColor;
+}
+.evidence-inferred .evidence-icon {
+  border-radius: 2px;
+}
+.evidence-inferred .evidence-icon::after {
+  content: "";
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  top: 4px;
+  border-top: 2px solid currentColor;
+}
+.decision-details-toggle {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.decision-details-trigger {
+  display: flex;
+  justify-content: flex-end;
+  cursor: pointer;
+  font-size: .86rem;
+  font-weight: 800;
+}
+.decision-details-label-open {
+  display: none;
+}
+.decision-details-toggle:checked ~ .decision-card-footer .decision-details-label-closed {
+  display: none;
+}
+.decision-details-toggle:checked ~ .decision-card-footer .decision-details-label-open {
+  display: inline;
+}
+.decision-details-dropdown {
+  display: none;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--odp-line);
+  color: var(--odp-muted);
+  font-size: .86rem;
+}
+.decision-details-toggle:checked ~ .decision-details-dropdown {
+  display: block;
+}
+.decision-details-dropdown h4 {
+  margin: 12px 0 6px;
+  color: var(--odp-text);
+  font-size: .82rem;
+}
+.decision-details-dropdown ul {
+  margin: 0;
+  padding-left: 18px;
+}
+.decision-details-dropdown li {
+  margin: 4px 0;
+}
+.executive-list {
+  margin-top: 16px;
+}
+.executive-item {
+  padding: 14px 0;
+  border-top: 1px solid var(--odp-line);
+}
+.executive-item:first-of-type {
+  border-top: 0;
+  padding-top: 0;
+}
+.executive-item p {
+  margin: 0 0 10px;
+}
+.business-evidence {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--odp-line);
+}
+.business-evidence h4 {
+  margin: 0 0 8px;
+  color: var(--odp-muted);
+  font-size: .8rem;
+  text-transform: uppercase;
+}
+.business-evidence ul,
+.technical-evidence ul {
+  margin: 0;
+  padding-left: 18px;
+}
+.business-evidence li {
+  margin: 4px 0;
+}
+.priority-evidence {
+  color: var(--odp-text);
+}
+.technical-evidence {
+  margin-top: 12px;
+  color: var(--odp-muted);
+  font-size: .85rem;
+}
+.technical-evidence summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+.evidence-refs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+.evidence-ref small {
+  color: var(--odp-muted);
+  font-weight: 700;
+}
+.chip.warning {
+  border-color: #d97706;
+  color: #92400e;
+  background: #fffbeb;
 }
 .product-grid {
   display: grid;
@@ -5217,6 +6716,7 @@ html[dir="rtl"] .odp-facts {
   }
   .grid,
   .actions-grid,
+  .decision-card-grid,
   .product-grid {
     grid-template-columns: 1fr;
   }

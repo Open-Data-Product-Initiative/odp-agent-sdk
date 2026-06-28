@@ -11,6 +11,7 @@ evidence streams into one maintained Open Data Products workspace:
 - ODPC catalog fragments and `odpc/catalog.yaml`;
 - linked ODPS product specifications under `odps/products/`;
 - ODPG graph YAML under `odpg/graph.yaml`;
+- a machine-readable leadership analysis package at `executive-summary.yaml`;
 - one static browser experience at `index.html`;
 - optional localized browser pages such as `index.fi.html` and `index.ar.html`;
 - source hashes, stable IDs, reports, and version snapshots.
@@ -134,6 +135,7 @@ The workflow owns this generated workspace shape:
 ```text
 <workspace>/
   index.html
+  executive-summary.yaml
   portfolio.yaml
   portfolio-state.yaml
   portfolio-i18n.yaml
@@ -155,6 +157,12 @@ The workflow owns this generated workspace shape:
       portfolio.yaml
       report.json
 ```
+
+`executive-summary.yaml` exists after LLM-backed build or refresh runs that
+complete the Executive Summary phase. It is the source of truth for the
+Executive Summary tab and should remain machine-readable. `portfolio.yaml`
+may reference it through `artifacts.executiveSummary`, but should not duplicate
+the executive summary body.
 
 `portfolio-i18n.yaml` exists only after localization.
 
@@ -190,17 +198,30 @@ missing, fail early. If an output folder is missing, create it.
 2. Resolve and scan source lane paths.
 3. Compare source hashes.
 4. Decide which sources should be processed.
-5. Render one portfolio-plan prompt.
+5. Render the portfolio-plan prompt for normalized portfolio artifacts only.
 6. Parse the model's YAML plan, with one syntax repair attempt.
 7. Reconcile generated IDs against the previous identity registry.
 8. Merge delta output into the current workspace when processing only changed
    or new sources.
 9. Normalize generated ODPC, ODPS, and ODPG shapes.
-10. Snapshot the previous HTML and portfolio map when rerunning.
-11. Write `portfolio.yaml`, `portfolio-state.yaml`, ODPC fragments, ODPS
+10. Render a separate Executive Summary prompt from the normalized portfolio
+    evidence and write the result to `executive-summary.yaml`.
+11. Snapshot the previous HTML and portfolio map when rerunning.
+12. Write `portfolio.yaml`, `portfolio-state.yaml`, ODPC fragments, ODPS
     products, ODPC catalog YAML, and ODPG graph YAML.
-12. Render `index.html`.
-13. Return one JSON-serializable report.
+13. Render `index.html`.
+14. Return one JSON-serializable report, including `llmCallCount` and
+    `llmPhases`.
+
+Normal LLM-backed build or refresh runs make two model calls:
+
+- `portfolio`: source lanes to normalized portfolio artifacts.
+- `executiveSummary`: normalized portfolio evidence to leadership decision
+  briefing.
+
+Each phase may make one extra repair call when the model returns malformed YAML.
+Refresh runs with no source changes, `portfolio render`, and `portfolio sync`
+must make zero model calls.
 
 `refresh_portfolio` delegates to `build_portfolio`. By default it sends only
 new or changed source files to the model. `--all-sources` sets `all_sources`
@@ -280,12 +301,27 @@ must still fail because the workspace cannot safely load or render it.
 Required top-level tabs:
 
 - Overview
+- Executive Summary
 - Business Objectives
 - Use Cases
 - Products
 - Signals
 - Graph
 - About
+
+The Executive Summary tab renders `executive-summary.yaml`. It should lead with
+a compact leadership decision dashboard: title, short subtitle, recommendation
+banner, and four decision cards in a 2x2 grid. The cards are Priority 1,
+Priority 2, Risk, and Readiness. Each card should show only a small label,
+short title, one-sentence insight, action line, confidence/evidence badges, and
+collapsed details. Priority cards should share the blue family, with Priority 1
+using the stronger blue treatment. Risk should use amber/orange and readiness
+should use slate-violet. Confidence badges use High/Medium/Low pills with
+green, amber, or red status dots; evidence badges use Direct/Inferred pills
+with neutral blue icon styling. Evidence should use business-facing labels
+inside the details area and keep technical IDs collapsed by default. If the YAML
+artifact is missing, render an honest missing-analysis state instead of
+fabricating leadership findings from heuristics.
 
 Products use a two-layer view:
 
@@ -304,6 +340,10 @@ removed.
 Generated HTML must escape user/model content. Localization must not rewrite or
 escape `<style>` and `<script>` blocks as normal text.
 
+`portfolio render` and `portfolio sync` must remain deterministic. They may
+load and render an existing `executive-summary.yaml`, but must not call a model
+or infer a new Executive Summary.
+
 ## Version Snapshots
 
 Successful build, refresh, and sync reruns snapshot previous browser output
@@ -321,7 +361,7 @@ version switcher that links to historical snapshot HTML pages.
 ## Localization
 
 `portfolio localize` translates human-facing HTML strings without changing
-canonical ODPC, ODPS, or ODPG YAML artifacts.
+canonical ODPC, ODPS, ODPG, or Executive Summary YAML artifacts.
 
 Localization writes:
 
@@ -380,6 +420,10 @@ High-value regression areas:
 - sync does not call an LLM;
 - ProductReference cards link to ODPS product details;
 - product modals render pricing-linked SLA, data quality, access, and payment;
+- Executive Summary renders from `executive-summary.yaml` and falls back
+  honestly when it is missing;
+- Executive Summary priority cards hide technical IDs by default while retaining
+  machine-readable evidence references in `executive-summary.yaml`;
 - graph explorer content is embedded without standalone header/footer copy;
 - localized pages preserve CSS and JavaScript;
 - RTL languages render with `dir="rtl"`;

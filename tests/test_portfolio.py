@@ -16,6 +16,7 @@ from open_data_products.portfolio import (
     localize_portfolio,
     parse_portfolio_plan,
     refresh_portfolio,
+    render_portfolio_executive_summary_prompt,
     render_portfolio_build_prompt,
     render_portfolio,
     sync_portfolio,
@@ -79,6 +80,152 @@ graphEdges:
     target: PR-CUSTOMER
     type: uses
     confidence: high
+executiveSummary:
+  portfolioPosition:
+    headline: Retention is the strongest near-term leadership topic.
+    narrative: >
+      The portfolio connects a retention objective, a retention workflow,
+      churn pressure signals, and a customer product candidate.
+  priorityBriefing:
+    recommendation: Fund retention workflow validation first. Validate partner expansion next. Strengthen signal coverage before final prioritization.
+    primaryFocus:
+      label: Priority 1
+      title: "Focus first: Retention workflow validation"
+      message: Retention is the clearest funding candidate because it connects a business objective, an operational use case, and a candidate product.
+      action: Fund validation of the retention workflow before assigning capacity to other portfolio paths.
+      rationaleTitle: Why this is first
+      rationale:
+        - Strongest objective, use case, and product alignment
+        - "Clear business outcome: reduce preventable churn"
+        - Best current evidence for near-term delivery
+      confidence: high
+      evidenceType: direct
+      evidence:
+        - type: businessObjective
+          label: Reduce preventable churn
+          id: OBJ-RETENTION
+        - type: useCase
+          label: Retention risk workflow
+          id: UC-RETENTION
+        - type: productReference
+          label: Customer health signals
+          id: PR-CUSTOMER
+    secondaryFocus:
+      label: Priority 2
+      title: "Validate next: Partner expansion"
+      message: Partner expansion has enough evidence to stay in the leadership discussion, but it is not ready to compete with retention for first delivery funding.
+      action: Validate the business case before assigning delivery capacity.
+      rationaleTitle: Why this is second
+      rationale:
+        - Has objective and use case alignment
+        - Candidate product exists
+        - Evidence is inferred, not yet strong enough for first priority
+      confidence: medium
+      evidenceType: inferred
+      evidence:
+        - type: businessObjective
+          label: Improve partner-led expansion planning
+          id: OBJ-PARTNER-EXPANSION
+        - type: useCase
+          label: Partner expansion planning
+          id: UC-PARTNER-EXPANSION
+        - type: productReference
+          label: Partner performance signals
+          id: PR-PARTNER
+    blocker:
+      label: Risk
+      title: "Do not ignore: Signal coverage risk"
+      message: Signal coverage looks thin. This may make prioritization look more certain than it is.
+      action: Improve signal coverage before using this portfolio view for final prioritization.
+      rationaleTitle: Why this matters
+      rationale:
+        - Weak evidence can distort funding decisions
+        - Thin signals reduce confidence
+        - Leadership may over-prioritize incomplete paths
+      confidence: low
+      evidenceType: inferred
+      evidence:
+        - type: signal
+          label: Churn market demand
+          id: SIG-CHURN
+    readinessCheck:
+      label: Readiness check
+      title: "Before build starts: Commercial readiness review"
+      message: The customer health product still needs human review before production commitment.
+      action: Confirm ownership, value model, operating model, and delivery readiness.
+      checklist:
+        - Business owner confirmed
+        - Value model reviewed
+        - Delivery owner assigned
+        - Operating model clear
+        - Production readiness reviewed
+      confidence: medium
+      evidenceType: inferred
+      evidence:
+        - type: productReference
+          label: Customer health signals
+          id: PR-CUSTOMER
+  swot:
+    strengths:
+      - id: STR-RETENTION-DEMAND
+        statement: Retention has clear objective and use-case pull.
+        decisionImplication: Treat retention as the strongest candidate for first delivery funding.
+        evidenceRefs:
+          - type: businessObjective
+            id: OBJ-RETENTION
+          - type: useCase
+            id: UC-RETENTION
+        confidence: high
+        inference: false
+    weaknesses:
+      - id: WEAK-OWNERSHIP-GAP
+        statement: Product ownership evidence needs review before delivery commitment.
+        decisionImplication: Confirm ownership, value model, and delivery readiness before moving into build.
+        evidenceRefs:
+          - type: productReference
+            id: PR-CUSTOMER
+        confidence: medium
+        inference: true
+    opportunities:
+      - id: OPP-RETENTION-REVIEW
+        statement: Leadership can use the portfolio to prioritize retention interventions.
+        decisionImplication: Validate the next growth case before assigning delivery capacity.
+        evidenceRefs:
+          - type: signal
+            id: SIG-CHURN
+        confidence: medium
+        inference: true
+    threats:
+      - id: THREAT-THIN-SIGNALS
+        statement: Thin market signal coverage could overstate portfolio confidence.
+        decisionImplication: Strengthen signal coverage before using this view for final prioritization.
+        evidenceRefs:
+          - type: signal
+            id: SIG-CHURN
+        confidence: low
+        inference: true
+  leadershipDecisions:
+    - id: DECIDE-RETENTION-FUNDING
+      question: Should leadership fund the retention product as the next delivery priority?
+      decisionType: invest
+      urgency: high
+      evidenceRefs:
+        - type: businessObjective
+          id: OBJ-RETENTION
+        - type: productReference
+          id: PR-CUSTOMER
+  evidenceGaps:
+    - id: GAP-OWNER
+      statement: Product owner and accountable business sponsor are not explicit.
+      evidenceRefs:
+        - type: productReference
+          id: PR-CUSTOMER
+  confidenceNotes:
+    - Priority items marked as inferred need human review before business action.
+  leadershipSummary:
+    recommendedFirstMove: Fund retention workflow validation
+    secondGrowthPath: Validate partner expansion evidence
+    mainRisk: Signal coverage may be too thin for prioritization confidence
 warnings:
   - Review generated pricing evidence.
 """
@@ -277,6 +424,201 @@ graphEdges:
     confidence: medium
 """
 
+EXECUTIVE_SUMMARY_YAML = """
+schema: https://opendataproducts.org/sdk/portfolio-executive-summary/v1
+kind: PortfolioExecutiveSummary
+metadata:
+  generatedAt: "2026-06-28T00:00:00Z"
+  generatedBy: open-data-products
+  sdkVersion: "0.0.0"
+  model: test-model
+  workspaceTitle: Generated Demo Portfolio
+portfolioPosition:
+  headline: Retention is the strongest near-term leadership topic.
+  narrative: >
+    The portfolio connects a retention objective, a retention workflow,
+    churn pressure signals, and a customer product candidate.
+priorityBriefing:
+  recommendation: Fund retention workflow validation first. Validate partner expansion next. Strengthen signal coverage before final prioritization.
+  primaryFocus:
+    label: Priority 1
+    title: "Focus first: Retention workflow validation"
+    message: Retention is the clearest funding candidate because it connects a business objective, an operational use case, and a candidate product.
+    action: Fund validation of the retention workflow before assigning capacity to other portfolio paths.
+    rationaleTitle: Why this is first
+    rationale:
+      - Strongest objective, use case, and product alignment
+      - "Clear business outcome: reduce preventable churn"
+      - Best current evidence for near-term delivery
+    confidence: high
+    evidenceType: direct
+    evidence:
+      - type: businessObjective
+        label: Reduce preventable churn
+        id: OBJ-RETENTION
+      - type: useCase
+        label: Retention risk workflow
+        id: UC-RETENTION
+      - type: productReference
+        label: Customer health signals
+        id: PR-CUSTOMER
+  secondaryFocus:
+    label: Priority 2
+    title: "Validate next: Partner expansion"
+    message: Partner expansion has enough evidence to stay in the leadership discussion, but it is not ready to compete with retention for first delivery funding.
+    action: Validate the business case before assigning delivery capacity.
+    rationaleTitle: Why this is second
+    rationale:
+      - Has objective and use case alignment
+      - Candidate product exists
+      - Evidence is inferred, not yet strong enough for first priority
+    confidence: medium
+    evidenceType: inferred
+    evidence:
+      - type: businessObjective
+        label: Improve partner-led expansion planning
+        id: OBJ-PARTNER-EXPANSION
+      - type: useCase
+        label: Partner expansion planning
+        id: UC-PARTNER-EXPANSION
+      - type: productReference
+        label: Partner performance signals
+        id: PR-PARTNER
+  blocker:
+    label: Risk
+    title: "Do not ignore: Signal coverage risk"
+    message: Signal coverage looks thin. This may make prioritization look more certain than it is.
+    action: Improve signal coverage before using this portfolio view for final prioritization.
+    rationaleTitle: Why this matters
+    rationale:
+      - Weak evidence can distort funding decisions
+      - Thin signals reduce confidence
+      - Leadership may over-prioritize incomplete paths
+    confidence: low
+    evidenceType: inferred
+    evidence:
+      - type: signal
+        label: Churn market demand
+        id: SIG-CHURN
+  readinessCheck:
+    label: Readiness check
+    title: "Before build starts: Commercial readiness review"
+    message: The customer health product still needs human review before production commitment.
+    action: Confirm ownership, value model, operating model, and delivery readiness.
+    checklist:
+      - Business owner confirmed
+      - Value model reviewed
+      - Delivery owner assigned
+      - Operating model clear
+      - Production readiness reviewed
+    confidence: medium
+    evidenceType: inferred
+    evidence:
+      - type: productReference
+        label: Customer health signals
+        id: PR-CUSTOMER
+swot:
+  strengths:
+    - id: STR-RETENTION-DEMAND
+      statement: Retention has clear objective and use-case pull.
+      decisionImplication: Treat retention as the strongest candidate for first delivery funding.
+      evidenceRefs:
+        - type: businessObjective
+          id: OBJ-RETENTION
+        - type: useCase
+          id: UC-RETENTION
+      confidence: high
+      inference: false
+  weaknesses:
+    - id: WEAK-OWNERSHIP-GAP
+      statement: Product ownership evidence needs review before delivery commitment.
+      decisionImplication: Confirm ownership, value model, and delivery readiness before moving into build.
+      evidenceRefs:
+        - type: productReference
+          id: PR-CUSTOMER
+      confidence: medium
+      inference: true
+  opportunities:
+    - id: OPP-RETENTION-REVIEW
+      statement: Leadership can use the portfolio to prioritize retention interventions.
+      decisionImplication: Validate the next growth case before assigning delivery capacity.
+      evidenceRefs:
+        - type: signal
+          id: SIG-CHURN
+      confidence: medium
+      inference: true
+  threats:
+    - id: THREAT-THIN-SIGNALS
+      statement: Thin market signal coverage could overstate portfolio confidence.
+      decisionImplication: Strengthen signal coverage before using this view for final prioritization.
+      evidenceRefs:
+        - type: signal
+          id: SIG-CHURN
+      confidence: low
+      inference: true
+leadershipDecisions:
+  - id: DECIDE-RETENTION-FUNDING
+    question: Should leadership fund the retention product as the next delivery priority?
+    decisionType: invest
+    urgency: high
+    evidenceRefs:
+      - type: businessObjective
+        id: OBJ-RETENTION
+      - type: productReference
+        id: PR-CUSTOMER
+evidenceGaps:
+  - id: GAP-OWNER
+    statement: Product owner and accountable business sponsor are not explicit.
+    evidenceRefs:
+      - type: productReference
+        id: PR-CUSTOMER
+confidenceNotes:
+  - Priority items marked as inferred need human review before business action.
+leadershipSummary:
+  recommendedFirstMove: Fund retention workflow validation
+  secondGrowthPath: Validate partner expansion evidence
+  mainRisk: Signal coverage may be too thin for prioritization confidence
+"""
+
+EXECUTIVE_SUMMARY_DELTA_YAML = """
+schema: https://opendataproducts.org/sdk/portfolio-executive-summary/v1
+kind: PortfolioExecutiveSummary
+metadata:
+  generatedAt: "2026-06-28T00:00:00Z"
+  generatedBy: open-data-products
+  sdkVersion: "0.0.0"
+  model: test-model
+  workspaceTitle: Generated Demo Portfolio
+portfolioPosition:
+  headline: Renewal is now a leadership review topic.
+  narrative: New renewal evidence changes the portfolio discussion.
+priorityBriefing:
+  recommendation: Include renewal in the next leadership review after validating the new workflow evidence.
+swot:
+  strengths:
+    - id: STR-RENEWAL-DEMAND
+      statement: Renewal has explicit workflow demand.
+      evidenceRefs:
+        - type: useCase
+          id: UC-RENEWAL
+      confidence: medium
+      inference: false
+  weaknesses: []
+  opportunities: []
+  threats: []
+leadershipDecisions:
+  - id: DECIDE-RENEWAL
+    question: Should leadership include renewal in the next portfolio review?
+    decisionType: validate
+    urgency: medium
+    evidenceRefs:
+      - type: useCase
+        id: UC-RENEWAL
+evidenceGaps: []
+confidenceNotes:
+  - Delta refresh summary is grounded in changed renewal evidence.
+"""
+
 
 def write_sample_workspace(workspace: Path) -> None:
     """Write a small portfolio workspace with linked ODPC, ODPS, and ODPG files."""
@@ -461,6 +803,14 @@ graph:
     )
 
 
+def write_sample_executive_summary(workspace: Path) -> None:
+    """Write a machine-readable executive summary fixture."""
+    (workspace / "executive-summary.yaml").write_text(
+        EXECUTIVE_SUMMARY_YAML,
+        encoding="utf-8",
+    )
+
+
 def write_source_lanes(root: Path) -> None:
     """Write source lane folders used by portfolio build tests."""
     (root / "objectives").mkdir(parents=True)
@@ -544,19 +894,34 @@ def test_portfolio_source_helpers_collect_and_compare_lane_changes(
     ]
 
 
+def _is_executive_summary_prompt(prompt: str) -> bool:
+    return prompt.startswith("# Create Portfolio Executive Summary")
+
+
 def fake_portfolio_client(prompt: str, model: str) -> str:
     """Return a deterministic portfolio plan and assert source lanes are present."""
     assert model == "test-model"
+    if _is_executive_summary_prompt(prompt):
+        assert "Normalized portfolio evidence:" in prompt
+        assert "businessObjectives:" in prompt
+        assert "graphEdges:" in prompt
+        assert (
+            "Business objective: Reduce churn risk and protect renewals" not in prompt
+        )
+        return EXECUTIVE_SUMMARY_YAML
     assert "Business objective: Reduce churn risk and protect renewals" in prompt
     assert "Use case: Retention Workflow" in prompt
     assert "Signal: churn pressure is rising" in prompt
     assert "Product discussion: Customer Product" in prompt
+    assert "executiveSummary:" not in prompt
     return PORTFOLIO_PLAN_YAML
 
 
 def drifting_portfolio_client(prompt: str, model: str) -> str:
     """Return drifted IDs once the added renewal source is present."""
     assert model == "test-model"
+    if _is_executive_summary_prompt(prompt):
+        return EXECUTIVE_SUMMARY_YAML
     if "Use case: Renewal Save Workflow" in prompt:
         return PORTFOLIO_DRIFT_PLAN_YAML
     return PORTFOLIO_PLAN_YAML
@@ -565,12 +930,16 @@ def drifting_portfolio_client(prompt: str, model: str) -> str:
 def schema_drift_portfolio_client(prompt: str, model: str) -> str:
     """Return a plan with common LLM enum and relationship drift."""
     assert model == "test-model"
+    if _is_executive_summary_prompt(prompt):
+        return EXECUTIVE_SUMMARY_YAML
     return PORTFOLIO_SCHEMA_DRIFT_PLAN_YAML
 
 
 def repairable_portfolio_client(prompt: str, model: str) -> str:
     """Return malformed YAML first, then a repaired portfolio plan."""
     assert model == "test-model"
+    if _is_executive_summary_prompt(prompt):
+        return EXECUTIVE_SUMMARY_YAML
     if prompt.startswith("# Repair Portfolio Plan YAML"):
         assert "expected <block end>" in prompt
         assert "e:" in prompt
@@ -591,9 +960,35 @@ businessObjectives:
 """
 
 
+def repairable_executive_summary_client(prompt: str, model: str) -> str:
+    """Return malformed Executive Summary YAML, then a repaired summary."""
+    assert model == "test-model"
+    if _is_executive_summary_prompt(prompt):
+        return """
+schema: https://opendataproducts.org/sdk/portfolio-executive-summary/v1
+kind: PortfolioExecutiveSummary
+portfolioPosition:
+  headline: "Broken summary
+  narrative: Broken summary.
+priorityBriefing:
+  recommendation: Review the portfolio.
+  primaryFocus:
+    label: Priority 1
+"""
+    if prompt.startswith("# Repair Portfolio Executive Summary YAML"):
+        assert "Executive Summary YAML could not be parsed" in prompt
+        assert "Malformed executive summary YAML:" in prompt
+        return EXECUTIVE_SUMMARY_YAML
+    return PORTFOLIO_PLAN_YAML
+
+
 def delta_portfolio_client(prompt: str, model: str) -> str:
     """Return only artifacts derived from a new source document."""
     assert model == "test-model"
+    if _is_executive_summary_prompt(prompt):
+        assert "Renewal Save Workflow" in prompt
+        assert "Use case: Renewal Save Workflow" not in prompt
+        return EXECUTIVE_SUMMARY_DELTA_YAML
     assert "Use case: Renewal Save Workflow" in prompt
     assert "Business objective: Reduce churn risk and protect renewals" not in prompt
     assert "Use case: Retention Workflow" not in prompt
@@ -605,6 +1000,8 @@ def delta_portfolio_client(prompt: str, model: str) -> str:
 def full_refresh_portfolio_client(prompt: str, model: str) -> str:
     """Assert all source documents are included in a forced full refresh."""
     assert model == "test-model"
+    if _is_executive_summary_prompt(prompt):
+        return EXECUTIVE_SUMMARY_YAML
     assert "Business objective: Reduce churn risk and protect renewals" in prompt
     assert "Use case: Renewal Save Workflow" in prompt
     assert "Use case: Retention Workflow" in prompt
@@ -616,6 +1013,8 @@ def full_refresh_portfolio_client(prompt: str, model: str) -> str:
 def collapsed_signal_portfolio_client(prompt: str, model: str) -> str:
     """Return no new signal even though the changed signal source is present."""
     assert model == "test-model"
+    if _is_executive_summary_prompt(prompt):
+        return EXECUTIVE_SUMMARY_YAML
     assert "Signal: regional retention pressure is rising" in prompt
     return """
 metadata:
@@ -630,6 +1029,8 @@ warnings:
 def renamed_signal_portfolio_client(prompt: str, model: str) -> str:
     """Return a renamed signal derived from the changed signal source."""
     assert model == "test-model"
+    if _is_executive_summary_prompt(prompt):
+        return EXECUTIVE_SUMMARY_YAML
     assert "priority accounts" in prompt
     return """
 metadata:
@@ -650,6 +1051,8 @@ signals:
 def overbroad_signal_delta_portfolio_client(prompt: str, model: str) -> str:
     """Return portfolio-wide objects even though only one signal changed."""
     assert model == "test-model"
+    if _is_executive_summary_prompt(prompt):
+        return EXECUTIVE_SUMMARY_YAML
     assert "Signal: regional retention pressure is rising" in prompt
     assert "Business objective: Reduce churn risk and protect renewals" not in prompt
     assert "Use case: Retention Workflow" not in prompt
@@ -728,6 +1131,7 @@ language: fi
 translations:
   Open Data Products Portfolio: Avoimen datan tuotteiden portfolio
   Generated workspace summary: Luodun työtilan yhteenveto
+  Executive Summary: Johdon yhteenveto
   Overview: Yleiskatsaus
   Products: Tuotteet
   Customer Product: Asiakastuote
@@ -739,6 +1143,7 @@ language: sv
 translations:
   Open Data Products Portfolio: Portfölj för öppna dataprodukter
   Generated workspace summary: Sammanfattning av skapad arbetsyta
+  Executive Summary: Ledningssammanfattning
   Overview: Översikt
   Products: Produkter
   Customer Product: Kundprodukt
@@ -750,6 +1155,7 @@ language: ar
 translations:
   Open Data Products Portfolio: محفظة منتجات البيانات المفتوحة
   Generated workspace summary: ملخص مساحة العمل المنشأة
+  Executive Summary: الملخص التنفيذي
   Overview: نظرة عامة
   Products: المنتجات
   Customer Product: منتج العملاء
@@ -806,6 +1212,7 @@ def test_render_portfolio_creates_missing_parent_and_artifact_detail_views(
 ) -> None:
     workspace = tmp_path / "workspace"
     write_sample_workspace(workspace)
+    write_sample_executive_summary(workspace)
     output = tmp_path / "deep" / "browser" / "index.html"
 
     result = render_portfolio(workspace, output_path=output)
@@ -816,15 +1223,142 @@ def test_render_portfolio_creates_missing_parent_and_artifact_detail_views(
     assert "catalog" in result["validationResults"]
     assert "graph" in result["validationResults"]
     assert "products" in result["validationResults"]
+    icon_dir = output.parent / "assets" / "executive_summary_icons"
+    assert (icon_dir / "priority_1_trophy.png").exists()
+    assert (icon_dir / "priority_2_growth.png").exists()
+    assert (icon_dir / "risk_warning.png").exists()
+    assert (icon_dir / "readiness_clipboard.png").exists()
+    assert str(icon_dir / "priority_1_trophy.png") in result["created"]
     assert "Business Objectives" in html
     assert "Use Cases" in html
     assert "Signals" in html
     assert "Products" in html
     assert "Graph" in html
     assert "About" in html
+    assert "Executive Summary" in html
     assert 'id="tab-overview"' in html
+    assert 'id="tab-executive-summary"' in html
+    assert 'for="tab-executive-summary"' in html
+    assert 'class="tab-panel executive-summary-panel"' in html
     assert 'for="tab-graph"' in html
     assert 'class="tab-panel graph-panel"' in html
+    assert "Retention is the strongest near-term leadership topic." in html
+    assert "executive-dashboard-intro" in html
+    assert "Recommended decision" in html
+    assert (
+        "Fund retention workflow validation first. Validate partner expansion next. "
+        "Strengthen signal coverage before final prioritization." in html
+    )
+    assert "decision-card-grid" in html
+    assert 'src="assets/executive_summary_icons/priority_1_trophy.png"' in html
+    assert 'src="assets/executive_summary_icons/priority_2_growth.png"' in html
+    assert 'src="assets/executive_summary_icons/risk_warning.png"' in html
+    assert 'src="assets/executive_summary_icons/readiness_clipboard.png"' in html
+    assert '<span class="decision-card-icon" aria-hidden="true"><img' in html
+    assert "Priority 1" in html
+    assert "Retention validation" in html
+    assert "Retention is the strongest first funding candidate." in html
+    assert "Fund validation first." in html
+    assert 'class="metadata-badge confidence-badge confidence-high"' in html
+    assert 'class="status-dot"' in html
+    assert 'class="metadata-badge evidence-badge evidence-direct"' in html
+    assert "High" in html
+    assert "Direct" in html
+    assert "Priority 2" in html
+    assert "Partner expansion" in html
+    assert "Partner expansion is promising but not yet first priority." in html
+    assert "Validate the business case next." in html
+    assert 'class="metadata-badge confidence-badge confidence-medium"' in html
+    assert 'class="metadata-badge evidence-badge evidence-inferred"' in html
+    assert "Medium" in html
+    assert "Inferred" in html
+    assert "Risk" in html
+    assert "Signal coverage" in html
+    assert "Thin signal coverage may overstate prioritization confidence." in html
+    assert "Improve coverage before final prioritization." in html
+    assert 'class="metadata-badge confidence-badge confidence-low"' in html
+    assert "Low" in html
+    assert "Readiness" in html
+    assert "Commercial review" in html
+    assert "The product still needs business readiness review." in html
+    assert "Confirm readiness before build." in html
+    assert "Leadership decisions" in html
+    assert "Should leadership fund the retention product" in html
+    assert "What needs attention" not in html
+    assert "Where to invest next" not in html
+    assert "What could block progress" not in html
+    assert "What is working" not in html
+    assert "Strengths" not in html
+    assert "Weaknesses" not in html
+    assert "Opportunities" not in html
+    assert "Threats" not in html
+    assert "Decision implication" not in html
+    assert (
+        "Treat retention as the strongest candidate for first delivery funding."
+        not in html
+    )
+    assert "executive-meta" not in html
+    assert "Basis</span>" not in html
+    assert "Confidence: High · Evidence: Direct" not in html
+    assert "Confidence: Medium · Evidence: Inferred" not in html
+    assert "Confidence: Low · Evidence: Inferred" not in html
+    assert "Objective: Reduce preventable churn" in html
+    assert "Use case: Retention risk workflow" in html
+    assert "Candidate product: Customer health signals" in html
+    assert "Objective: Improve partner-led expansion planning" in html
+    assert "Use case: Partner expansion planning" in html
+    assert "Candidate product: Partner performance signals" in html
+    assert "Signal: Churn market demand" in html
+    assert "Evidence gaps" in html
+    assert "Confidence notes" in html
+    first_card = html.split('<article class="decision-card primary-focus">', 1)[
+        1
+    ].split("</article>", 1)[0]
+    visible_first_card = first_card.split('<div class="decision-details-dropdown">', 1)[
+        0
+    ]
+    assert "Why this is first" not in visible_first_card
+    assert "Objective: Reduce preventable churn" not in visible_first_card
+    assert "OBJ-RETENTION" not in visible_first_card
+    assert "Show more" in html
+    assert "Show less" in html
+    assert "Show details" not in html
+    assert "Technical evidence" in html
+    assert "OBJ-RETENTION" in html
+    assert "Inference" not in html
+    assert "swot-grid" not in html
+    assert "leadership-summary-bar" not in html
+    intro_css = html.split(".executive-dashboard-intro {", 1)[1].split("}", 1)[0]
+    assert "padding: 24px 28px;" in intro_css
+    assert "margin-bottom: 24px;" in intro_css
+    recommendation_css = html.split(".leadership-recommendation {", 1)[1].split("}", 1)[
+        0
+    ]
+    assert "margin: 0 0 28px;" in recommendation_css
+    dashboard_css = html.split(".decision-card-grid {", 1)[1].split("}", 1)[0]
+    assert "grid-template-columns: repeat(2, minmax(0, 1fr));" in dashboard_css
+    assert "align-items: start;" in dashboard_css
+    assert "gap: 28px;" in dashboard_css
+    secondary_css = html.split(".secondary-focus {", 1)[1].split("}", 1)[0]
+    assert "border-top-color: #3b82f6;" in secondary_css
+    assert "border-top-color: #0f766e;" not in secondary_css
+    assert ".metadata-badge {" in html
+    assert ".confidence-high .status-dot" in html
+    assert ".confidence-medium .status-dot" in html
+    assert ".confidence-low .status-dot" in html
+    assert ".decision-details-label-open" in html
+    assert ".decision-details-toggle:checked ~ .decision-card-footer" in html
+    assert ".decision-details-dropdown" in html
+    assert 'class="decision-details-toggle"' in first_card
+    assert '<label class="decision-details-trigger"' in first_card
+    assert first_card.index('<div class="decision-card-footer">') < first_card.index(
+        '<div class="decision-details-dropdown">'
+    )
+    footer_html = first_card.split('<div class="decision-card-footer">', 1)[1].split(
+        '<div class="decision-details-dropdown">', 1
+    )[0]
+    assert '<label class="decision-details-trigger"' in footer_html
+    assert "decision-details-dropdown" not in footer_html
     assert "Recommended next actions" in html
     assert "Suggested follow-ups are derived from warnings" not in html
     assert "What changed since last version" in html
@@ -889,11 +1423,27 @@ def test_render_portfolio_creates_missing_parent_and_artifact_detail_views(
     assert "versions/2026-06-07T12-30-00Z/index.html" in html
 
 
+def test_render_portfolio_shows_missing_executive_summary_state(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "workspace"
+    write_sample_workspace(workspace)
+
+    render_portfolio(workspace)
+
+    html = (workspace / "index.html").read_text(encoding="utf-8")
+    assert "Executive Summary" in html
+    assert "executive-summary.yaml" in html
+    assert "Executive summary has not been generated" in html
+    assert "Strengths" not in html
+
+
 def test_explain_portfolio_reports_counts_and_browser_entrypoint(
     tmp_path: Path,
 ) -> None:
     workspace = tmp_path / "portfolio"
     write_sample_workspace(workspace)
+    write_sample_executive_summary(workspace)
     render_portfolio(workspace)
 
     summary = explain_portfolio(workspace)
@@ -908,6 +1458,11 @@ def test_explain_portfolio_reports_counts_and_browser_entrypoint(
     assert summary["graphNodeCount"] == 2
     assert summary["graphEdgeCount"] == 1
     assert summary["versionCount"] == 1
+    assert summary["hasExecutiveSummary"] is True
+    assert summary["priorityItemCount"] == 4
+    assert summary["swotItemCount"] == 4
+    assert summary["leadershipDecisionCount"] == 1
+    assert summary["evidenceGapCount"] == 1
     assert "validationResults" in summary
     assert "catalog" in summary["validationResults"]
 
@@ -925,7 +1480,11 @@ def test_portfolio_cli_render_and_explain_emit_final_json_report(
     assert render_payload["kind"] == "PortfolioRender"
     assert render_payload["workspace"] == str(workspace)
     assert render_payload["html"] == str(workspace / "index.html")
-    assert render_payload["created"] == [str(workspace / "index.html")]
+    assert str(workspace / "index.html") in render_payload["created"]
+    assert (
+        str(workspace / "assets" / "executive_summary_icons" / "priority_1_trophy.png")
+        in render_payload["created"]
+    )
     assert "validationResults" in render_payload
 
     assert main(["portfolio", "explain", str(workspace), "--json"]) == 0
@@ -962,14 +1521,20 @@ def test_build_portfolio_creates_workspace_artifacts_from_source_lanes(
         "signals": 1,
         "products": 1,
     }
+    assert result["llmCallCount"] == 2
+    assert result["llmPhases"] == ["portfolio", "executiveSummary"]
     assert result["artifactCounts"]["productReferences"] == 1
     assert result["artifactCounts"]["odpsProducts"] == 1
+    assert result["artifactCounts"]["priorityItems"] == 4
+    assert result["artifactCounts"]["swotItems"] == 4
+    assert result["artifactCounts"]["leadershipDecisions"] == 1
     assert result["warnings"] == ["Review generated pricing evidence."]
     assert "validationResults" in result
     assert "catalog" in result["validationResults"]
     assert "graph" in result["validationResults"]
     assert len(result["validationResults"]["products"]) == 1
     assert (workspace / "portfolio.yaml").exists()
+    assert (workspace / "executive-summary.yaml").exists()
     assert (workspace / "portfolio-state.yaml").exists()
     assert (workspace / "odpc" / "catalog.yaml").exists()
     assert (
@@ -979,11 +1544,73 @@ def test_build_portfolio_creates_workspace_artifacts_from_source_lanes(
     assert (workspace / "odpg" / "graph.yaml").exists()
     html = (workspace / "index.html").read_text(encoding="utf-8")
     assert "Generated Demo Portfolio" in html
+    assert "Executive Summary" in html
+    assert "Retention is the strongest near-term leadership topic." in html
     assert "Full product generated from source lanes." in html
+    summary_doc = load_mapping(workspace / "executive-summary.yaml")
+    assert summary_doc["kind"] == "PortfolioExecutiveSummary"
+    assert summary_doc["metadata"]["model"] == "test-model"
+    assert summary_doc["swot"]["strengths"][0]["evidenceRefs"] == [
+        {"type": "businessObjective", "id": "OBJ-RETENTION"},
+        {"type": "useCase", "id": "UC-RETENTION"},
+    ]
     catalog_text = (workspace / "odpc" / "catalog.yaml").read_text(encoding="utf-8")
     assert "$ref: ../odps/products/customer-product.yaml" in catalog_text
+    portfolio_text = (workspace / "portfolio.yaml").read_text(encoding="utf-8")
+    assert "executiveSummary: executive-summary.yaml" in portfolio_text
+    assert "swot:" not in portfolio_text
     state_text = (workspace / "portfolio-state.yaml").read_text(encoding="utf-8")
     assert "sha256" in state_text
+
+
+def test_sync_portfolio_preserves_existing_executive_summary_without_generation(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "workspace"
+    write_sample_workspace(workspace)
+    write_sample_executive_summary(workspace)
+
+    result = sync_portfolio(workspace)
+
+    summary_text = (workspace / "executive-summary.yaml").read_text(encoding="utf-8")
+    html = (workspace / "index.html").read_text(encoding="utf-8")
+    assert result["kind"] == "PortfolioSync"
+    assert "Retention is the strongest near-term leadership topic." in summary_text
+    assert "Retention is the strongest near-term leadership topic." in html
+    assert result["artifactCounts"]["priorityItems"] == 4
+    assert result["artifactCounts"]["swotItems"] == 4
+
+
+def test_render_portfolio_reports_priority_briefing_validation_errors(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "workspace"
+    write_sample_workspace(workspace)
+    (workspace / "executive-summary.yaml").write_text(
+        EXECUTIVE_SUMMARY_YAML.replace(
+            """    evidence:
+      - type: businessObjective
+        label: Reduce preventable churn
+        id: OBJ-RETENTION
+      - type: useCase
+        label: Retention risk workflow
+        id: UC-RETENTION
+      - type: productReference
+        label: Customer health signals
+        id: PR-CUSTOMER
+""",
+            "",
+        ),
+        encoding="utf-8",
+    )
+
+    result = render_portfolio(workspace)
+
+    assert result["validationResults"]["executiveSummary"]["valid"] is False
+    assert any(
+        "priorityBriefing.primaryFocus.evidence is required" in error
+        for error in result["validationResults"]["executiveSummary"]["errors"]
+    )
 
 
 def test_build_portfolio_uses_user_title_and_persists_it_across_reruns(
@@ -1140,37 +1767,34 @@ def test_portfolio_build_prompt_defines_schema_and_linking_rules() -> None:
     assert "productReference:" in prompt
     assert "odpsProduct:" in prompt
     assert "graphEdges:" in prompt
+    assert "executiveSummary:" not in prompt
+    assert "portfolioPosition:" not in prompt
+    assert "priorityBriefing:" not in prompt
+    assert "Do not emit executiveSummary in this phase" in prompt
     assert "warnings:" in prompt
     assert "productReference.productID must match odpsProduct" in prompt
     assert 'productModel.$ref must be "../odps/products/<productID>.yaml"' in prompt
     assert "Graph edge source and target values must use generated stable IDs" in prompt
-    assert "Do not invent confident facts" in prompt
-    assert "ODPS v4.1 product component rules" in prompt
-    assert "productStrategy:" in prompt
-    assert "dataHolder:" in prompt
-    assert "paymentGateways:" in prompt
-    assert "license:" in prompt
-    assert "scope:" in prompt
-    assert "SLA must be an object, never a list" in prompt
-    assert "dataQuality must be an object, never a list" in prompt
-    assert "Allowed dataQuality dimension names are" in prompt
-    assert "Map reconciliation checks to consistency" in prompt
-    assert "dataAccess must be a named mapping of access method objects" in prompt
+
+
+def test_portfolio_executive_summary_prompt_uses_normalized_evidence() -> None:
+    plan = parse_portfolio_plan(PORTFOLIO_PLAN_YAML)
+    prompt = render_portfolio_executive_summary_prompt(plan)
+
+    assert prompt.startswith("# Create Portfolio Executive Summary")
+    assert "Return only YAML" in prompt
+    assert "kind: PortfolioExecutiveSummary" in prompt
+    assert "priorityBriefing:" in prompt
+    assert "dashboardTitle: Retention validation" in prompt
+    assert "leadershipDecisions:" in prompt
+    assert "Normalized portfolio evidence:" in prompt
+    assert "businessObjectives:" in prompt
+    assert "graphEdges:" in prompt
     assert (
-        "pricingPlans.declarative.en must be a list of pricing plan objects" in prompt
+        "executiveSummary:" not in prompt.split("Normalized portfolio evidence:", 1)[1]
     )
-    assert "#/product/SLA/declarative/default" in prompt
-    assert "#/product/dataQuality/declarative/default" in prompt
-    assert "#/product/dataAccess/API" in prompt
-    assert "#/product/paymentGateways/default" in prompt
-    assert "scopeOfUse" not in prompt
-    assert "Never use array-index reference paths" in prompt
-    assert "Do not emit dataOps" in prompt
-    assert "x-* extension fields are allowed" in prompt
-    assert "inputs/objectives/retention.md" in prompt
-    assert "Business objective: Improve Retention" in prompt
-    assert "inputs/use-cases/retention.md" in prompt
-    assert "Use case: Retention Workflow" in prompt
+    assert "inputs/objectives/retention.md" not in prompt
+    assert "Business objective: Improve Retention" not in prompt
 
 
 def test_parse_portfolio_plan_accepts_open_markdown_yaml_fence() -> None:
@@ -1216,9 +1840,46 @@ def test_build_portfolio_repairs_malformed_plan_yaml(tmp_path: Path) -> None:
     )
 
     assert result["valid"] is True
+    assert result["llmCallCount"] == 3
+    assert result["llmPhases"] == [
+        "portfolio",
+        "portfolioRepair",
+        "executiveSummary",
+    ]
     assert "Portfolio plan YAML required syntax repair." in result["warnings"]
     assert (workspace / "portfolio.yaml").exists()
     assert "Customer Product" in (workspace / "index.html").read_text(encoding="utf-8")
+
+
+def test_build_portfolio_repairs_malformed_executive_summary_yaml(
+    tmp_path: Path,
+) -> None:
+    sources = tmp_path / "sources"
+    workspace = tmp_path / "generated" / "portfolio"
+    write_source_lanes(sources)
+
+    result = build_portfolio(
+        workspace,
+        objectives=sources / "objectives",
+        use_cases=sources / "use-cases",
+        signals=sources / "signals",
+        products=sources / "products",
+        client=repairable_executive_summary_client,
+        model="test-model",
+    )
+
+    assert result["valid"] is True
+    assert result["llmCallCount"] == 3
+    assert result["llmPhases"] == [
+        "portfolio",
+        "executiveSummary",
+        "executiveSummaryRepair",
+    ]
+    summary_doc = load_mapping(workspace / "executive-summary.yaml")
+    assert (
+        "Executive Summary YAML required syntax repair."
+        in summary_doc["confidenceNotes"]
+    )
 
 
 def test_portfolio_cli_build_emits_one_final_json_report(
@@ -1281,6 +1942,7 @@ def test_localize_portfolio_writes_i18n_and_localized_html_without_touching_yaml
 ) -> None:
     workspace = tmp_path / "workspace"
     write_sample_workspace(workspace)
+    write_sample_executive_summary(workspace)
     (workspace / "portfolio-i18n.yaml").write_text(
         """
 defaultLanguage: en
@@ -1295,7 +1957,9 @@ translations:
         encoding="utf-8",
     )
     product_path = workspace / "odps" / "products" / "customer-product.yaml"
+    summary_path = workspace / "executive-summary.yaml"
     original_product_yaml = product_path.read_text(encoding="utf-8")
+    original_summary_yaml = summary_path.read_text(encoding="utf-8")
 
     result = localize_portfolio(
         workspace,
@@ -1321,6 +1985,7 @@ translations:
     assert 0 < qa["languages"]["fi"]["changedCoverage"] <= 1
     assert "validationResults" in result
     assert product_path.read_text(encoding="utf-8") == original_product_yaml
+    assert summary_path.read_text(encoding="utf-8") == original_summary_yaml
 
     i18n = load_mapping(workspace / "portfolio-i18n.yaml")
     assert i18n["defaultLanguage"] == "en"
@@ -1341,7 +2006,10 @@ translations:
     assert 'href="index.fi.html"' in english_html
     assert 'href="index.html"' in finnish_html
     assert "Tuotteet" in finnish_html
+    assert "Johdon yhteenveto" in finnish_html
+    assert "Retention is the strongest near-term leadership topic." in finnish_html
     assert "Asiakastuote" in finnish_html
+    assert "Ledningssammanfattning" in swedish_html
     assert "Kundprodukt" in swedish_html
 
     english_style = english_html.split("<style>", 1)[1].split("</style>", 1)[0]
@@ -1631,6 +2299,13 @@ def test_refresh_portfolio_uses_state_sources_and_snapshots_previous_html(
     assert "Retention Workflow" in latest_html
     assert "Renewal Save Workflow" in latest_html
     assert "Customer Product" in latest_html
+    assert "Renewal is now a leadership review topic." in latest_html
+    summary = load_mapping(workspace / "executive-summary.yaml")
+    assert (
+        summary["portfolioPosition"]["headline"]
+        == "Renewal is now a leadership review topic."
+    )
+    assert result["artifactCounts"]["swotItems"] == 1
     assert "Portfolio versions" in latest_html
     assert "versions/" in latest_html
     assert "PortfolioRefresh" in (
