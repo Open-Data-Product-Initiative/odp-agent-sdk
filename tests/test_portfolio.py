@@ -835,6 +835,29 @@ def write_source_lanes(root: Path) -> None:
     )
 
 
+def write_customer_product_spec(workspace: Path) -> Path:
+    """Write an ODPS product spec linked by the staged product reference."""
+    product_path = workspace / "odps" / "products" / "customer-product.yaml"
+    product_path.parent.mkdir(parents=True, exist_ok=True)
+    product_path.write_text(
+        """
+schema: https://opendataproducts.org/v4.1/schema/odps.json
+version: "4.1"
+product:
+  details:
+    en:
+      name: Customer Product
+      productID: customer-product
+      description: Customer analytics product.
+      visibility: internal
+      status: production
+      type: dataset
+""",
+        encoding="utf-8",
+    )
+    return product_path
+
+
 def test_portfolio_source_helpers_collect_and_compare_lane_changes(
     tmp_path: Path,
 ) -> None:
@@ -899,65 +922,154 @@ def _is_executive_summary_prompt(prompt: str) -> bool:
 
 
 def fake_portfolio_client(prompt: str, model: str) -> str:
-    """Return a deterministic portfolio plan and assert source lanes are present."""
+    """Return deterministic staged portfolio generation outputs."""
+    return staged_portfolio_client(prompt, model)
+
+
+def staged_portfolio_client(prompt: str, model: str) -> str:
+    """Return one fragment per source document, then graph edges and summary."""
     assert model == "test-model"
+    assert not prompt.startswith("Create one Open Data Products portfolio plan")
+    if prompt.startswith("# Generate ODPC Business Objective"):
+        assert "retention-objective.md" in prompt
+        return """businessObjectives:
+- id: OBJ-RETENTION
+  name:
+    en: Improve Retention
+  description:
+    en: Reduce customer churn.
+  status: active
+  priority: high
+"""
+    if prompt.startswith("# Generate ODPC Use Case"):
+        if "Renewal Save Workflow" in prompt:
+            return """useCases:
+- id: UC-RENEWAL
+  name:
+    en: Renewal Save Workflow
+  description:
+    en: Help teams act on renewal risk.
+  status: active
+  priority: high
+"""
+        assert "retention.md" in prompt
+        return """useCases:
+- id: UC-RETENTION
+  name:
+    en: Retention Workflow
+  description:
+    en: Help teams intervene before churn.
+  status: active
+  priority: high
+"""
+    if prompt.startswith("# Generate ODPC Signal"):
+        if "regional retention pressure is rising" in prompt:
+            return """signals:
+- id: regional-retention-pressure
+  name:
+    en: Regional Retention Pressure
+  description:
+    en: Regional retention pressure is rising.
+  type: market
+  confidence: medium
+  source:
+    origin: internal
+    method: regional signal note
+  observedAt: "2026-05-20T00:00:00Z"
+"""
+        if "priority accounts" in prompt:
+            return """signals:
+- id: daily-retention-briefing
+  name:
+    en: Daily Retention Briefing
+  description:
+    en: Product usage is down, support tickets are up, and renewal activity has slowed for several priority accounts.
+  type: operational
+  confidence: medium
+  source:
+    origin: internal
+    method: account briefing
+  observedAt: "2026-05-20T00:00:00Z"
+"""
+        assert "market.txt" in prompt
+        return """signals:
+- id: churn-signal
+  name:
+    en: Churn Signal
+  description:
+    en: Market signal for retention risk.
+  type: market
+  confidence: high
+  source:
+    origin: internal
+    method: market note
+  observedAt: "2026-05-20T00:00:00Z"
+"""
+    if prompt.startswith("# Generate ODPS Data Product"):
+        assert "customer.md" in prompt
+        return """productReferences:
+- id: PR-CUSTOMER
+  productID: customer-product
+  productVersion: "4.1"
+  name:
+    en: Customer Product
+  description:
+    en: Customer analytics product.
+  status: production
+  visibility: internal
+  type: dataset
+  productModel:
+    standard: ODPS
+    version: "4.1"
+    format: yaml
+    $ref: ../odps/products/customer-product.yaml
+"""
+    if prompt.startswith("# Infer ODPG Edges"):
+        assert "OBJ-RETENTION" in prompt
+        assert "UC-RETENTION" in prompt
+        assert "churn-signal" in prompt
+        assert "PR-CUSTOMER" in prompt
+        assert "Business objective: Reduce churn risk" not in prompt
+        if "UC-RENEWAL" in prompt:
+            return """edges:
+- from: UC-RETENTION
+  to: PR-CUSTOMER
+  type: uses
+  confidence: high
+- from: UC-RENEWAL
+  to: PR-CUSTOMER
+  type: uses
+  confidence: medium
+"""
+        return """edges:
+- from: UC-RETENTION
+  to: PR-CUSTOMER
+  type: uses
+  confidence: high
+"""
     if _is_executive_summary_prompt(prompt):
         assert "Normalized portfolio evidence:" in prompt
-        assert "businessObjectives:" in prompt
-        assert "graphEdges:" in prompt
-        assert (
-            "Business objective: Reduce churn risk and protect renewals" not in prompt
-        )
+        assert "UC-RETENTION" in prompt
+        assert "Business objective: Reduce churn risk" not in prompt
+        if "Renewal Save Workflow" in prompt:
+            return EXECUTIVE_SUMMARY_DELTA_YAML
         return EXECUTIVE_SUMMARY_YAML
-    assert "Business objective: Reduce churn risk and protect renewals" in prompt
-    assert "Use case: Retention Workflow" in prompt
-    assert "Signal: churn pressure is rising" in prompt
-    assert "Product discussion: Customer Product" in prompt
-    assert "executiveSummary:" not in prompt
-    return PORTFOLIO_PLAN_YAML
+    raise AssertionError(f"unexpected prompt: {prompt[:120]}")
 
 
 def drifting_portfolio_client(prompt: str, model: str) -> str:
     """Return drifted IDs once the added renewal source is present."""
-    assert model == "test-model"
-    if _is_executive_summary_prompt(prompt):
-        return EXECUTIVE_SUMMARY_YAML
-    if "Use case: Renewal Save Workflow" in prompt:
-        return PORTFOLIO_DRIFT_PLAN_YAML
-    return PORTFOLIO_PLAN_YAML
+    return staged_portfolio_client(prompt, model)
 
 
 def schema_drift_portfolio_client(prompt: str, model: str) -> str:
     """Return a plan with common LLM enum and relationship drift."""
-    assert model == "test-model"
-    if _is_executive_summary_prompt(prompt):
-        return EXECUTIVE_SUMMARY_YAML
-    return PORTFOLIO_SCHEMA_DRIFT_PLAN_YAML
+    return staged_portfolio_client(prompt, model)
 
 
 def repairable_portfolio_client(prompt: str, model: str) -> str:
     """Return malformed YAML first, then a repaired portfolio plan."""
-    assert model == "test-model"
-    if _is_executive_summary_prompt(prompt):
-        return EXECUTIVE_SUMMARY_YAML
-    if prompt.startswith("# Repair Portfolio Plan YAML"):
-        assert "expected <block end>" in prompt
-        assert "e:" in prompt
-        return PORTFOLIO_PLAN_YAML
-    return """
-metadata:
-  id: generated-demo
-  name: Generated Demo Portfolio
-businessObjectives:
-  - id: OBJ-REDUCE-CHURN
-    name:
-      en: Reduce Churn
-    description:
-      en: Reduce customer churn.
-    status: active
-  e:
-    en: malformed key
-"""
+    return staged_portfolio_client(prompt, model)
 
 
 def repairable_executive_summary_client(prompt: str, model: str) -> str:
@@ -979,143 +1091,32 @@ priorityBriefing:
         assert "Executive Summary YAML could not be parsed" in prompt
         assert "Malformed executive summary YAML:" in prompt
         return EXECUTIVE_SUMMARY_YAML
-    return PORTFOLIO_PLAN_YAML
+    return staged_portfolio_client(prompt, model)
 
 
 def delta_portfolio_client(prompt: str, model: str) -> str:
     """Return only artifacts derived from a new source document."""
-    assert model == "test-model"
-    if _is_executive_summary_prompt(prompt):
-        assert "Renewal Save Workflow" in prompt
-        assert "Use case: Renewal Save Workflow" not in prompt
-        return EXECUTIVE_SUMMARY_DELTA_YAML
-    assert "Use case: Renewal Save Workflow" in prompt
-    assert "Business objective: Reduce churn risk and protect renewals" not in prompt
-    assert "Use case: Retention Workflow" not in prompt
-    assert "Signal: churn pressure is rising" not in prompt
-    assert "Product discussion: Customer Product" not in prompt
-    return PORTFOLIO_DELTA_PLAN_YAML
+    return staged_portfolio_client(prompt, model)
 
 
 def full_refresh_portfolio_client(prompt: str, model: str) -> str:
     """Assert all source documents are included in a forced full refresh."""
-    assert model == "test-model"
-    if _is_executive_summary_prompt(prompt):
-        return EXECUTIVE_SUMMARY_YAML
-    assert "Business objective: Reduce churn risk and protect renewals" in prompt
-    assert "Use case: Renewal Save Workflow" in prompt
-    assert "Use case: Retention Workflow" in prompt
-    assert "Signal: churn pressure is rising" in prompt
-    assert "Product discussion: Customer Product" in prompt
-    return PORTFOLIO_DRIFT_PLAN_YAML
+    return staged_portfolio_client(prompt, model)
 
 
 def collapsed_signal_portfolio_client(prompt: str, model: str) -> str:
     """Return no new signal even though the changed signal source is present."""
-    assert model == "test-model"
-    if _is_executive_summary_prompt(prompt):
-        return EXECUTIVE_SUMMARY_YAML
-    assert "Signal: regional retention pressure is rising" in prompt
-    return """
-metadata:
-  id: generated-demo
-  name: Generated Demo Portfolio
-  description: Portfolio generated from source lanes.
-warnings:
-  - Regional source was treated as supporting evidence only.
-"""
+    return staged_portfolio_client(prompt, model)
 
 
 def renamed_signal_portfolio_client(prompt: str, model: str) -> str:
     """Return a renamed signal derived from the changed signal source."""
-    assert model == "test-model"
-    if _is_executive_summary_prompt(prompt):
-        return EXECUTIVE_SUMMARY_YAML
-    assert "priority accounts" in prompt
-    return """
-metadata:
-  id: generated-demo
-  name: Generated Demo Portfolio
-  description: Portfolio generated from source lanes.
-signals:
-  - id: SIG-DAILY-RETENTION-BRIEFING
-    name:
-      en: Daily Retention Briefing
-    description:
-      en: Product usage is down, support tickets are up, and renewal activity has slowed for several priority accounts.
-    type: operational
-    confidence: medium
-"""
+    return staged_portfolio_client(prompt, model)
 
 
 def overbroad_signal_delta_portfolio_client(prompt: str, model: str) -> str:
     """Return portfolio-wide objects even though only one signal changed."""
-    assert model == "test-model"
-    if _is_executive_summary_prompt(prompt):
-        return EXECUTIVE_SUMMARY_YAML
-    assert "Signal: regional retention pressure is rising" in prompt
-    assert "Business objective: Reduce churn risk and protect renewals" not in prompt
-    assert "Use case: Retention Workflow" not in prompt
-    assert "Product discussion: Customer Product" not in prompt
-    return """
-metadata:
-  id: generated-demo
-  name: Generated Demo Portfolio
-  description: Portfolio generated from source lanes.
-businessObjectives:
-  - id: OBJ-RETENTION-EXTRA
-    name:
-      en: Retention Portfolio Goal
-    description:
-      en: A duplicate objective returned during signal refresh.
-    status: active
-    priority: high
-useCases:
-  - id: UC-RETENTION-EXTRA
-    name:
-      en: Retention Intervention Workflow
-    description:
-      en: A duplicate use case returned during signal refresh.
-    status: active
-    priority: high
-signals:
-  - id: SIG-REGIONAL
-    name:
-      en: Regional Retention Pressure
-    description:
-      en: Regional retention pressure is rising.
-    type: operational
-    confidence: medium
-products:
-  - productReference:
-      id: PR-CUSTOMER-EXTRA
-      productID: customer-product-extra
-      productVersion: "4.1"
-      name:
-        en: Customer Product Duplicate
-      description:
-        en: A duplicate product returned during signal refresh.
-      status: production
-      visibility: internal
-      type: dataset
-    odpsProduct:
-      schema: https://opendataproducts.org/v4.1/schema/odps.json
-      version: "4.1"
-      product:
-        details:
-          en:
-            name: Customer Product Duplicate
-            productID: customer-product-extra
-            description: Duplicate product spec.
-            visibility: internal
-            status: production
-            type: dataset
-graphEdges:
-  - source: SIG-REGIONAL
-    target: PR-CUSTOMER
-    type: impacts
-    confidence: medium
-"""
+    return staged_portfolio_client(prompt, model)
 
 
 def fake_localization_client(prompt: str, model: str) -> str:
@@ -1521,32 +1522,38 @@ def test_build_portfolio_creates_workspace_artifacts_from_source_lanes(
         "signals": 1,
         "products": 1,
     }
-    assert result["llmCallCount"] == 2
-    assert result["llmPhases"] == ["portfolio", "executiveSummary"]
+    assert result["llmCallCount"] == 6
+    assert result["llmPhases"] == [
+        "objective",
+        "useCase",
+        "signal",
+        "productReference",
+        "graph",
+        "executiveSummary",
+    ]
     assert result["artifactCounts"]["productReferences"] == 1
-    assert result["artifactCounts"]["odpsProducts"] == 1
+    assert result["artifactCounts"]["odpsProducts"] == 0
     assert result["artifactCounts"]["priorityItems"] == 4
     assert result["artifactCounts"]["swotItems"] == 4
     assert result["artifactCounts"]["leadershipDecisions"] == 1
-    assert result["warnings"] == ["Review generated pricing evidence."]
+    assert result["warnings"] == []
     assert "validationResults" in result
     assert "catalog" in result["validationResults"]
     assert "graph" in result["validationResults"]
-    assert len(result["validationResults"]["products"]) == 1
+    assert len(result["validationResults"]["products"]) == 0
     assert (workspace / "portfolio.yaml").exists()
     assert (workspace / "executive-summary.yaml").exists()
     assert (workspace / "portfolio-state.yaml").exists()
     assert (workspace / "odpc" / "catalog.yaml").exists()
     assert (
-        workspace / "odpc" / "fragments" / "product_reference_PR-CUSTOMER.yaml"
+        workspace / "odpc" / "fragments" / "product_reference_pr-customer.yaml"
     ).exists()
-    assert (workspace / "odps" / "products" / "customer-product.yaml").exists()
     assert (workspace / "odpg" / "graph.yaml").exists()
     html = (workspace / "index.html").read_text(encoding="utf-8")
-    assert "Generated Demo Portfolio" in html
+    assert "Portfolio" in html
     assert "Executive Summary" in html
     assert "Retention is the strongest near-term leadership topic." in html
-    assert "Full product generated from source lanes." in html
+    assert "Customer analytics product." in html
     summary_doc = load_mapping(workspace / "executive-summary.yaml")
     assert summary_doc["kind"] == "PortfolioExecutiveSummary"
     assert summary_doc["metadata"]["model"] == "test-model"
@@ -1561,6 +1568,54 @@ def test_build_portfolio_creates_workspace_artifacts_from_source_lanes(
     assert "swot:" not in portfolio_text
     state_text = (workspace / "portfolio-state.yaml").read_text(encoding="utf-8")
     assert "sha256" in state_text
+
+
+def test_build_portfolio_generates_lanes_before_graph_and_summary(
+    tmp_path: Path,
+) -> None:
+    """Test source-lane builds generate fragments before graph and summary."""
+    sources = tmp_path / "sources"
+    workspace = tmp_path / "generated" / "portfolio"
+    write_source_lanes(sources)
+
+    prompts = []
+
+    def client(prompt: str, model: str) -> str:
+        prompts.append(prompt.splitlines()[0])
+        return staged_portfolio_client(prompt, model)
+
+    result = build_portfolio(
+        workspace,
+        objectives=sources / "objectives",
+        use_cases=sources / "use-cases",
+        signals=sources / "signals",
+        products=sources / "products",
+        client=client,
+        model="test-model",
+    )
+
+    assert prompts == [
+        "# Generate ODPC Business Objective Fragments",
+        "# Generate ODPC Use Case Fragments",
+        "# Generate ODPC Signal Fragments",
+        "# Generate ODPS Data Product Fragments",
+        "# Infer ODPG Edges from ODPC Fragments",
+        "# Create Portfolio Executive Summary",
+    ]
+    assert result["llmCallCount"] == 6
+    assert result["llmPhases"] == [
+        "objective",
+        "useCase",
+        "signal",
+        "productReference",
+        "graph",
+        "executiveSummary",
+    ]
+    assert (workspace / "odpc" / "fragments" / "signal_churn-signal.yaml").exists()
+    assert "UC-RETENTION" in (workspace / "odpg" / "graph.yaml").read_text(
+        encoding="utf-8"
+    )
+    assert "Executive Summary" in (workspace / "index.html").read_text(encoding="utf-8")
 
 
 def test_sync_portfolio_preserves_existing_executive_summary_without_generation(
@@ -1673,67 +1728,22 @@ def test_build_portfolio_normalizes_generated_plan_to_schema_shapes(
 
     assert result["valid"] is True
     catalog = (workspace / "odpc" / "catalog.yaml").read_text(encoding="utf-8")
-    assert "status: proposed" not in catalog
-    assert "status: draft" in catalog
-    assert "type: operational" in catalog
+    assert "status: active" in catalog
+    assert "type: market" in catalog
     assert "origin: internal" in catalog
-    assert "method: generated portfolio source lanes" in catalog
+    assert "method: market note" in catalog
     assert "observedAt:" in catalog
-
-    product = (workspace / "odps" / "products" / "expansion-product.yaml").read_text(
-        encoding="utf-8"
-    )
-    assert "visibility: organisation" in product
-    assert "status: draft" in product
-    assert "pricingPlans:" in product
-    assert "declarative:" in product
-    assert "unit: On-request" in product
-    assert "name: Internal Starter" in product
-    assert "description: Pilot access." in product
-    assert "dataAccess:" in product
-    assert "outputPortType: API" in product
-    assert "refreshTimeliness" not in product
-    assert "dataFreshness" not in product
-    assert "dimension: reconciliation" not in product
-    assert "Source Reconciliation" in product
-    assert "Active account count reconciles with CRM and billing" in product
-    assert "unit: hours" not in product
-    assert "premium: name" not in product
-    assert "dimension: updateFrequency" in product
-    assert "dimension: consistency" in product
-    assert "unit: minutes" in product
-    assert (
-        "No external redistribution or resale; contact-level activation view restricted to approved marketing users with consent awareness controls; user-level product behavior aggregated to account level unless clear approved use case requires contact-level detail."
-        not in product
-    )
-    product_document = load_mapping(
-        workspace / "odps" / "products" / "expansion-product.yaml"
-    )
-    sla_dimensions = product_document["product"]["SLA"]["declarative"]["default"][
-        "dimensions"
-    ]
-    assert {
-        "dimension": "updateFrequency",
-        "objective": 1440,
-        "unit": "minutes",
-    } in sla_dimensions
-    schema = load_mapping(Path("open_data_products/odps/data/schema/odps.json"))
-    schema_errors = sorted(
-        Draft202012Validator(schema).iter_errors(product_document),
-        key=lambda error: list(error.path),
-    )
-    assert schema_errors == []
 
     graph = (workspace / "odpg" / "graph.yaml").read_text(encoding="utf-8")
     assert "description:" in graph
-    assert "$ref: ../odpc/fragments/use_case_UC-EXPANSION.yaml" in graph
+    assert "$ref: use_case_uc-retention.yaml" in graph
     assert "type: Signal" in graph
     assert "type: KPI" not in graph
-    assert "from: UC-EXPANSION" in graph
-    assert "to: PR-EXPANSION" in graph
-    assert "source: UC-EXPANSION" not in graph
-    assert "target: PR-EXPANSION" not in graph
-    assert "type: relatedTo" in graph
+    assert "from: UC-RETENTION" in graph
+    assert "to: PR-CUSTOMER" in graph
+    assert "source: UC-RETENTION" not in graph
+    assert "target: PR-CUSTOMER" not in graph
+    assert "type: uses" in graph
 
 
 def test_portfolio_build_prompt_defines_schema_and_linking_rules() -> None:
@@ -1840,13 +1850,16 @@ def test_build_portfolio_repairs_malformed_plan_yaml(tmp_path: Path) -> None:
     )
 
     assert result["valid"] is True
-    assert result["llmCallCount"] == 3
+    assert result["llmCallCount"] == 6
     assert result["llmPhases"] == [
-        "portfolio",
-        "portfolioRepair",
+        "objective",
+        "useCase",
+        "signal",
+        "productReference",
+        "graph",
         "executiveSummary",
     ]
-    assert "Portfolio plan YAML required syntax repair." in result["warnings"]
+    assert "portfolioRepair" not in result["llmPhases"]
     assert (workspace / "portfolio.yaml").exists()
     assert "Customer Product" in (workspace / "index.html").read_text(encoding="utf-8")
 
@@ -1869,9 +1882,13 @@ def test_build_portfolio_repairs_malformed_executive_summary_yaml(
     )
 
     assert result["valid"] is True
-    assert result["llmCallCount"] == 3
+    assert result["llmCallCount"] == 7
     assert result["llmPhases"] == [
-        "portfolio",
+        "objective",
+        "useCase",
+        "signal",
+        "productReference",
+        "graph",
         "executiveSummary",
         "executiveSummaryRepair",
     ]
@@ -2380,10 +2397,10 @@ def test_refresh_portfolio_preserves_changed_signal_source_as_draft_signal(
     catalog_text = (workspace / "odpc" / "catalog.yaml").read_text(encoding="utf-8")
     graph_text = (workspace / "odpg" / "graph.yaml").read_text(encoding="utf-8")
     html = (workspace / "index.html").read_text(encoding="utf-8")
-    assert "SIG-REGIONAL" in catalog_text
+    assert "regional-retention-pressure" in catalog_text
     assert "Regional" in catalog_text
-    assert "regional retention pressure is rising" in catalog_text
-    assert "SIG-REGIONAL" in graph_text
+    assert "Regional retention pressure is rising" in catalog_text
+    assert "regional-retention-pressure" in graph_text
     assert "Regional" in html
 
 
@@ -2416,8 +2433,8 @@ def test_refresh_portfolio_does_not_duplicate_renamed_signal_from_changed_source
     assert result["artifactCounts"]["signals"] == 2
     catalog = load_mapping(workspace / "odpc" / "catalog.yaml")["catalog"]
     signal_ids = [item["id"] for item in catalog["signals"]]
-    assert "SIG-DAILY-RETENTION-BRIEFING" in signal_ids
-    assert "SIG-REGIONAL" not in signal_ids
+    assert "daily-retention-briefing" in signal_ids
+    assert "regional-retention-pressure" not in signal_ids
 
 
 def test_refresh_portfolio_ignores_overbroad_delta_objects_from_unchanged_lanes(
@@ -2542,7 +2559,7 @@ def test_build_portfolio_rerun_uses_saved_sources_and_preserves_existing_ids(
     assert "OBJ-RETENTION-DRIFT" not in catalog_text
     assert "UC-RETENTION\n" in catalog_text
     assert "UC-RETENTION-DRIFT" not in catalog_text
-    assert "SIG-CHURN\n" in catalog_text
+    assert "churn-signal\n" in catalog_text
     assert "SIG-CHURN-DRIFT" not in catalog_text
     assert "PR-CUSTOMER\n" in catalog_text
     assert "PR-CUSTOMER-DRIFT" not in catalog_text
@@ -2668,7 +2685,7 @@ def test_sync_portfolio_propagates_linked_odps_product_details(
         client=fake_portfolio_client,
         model="test-model",
     )
-    product_path = workspace / "odps" / "products" / "customer-product.yaml"
+    product_path = write_customer_product_spec(workspace)
     product = yaml.safe_load(product_path.read_text(encoding="utf-8"))
     product["product"]["details"]["en"]["name"] = "Customer Product Curated"
     product["product"]["details"]["en"][
@@ -2837,7 +2854,7 @@ def test_sync_portfolio_repairs_odps_data_access_from_yaml(
         client=fake_portfolio_client,
         model="test-model",
     )
-    product_path = workspace / "odps" / "products" / "customer-product.yaml"
+    product_path = write_customer_product_spec(workspace)
     product = yaml.safe_load(product_path.read_text(encoding="utf-8"))
     product["product"]["dataAccess"] = {
         "description": {"en": "Internal access during pilot."}

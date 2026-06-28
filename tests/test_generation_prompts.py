@@ -1675,6 +1675,52 @@ def test_generate_local_artifacts_for_kind_processes_each_product_reference_sour
     assert (tmp_path / "fragments" / "product_reference_passenger-flow.yaml").is_file()
 
 
+def test_generate_local_artifacts_for_kind_emits_one_fragment_per_source_file(
+    tmp_path,
+):
+    """Test one source document produces one selected-kind fragment."""
+    source = tmp_path / "signals" / "market.md"
+    source.parent.mkdir()
+    source.write_text(
+        "# Market signal\n\nChurn pressure increased on 2026-05-20.",
+        encoding="utf-8",
+    )
+
+    artifacts = generate_local_artifacts_for_kind(
+        "signal",
+        source.parent,
+        tmp_path / "fragments",
+        client=lambda prompt, model: """signals:
+- id: churn-pressure-signal
+  name:
+    en: Churn Pressure Signal
+  description:
+    en: Churn pressure increased.
+  type: market
+  source:
+    origin: internal
+    method: market note
+  observedAt: "2026-05-20T00:00:00Z"
+- id: duplicate-churn-pressure-signal
+  name:
+    en: Duplicate Churn Pressure Signal
+  description:
+    en: A second signal from the same source document.
+  type: market
+  source:
+    origin: internal
+    method: market note
+  observedAt: "2026-05-20T00:00:00Z"
+""",
+    )
+
+    assert [artifact.name for artifact in artifacts] == ["signal:churn-pressure-signal"]
+    assert (tmp_path / "fragments" / "signal_churn-pressure-signal.yaml").is_file()
+    assert not (
+        tmp_path / "fragments" / "signal_duplicate-churn-pressure-signal.yaml"
+    ).exists()
+
+
 def test_generate_local_artifacts_for_kind_rejects_product_alias(tmp_path):
     """Test ambiguous product kind is not accepted."""
     try:
@@ -2086,15 +2132,18 @@ product:
     }
     english = document["product"]["details"]["en"]
     assert "hallucinatedDetail" not in english
-    sla_dimension = document["product"]["SLA"]["declarative"]["default"]["dimensions"][0]
+    sla_dimension = document["product"]["SLA"]["declarative"]["default"]["dimensions"][
+        0
+    ]
     dq_dimension = document["product"]["dataQuality"]["declarative"]["default"][
         "dimensions"
     ][0]
     pricing_plan = document["product"]["pricingPlans"]["declarative"]["en"][0]
     assert "monitoring" not in sla_dimension
-    assert "unsupportedPackageField" not in document["product"]["SLA"]["declarative"][
-        "default"
-    ]
+    assert (
+        "unsupportedPackageField"
+        not in document["product"]["SLA"]["declarative"]["default"]
+    )
     assert "validationRules" not in dq_dimension
     assert "hallucinatedPlanField" not in pricing_plan
 

@@ -8,9 +8,10 @@ Output rules:
 - Return exactly one YAML document with a top-level `productReferences` list.
 - The document root must be a mapping. Do not start the YAML with `- productReferences:`.
 - Do not use YAML document separators such as `---`.
-- Generate all data product references supported by the source documents, not a
+- Generate exactly one data product reference for this source document, not a
   full catalog.
-- Only create items for source documents that explicitly describe data products.
+- Only create an item when the source document explicitly describes a data
+  product.
 - Never create `productReferences` for use cases, business objectives, or
   signals.
 - Never use fields named `useCaseID`, `signalID`, or `objectiveID`.

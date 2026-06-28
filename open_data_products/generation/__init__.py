@@ -261,6 +261,7 @@ BUILT_IN_PROVIDERS: Dict[str, Dict[str, Any]] = {
     },
 }
 
+
 def ollama_generate(
     prompt: str,
     model: str = DEFAULT_GENERATION_MODEL,
@@ -1234,6 +1235,7 @@ def generate_local_artifact(
         model,
         model_client,
         prompt_dir=prompt_dir,
+        max_fragments=1,
     )
     if not artifacts:
         raise RuntimeError(f"No artifacts generated for kind: {artifact_kind}")
@@ -1282,6 +1284,7 @@ def generate_local_artifacts_for_kind(
                 model,
                 model_client,
                 prompt_dir=prompt_dir,
+                max_fragments=1,
             )
         )
     if not artifacts:
@@ -1697,6 +1700,7 @@ def _run_generation_task(
     prompt_context: Optional[str] = None,
     expected_graph_nodes: Optional[Sequence[dict]] = None,
     prompt_dir: Optional[PathLike] = None,
+    max_fragments: Optional[int] = None,
 ) -> List[GeneratedArtifact]:
     prompt = (
         _render_generation_prompt_context(
@@ -1733,13 +1737,19 @@ def _run_generation_task(
             )
         ]
 
-    return _write_generated_artifacts(task, yaml_output, destination)
+    return _write_generated_artifacts(
+        task,
+        yaml_output,
+        destination,
+        max_fragments=max_fragments,
+    )
 
 
 def _write_generated_artifacts(
     task: GenerationTask,
     yaml_output: str,
     destination: Path,
+    max_fragments: Optional[int] = None,
 ) -> List[GeneratedArtifact]:
     if task.expected_root == "graph":
         output_path = destination / task.output_name
@@ -1785,7 +1795,8 @@ def _write_generated_artifacts(
         return []
 
     artifacts = []
-    for index, item in enumerate(items):
+    selected_items = items[:max_fragments] if max_fragments is not None else items
+    for index, item in enumerate(selected_items):
         if not isinstance(item, dict):
             continue
         item_id = str(item.get("id") or f"{task.filename_prefix}-{index + 1}")

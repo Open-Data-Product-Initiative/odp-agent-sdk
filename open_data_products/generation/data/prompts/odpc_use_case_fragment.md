@@ -9,7 +9,7 @@ Output rules:
 - The document root must be a mapping. Do not start the YAML with
   `- useCases:`.
 - Do not use YAML document separators such as `---`.
-- Generate all use case fragments supported by the source documents, not a full
+- Generate exactly one use case fragment for this source document, not a full
   catalog.
 - Each item must follow the ODPC UseCase shape with `id`, nested
   `name: {en: ...}`, and nested `description: {en: ...}`.

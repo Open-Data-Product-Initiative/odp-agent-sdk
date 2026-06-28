@@ -9,7 +9,7 @@ Output rules:
 - The document root must be a mapping. Do not start the YAML with
   `- businessObjectives:`.
 - Do not use YAML document separators such as `---`.
-- Generate all business objective fragments supported by the source documents,
+- Generate exactly one business objective fragment for this source document,
   not a full catalog.
 - Each item must follow the ODPC BusinessObjective shape with `id`, nested
   `name: {en: ...}`, and nested `description: {en: ...}`.

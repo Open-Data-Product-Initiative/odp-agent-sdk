@@ -11,7 +11,7 @@ Output rules:
 - Do not use YAML document separators such as `---`.
 - Allowed enum values are strict. Replace any source wording such as
   "moderate" with `medium`.
-- Generate all signal fragments supported by the source documents, not a full
+- Generate exactly one signal fragment for this source document, not a full
   catalog.
 - Each item must follow the ODPC Signal shape with `id`, `name.en`,
   `description.en`, `type`, `source.origin`, `source.method`, and `observedAt`.
@@ -25,7 +25,7 @@ Output rules:
 - Derive each signal `id` by lowercasing `name.en` and replacing spaces with
   hyphens. Do not derive the signal `id` from an affected use case, objective,
   product, or domain.
-- Generate at most one signal for each source document that describes a signal.
+- Generate at most one signal for this source document.
 - Preserve the source signal name when it is present.
 - If no observation date or time is supported by the source text, return `signals: []`
   for that source instead of guessing. Do not invent an `observedAt` value.

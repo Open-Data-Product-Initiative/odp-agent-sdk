@@ -7,3 +7,4 @@ dist/
 .DS_Store
 /generated/
 /examples/portfolio/workspace/
+.open-data-products/activity.log

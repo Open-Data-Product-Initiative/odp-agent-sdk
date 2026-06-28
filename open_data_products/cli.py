@@ -5,10 +5,17 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import time
 from pathlib import Path
-from typing import TYPE_CHECKING, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from . import __version__
+from ._activity import (
+    ActivityContext,
+    ActivityEvent,
+    utc_timestamp,
+    write_activity_event,
+)
 from .agent import (
     explain_document,
     load_document,
@@ -300,6 +307,163 @@ def _portfolio_exit_code(payload: Dict[str, object], args: argparse.Namespace) -
     return 0
 
 
+def _activity_command_id(args: argparse.Namespace) -> str:
+    """Return the canonical command id for a parsed CLI namespace."""
+    command = str(getattr(args, "command", "") or "cli")
+    for nested in ("recipe_command", "portfolio_command", "product_command"):
+        value = getattr(args, nested, None)
+        if value:
+            return f"{command}.{value}"
+    return command
+
+
+def _activity_command_id_from_argv(argv: List[str]) -> str:
+    """Return a best-effort command id before argparse has a namespace."""
+    for item in argv:
+        if item in {"--help", "-h", "--version", "-V"}:
+            return "cli"
+        if not item.startswith("-"):
+            return item
+    return "cli"
+
+
+def _activity_details_from_args(args: argparse.Namespace) -> Dict[str, Any]:
+    """Return safe default activity details from parsed CLI arguments."""
+    details: Dict[str, Any] = {}
+    for name in (
+        "document",
+        "bundle",
+        "source",
+        "output",
+        "workspace",
+        "input_dir",
+        "source_dir",
+        "kind",
+        "provider",
+        "model",
+    ):
+        value = getattr(args, name, None)
+        if value is not None:
+            details[name] = value
+    if getattr(args, "json", False):
+        details["json"] = True
+    return details
+
+
+def _activity_level(exit_code: int, context: ActivityContext) -> str:
+    """Return the activity classification for a CLI exit code and context."""
+    if exit_code != 0:
+        return "FAILED"
+    warnings = context.details.get("warnings")
+    errors = context.details.get("errors")
+    if context.warning or (isinstance(warnings, int) and warnings > 0):
+        return "WARNING"
+    if isinstance(errors, int) and errors > 0:
+        return "WARNING"
+    return "SUCCESS"
+
+
+def _activity_message(command: str, level: str, context: ActivityContext) -> str:
+    """Return a concise activity message."""
+    if context.message:
+        return context.message
+    if level == "FAILED":
+        return f"{command} failed"
+    if level == "WARNING":
+        return f"{command} completed with warnings"
+    return f"{command} completed"
+
+
+def _write_cli_activity(
+    command: str,
+    context: ActivityContext,
+    exit_code: int,
+    duration_ms: int,
+) -> None:
+    """Write one CLI activity event, warning but continuing on logging errors."""
+    level = _activity_level(exit_code, context)
+    try:
+        write_activity_event(
+            ActivityEvent(
+                timestamp=utc_timestamp(),
+                level=level,
+                source="cli",
+                command=command,
+                exit_code=exit_code,
+                duration_ms=duration_ms,
+                message=_activity_message(command, level, context),
+                details=context.details,
+            )
+        )
+    except OSError as exc:
+        print(f"Warning: could not write SDK activity log: {exc}", file=sys.stderr)
+
+
+def _write_llm_invocation_activity(
+    args: argparse.Namespace,
+    settings: Any,
+    *,
+    phase: Optional[str] = None,
+) -> None:
+    """Write an activity line for a CLI LLM provider invocation."""
+    details = {
+        "parent_command": _activity_command_id(args),
+        "provider": getattr(settings, "provider", None),
+        "provider_type": getattr(settings, "provider_type", None),
+        "model": getattr(settings, "model", None),
+    }
+    if phase:
+        details["phase"] = phase
+    kind = getattr(args, "kind", None)
+    if kind:
+        details["kind"] = kind
+    try:
+        write_activity_event(
+            ActivityEvent(
+                timestamp=utc_timestamp(),
+                level="INFO",
+                source="cli",
+                command="llm.invoke",
+                exit_code=0,
+                duration_ms=0,
+                message="LLM provider invoked",
+                details=details,
+            )
+        )
+    except OSError as exc:
+        print(f"Warning: could not write SDK activity log: {exc}", file=sys.stderr)
+
+
+def _finalize_activity(
+    args: argparse.Namespace,
+    context: ActivityContext,
+    start_time: float,
+    exit_code: int,
+) -> int:
+    """Write the terminal activity event for a parsed CLI command."""
+    context.details = {**_activity_details_from_args(args), **context.details}
+    duration_ms = int((time.monotonic() - start_time) * 1000)
+    _write_cli_activity(_activity_command_id(args), context, exit_code, duration_ms)
+    return exit_code
+
+
+def _log_parse_failure(argv: List[str], exit_code: int, start_time: float) -> None:
+    """Write an activity event for argparse failures."""
+    if exit_code == 0:
+        return
+    duration_ms = int((time.monotonic() - start_time) * 1000)
+    context = ActivityContext(
+        details={"argument_count": len(argv)},
+        message="CLI argument parsing failed",
+    )
+    _write_cli_activity(
+        _activity_command_id_from_argv(argv),
+        context,
+        exit_code,
+        duration_ms,
+    )
+
+
 def _print_odpg_summary(summary: Dict[str, object]) -> None:
     """Print an ODPG summary for humans."""
     print(f"ODPG Graph: {summary.get('name') or summary.get('id') or '(unnamed)'}")
@@ -356,6 +520,8 @@ Examples:
 
 def main(argv: Optional[List[str]] = None) -> int:
     """Run the top-level Open Data Products CLI."""
+    cli_argv = list(sys.argv[1:] if argv is None else argv)
+    parse_start_time = time.monotonic()
     parser = argparse.ArgumentParser(
         prog="open-data-products",
         description=(
@@ -1278,16 +1444,44 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     add_product_subparser(subparsers)
 
-    args = parser.parse_args(argv)
+    try:
+        args = parser.parse_args(cli_argv)
+    except SystemExit as exc:
+        exit_code = exc.code if isinstance(exc.code, int) else 1
+        _log_parse_failure(cli_argv, exit_code, parse_start_time)
+        raise
+
+    activity_context = ActivityContext()
+    activity_start_time = time.monotonic()
 
     try:
         if args.command == "validate":
             document_result = validate_document(args.document)
+            activity_context.add_details(
+                document=args.document,
+                spec=document_result.spec,
+                valid=document_result.valid,
+                errors=len(document_result.errors),
+                warnings=len(document_result.warnings),
+            )
+            activity_context.warning = document_result.valid and bool(
+                document_result.warnings
+            )
+            activity_context.message = (
+                "Document validation passed"
+                if document_result.valid
+                else "Document validation failed"
+            )
             if args.json:
                 print(json.dumps(document_result.to_dict(), indent=2))
             else:
                 _print_validation_report(args.document, document_result)
-            return 0 if document_result.valid else 1
+            return _finalize_activity(
+                args,
+                activity_context,
+                activity_start_time,
+                0 if document_result.valid else 1,
+            )
 
         if args.command == "explain":
             document = load_document(args.document)
@@ -1301,7 +1495,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             else:
                 summary = explain_document(document, path=Path(args.document))
                 print(summary, end="")
-            return 0
+            return _finalize_activity(args, activity_context, activity_start_time, 0)
 
         if args.command == "refs":
             refs = resolve_references(args.document)
@@ -1310,7 +1504,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             else:
                 for ref in refs:
                     print(f"{ref.pointer} -> {ref.ref}")
-            return 0
+            return _finalize_activity(args, activity_context, activity_start_time, 0)
 
         if args.command == "resources":
             resources = [get_resource(args.id)] if args.id else list_resources()
@@ -1323,7 +1517,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                     print(
                         f"{resource.id}\t{resource.spec}\t{resource.type}\t{resource.path}"
                     )
-            return 0
+            return _finalize_activity(args, activity_context, activity_start_time, 0)
 
         if args.command == "summary":
             summary = load_summary(args.document)
@@ -1331,7 +1525,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                 print(json.dumps(summary, indent=2))
             else:
                 _print_summary_report(summary)
-            return 0
+            return _finalize_activity(args, activity_context, activity_start_time, 0)
 
         if args.command == "okf-validate":
             from .okf import validate_okf_bundle
@@ -1348,7 +1542,9 @@ def main(argv: Optional[List[str]] = None) -> int:
                 print(f"{args.bundle}: invalid OKF bundle", file=sys.stderr)
                 for error in result.errors:
                     print(f"- {error}", file=sys.stderr)
-            return 0 if result.valid else 1
+            return _finalize_activity(
+                args, activity_context, activity_start_time, 0 if result.valid else 1
+            )
 
         if args.command == "okf-summary":
             from .okf import summarize_okf_bundle
@@ -1364,7 +1560,12 @@ def main(argv: Optional[List[str]] = None) -> int:
                     if isinstance(concept, dict):
                         title = concept.get("title") or concept.get("id")
                         print(f"- {concept.get('id')}: {title}")
-            return 0 if summary["valid"] else 1
+            return _finalize_activity(
+                args,
+                activity_context,
+                activity_start_time,
+                0 if summary["valid"] else 1,
+            )
 
         if args.command == "okf-import":
             from .okf import import_okf_bundle
@@ -1373,7 +1574,9 @@ def main(argv: Optional[List[str]] = None) -> int:
                 written = import_okf_bundle(args.bundle, args.output)
             except (OSError, ValueError) as exc:
                 print(f"OKF import error: {exc}", file=sys.stderr)
-                return 1
+                return _finalize_activity(
+                    args, activity_context, activity_start_time, 1
+                )
             payload = {
                 "spec": "okf",
                 "kind": "ImportedSourceDocuments",
@@ -1386,7 +1589,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                 print(f"OKF source documents written: {len(written)}")
                 for path in written:
                     print(path)
-            return 0
+            return _finalize_activity(args, activity_context, activity_start_time, 0)
 
         if args.command == "okf-export":
             from .okf import export_okf_bundle
@@ -1395,7 +1598,9 @@ def main(argv: Optional[List[str]] = None) -> int:
                 written = export_okf_bundle(args.source, args.output)
             except (OSError, ValueError) as exc:
                 print(f"OKF export error: {exc}", file=sys.stderr)
-                return 1
+                return _finalize_activity(
+                    args, activity_context, activity_start_time, 1
+                )
             payload = {
                 "spec": "okf",
                 "kind": "KnowledgeBundle",
@@ -1407,7 +1612,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             else:
                 print(f"OKF bundle written: {args.output}")
                 print(f"Files: {len(written)}")
-            return 0
+            return _finalize_activity(args, activity_context, activity_start_time, 0)
 
         if args.command == "config":
             from .generation import (
@@ -1431,7 +1636,9 @@ def main(argv: Optional[List[str]] = None) -> int:
                         print(print_recipe_config(args.config_path), end="")
                     else:
                         print(print_config(args.domain, args.config_path), end="")
-                    return 0
+                    return _finalize_activity(
+                        args, activity_context, activity_start_time, 0
+                    )
                 if args.check:
                     if args.domain == "recipes":
                         payload = validate_recipe_config(
@@ -1472,7 +1679,9 @@ def main(argv: Optional[List[str]] = None) -> int:
                     payload["copied_prompts"] = [path.name for path in copied_prompts]
             except (FileExistsError, FileNotFoundError, KeyError, ValueError) as exc:
                 print(str(exc), file=sys.stderr)
-                return 1
+                return _finalize_activity(
+                    args, activity_context, activity_start_time, 1
+                )
 
             if args.json:
                 print(json.dumps(payload, indent=2))
@@ -1485,7 +1694,12 @@ def main(argv: Optional[List[str]] = None) -> int:
                         print(f"Error: {error}")
                     for warning in payload["warnings"]:
                         print(f"Warning: {warning}")
-                    return 0 if payload["valid"] else 1
+                    return _finalize_activity(
+                        args,
+                        activity_context,
+                        activity_start_time,
+                        0 if payload["valid"] else 1,
+                    )
                 print(f"Config domain: {payload['domain']}")
                 print(f"Bundled template: {payload['template_path']}")
                 print(f"Active config: {payload['config_path']}")
@@ -1504,7 +1718,9 @@ def main(argv: Optional[List[str]] = None) -> int:
                         "Edit a copied config and pass it with "
                         "`open-data-products recipe list --config <path>`."
                     )
-                    return 0
+                    return _finalize_activity(
+                        args, activity_context, activity_start_time, 0
+                    )
                 resolved = payload["resolved"]
                 print(f"Provider: {resolved['provider']}")
                 print(f"Model: {resolved['model']}")
@@ -1515,8 +1731,13 @@ def main(argv: Optional[List[str]] = None) -> int:
                     "`open-data-products generate --config <path> --kind signal`."
                 )
             if args.check:
-                return 0 if payload["valid"] else 1
-            return 0
+                return _finalize_activity(
+                    args,
+                    activity_context,
+                    activity_start_time,
+                    0 if payload["valid"] else 1,
+                )
+            return _finalize_activity(args, activity_context, activity_start_time, 0)
 
         if args.command == "recipe":
             from .odpr import (
@@ -1536,13 +1757,10 @@ def main(argv: Optional[List[str]] = None) -> int:
             try:
                 if args.recipe_command == "list":
                     default_config = Path("recipes.config.yaml")
-                    list_starters = (
-                        args.starters
-                        or (
-                            args.config is None
-                            and args.group is None
-                            and not default_config.is_file()
-                        )
+                    list_starters = args.starters or (
+                        args.config is None
+                        and args.group is None
+                        and not default_config.is_file()
                     )
                     if list_starters:
                         payload = list_starter_recipes(catalog_path=args.catalog)
@@ -1707,7 +1925,9 @@ def main(argv: Optional[List[str]] = None) -> int:
                     for reason in payload.get("blockingReasons", []):
                         if isinstance(reason, dict):
                             print(f"Blocking: {reason.get('message')}")
-            return exit_code
+            return _finalize_activity(
+                args, activity_context, activity_start_time, exit_code
+            )
 
         if args.command == "generate":
             from .generation import (
@@ -1729,7 +1949,9 @@ def main(argv: Optional[List[str]] = None) -> int:
                         "backslash before the next option.",
                         file=sys.stderr,
                     )
-                return 2
+                return _finalize_activity(
+                    args, activity_context, activity_start_time, 2
+                )
             try:
                 settings = resolve_generation_settings(
                     config_path=args.config,
@@ -1743,9 +1965,12 @@ def main(argv: Optional[List[str]] = None) -> int:
                 generation_input = settings.input_path or DEFAULT_GENERATION_INPUT
                 generation_output = settings.output_path or DEFAULT_GENERATION_OUTPUT
                 model_client = create_generation_client(settings)
+                _write_llm_invocation_activity(args, settings, phase=args.kind)
             except (FileNotFoundError, RuntimeError, ValueError) as exc:
                 print(str(exc), file=sys.stderr)
-                return 1
+                return _finalize_activity(
+                    args, activity_context, activity_start_time, 1
+                )
 
             prompt_kwargs = (
                 {"prompt_dir": settings.prompt_path} if settings.prompt_path else {}
@@ -1773,7 +1998,9 @@ def main(argv: Optional[List[str]] = None) -> int:
                 )
             except (KeyError, RuntimeError, ValueError) as exc:
                 print(str(exc), file=sys.stderr)
-                return 1
+                return _finalize_activity(
+                    args, activity_context, activity_start_time, 1
+                )
             valid_yaml = all(artifact.valid_yaml for artifact in artifacts)
             response_kind = (
                 "LocalGeneration"
@@ -1809,7 +2036,9 @@ def main(argv: Optional[List[str]] = None) -> int:
                     print(f"- {artifact.name}: {artifact.output_path}")
                     for error in artifact.errors:
                         print(f"  - {error}")
-            return 0 if valid_yaml else 1
+            return _finalize_activity(
+                args, activity_context, activity_start_time, 0 if valid_yaml else 1
+            )
 
         if args.command == "odpc-summary":
             from .odpc import collect_ids, count_items, explain_catalog
@@ -1843,7 +2072,12 @@ def main(argv: Optional[List[str]] = None) -> int:
                 print(json.dumps(payload, indent=2))
             else:
                 print(explain_catalog(document, path=Path(args.catalog)), end="")
-            return 0 if catalog_result.valid else 1
+            return _finalize_activity(
+                args,
+                activity_context,
+                activity_start_time,
+                0 if catalog_result.valid else 1,
+            )
 
         if args.command == "odpc-build":
             from .odpc import (
@@ -1887,7 +2121,9 @@ def main(argv: Optional[List[str]] = None) -> int:
                     print("Generated catalog is invalid:", file=sys.stderr)
                     for error in build_result.errors:
                         print(f"- {error}", file=sys.stderr)
-                return 1
+                return _finalize_activity(
+                    args, activity_context, activity_start_time, 1
+                )
 
             write_catalog(output, document)
             if html_output:
@@ -1921,7 +2157,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                     f"businessObjectives={payload['businessObjectiveCount']}, "
                     f"signals={payload['signalCount']})"
                 )
-            return 0
+            return _finalize_activity(args, activity_context, activity_start_time, 0)
 
         if args.command == "odpc-search":
             from .odpc import render_object_records, search_objects
@@ -1944,7 +2180,9 @@ def main(argv: Optional[List[str]] = None) -> int:
                 )
             else:
                 print(render_object_records(matches), end="")
-            return 0 if matches else 1
+            return _finalize_activity(
+                args, activity_context, activity_start_time, 0 if matches else 1
+            )
 
         if args.command == "odpc-artifacts":
             from .odpc import build_catalog_artifacts, write_catalog_artifacts
@@ -1966,7 +2204,12 @@ def main(argv: Optional[List[str]] = None) -> int:
                 print("Catalog artifacts are in sync")
             else:
                 print(f"Generated {payload['artifact_count']} catalog artifacts")
-            return 1 if args.check and changed else 0
+            return _finalize_activity(
+                args,
+                activity_context,
+                activity_start_time,
+                1 if args.check and changed else 0,
+            )
 
         if args.command == "odpv-summary":
             from .odpv import load_vocabulary, validate_vocabulary
@@ -1987,7 +2230,12 @@ def main(argv: Optional[List[str]] = None) -> int:
                 )
                 for error in vocabulary_result.errors:
                     print(f"- {error}")
-            return 0 if vocabulary_result.valid else 1
+            return _finalize_activity(
+                args,
+                activity_context,
+                activity_start_time,
+                0 if vocabulary_result.valid else 1,
+            )
 
         if args.command == "odpv-search":
             from .odpv import render_search_results, search_vocabulary
@@ -2006,7 +2254,9 @@ def main(argv: Optional[List[str]] = None) -> int:
                 )
             else:
                 print(render_search_results(matches), end="")
-            return 0 if matches else 1
+            return _finalize_activity(
+                args, activity_context, activity_start_time, 0 if matches else 1
+            )
 
         if args.command == "odpv-resolve":
             from .odpv import resolve_vocabulary_term
@@ -2017,7 +2267,12 @@ def main(argv: Optional[List[str]] = None) -> int:
             else:
                 match = payload.get("match")
                 print(match["id"] if match else "No matching ODPV term found.")
-            return 0 if payload.get("match") else 1
+            return _finalize_activity(
+                args,
+                activity_context,
+                activity_start_time,
+                0 if payload.get("match") else 1,
+            )
 
         if args.command == "odpv-explain":
             from .odpv import explain_vocabulary_term
@@ -2027,7 +2282,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                 print(json.dumps(payload, indent=2))
             else:
                 print(f"{payload['id']}: {payload['definition'].get('en', '')}")
-            return 0
+            return _finalize_activity(args, activity_context, activity_start_time, 0)
 
         if args.command == "odpv-relationship":
             from .odpv import check_vocabulary_relationship
@@ -2044,7 +2299,12 @@ def main(argv: Optional[List[str]] = None) -> int:
                 print(f"{args.source} {args.verb} {args.target}: {state}")
                 for note in payload["notes"]:
                     print(f"- {note}")
-            return 0 if payload["compatible"] else 1
+            return _finalize_activity(
+                args,
+                activity_context,
+                activity_start_time,
+                0 if payload["compatible"] else 1,
+            )
 
         if args.command == "odpv-context":
             from .odpv import agent_vocabulary_context
@@ -2055,7 +2315,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             else:
                 term = payload["term"]
                 print(f"{term['id']}: {term['definition'].get('en', '')}")
-            return 0
+            return _finalize_activity(args, activity_context, activity_start_time, 0)
 
         if args.command == "odpg-summary":
             from .odpg import load_graph, summarize_graph
@@ -2065,7 +2325,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                 print(json.dumps(summary, indent=2))
             else:
                 _print_odpg_summary(summary)
-            return 0
+            return _finalize_activity(args, activity_context, activity_start_time, 0)
 
         if args.command == "odpg-build":
             from .generation import (
@@ -2095,6 +2355,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                     prompt_dir=args.prompts,
                 )
                 model_client = create_generation_client(settings)
+                _write_llm_invocation_activity(args, settings, phase="graph")
                 document = build_graph(
                     args.input_dir,
                     recursive=not args.no_recursive,
@@ -2126,7 +2387,9 @@ def main(argv: Optional[List[str]] = None) -> int:
                     )
                 else:
                     print(f"Could not build ODPG graph: {exc}", file=sys.stderr)
-                return 1
+                return _finalize_activity(
+                    args, activity_context, activity_start_time, 1
+                )
 
             if build_result is not None and not build_result.valid:
                 if args.json:
@@ -2146,7 +2409,9 @@ def main(argv: Optional[List[str]] = None) -> int:
                     print("Generated graph is invalid:", file=sys.stderr)
                     for error in build_result.errors:
                         print(f"- {error}", file=sys.stderr)
-                return 1
+                return _finalize_activity(
+                    args, activity_context, activity_start_time, 1
+                )
 
             write_graph(output, document)
             if toon_output:
@@ -2171,7 +2436,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                     f"Generated {output} "
                     f"(nodes={payload['nodeCount']}, edges={payload['edgeCount']})"
                 )
-            return 0
+            return _finalize_activity(args, activity_context, activity_start_time, 0)
 
         if args.command == "odpg-traverse":
             from .odpg import load_graph, traverse_graph, validate_graph
@@ -2183,7 +2448,9 @@ def main(argv: Optional[List[str]] = None) -> int:
                     print(json.dumps(graph_result.to_dict(), indent=2))
                 else:
                     _print_validation_report(args.graph, graph_result)
-                return 1
+                return _finalize_activity(
+                    args, activity_context, activity_start_time, 1
+                )
             paths = traverse_graph(
                 graph,
                 args.start,
@@ -2195,7 +2462,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                 print(json.dumps({"start": args.start, "paths": paths}, indent=2))
             else:
                 _print_odpg_paths(args.start, paths)
-            return 0
+            return _finalize_activity(args, activity_context, activity_start_time, 0)
 
         if args.command == "odpg-analyze":
             from .odpg import analyze_graph, load_graph, validate_graph
@@ -2207,7 +2474,9 @@ def main(argv: Optional[List[str]] = None) -> int:
                     print(json.dumps(graph_result.to_dict(), indent=2))
                 else:
                     _print_validation_report(args.graph, graph_result)
-                return 1
+                return _finalize_activity(
+                    args, activity_context, activity_start_time, 1
+                )
             analysis = analyze_graph(graph)
             if args.json:
                 print(
@@ -2225,7 +2494,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                     print(f"- Warning: {warning}")
                 for item in analysis:
                     print(f"- {item}")
-            return 0
+            return _finalize_activity(args, activity_context, activity_start_time, 0)
 
         if args.command == "odpg-agent-context":
             from ._context_artifacts import select_context_artifact
@@ -2238,7 +2507,9 @@ def main(argv: Optional[List[str]] = None) -> int:
                     print(json.dumps(graph_result.to_dict(), indent=2))
                 else:
                     _print_validation_report(args.graph, graph_result)
-                return 1
+                return _finalize_activity(
+                    args, activity_context, activity_start_time, 1
+                )
             payload = agent_context(graph, args.node, args.depth)
             payload["warnings"] = graph_result.warnings
             if args.context_format:
@@ -2265,7 +2536,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                 related = payload.get("relatedNodes", [])
                 if isinstance(related, list):
                     print(f"Related nodes: {len(related)}")
-            return 0
+            return _finalize_activity(args, activity_context, activity_start_time, 0)
 
         if args.command == "odpg-generate":
             from .odpg import generate_graph_explorer
@@ -2281,7 +2552,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                 print(json.dumps(payload, indent=2))
             else:
                 print(f"Graph Explorer generated successfully: {output}")
-            return 0
+            return _finalize_activity(args, activity_context, activity_start_time, 0)
 
         if args.command == "odpg-convert":
             from .odpg import convert_file, dump_graph_yaml
@@ -2310,18 +2581,20 @@ def main(argv: Optional[List[str]] = None) -> int:
                     print(f"ODPG graph written successfully: {args.output}")
             else:
                 print(dump_graph_yaml(document), end="")
-            return 0
+            return _finalize_activity(args, activity_context, activity_start_time, 0)
 
         if args.command == "manifest":
             from .mcp.manifest import generate_agent_manifest
 
             print(json.dumps(generate_agent_manifest(), indent=2))
-            return 0
+            return _finalize_activity(args, activity_context, activity_start_time, 0)
 
         if args.command == "serve":
             from .mcp.server import serve
 
-            return serve()
+            return _finalize_activity(
+                args, activity_context, activity_start_time, serve()
+            )
 
         if args.command == "portfolio":
             from .portfolio import (
@@ -2353,6 +2626,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                         prompt_dir=args.prompts,
                     )
                     client = create_generation_client(settings)
+                    _write_llm_invocation_activity(args, settings, phase="portfolio")
                     payload = build_portfolio(
                         workspace,
                         objectives=args.objectives,
@@ -2377,6 +2651,9 @@ def main(argv: Optional[List[str]] = None) -> int:
                         prompt_dir=args.prompts,
                     )
                     client = create_generation_client(settings)
+                    _write_llm_invocation_activity(
+                        args, settings, phase="portfolio.refresh"
+                    )
                     payload = refresh_portfolio(
                         args.workspace,
                         objectives=args.objectives,
@@ -2404,6 +2681,9 @@ def main(argv: Optional[List[str]] = None) -> int:
                         prompt_dir=args.prompts,
                     )
                     client = create_generation_client(settings)
+                    _write_llm_invocation_activity(
+                        args, settings, phase="portfolio.localize"
+                    )
                     payload = localize_portfolio(
                         args.workspace,
                         languages=args.languages,
@@ -2425,7 +2705,9 @@ def main(argv: Optional[List[str]] = None) -> int:
                     as_json=args.json,
                     spec="portfolio",
                 )
-                return 1
+                return _finalize_activity(
+                    args, activity_context, activity_start_time, 1
+                )
 
             payload["validationMode"] = _portfolio_validation_mode(args)
             if args.json:
@@ -2439,17 +2721,27 @@ def main(argv: Optional[List[str]] = None) -> int:
                 if "created" in payload:
                     print(f"Created: {len(payload['created'])}")
                     print(f"Updated: {len(payload['updated'])}")
-            return _portfolio_exit_code(payload, args)
+            return _finalize_activity(
+                args,
+                activity_context,
+                activity_start_time,
+                _portfolio_exit_code(payload, args),
+            )
 
         if args.command == "product":
-            return handle_product_command(args)
+            return _finalize_activity(
+                args,
+                activity_context,
+                activity_start_time,
+                handle_product_command(args),
+            )
     except Exception as exc:
         args_for_error = locals().get("args")
         as_json = bool(getattr(args_for_error, "json", False))
         _print_error_payload(exc, as_json=as_json)
-        return 1
+        return _finalize_activity(args, activity_context, activity_start_time, 1)
 
-    return 1
+    return _finalize_activity(args, activity_context, activity_start_time, 1)
 
 
 def _print_validation_report(document: str, result: "ValidationResult") -> None:

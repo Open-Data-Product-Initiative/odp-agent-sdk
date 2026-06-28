@@ -18,7 +18,7 @@ from . import __version__
 from ._io import load_mapping
 from .odpc import load_catalog
 from .odpc.catalog import text_value
-from .odpg import build_graph_explorer_html, load_graph
+from .odpg import build_graph, build_graph_explorer_html, load_graph
 from .odps._normalization import (
     ODPS_DATA_QUALITY_DIMENSION_ALIASES,
     ODPS_DATA_QUALITY_DIMENSIONS,
@@ -224,35 +224,42 @@ def build_portfolio(
         if process_all_sources or not has_previous_sources
         else _changed_source_lanes(lanes, source_changes)
     )
+    workspace_title = _resolve_workspace_title(title, previous_state)
     llm_call_count = 0
     llm_phases: List[str] = []
+    written: List[Tuple[Path, str]] = []
     if any(process_lanes.values()):
         if client is None:
             raise ValueError("A model client is required to build a portfolio.")
-        prompt = render_portfolio_build_prompt(process_lanes)
+        lane_phases = _generate_portfolio_lane_fragments(
+            root,
+            process_lanes,
+            client,
+            model,
+        )
+        llm_call_count += len(lane_phases)
+        llm_phases.extend(lane_phases)
+        catalog = _catalog_from_fragments(root)
+        catalog = _apply_catalog_title(catalog, workspace_title)
+        product_specs = _load_product_specs(root)
+        written.extend(_sync_product_references_from_odps(root, catalog, product_specs))
+        written.append(_write_yaml(root / "odpc" / "catalog.yaml", catalog))
+        graph = build_graph(
+            root / "odpc" / "fragments",
+            output_path=root / "odpg" / "graph.yaml",
+            client=client,
+            model=model,
+        )
         llm_call_count += 1
-        llm_phases.append("portfolio")
-        raw_plan = client(prompt, model)
-        plan, repaired = _parse_portfolio_plan_with_repair(raw_plan, client, model)
-        if repaired:
-            llm_call_count += 1
-            llm_phases.append("portfolioRepair")
-        plan = _reconcile_plan_identity(plan, previous_state)
-        if not process_all_sources and has_previous_sources:
-            existing_plan = _plan_from_workspace(root)
-            plan = _filter_delta_plan_by_changed_lanes(
-                plan,
-                process_lanes,
-                existing_plan,
-            )
-            plan = _merge_portfolio_plans(existing_plan, plan)
+        llm_phases.append("graph")
+        written.append(_write_yaml(root / "odpg" / "graph.yaml", graph))
+        plan = _plan_from_workspace(root)
     else:
         plan = _plan_from_workspace(root)
     if has_previous_sources:
         plan = _ensure_changed_signal_source_coverage(plan, lanes, source_changes)
     plan = _reconcile_plan_identity(plan, previous_state)
     plan = _normalize_portfolio_plan(plan)
-    workspace_title = _resolve_workspace_title(title, previous_state)
     plan = _apply_workspace_title(plan, workspace_title)
     if any(process_lanes.values()):
         if client is None:
@@ -274,13 +281,15 @@ def build_portfolio(
     created: List[str] = []
     updated: List[str] = []
     unchanged: List[str] = []
-    written = _write_portfolio_artifacts(
-        root,
-        plan,
-        lanes,
-        lane_paths=lane_paths,
-        title=workspace_title,
-        model=model,
+    written.extend(
+        _write_portfolio_metadata_artifacts(
+            root,
+            plan,
+            lanes,
+            lane_paths=lane_paths,
+            title=workspace_title,
+            model=model,
+        )
     )
     for path, state in written:
         if state == "created":
@@ -1235,6 +1244,60 @@ def _write_portfolio_artifacts(
     written.append(_write_yaml(root / "odpc" / "catalog.yaml", catalog))
     written.append(_write_yaml(root / "odpg" / "graph.yaml", _graph_document(plan)))
     return written
+
+
+def _write_portfolio_metadata_artifacts(
+    root: Path,
+    plan: Dict[str, Any],
+    lanes: Dict[str, List[Dict[str, str]]],
+    lane_paths: Optional[Dict[str, str]] = None,
+    title: Optional[str] = None,
+    model: Optional[str] = None,
+) -> List[Tuple[Path, str]]:
+    written: List[Tuple[Path, str]] = []
+    written.append(_write_yaml(root / "portfolio.yaml", _portfolio_map(plan, lanes)))
+    executive_summary = _executive_summary_document(plan, title=title, model=model)
+    if executive_summary is not None:
+        written.append(_write_yaml(root / DEFAULT_EXECUTIVE_SUMMARY, executive_summary))
+    written.append(
+        _write_yaml(
+            root / "portfolio-state.yaml",
+            _portfolio_state(plan, lanes, lane_paths or {}, title),
+        )
+    )
+    return written
+
+
+def _generate_portfolio_lane_fragments(
+    root: Path,
+    lanes: Dict[str, List[Dict[str, str]]],
+    client: PortfolioBuildClient,
+    model: str,
+) -> List[str]:
+    from .generation import generate_local_artifacts_for_kind
+
+    fragments_dir = root / "odpc" / "fragments"
+    lane_specs = (
+        ("objectives", "objective", "objective"),
+        ("useCases", "use-case", "useCase"),
+        ("signals", "signal", "signal"),
+        ("products", "product-reference", "productReference"),
+    )
+    phases: List[str] = []
+    for lane_name, artifact_kind, phase in lane_specs:
+        for source in lanes.get(lane_name, []):
+            source_path = source.get("path")
+            if not source_path:
+                continue
+            generate_local_artifacts_for_kind(
+                artifact_kind,
+                source_path,
+                fragments_dir,
+                model=model,
+                client=client,
+            )
+            phases.append(phase)
+    return phases
 
 
 def _write_yaml(path: Path, document: Dict[str, Any]) -> Tuple[Path, str]:
@@ -2526,6 +2589,22 @@ def _default_catalog_metadata(root: Path) -> Dict[str, Any]:
     }
 
 
+def _apply_catalog_title(
+    catalog: Dict[str, Any], title: Optional[str]
+) -> Dict[str, Any]:
+    if not title:
+        return catalog
+    catalog_root = catalog.setdefault("catalog", {})
+    if not isinstance(catalog_root, dict):
+        return catalog
+    metadata = catalog_root.setdefault("metadata", {})
+    if not isinstance(metadata, dict):
+        metadata = {}
+        catalog_root["metadata"] = metadata
+    metadata["name"] = {"en": title}
+    return catalog
+
+
 def _fragment_collections(fragments_dir: Path) -> Dict[str, List[Dict[str, Any]]]:
     collections: Dict[str, List[Dict[str, Any]]] = {
         "businessObjectives": [],
@@ -3036,7 +3115,11 @@ def _artifact_counts(plan: Dict[str, Any]) -> Dict[str, int]:
         "useCases": len(_list(plan, "useCases")),
         "signals": len(_list(plan, "signals")),
         "productReferences": len(_list(plan, "products")),
-        "odpsProducts": len(_list(plan, "products")),
+        "odpsProducts": sum(
+            1
+            for product in _list(plan, "products")
+            if isinstance(product.get("odpsProduct"), dict)
+        ),
         "graphEdges": len(_list(plan, "graphEdges")),
     }
     counts.update(_executive_summary_counts(plan.get("executiveSummary")))

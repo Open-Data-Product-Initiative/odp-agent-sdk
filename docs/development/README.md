@@ -27,6 +27,9 @@ Use these pages when changing complex SDK behavior:
   generation.
 - [MCP development](mcp.md): MCP tool registry, safe-class policy,
   stdio server behavior, ARWS manifest generation, and tests.
+- [SDK activity logging plan](sdk-activity-logging-plan.md): fixed-format
+  command activity events, classification, rotation, redaction, and CLI
+  integration planning.
 
 Keep these pages focused on implementation rules and contributor workflows.
 User setup, beginner commands, and runnable examples belong in the user-facing

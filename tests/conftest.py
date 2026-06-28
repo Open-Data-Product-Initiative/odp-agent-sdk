@@ -9,6 +9,12 @@ from open_data_products.odps import OpenDataProduct
 from open_data_products.odps.models import ProductDetails
 
 
+@pytest.fixture(autouse=True)
+def disable_activity_logging_by_default(monkeypatch):
+    """Keep unrelated CLI tests from writing workspace activity logs."""
+    monkeypatch.setenv("OPEN_DATA_PRODUCTS_ACTIVITY_LOG", "0")
+
+
 @pytest.fixture
 def sample_product_details():
     """Provide a basic ProductDetails instance for testing."""
