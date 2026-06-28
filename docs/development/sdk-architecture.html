@@ -394,6 +394,7 @@
         <div class="hero-meta" aria-label="SDK capability areas">
           <span class="pill">Python API</span>
           <span class="pill">Unified CLI</span>
+          <span class="pill">Activity log</span>
           <span class="pill">MCP server</span>
           <span class="pill">ODPS / ODPC / ODPG / ODPV / ODPR</span>
         </div>
@@ -424,6 +425,7 @@
             <div class="mini-box">Portfolio<small>workspaces</small></div>
             <div class="mini-box">Resources<small>schemas</small></div>
           </div>
+          <div class="mini-box">Activity<small>workspace log</small></div>
         </div>
       </div>
     </div>
@@ -452,6 +454,7 @@
         <div class="map-column">
           <div class="node">Python API<small>open_data_products</small></div>
           <div class="node">CLI<small>open-data-products</small></div>
+          <div class="node">Activity log<small>.open-data-products/activity.log</small></div>
           <div class="node">MCP server<small>stdio JSON-RPC</small></div>
         </div>
         <div class="node hub">
@@ -549,13 +552,17 @@
           <strong>mcp</strong>
           <span>Tool registry, stdio JSON-RPC server, ARWS manifest integration, and explicit safe or state-changing tool classes.</span>
         </div>
+        <div class="tile">
+          <strong>_activity.py</strong>
+          <span>Internal CLI evidence logging: workspace resolution, fixed activity lines, redaction, and rotating file writes.</span>
+        </div>
       </div>
       <p class="caption" style="margin-top: 16px;">
         Root modules such as `agent.py`, `summary.py`, `resources.py`,
         `pricing.py`, and `portfolio.py` handle cross-spec facades or
         product-level workflows. Underscored modules such as `_toon.py`,
-        `_gcf.py`, `_io.py`, and `_search.py` are internal implementation
-        helpers.
+        `_gcf.py`, `_activity.py`, `_io.py`, and `_search.py` are internal
+        implementation helpers.
       </p>
     </section>
 
@@ -592,6 +599,13 @@
               CLI, MCP tools, and the ARWS manifest reuse the same SDK functions
               that Python users call directly. File-creating MCP tools are
               classified as state-changing.
+            </p>
+          </div>
+          <div class="layer amber">
+            <h3>Activity evidence</h3>
+            <p class="caption">
+              CLI command outcomes and LLM provider invocations are written as
+              fixed lines in the resolved workspace activity log.
             </p>
           </div>
           <div class="layer">
@@ -641,6 +655,21 @@
           <p class="caption">Use the result from Python, CLI, MCP, or reports.</p>
         </div>
       </div>
+    </section>
+
+    <section class="panel">
+      <h2>CLI Activity Evidence</h2>
+      <p>
+        The CLI writes workspace-local activity evidence through internal
+        `_activity.py` helpers. By default, command outcomes append to
+        `.open-data-products/activity.log` under the resolved workspace root.
+        Each CLI invocation writes a terminal outcome line with classification,
+        command id, exit code, duration, and redacted details. LLM-backed
+        workflows also write an `[INFO]` `llm.invoke` line with the parent
+        command, provider, provider type, model, and phase before the provider
+        is called. This log is separate from MCP safe-tool behavior and uses
+        Python standard-library rotating file handling.
+      </p>
     </section>
 
     <section class="panel">
@@ -723,6 +752,7 @@
         <div class="tile"><strong>ODPR</strong><span>Recipe validation, RecipeCatalog discovery, starter init, explanation, dry-run planning, and guarded execution.</span></div>
         <div class="tile"><strong>agent.py</strong><span>Cross-spec load, detect, validate, explain, and reference behavior.</span></div>
         <div class="tile"><strong>generation/</strong><span>LLM config, providers, prompts, artifact normalization, validation, and repair.</span></div>
+        <div class="tile"><strong>_activity.py</strong><span>Workspace activity log, command classifications, LLM invocation evidence, rotation, and redaction.</span></div>
         <div class="tile"><strong>mcp/</strong><span>Tool registry, stdio server, content envelopes, manifest integration, and ARWS tool classes.</span></div>
         <div class="tile"><strong>docs/</strong><span>User guides for workflows, development notes for internals, planning for future work.</span></div>
       </div>

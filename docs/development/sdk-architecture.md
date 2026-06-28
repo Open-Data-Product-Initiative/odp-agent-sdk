@@ -74,6 +74,7 @@ flowchart TB
 | Spec namespaces | Implementation details for ODPS, ODPC, ODPG, ODPV, and ODPR. | `odps/`, `odpc/`, `odpg/`, `odpv/`, `odpr/` |
 | CLI surface | Human-readable default commands plus `--json` for scripts and agents. | `cli.py`, `cli_core.py`, `cli_product.py`, spec `cli.py` files |
 | MCP and manifest | Safe local agent tools and ARWS manifest output. | `mcp/tools.py`, `mcp/server.py`, `mcp/manifest.py` |
+| Activity logging | Workspace-local CLI activity evidence, rotating log writes, command outcome lines, and LLM invocation lines. | `_activity.py`, `cli.py` |
 | Bundled resources | Schemas, prompts, examples, vocabulary records, and guidance indexes. | `resources.py`, package `data/` folders |
 | Generation | Prompt rendering, provider resolution, local/hosted LLM calls, YAML normalization, and repair loops. | `generation/` |
 | Data Contracts | Optional external contract validation plus ODPS contract reference and alignment workflows. | `contracts/` |
@@ -88,8 +89,9 @@ be part of the supported SDK contract, export it from
 
 Internal modules use a leading underscore and should stay behind a stable
 facade. For example, `_toon.py`, `_gcf.py`, and `_context_metrics.py` support
-compact-context workflows, but user-facing code should normally call catalog,
-graph, CLI, or public API helpers instead of importing these modules directly.
+compact-context workflows, while `_activity.py` supports CLI evidence logging.
+User-facing code should normally call catalog, graph, CLI, or public API
+helpers instead of importing these modules directly.
 
 ```mermaid
 flowchart LR
@@ -126,7 +128,7 @@ import path.
 | `open_data_products.contracts` | Data Contract loading, optional `datacontract-cli` adapter use, contract references, schema summaries, alignment, exports, and reports. | The behavior connects ODPS products to external or inline Data Contracts. |
 | `open_data_products.mcp` | Tool registry, stdio JSON-RPC server, and ARWS manifest. | The behavior exposes SDK capabilities to agent hosts. |
 | Root modules such as `agent.py`, `summary.py`, `resources.py`, `pricing.py`, and `portfolio.py` | Cross-spec facades or product-level workflows that do not belong to exactly one standards namespace. | The behavior coordinates multiple specs or provides a package-level workflow. |
-| Internal helpers such as `_toon.py`, `_gcf.py`, `_io.py`, and `_search.py` | Shared implementation details used by public modules. | You are working inside the SDK implementation; do not make these direct user-facing imports. |
+| Internal helpers such as `_toon.py`, `_gcf.py`, `_activity.py`, `_io.py`, and `_search.py` | Shared implementation details used by public modules, including compact contexts and CLI activity evidence. | You are working inside the SDK implementation; do not make these direct user-facing imports. |
 
 ```mermaid
 flowchart TB
@@ -321,6 +323,15 @@ workspace from a packaged starter. Tool handlers live in `mcp/tools.py`,
 return MCP content envelopes, and delegate to the same facades used by Python
 and CLI workflows.
 
+The CLI also writes workspace-local activity evidence through `_activity.py`.
+By default, command outcomes are appended to
+`.open-data-products/activity.log` under the resolved workspace root. Each CLI
+invocation writes one terminal outcome line, and LLM-backed workflows also
+write an `[INFO]` `llm.invoke` line with provider and model details before the
+provider is called. The log uses Python standard-library rotating file
+handling, redacts sensitive detail keys, and remains separate from MCP safe
+tool behavior.
+
 ```mermaid
 flowchart TB
     Host[Agent host]
@@ -352,6 +363,7 @@ flowchart LR
     Prompts[Bundled or copied prompts]
     Config[Generation config]
     Provider[LLM provider]
+    Activity[activity.log\nllm.invoke evidence]
     Artifacts[YAML artifacts]
     Validate[SDK validation and normalization]
     Outputs[ODPC fragments, ODPS products, ODPG graphs]
@@ -360,6 +372,7 @@ flowchart LR
     Sources --> Prompts
     Config --> Provider
     Prompts --> Provider
+    Provider --> Activity
     Provider --> Artifacts
     Artifacts --> Validate
     Validate --> Outputs
@@ -434,6 +447,7 @@ Before finishing work, run the repository checklist from `AGENTS.md`:
 - [MCP development](mcp.md)
 - [Generation development](generation.md)
 - [Portfolio development](portfolio.md)
+- [SDK activity logging plan](sdk-activity-logging-plan.md)
 - [ODPS validation development](odps-validation.md)
 - [ODPC catalog development](odpc-catalog.md)
 - [ODPG graph development](odpg-graph.md)
