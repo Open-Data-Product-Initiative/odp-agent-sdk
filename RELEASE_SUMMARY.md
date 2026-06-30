@@ -1,4 +1,4 @@
-# Release Summary: 0.3.3
+# Release Summary: 0.3.4
 
 ## Source-To-Fragment Generation
 
