@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import csv
 from email import policy
 from email.parser import BytesParser
 import hashlib
+import io
 from pathlib import Path
 import re
 from typing import Dict, List, Tuple
@@ -13,7 +15,9 @@ import zlib
 from zipfile import BadZipFile, ZipFile
 
 TEXT_SUFFIXES = (".md", ".txt", ".yaml", ".yml", ".json")
+CSV_ROW_LIMIT = 50
 PORTFOLIO_DOCUMENT_SUFFIXES = TEXT_SUFFIXES + (
+    ".csv",
     ".eml",
     ".msg",
     ".docx",
@@ -33,6 +37,8 @@ def load_source_documents(path: Path) -> List[Dict[str, str]]:
     source_type, detection_method = detect_source_type(path)
     if source_type in TEXT_SUFFIXES:
         return [_text_record(path, detection_method=detection_method)]
+    if source_type == ".csv":
+        return [_csv_record(path, detection_method=detection_method)]
     if source_type == ".eml":
         return [_email_record(path, detection_method=detection_method)]
     if source_type == ".msg":
@@ -59,6 +65,8 @@ def detect_source_type(path: Path) -> Tuple[str, str]:
         return ooxml_type, "ooxml-container"
     if _looks_like_eml(header):
         return ".eml", "rfc822-headers"
+    if _looks_like_csv(header):
+        return ".csv", "csv-sniffer"
     suffix = path.suffix.lower()
     if suffix in PORTFOLIO_DOCUMENT_SUFFIXES:
         return suffix, "extension"
@@ -74,6 +82,29 @@ def _looks_like_eml(header: bytes) -> bool:
         return False
     header_names = ("subject:", "from:", "to:", "date:", "content-type:")
     return sum(1 for name in header_names if name in text) >= 2
+
+
+def _looks_like_csv(header: bytes) -> bool:
+    try:
+        sample = header.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        return False
+    if not sample.strip() or "\n" not in sample:
+        return False
+    try:
+        dialect = csv.Sniffer().sniff(sample)
+    except csv.Error:
+        return False
+    if dialect.delimiter not in {",", ";", "\t"}:
+        return False
+    rows = list(csv.reader(io.StringIO(sample), dialect))
+    non_empty_rows = [row for row in rows if any(cell.strip() for cell in row)]
+    if len(non_empty_rows) < 2:
+        return False
+    width = len(non_empty_rows[0])
+    if width < 2:
+        return False
+    return all(len(row) == width for row in non_empty_rows[:5])
 
 
 def _detect_ooxml_type(path: Path) -> str:
@@ -103,6 +134,67 @@ def _text_record(path: Path, *, detection_method: str) -> Dict[str, str]:
         title=path.stem,
         detection_method=detection_method,
     )
+
+
+def _csv_record(path: Path, *, detection_method: str) -> Dict[str, str]:
+    text = _csv_text(path)
+    return _source_record(
+        path,
+        text=text,
+        source_type="csv",
+        source_unit="table",
+        source_unit_id="1",
+        title=path.stem,
+        detection_method=detection_method,
+    )
+
+
+def _csv_text(path: Path) -> str:
+    content = path.read_text(encoding="utf-8-sig")
+    rows = list(csv.reader(io.StringIO(content)))
+    rows = [row for row in rows if any(cell.strip() for cell in row)]
+    if not rows:
+        return ""
+    header = [cell.strip() for cell in rows[0]]
+    data_rows = [[cell.strip() for cell in row] for row in rows[1:]]
+    included_rows = data_rows[:CSV_ROW_LIMIT]
+    lines = [
+        f"CSV table: {path.name}",
+        f"Columns: {', '.join(header)}",
+        f"Rows: {len(data_rows)}",
+        f"Rows included: {len(included_rows)}",
+    ]
+    omitted = max(len(data_rows) - len(included_rows), 0)
+    if omitted:
+        lines.append(f"Rows omitted: {omitted}")
+    lines.extend(_markdown_table(header, included_rows))
+    return "\n".join(lines)
+
+
+def _markdown_table(header: List[str], rows: List[List[str]]) -> List[str]:
+    if not header:
+        return []
+    normalized_rows = [_normalize_row(row, len(header)) for row in rows]
+    table = [
+        "| " + " | ".join(_escape_table_cell(cell) for cell in header) + " |",
+        "| " + " | ".join("---" for _item in header) + " |",
+    ]
+    for row in normalized_rows:
+        table.append(
+            "| " + " | ".join(_escape_table_cell(cell) for cell in row) + " |"
+        )
+    return table
+
+
+def _normalize_row(row: List[str], width: int) -> List[str]:
+    normalized = list(row[:width])
+    while len(normalized) < width:
+        normalized.append("")
+    return normalized
+
+
+def _escape_table_cell(value: str) -> str:
+    return value.replace("|", "\\|").replace("\n", " ").strip()
 
 
 def _docx_record(path: Path, *, detection_method: str) -> Dict[str, str]:

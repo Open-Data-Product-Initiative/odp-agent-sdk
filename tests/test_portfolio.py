@@ -1241,6 +1241,94 @@ def test_portfolio_source_helpers_detect_pdf_from_content_before_extension(
     assert "Customer analytics product" in lanes["products"][0]["text"]
 
 
+def test_portfolio_source_helpers_extract_csv_as_one_source_record(
+    tmp_path: Path,
+) -> None:
+    from open_data_products.portfolio_sources import collect_source_lanes
+
+    sources = tmp_path / "sources"
+    (sources / "signals").mkdir(parents=True)
+    csv_path = sources / "signals" / "churn-signals.csv"
+    csv_path.write_text(
+        "segment,churn_rate,priority\n"
+        "enterprise,0.12,high\n"
+        "midmarket,0.08,medium\n",
+        encoding="utf-8",
+    )
+
+    lanes = collect_source_lanes(
+        objectives=None,
+        use_cases=None,
+        signals=sources / "signals",
+        products=None,
+    )
+
+    assert len(lanes["signals"]) == 1
+    assert lanes["signals"][0]["sourceType"] == "csv"
+    assert lanes["signals"][0]["sourceId"] == f"{csv_path}#table-1"
+    assert lanes["signals"][0]["sourceUnit"] == "table"
+    assert lanes["signals"][0]["sourceUnitId"] == "1"
+    assert lanes["signals"][0]["detectionMethod"] == "csv-sniffer"
+    assert "Columns: segment, churn_rate, priority" in lanes["signals"][0]["text"]
+    assert "| enterprise | 0.12 | high |" in lanes["signals"][0]["text"]
+    assert "| midmarket | 0.08 | medium |" in lanes["signals"][0]["text"]
+
+
+def test_portfolio_source_helpers_detect_csv_from_content_before_extension(
+    tmp_path: Path,
+) -> None:
+    from open_data_products.portfolio_sources import collect_source_lanes
+
+    sources = tmp_path / "sources"
+    (sources / "products").mkdir(parents=True)
+    csv_path = sources / "products" / "product-candidates.txt"
+    csv_path.write_text(
+        "product,need\n"
+        "Customer Health,retention visibility\n",
+        encoding="utf-8",
+    )
+
+    lanes = collect_source_lanes(
+        objectives=None,
+        use_cases=None,
+        signals=None,
+        products=sources / "products",
+    )
+
+    assert len(lanes["products"]) == 1
+    assert lanes["products"][0]["sourceType"] == "csv"
+    assert lanes["products"][0]["detectionMethod"] == "csv-sniffer"
+    assert lanes["products"][0]["sourceUnit"] == "table"
+    assert "| Customer Health | retention visibility |" in lanes["products"][0]["text"]
+
+
+def test_portfolio_source_helpers_limits_csv_rows_in_source_text(
+    tmp_path: Path,
+) -> None:
+    from open_data_products.portfolio_sources import collect_source_lanes
+
+    sources = tmp_path / "sources"
+    (sources / "use-cases").mkdir(parents=True)
+    csv_path = sources / "use-cases" / "requests.csv"
+    rows = ["id,request"]
+    rows.extend(f"{index},Request {index}" for index in range(1, 56))
+    csv_path.write_text("\n".join(rows) + "\n", encoding="utf-8")
+
+    lanes = collect_source_lanes(
+        objectives=None,
+        use_cases=sources / "use-cases",
+        signals=None,
+        products=None,
+    )
+
+    text = lanes["useCases"][0]["text"]
+    assert "Rows: 55" in text
+    assert "Rows included: 50" in text
+    assert "| 50 | Request 50 |" in text
+    assert "Request 51" not in text
+    assert "Rows omitted: 5" in text
+
+
 def _is_executive_summary_prompt(prompt: str) -> bool:
     return prompt.startswith("# Create Portfolio Executive Summary")
 
