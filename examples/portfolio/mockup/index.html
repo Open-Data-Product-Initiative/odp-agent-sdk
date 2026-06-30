@@ -485,26 +485,44 @@
 
     .footer-inner {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) auto;
-      gap: 18px;
-      align-items: start;
+      gap: 22px;
     }
 
-    .footer p {
-      max-width: 760px;
+    .footer-status {
       margin: 0;
+      max-width: 880px;
+      color: rgba(255, 255, 255, .88);
     }
 
-    .footer-links {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: flex-end;
-      gap: 12px;
+    .footer-columns {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 20px;
+    }
+
+    .footer-column h2 {
+      margin: 0 0 10px;
+      color: #fff;
+      font-size: .82rem;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
+
+    .footer-column ul {
+      display: grid;
+      gap: 8px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .footer-column a {
+      color: #fff;
       font-weight: 700;
     }
 
-    .footer-links a {
-      color: #fff;
+    .footer-column span {
+      color: rgba(255, 255, 255, .62);
     }
 
     @media (max-width: 900px) {
@@ -524,12 +542,8 @@
 
       .wide { grid-column: auto; }
 
-      .footer-inner {
+      .footer-columns {
         grid-template-columns: 1fr;
-      }
-
-      .footer-links {
-        justify-content: flex-start;
       }
     }
   </style>
@@ -538,7 +552,7 @@
   <header class="topbar">
     <div class="topbar-inner">
       <a class="brand" href="#overview" aria-label="Open Data Products portfolio">
-        <span>Open Data Products Portfolio</span>
+        <span>Data Products Portfolio</span>
       </a>
     </div>
   </header>
@@ -845,12 +859,44 @@
   </main>
   <footer class="footer">
     <div class="wrap footer-inner">
-      <p>Generated with the Open Data Products SDK. This static portfolio keeps catalog artifacts, ODPS product specs, ODPG graph data, version snapshots, and review guidance together in one browser-openable file.</p>
-      <nav class="footer-links" aria-label="Portfolio artifact links">
-        <a href="odpc/catalog.yaml">Catalog YAML</a>
-        <a href="odpg/graph.yaml">Graph YAML</a>
-        <a href="#overview">Back to top</a>
-      </nav>
+      <p class="footer-status">Draft portfolio generated with the Data Products SDK. Human review is required before product specs are treated as production-ready.</p>
+      <div class="footer-columns">
+        <section class="footer-column">
+          <h2>Review status</h2>
+          <ul>
+            <li>Draft portfolio</li>
+            <li>Human acceptance required</li>
+            <li>Latest snapshot available</li>
+          </ul>
+        </section>
+        <nav class="footer-column" aria-label="Portfolio next actions">
+          <h2>Next actions</h2>
+          <ul>
+            <li><a href="#executive-summary">Review executive decisions</a></li>
+            <li><a href="#executive-summary">Resolve evidence gaps</a></li>
+            <li><a href="#products">Approve product specs</a></li>
+            <li><a href="#overview">Compare previous snapshot</a></li>
+          </ul>
+        </nav>
+        <nav class="footer-column" aria-label="Portfolio evidence links">
+          <h2>Evidence</h2>
+          <ul>
+            <li><a href="#about">Source summary</a></li>
+            <li><a href="#overview">Portfolio versions</a></li>
+            <li><a href="#graph">Graph view</a></li>
+            <li><a href="#objectives">Catalog objects</a></li>
+          </ul>
+        </nav>
+        <nav class="footer-column" aria-label="Portfolio artifact links">
+          <h2>Artifacts</h2>
+          <ul>
+            <li><a href="odpc/catalog.yaml">Catalog YAML</a></li>
+            <li><a href="odpg/graph.yaml">Graph YAML</a></li>
+            <li><a href="#products">Product specs</a></li>
+            <li><a href="#overview">Back to top</a></li>
+          </ul>
+        </nav>
+      </div>
     </div>
   </footer>
 </body>

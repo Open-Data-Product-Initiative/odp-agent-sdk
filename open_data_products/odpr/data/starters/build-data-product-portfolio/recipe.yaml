@@ -18,5 +18,5 @@ recipe:
       command: portfolio.build
       with:
         products:
-          - inputs/products
+          - sources/products
         workspace: outputs/portfolio

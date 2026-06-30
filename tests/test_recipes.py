@@ -39,7 +39,7 @@ def _fake_localization_client(prompt: str, model: str) -> str:
         return """
 language: fi
 translations:
-  Open Data Products Portfolio: Open Data Products Portfolio FI
+  Data Products Portfolio: Data Products Portfolio FI
   Generated workspace summary: Generated workspace summary FI
   Overview: Overview FI
   Products: Products FI
@@ -49,7 +49,7 @@ translations:
     return """
 language: sv
 translations:
-  Open Data Products Portfolio: Open Data Products Portfolio SV
+  Data Products Portfolio: Data Products Portfolio SV
   Generated workspace summary: Generated workspace summary SV
   Overview: Overview SV
   Products: Products SV
@@ -767,7 +767,7 @@ recipe:
       command: portfolio.build
       with:
         products:
-          - inputs/products
+          - sources/products
         workspace: outputs/portfolio
 """,
         encoding="utf-8",
@@ -776,7 +776,7 @@ recipe:
     plan = plan_recipe_run(recipe_path, project_root=tmp_path)
 
     assert plan["steps"][0]["inputs"] == [
-        {"path": "inputs/products", "exists": False}
+        {"path": "sources/products", "exists": False}
     ]
     assert plan["steps"][0]["plannedWrites"] == [
         {"path": "outputs/portfolio", "allowed": True}
@@ -1210,6 +1210,7 @@ def test_execute_recipe_run_refreshes_portfolio_after_llm_and_review_approval(
         client=None,
         model="",
         all_sources=False,
+        source_budget=None,
     ):
         assert workspace_path == workspace
         assert objectives == source_root / "objectives"
@@ -1220,6 +1221,7 @@ def test_execute_recipe_run_refreshes_portfolio_after_llm_and_review_approval(
         assert client == "fake-client"
         assert model == "test-model"
         assert all_sources is True
+        assert source_budget is not None
         return {
             "kind": "PortfolioRefresh",
             "valid": True,
@@ -1305,6 +1307,8 @@ def test_execute_recipe_run_builds_portfolio_after_llm_and_review_approval(
         title=None,
         client=None,
         model="",
+        context_format="markdown",
+        source_budget=None,
     ):
         assert workspace_path == workspace
         assert objectives == source_root / "objectives"
@@ -1314,6 +1318,8 @@ def test_execute_recipe_run_builds_portfolio_after_llm_and_review_approval(
         assert title is None
         assert client == "fake-client"
         assert model == "test-model"
+        assert context_format == "markdown"
+        assert source_budget is not None
         return {
             "kind": "PortfolioBuild",
             "valid": True,
@@ -1819,7 +1825,7 @@ def test_init_starter_recipe_parameterized_creates_values_files(
     assert values["starter"]["id"] == "RCP-SDK-PORTFOLIO-BUILD"
     assert values["paths"] == {
         "workspace": "outputs/portfolio",
-        "products": ["inputs/products"],
+        "products": ["sources/products"],
     }
     assert schema["type"] == "object"
     assert "Parameterized Mode" in (target / "README.md").read_text(encoding="utf-8")
@@ -1842,7 +1848,7 @@ def test_explain_recipe_resolves_starter_and_loads_full_recipe() -> None:
             "command": "portfolio.build",
             "classification": "llm-backed",
             "with": {
-                "products": ["inputs/products"],
+                "products": ["sources/products"],
                 "workspace": "outputs/portfolio",
             },
         }

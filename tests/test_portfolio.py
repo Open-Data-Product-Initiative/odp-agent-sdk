@@ -2,6 +2,7 @@
 
 import json
 from pathlib import Path
+from zipfile import ZipFile
 
 import pytest
 import yaml
@@ -11,8 +12,10 @@ from open_data_products._io import load_mapping
 from open_data_products.cli import main
 from open_data_products.portfolio import (
     _chunk_localization_strings,
+    _reduce_source_lanes_for_prompt,
     build_portfolio,
     explain_portfolio,
+    inspect_portfolio_intake,
     localize_portfolio,
     parse_portfolio_plan,
     refresh_portfolio,
@@ -21,6 +24,7 @@ from open_data_products.portfolio import (
     render_portfolio,
     sync_portfolio,
 )
+from open_data_products.generation.models import PortfolioSourceBudget
 
 PORTFOLIO_PLAN_YAML = """
 metadata:
@@ -898,23 +902,231 @@ def test_portfolio_source_helpers_collect_and_compare_lane_changes(
 
     changes = source_changes(previous_state, updated_lanes)
     changed_lanes = changed_source_lanes(updated_lanes, changes)
+    retention_id = f"{sources / 'use-cases' / 'retention.md'}#file-1"
+    market_id = f"{sources / 'signals' / 'market.txt'}#file-1"
+    orders_id = f"{sources / 'products' / 'orders.json'}#file-1"
 
-    assert source_hashes_by_lane(previous_state)
+    assert retention_id in source_hashes_by_lane(previous_state)["useCases"]
     assert changes["lanes"]["useCases"]["updated"] == [
         str(sources / "use-cases" / "retention.md")
     ]
+    assert changes["lanes"]["useCases"]["updatedSourceIds"] == [retention_id]
     assert changes["lanes"]["signals"]["removed"] == [
         str(sources / "signals" / "market.txt")
     ]
+    assert changes["lanes"]["signals"]["removedSourceIds"] == [market_id]
     assert changes["lanes"]["products"]["created"] == [
         str(sources / "products" / "orders.json")
     ]
+    assert changes["lanes"]["products"]["createdSourceIds"] == [orders_id]
+    assert changed_lanes["products"][0]["sourceId"] == orders_id
     assert [source["path"] for source in changed_lanes["products"]] == [
         str(sources / "products" / "orders.json")
     ]
     assert source_change_warnings(changes) == [
         f"Source file no longer present: {sources / 'signals' / 'market.txt'}"
     ]
+
+
+def test_portfolio_source_helpers_extract_eml_and_warn_for_msg_without_extra(
+    tmp_path: Path,
+) -> None:
+    from open_data_products.portfolio_sources import (
+        collect_source_lanes,
+        source_extraction_warnings,
+    )
+
+    sources = tmp_path / "sources"
+    (sources / "use-cases").mkdir(parents=True)
+    (sources / "use-cases" / "retention-request.eml").write_text(
+        "\r\n".join(
+            [
+                "Subject: Retention reporting",
+                "From: Customer Lead <customer@example.com>",
+                "To: Products <products@example.com>",
+                "Date: Mon, 01 Jun 2026 10:00:00 +0000",
+                "Content-Type: text/plain; charset=utf-8",
+                "",
+                "Please provide weekly churn reporting by segment.",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    msg_path = sources / "use-cases" / "outlook-request.msg"
+    msg_path.write_bytes(b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1fake-msg")
+
+    lanes = collect_source_lanes(
+        objectives=None,
+        use_cases=sources / "use-cases",
+        signals=None,
+        products=None,
+    )
+
+    use_cases = lanes["useCases"]
+    assert [source["path"] for source in use_cases] == [
+        str(sources / "use-cases" / "retention-request.eml")
+    ]
+    assert use_cases[0]["sourceType"] == "eml"
+    assert (
+        use_cases[0]["sourceId"]
+        == f"{sources / 'use-cases' / 'retention-request.eml'}#message-1"
+    )
+    assert use_cases[0]["sourceUnit"] == "message"
+    assert use_cases[0]["title"] == "Retention reporting"
+    assert "Please provide weekly churn reporting by segment." in use_cases[0]["text"]
+    assert source_extraction_warnings(lanes) == [
+        (
+            f"Skipped Outlook .msg source {msg_path}: install "
+            "open-data-products[email] to enable .msg extraction."
+        )
+    ]
+
+
+def test_portfolio_source_helpers_detect_types_from_content_before_extension(
+    tmp_path: Path,
+) -> None:
+    from open_data_products.portfolio_sources import (
+        collect_source_lanes,
+        source_extraction_warnings,
+    )
+
+    sources = tmp_path / "sources"
+    (sources / "use-cases").mkdir(parents=True)
+    renamed_eml = sources / "use-cases" / "customer-request.txt"
+    renamed_eml.write_text(
+        "\r\n".join(
+            [
+                "Subject: Segment data request",
+                "From: Customer <customer@example.com>",
+                "Content-Type: text/plain; charset=utf-8",
+                "",
+                "Can we get a weekly segment extract?",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    renamed_msg = sources / "use-cases" / "outlook-request.txt"
+    renamed_msg.write_bytes(b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1fake-msg")
+
+    lanes = collect_source_lanes(
+        objectives=None,
+        use_cases=sources / "use-cases",
+        signals=None,
+        products=None,
+    )
+
+    assert [source["path"] for source in lanes["useCases"]] == [str(renamed_eml)]
+    assert lanes["useCases"][0]["sourceType"] == "eml"
+    assert lanes["useCases"][0]["detectionMethod"] == "rfc822-headers"
+    assert lanes["useCases"][0]["title"] == "Segment data request"
+    assert source_extraction_warnings(lanes) == [
+        (
+            f"Skipped Outlook .msg source {renamed_msg}: install "
+            "open-data-products[email] to enable .msg extraction."
+        )
+    ]
+
+
+def test_portfolio_source_helpers_scan_extensionless_supported_files(
+    tmp_path: Path,
+) -> None:
+    from open_data_products.portfolio_sources import (
+        collect_source_lanes,
+        source_extraction_warnings,
+    )
+
+    sources = tmp_path / "sources"
+    (sources / "use-cases").mkdir(parents=True)
+    msg_path = sources / "use-cases" / "outlook-request"
+    msg_path.write_bytes(b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1fake-msg")
+
+    lanes = collect_source_lanes(
+        objectives=None,
+        use_cases=sources / "use-cases",
+        signals=None,
+        products=None,
+    )
+
+    assert lanes["useCases"] == []
+    assert source_extraction_warnings(lanes) == [
+        (
+            f"Skipped Outlook .msg source {msg_path}: install "
+            "open-data-products[email] to enable .msg extraction."
+        )
+    ]
+
+
+def test_portfolio_source_helpers_detect_ooxml_from_container(
+    tmp_path: Path,
+) -> None:
+    from open_data_products.portfolio_sources import collect_source_lanes
+
+    sources = tmp_path / "sources"
+    (sources / "objectives").mkdir(parents=True)
+    (sources / "products").mkdir(parents=True)
+    docx_path = sources / "objectives" / "strategy-notes"
+    pptx_path = sources / "products" / "product-deck.txt"
+    with ZipFile(docx_path, "w") as archive:
+        archive.writestr(
+            "word/document.xml",
+            """
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p><w:r><w:t>Improve retention</w:t></w:r></w:p>
+    <w:p><w:r><w:t>Prioritize churn reporting</w:t></w:r></w:p>
+  </w:body>
+</w:document>
+""",
+        )
+    with ZipFile(pptx_path, "w") as archive:
+        archive.writestr("ppt/presentation.xml", "<p:presentation />")
+        archive.writestr(
+            "ppt/slides/slide1.xml",
+            """
+<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+       xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+  <p:cSld><p:spTree>
+    <p:sp><p:txBody><a:p><a:r><a:t>Customer analytics product</a:t></a:r></a:p></p:txBody></p:sp>
+    <p:sp><p:txBody><a:p><a:r><a:t>Weekly segment reporting</a:t></a:r></a:p></p:txBody></p:sp>
+  </p:spTree></p:cSld>
+</p:sld>
+""",
+        )
+        archive.writestr(
+            "ppt/slides/slide2.xml",
+            """
+<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+       xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+  <p:cSld><p:spTree>
+    <p:sp><p:txBody><a:p><a:r><a:t>Renewal risk signal</a:t></a:r></a:p></p:txBody></p:sp>
+  </p:spTree></p:cSld>
+</p:sld>
+""",
+        )
+
+    lanes = collect_source_lanes(
+        objectives=sources / "objectives",
+        use_cases=None,
+        signals=None,
+        products=sources / "products",
+    )
+
+    assert lanes["objectives"][0]["sourceType"] == "docx"
+    assert lanes["objectives"][0]["sourceId"] == f"{docx_path}#document-1"
+    assert lanes["objectives"][0]["detectionMethod"] == "ooxml-container"
+    assert "Improve retention" in lanes["objectives"][0]["text"]
+    assert "Prioritize churn reporting" in lanes["objectives"][0]["text"]
+    assert len(lanes["products"]) == 1
+    assert lanes["products"][0]["sourceType"] == "pptx"
+    assert lanes["products"][0]["sourceId"] == f"{pptx_path}#deck-1"
+    assert lanes["products"][0]["sourceUnit"] == "deck"
+    assert lanes["products"][0]["sourceUnitId"] == "1"
+    assert lanes["products"][0]["detectionMethod"] == "ooxml-container"
+    assert "Slide 1:" in lanes["products"][0]["text"]
+    assert "Customer analytics product" in lanes["products"][0]["text"]
+    assert "Weekly segment reporting" in lanes["products"][0]["text"]
+    assert "Slide 2:" in lanes["products"][0]["text"]
+    assert "Renewal risk signal" in lanes["products"][0]["text"]
 
 
 def _is_executive_summary_prompt(prompt: str) -> bool:
@@ -1130,7 +1342,7 @@ def fake_localization_client(prompt: str, model: str) -> str:
         return """
 language: fi
 translations:
-  Open Data Products Portfolio: Avoimen datan tuotteiden portfolio
+  Data Products Portfolio: Datatuotteiden portfolio
   Generated workspace summary: Luodun työtilan yhteenveto
   Executive Summary: Johdon yhteenveto
   Overview: Yleiskatsaus
@@ -1142,7 +1354,7 @@ translations:
         return """
 language: sv
 translations:
-  Open Data Products Portfolio: Portfölj för öppna dataprodukter
+  Data Products Portfolio: Dataproduktportfölj
   Generated workspace summary: Sammanfattning av skapad arbetsyta
   Executive Summary: Ledningssammanfattning
   Overview: Översikt
@@ -1154,7 +1366,7 @@ translations:
         return """
 language: ar
 translations:
-  Open Data Products Portfolio: محفظة منتجات البيانات المفتوحة
+  Data Products Portfolio: محفظة منتجات البيانات
   Generated workspace summary: ملخص مساحة العمل المنشأة
   Executive Summary: الملخص التنفيذي
   Overview: نظرة عامة
@@ -1173,7 +1385,7 @@ def repairable_localization_client(prompt: str, model: str) -> str:
         return """
 language: fi
 translations:
-  Open Data Products Portfolio: Avoimen datan tuotteiden portfolio
+  Data Products Portfolio: Datatuotteiden portfolio
   Products: Tuotteet
   Customer Product: Asiakastuote
   "This portfolio was generated with the Open Data Products SDK and is grounded in the OpenDataProducts.org standards family: ODPC for catalog objects, ODPS for product specifications, ODPG for graph relationships, and ODPV for shared vocabulary where used.": "Tämä portfolio luotiin Open Data Products SDK:lla ja perustuu OpenDataProducts.org-standardiperheeseen: ODPC luettelokohteille, ODPS tuotemäärityksille, ODPG graafisuhteille ja ODPV sanastolle, kun sitä käytetään."
@@ -1182,7 +1394,7 @@ translations:
     return """
 language: fi
 translations:
-  Open Data Products Portfolio: Avoimen datan tuotteiden portfolio
+  Data Products Portfolio: Datatuotteiden portfolio
   Products: Tuotteet
   Customer Product: Asiakastuote
   This portfolio was generated with the Open Data Products SDK and is grounded in the OpenDataProducts.org standards family: ODPC for catalog objects, ODPS for product specifications, ODPG for graph relationships, and ODPV for shared vocabulary where used.: Tämä portfolio luotiin Open Data Products SDK:lla ja perustuu OpenDataProducts.org-standardiperheeseen: ODPC luettelokohteille, ODPS tuotemäärityksille, ODPG graafisuhteille ja ODPV sanastolle, kun sitä käytetään.
@@ -1230,6 +1442,11 @@ def test_render_portfolio_creates_missing_parent_and_artifact_detail_views(
     assert (icon_dir / "risk_warning.png").exists()
     assert (icon_dir / "readiness_clipboard.png").exists()
     assert str(icon_dir / "priority_1_trophy.png") in result["created"]
+    assert 'aria-label="Data products portfolio">Data Products Portfolio</a>' in html
+    assert (
+        'aria-label="Open Data Products portfolio">Open Data Products Portfolio</a>'
+        not in html
+    )
     assert "Business Objectives" in html
     assert "Use Cases" in html
     assert "Signals" in html
@@ -1405,6 +1622,17 @@ def test_render_portfolio_creates_missing_parent_and_artifact_detail_views(
     assert "fullscreenTarget.requestFullscreen()" in html
     assert "Open Data Product Graphs Explorer" not in html
     assert "<footer" in html
+    assert "Draft portfolio generated with the Data Products SDK." in html
+    assert "Review status" in html
+    assert "Next actions" in html
+    assert "Evidence" in html
+    assert "Artifacts" in html
+    assert "Human acceptance required" in html
+    assert "Review executive decisions" in html
+    assert "Resolve evidence gaps" in html
+    assert "Approve product specs" in html
+    assert "Compare previous snapshot" in html
+    assert "Portfolio versions" in html
     assert "Catalog YAML" in html
     assert "Graph YAML" in html
     assert "Improve Retention" in html
@@ -1568,6 +1796,64 @@ def test_build_portfolio_creates_workspace_artifacts_from_source_lanes(
     assert "swot:" not in portfolio_text
     state_text = (workspace / "portfolio-state.yaml").read_text(encoding="utf-8")
     assert "sha256" in state_text
+
+
+def test_build_portfolio_reports_skipped_msg_sources_without_counting_warning_lane(
+    tmp_path: Path,
+) -> None:
+    sources = tmp_path / "sources"
+    workspace = tmp_path / "generated" / "portfolio"
+    write_source_lanes(sources)
+    msg_path = sources / "use-cases" / "outlook-request.msg"
+    msg_path.write_bytes(b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1fake-msg")
+
+    result = build_portfolio(
+        workspace,
+        objectives=sources / "objectives",
+        use_cases=sources / "use-cases",
+        signals=sources / "signals",
+        products=sources / "products",
+        client=fake_portfolio_client,
+        model="test-model",
+    )
+    state = yaml.safe_load((workspace / "portfolio-state.yaml").read_text())
+
+    assert "__warnings" not in result["sourceCounts"]
+    assert "__warnings" not in result["processedSourceCounts"]
+    assert "__warnings" not in state["sources"]
+    assert "sourceId" in state["sources"]["useCases"][0]
+    assert (
+        f"Skipped Outlook .msg source {msg_path}: install "
+        "open-data-products[email] to enable .msg extraction."
+    ) in result["warnings"]
+    assert result["sourceExtraction"] == {
+        "warnings": [
+            (
+                f"Skipped Outlook .msg source {msg_path}: install "
+                "open-data-products[email] to enable .msg extraction."
+            )
+        ],
+        "skippedSourceCount": 1,
+    }
+
+
+def test_build_portfolio_reports_selected_context_format(tmp_path: Path) -> None:
+    sources = tmp_path / "sources"
+    workspace = tmp_path / "generated" / "portfolio"
+    write_source_lanes(sources)
+
+    result = build_portfolio(
+        workspace,
+        objectives=sources / "objectives",
+        use_cases=sources / "use-cases",
+        signals=sources / "signals",
+        products=sources / "products",
+        client=fake_portfolio_client,
+        model="test-model",
+        context_format="gcf",
+    )
+
+    assert result["contextFormat"] == "gcf"
 
 
 def test_build_portfolio_generates_lanes_before_graph_and_summary(
@@ -1750,14 +2036,14 @@ def test_portfolio_build_prompt_defines_schema_and_linking_rules() -> None:
     lanes = {
         "objectives": [
             {
-                "path": "inputs/objectives/retention.md",
+                "path": "sources/objectives/retention.md",
                 "text": "Business objective: Improve Retention",
                 "sha256": "obj",
             }
         ],
         "useCases": [
             {
-                "path": "inputs/use-cases/retention.md",
+                "path": "sources/use-cases/retention.md",
                 "text": "Use case: Retention Workflow",
                 "sha256": "abc",
             }
@@ -1787,6 +2073,158 @@ def test_portfolio_build_prompt_defines_schema_and_linking_rules() -> None:
     assert "Graph edge source and target values must use generated stable IDs" in prompt
 
 
+def test_reduce_source_lanes_chunks_and_reports_budget_metadata() -> None:
+    lanes = {
+        "objectives": [
+            {
+                "path": "sources/objectives/retention.md",
+                "sourceId": "sources/objectives/retention.md#file-1",
+                "text": "alpha\n\nbravo\n\ncharlie\n\ndelta",
+                "sha256": "obj",
+            }
+        ],
+        "useCases": [
+            {
+                "path": "sources/use-cases/retention.md",
+                "sourceId": "sources/use-cases/retention.md#file-1",
+                "text": "echo",
+                "sha256": "uc",
+            }
+        ],
+        "signals": [],
+        "products": [],
+    }
+
+    reduced, budget = _reduce_source_lanes_for_prompt(
+        lanes,
+        max_source_chars=12,
+        max_prompt_chars=22,
+    )
+
+    assert reduced["objectives"][0]["text"] == "alpha\n\nbravo\n\ncharlie"
+    assert reduced["objectives"][0]["chunkCount"] == "3"
+    assert reduced["objectives"][0]["includedChunkCount"] == "2"
+    assert reduced["objectives"][0]["omittedChunkCount"] == "1"
+    assert reduced["useCases"][0]["text"] == "echo"
+    assert budget["method"] == "deterministic-chunk-budget"
+    assert budget["budgetScope"] == "per-source"
+    assert budget["chunkCount"] == 4
+    assert budget["includedChunkCount"] == 3
+    assert budget["omittedChunkCount"] == 1
+    assert budget["reducedSourceCount"] == 1
+    assert budget["warnings"] == [
+        "Content omitted from prompt: 1 chunks over context budget"
+    ]
+
+
+def test_build_portfolio_reduces_long_source_before_lane_llm_calls(
+    tmp_path: Path,
+) -> None:
+    sources = tmp_path / "sources"
+    workspace = tmp_path / "generated" / "portfolio"
+    write_source_lanes(sources)
+    tail_marker = "TAIL_MARKER_SHOULD_NOT_REACH_LLM"
+    (sources / "objectives" / "retention-objective.md").write_text(
+        "Business objective: Improve Retention\n\n"
+        + ("Relevant retention context.\n\n" * 900)
+        + tail_marker,
+        encoding="utf-8",
+    )
+    prompts = []
+
+    def client(prompt: str, model: str) -> str:
+        prompts.append(prompt)
+        return staged_portfolio_client(prompt, model)
+
+    result = build_portfolio(
+        workspace,
+        objectives=sources / "objectives",
+        use_cases=sources / "use-cases",
+        signals=sources / "signals",
+        products=sources / "products",
+        client=client,
+        model="test-model",
+    )
+
+    assert tail_marker not in prompts[0]
+    assert result["sourceBudget"]["method"] == "deterministic-chunk-budget"
+    assert result["sourceBudget"]["omittedChunkCount"] > 0
+    assert result["sourceBudget"]["warnings"] == [
+        f"Content omitted from prompt: {result['sourceBudget']['omittedChunkCount']} chunks over context budget"
+    ]
+    assert result["promptBudget"]["method"] == "final-prompt-char-gate"
+    assert result["promptBudget"]["checkedPromptCount"] > 0
+    assert (
+        result["promptBudget"]["maxObservedPromptChars"]
+        <= result["promptBudget"]["maxPromptChars"]
+    )
+
+
+def test_build_portfolio_blocks_llm_call_when_rendered_prompt_exceeds_budget(
+    tmp_path: Path,
+) -> None:
+    sources = tmp_path / "sources"
+    workspace = tmp_path / "generated" / "portfolio"
+    write_source_lanes(sources)
+    calls = []
+
+    def client(prompt: str, model: str) -> str:
+        calls.append(prompt)
+        return staged_portfolio_client(prompt, model)
+
+    with pytest.raises(ValueError) as excinfo:
+        build_portfolio(
+            workspace,
+            objectives=sources / "objectives",
+            use_cases=sources / "use-cases",
+            signals=sources / "signals",
+            products=sources / "products",
+            client=client,
+            model="test-model",
+            source_budget=PortfolioSourceBudget(
+                max_source_chars=40,
+                max_prompt_chars=100,
+            ),
+        )
+
+    assert calls == []
+    assert "Portfolio prompt exceeds configured budget" in str(excinfo.value)
+    assert "maxPromptChars=100" in str(excinfo.value)
+
+
+def test_inspect_portfolio_intake_reports_extraction_and_budget(
+    tmp_path: Path,
+) -> None:
+    sources = tmp_path / "sources"
+    write_source_lanes(sources)
+    (sources / "use-cases" / "long.md").write_text(
+        "Use case: Expansion\n\n" + ("Detailed workflow evidence.\n\n" * 20),
+        encoding="utf-8",
+    )
+
+    result = inspect_portfolio_intake(
+        use_cases=sources / "use-cases",
+        source_budget=PortfolioSourceBudget(max_source_chars=40, max_prompt_chars=120),
+    )
+
+    assert result["kind"] == "PortfolioIntake"
+    assert result["llmCallCount"] == 0
+    assert result["sourceCounts"]["useCases"] == 2
+    assert result["sourceBudget"]["maxSourceChars"] == 40
+    assert result["sourceBudget"]["maxPromptChars"] == 120
+    assert result["sourceBudget"]["omittedChunkCount"] > 0
+    long_source = [
+        source
+        for source in result["sources"]
+        if source["path"] == str(sources / "use-cases" / "long.md")
+    ][0]
+    assert long_source["lane"] == "useCases"
+    assert long_source["sourceType"] == "md"
+    assert long_source["extractedChars"] > 120
+    assert long_source["chunkCount"] > long_source["includedChunkCount"]
+    assert long_source["status"] == "reduced"
+
+
 def test_portfolio_executive_summary_prompt_uses_normalized_evidence() -> None:
     plan = parse_portfolio_plan(PORTFOLIO_PLAN_YAML)
     prompt = render_portfolio_executive_summary_prompt(plan)
@@ -1803,7 +2241,7 @@ def test_portfolio_executive_summary_prompt_uses_normalized_evidence() -> None:
     assert (
         "executiveSummary:" not in prompt.split("Normalized portfolio evidence:", 1)[1]
     )
-    assert "inputs/objectives/retention.md" not in prompt
+    assert "sources/objectives/retention.md" not in prompt
     assert "Business objective: Improve Retention" not in prompt
 
 
@@ -1933,6 +2371,8 @@ def test_portfolio_cli_build_emits_one_final_json_report(
                 "CLI Controlled Portfolio",
                 "--model",
                 "test-model",
+                "--context-format",
+                "gcf",
                 "--output",
                 str(workspace),
                 "--json",
@@ -1946,6 +2386,7 @@ def test_portfolio_cli_build_emits_one_final_json_report(
     assert payload["workspace"] == str(workspace)
     assert payload["html"] == str(workspace / "index.html")
     assert payload["sourceCounts"]["objectives"] == 1
+    assert payload["contextFormat"] == "gcf"
     assert payload["artifactCounts"]["graphEdges"] == 1
     assert "validationResults" in payload
     assert (workspace / "index.html").exists()
@@ -2055,7 +2496,7 @@ def test_localize_portfolio_marks_rtl_language_pages(tmp_path: Path) -> None:
 
     assert '<html lang="en" dir="ltr">' in english_html
     assert '<html lang="ar-AE" dir="rtl">' in arabic_html
-    assert "محفظة منتجات البيانات المفتوحة" in arabic_html
+    assert "محفظة منتجات البيانات" in arabic_html
     assert 'html[dir="rtl"]' in arabic_html
 
 
@@ -2166,6 +2607,129 @@ def test_portfolio_cli_build_defaults_to_validation_warning_mode(
 
     assert payload["valid"] is False
     assert payload["validationMode"] == "warn"
+
+
+def test_portfolio_cli_build_passes_configured_source_budget(
+    tmp_path: Path,
+    capsys,
+    monkeypatch,
+) -> None:
+    from open_data_products import generation, portfolio
+
+    config = tmp_path / "generation.config.yaml"
+    config.write_text(
+        """
+provider: ollama
+model: qwen2.5
+portfolio:
+  sourceBudget:
+    maxSourceChars: 40
+    maxPromptChars: 80
+providers:
+  ollama:
+    type: ollama
+    model: qwen2.5
+""",
+        encoding="utf-8",
+    )
+    captured = {}
+
+    def fake_build_portfolio(*args, **kwargs):
+        captured.update(kwargs)
+        return {
+            "spec": "portfolio",
+            "kind": "PortfolioBuild",
+            "workspace": str(tmp_path / "workspace"),
+            "html": str(tmp_path / "workspace" / "index.html"),
+            "validationResults": {},
+            "created": [],
+            "updated": [],
+            "unchanged": [],
+            "valid": True,
+        }
+
+    monkeypatch.setattr(generation, "create_generation_client", lambda settings: None)
+    monkeypatch.setattr(portfolio, "build_portfolio", fake_build_portfolio)
+
+    assert (
+        main(
+            [
+                "portfolio",
+                "build",
+                "--config",
+                str(config),
+                "--output",
+                str(tmp_path / "workspace"),
+                "--json",
+            ]
+        )
+        == 0
+    )
+    json.loads(capsys.readouterr().out)
+
+    assert captured["source_budget"].max_source_chars == 40
+    assert captured["source_budget"].max_prompt_chars == 80
+
+
+def test_portfolio_cli_intake_emits_budget_report(
+    tmp_path: Path,
+    capsys,
+) -> None:
+    sources = tmp_path / "sources"
+    write_source_lanes(sources)
+    config = tmp_path / "generation.config.yaml"
+    config.write_text(
+        """
+provider: ollama
+model: qwen2.5
+portfolio:
+  sourceBudget:
+    maxSourceChars: 40
+    maxPromptChars: 120
+providers:
+  ollama:
+    type: ollama
+    model: qwen2.5
+""",
+        encoding="utf-8",
+    )
+
+    assert (
+        main(
+            [
+                "portfolio",
+                "intake",
+                "--config",
+                str(config),
+                "--objectives",
+                str(sources / "objectives"),
+                "--use-cases",
+                str(sources / "use-cases"),
+                "--signals",
+                str(sources / "signals"),
+                "--products",
+                str(sources / "products"),
+                "--json",
+            ]
+        )
+        == 0
+    )
+    payload = json.loads(capsys.readouterr().out)
+
+    assert payload["kind"] == "PortfolioIntake"
+    assert payload["llmCallCount"] == 0
+    assert payload["sourceCounts"]["objectives"] == 1
+    assert payload["sourceCounts"]["useCases"] == 1
+    assert payload["sourceCounts"]["signals"] == 1
+    assert payload["sourceCounts"]["products"] == 1
+    assert payload["sourceBudget"]["maxSourceChars"] == 40
+    assert payload["sourceBudget"]["maxPromptChars"] == 120
+    assert {source["lane"] for source in payload["sources"]} == {
+        "objectives",
+        "useCases",
+        "signals",
+        "products",
+    }
 
 
 def test_portfolio_cli_build_strict_validation_returns_nonzero_for_invalid_report(

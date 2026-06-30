@@ -1031,10 +1031,10 @@ Equivalent SDK command:
 
 ```bash
 open-data-products portfolio build \
-  --objectives inputs/objectives/ \
-  --use-cases inputs/use-cases/ \
-  --signals inputs/signals/ \
-  --products inputs/products/ \
+  --objectives sources/objectives/ \
+  --use-cases sources/use-cases/ \
+  --signals sources/signals/ \
+  --products sources/products/ \
   --output generated/portfolio/ \
   --title "Public Data Product Portfolio" \
   --config generation.config.yaml \

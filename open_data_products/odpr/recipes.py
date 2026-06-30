@@ -1867,6 +1867,7 @@ def _execute_step(
                 title=_string(parameters.get("title")),
                 client=client,
                 model=settings.model,
+                source_budget=settings.portfolio_source_budget,
             )
             return _portfolio_step_result(step, started_at, root, result)
         if command == "portfolio.refresh":
@@ -1894,6 +1895,7 @@ def _execute_step(
                 client=client,
                 model=settings.model,
                 all_sources=parameters.get("allSources") is True,
+                source_budget=settings.portfolio_source_budget,
             )
             return _portfolio_step_result(step, started_at, root, result)
         if command == "portfolio.render":

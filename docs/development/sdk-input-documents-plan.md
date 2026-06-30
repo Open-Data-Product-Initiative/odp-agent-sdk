@@ -66,10 +66,10 @@ Example:
 
 ```bash
 open-data-products portfolio build \
-  --objectives inputs/objectives/ \
-  --use-cases inputs/use-cases/ \
-  --signals inputs/signals/ \
-  --products inputs/products/ \
+  --objectives sources/objectives/ \
+  --use-cases sources/use-cases/ \
+  --signals sources/signals/ \
+  --products sources/products/ \
   --output portfolio/
 ```
 
@@ -93,13 +93,13 @@ inputs/
 
 The SDK source scanner detects each supported file type from metadata and
 content signatures, extracts normalized text internally, preserves source
-metadata, and passes the extracted text into the existing portfolio or
-generation prompt flow. File extensions are useful hints, but they should not
-be the only source of truth.
+metadata in JSON-compatible source records, and passes compact Markdown or
+plain text into the existing portfolio or generation prompt flow. File
+extensions are useful hints, but they should not be the only source of truth.
 
 The lane is determined by the folder where the file is placed. A PowerPoint
-deck in `inputs/objectives/` is treated as objective source material; the same
-deck in `inputs/products/` is treated as product source material. This keeps
+deck in `sources/objectives/` is treated as objective source material; the same
+deck in `sources/products/` is treated as product source material. This keeps
 classification transparent and avoids hidden automatic business decisions.
 
 Direct `generate --input some-file.pptx --kind odps-product` can be supported
@@ -146,7 +146,7 @@ The source record should include both the detected type and the evidence used:
 
 ```python
 {
-    "source_path": "inputs/objectives/strategy-priorities",
+    "source_path": "sources/objectives/strategy-priorities",
     "declared_type": None,
     "detected_type": "pptx",
     "detection_method": "ooxml-container",
@@ -198,6 +198,12 @@ PowerPoint support should extract:
 - table text
 - slide number and deck filename as metadata
 
+PowerPoint decks should remain one business source record in v1. The extractor
+may preserve slide boundaries inside that record, for example with `Slide 1:`
+markers, but it should not split one deck into multiple lane sources by
+default. The lane folder communicates the deck's business role: one deck can be
+one signal, one product need, one objective input, or similar.
+
 PowerPoint support should not extract speaker notes by default in v1 and should
 not attempt to interpret images in v1. Speaker-note extraction and OCR can be
 later optional capabilities.
@@ -230,8 +236,10 @@ metadata and the sanitized message body.
 `.msg` must also be supported in v1 because many customers will save or forward
 business conversations directly from Outlook. The implementation should treat
 `.msg` as a required v1 capability, but keep its parser dependency optional so
-the base SDK stays lightweight. If the dependency is missing, the command must
-return a clear install message instead of silently skipping Outlook files.
+the base SDK stays lightweight. If the dependency is missing, the command
+should skip the affected `.msg` file, add a clear install-guidance warning to
+the normal command log and `--json` output, and continue processing the
+remaining lane sources. It must not silently skip Outlook files.
 
 Email extraction should not include attachments by default. Attachments can be
 listed in the extraction report and processed separately only when explicitly
@@ -299,15 +307,20 @@ These should be explicit adapters, not generic "read anything" behavior.
 ## Internal Extraction Contract
 
 The extraction layer should create normalized source records in memory and, for
-debuggability, include extraction details in the existing command report or an
-optional sidecar report. It should not require writing a separate prepared
-source tree before portfolio generation can run.
+debuggability, include extraction details in the existing command report and
+default `--json` output. Source records are JSON-compatible tracking records;
+they are not the final prompt format. Prompt assembly should render those
+records into compact Markdown or plain text blocks only. Do not use HTML as the
+normalized extraction format or as the v1 prompt format. Raw Office, Outlook,
+SharePoint, or web-exported HTML is especially out of scope because it tends to
+carry style, layout, and boilerplate noise. It should not require writing a
+separate prepared source tree before portfolio generation can run.
 
 Internal source record shape:
 
 ```python
 {
-    "source_path": "inputs/objectives/strategy-deck.pptx",
+    "source_path": "sources/objectives/strategy-deck.pptx",
     "declared_type": "pptx",
     "detected_type": "pptx",
     "detection_method": "ooxml-container",
@@ -316,8 +329,9 @@ Internal source record shape:
     "source_unit_id": "3",
     "lane": "objectives",
     "title": "Improve customer retention",
-    "text": "...normalized Markdown text...",
-    "text_sha256": "...",
+    "content": "...normalized plain text or Markdown...",
+    "content_format": "markdown",
+    "content_sha256": "...",
     "estimated_tokens": 620,
     "truncated": false,
     "sha256": "...",
@@ -330,7 +344,7 @@ metadata:
 
 ```python
 {
-    "source_path": "inputs/products/product-whiteboard.jpg",
+    "source_path": "sources/products/product-whiteboard.jpg",
     "declared_type": "jpg",
     "detected_type": "jpeg",
     "detection_method": "image-header",
@@ -339,7 +353,8 @@ metadata:
     "source_unit_id": "1",
     "lane": "products",
     "title": "product-whiteboard",
-    "text": "...OCR or vision extracted text...",
+    "content": "...OCR or vision extracted text...",
+    "content_format": "plain",
     "extraction_method": "ocr",
     "sha256": "...",
     "warnings": ["review extracted text for OCR errors"],
@@ -361,6 +376,46 @@ portfolio/
 
 Sidecars are for review and troubleshooting. They are not the primary workflow
 contract.
+
+Prompt rendering should keep source boundaries explicit without wrapping long
+business text in JSON or HTML. A prompt block can use Markdown headings,
+bullets, short tables, and source labels, for example:
+
+```markdown
+## Lane: use-cases
+### Source: sales-followup.eml
+Type: email
+Unit: message 1
+
+Customer asked for weekly retention reporting by segment.
+
+- Need: churn visibility
+- Constraint: CRM export is delayed by one day
+```
+
+JSON remains the format for source records, state, reports, chunk metadata,
+warning lists, and deterministic tests. Markdown or plain text remains the v1
+default format sent to the LLM.
+
+Packed context formats such as GCF or TOON can be added as optional prompt
+rendering formats after the source loader and reduction gate are working.
+Expose the prompt/context format in the portfolio API and CLI, defaulting to
+Markdown/plain text for v1. It should be selected through an explicit setting
+such as:
+
+```python
+prepare_prompt_sources(
+    lanes,
+    max_prompt_tokens=12000,
+    context_format="markdown",  # later: "gcf" or "toon"
+)
+```
+
+Packed formats must only be applied after extraction, optional obfuscation,
+chunking, and required reduction. They are not canonical storage formats and
+must not hide omitted evidence. Reports still need to show source counts, chunk
+counts, omitted chunks, estimated prompt size, reduction method, selected
+context format, and warnings.
 
 For email extraction, frontmatter should avoid exposing unnecessary personal
 data by default if sidecars are written:
@@ -393,7 +448,7 @@ business signal.
 
 The v1 source loader should therefore separate extraction from prompt assembly:
 
-1. Extract supported documents into normalized source records.
+1. Extract supported documents into JSON-compatible normalized source records.
 2. Estimate size for each source record before LLM use.
 3. Split long records into deterministic chunks with stable source unit IDs.
 4. Preserve source path, lane, unit type, unit ID, and checksum for each chunk.
@@ -405,14 +460,19 @@ Recommended v1 behavior:
 
 - Never silently truncate extracted text before an LLM call.
 - Prefer deterministic chunking over arbitrary prompt truncation.
+- Use deterministic reduction only in v1. Do not add an LLM summarization or
+  reduction pass until the deterministic budget gate, report fields, and tests
+  are stable.
 - Keep chunk boundaries aligned with natural structure where possible: slide,
   heading section, transcript speaker turn, email message, paragraph, or table
   row group.
 - Run lane-level reduction before product generation when a lane contains more
   text than the configured context budget.
-- Keep the original extracted text available in the debug/report output when
-  reporting is enabled, but send only the selected chunk summaries or reduced
-  lane brief into the LLM-backed generation step.
+- Keep the original extracted content available in the debug/report output when
+  reporting is enabled, but send only reduced lane briefs into the LLM-backed
+  generation step. Render those briefs as Markdown/plain text by default, with
+  packed formats such as GCF or TOON available later as explicit post-reduction
+  prompt formats.
 - Include token or character estimates, chunk counts, and reduction warnings in
   `--json` output.
 
@@ -468,8 +528,10 @@ V1 should prioritize clear, high-confidence identifiers:
 
 Recommended behavior:
 
-- Make obfuscation opt-in at first, for example `--obfuscate-personal-data`,
-  unless a workflow explicitly targets hosted LLM use.
+- Enable obfuscation automatically for document intake before LLM-backed
+  portfolio generation. Keep the helper available as `obfuscate_personal_data`
+  and allow an explicit CLI/API override later only if a clear local-only use
+  case needs raw extracted content.
 - Run obfuscation after extraction and before chunking/reduction so placeholder
   IDs remain stable across chunks.
 - Preserve placeholder consistency within one command run, so the same detected
@@ -491,10 +553,10 @@ Classification should start from folders, not an automatic classifier.
 
 The existing portfolio lane arguments remain authoritative:
 
-- `--objectives inputs/objectives/`
-- `--use-cases inputs/use-cases/`
-- `--signals inputs/signals/`
-- `--products inputs/products/`
+- `--objectives sources/objectives/`
+- `--use-cases sources/use-cases/`
+- `--signals sources/signals/`
+- `--products sources/products/`
 
 Recommended v1 behavior:
 
@@ -529,11 +591,11 @@ first version conservative.
 - For email, extract message body and minimal metadata by default. Do not
   extract attachments, full recipient lists, or complete reply chains unless
   explicitly enabled.
-- Include an opt-in `--obfuscate-personal-data` option for clear personal data,
-  but do not rely on it as a complete privacy guarantee.
-- Always include extraction warnings in `--json` output. Optionally write a
-  source-extraction report showing source files, extracted units, skipped
-  content, warnings, and output paths when a report flag is enabled.
+- Obfuscate clear personal data automatically before LLM-backed document
+  intake, but do not rely on it as a complete privacy guarantee.
+- Always include extraction warnings and source-extraction summary fields in
+  the normal `--json` output. Do not add a separate source-extraction report
+  flag in v1.
 
 Potential warning text:
 
@@ -602,8 +664,9 @@ open-data-products[images]
 ```
 
 The base SDK should remain lightweight. If optional dependencies are missing,
-the existing command should return a clear install message for the unsupported
-file type.
+portfolio lane processing should add clear install-guidance warnings to the
+normal command log and `--json` output, skip only the affected source files, and
+continue processing the remaining supported lane sources.
 
 ## Tests
 
@@ -616,11 +679,10 @@ Add focused tests before implementation:
   validation contradicts the extension.
 - detection reports include detected type, detection method, MIME type when
   available, checksum, and warnings.
-- `generate --input file.pptx --kind odps-product` either works through the
-  shared source loader or returns a clear "not supported yet" message,
-  depending on chosen v1 scope.
-- `.pptx` extraction creates source records per slide or one combined source
-  record, depending on chosen v1 behavior.
+- `generate --input file.pptx --kind odps-product` returns a clear
+  "not supported yet" message in v1; document intake is portfolio-lane-first.
+- `.pptx` extraction creates one source record per deck, while preserving slide
+  boundaries inside the extracted text.
 - extraction skips hidden slides unless explicitly enabled.
 - speaker notes are not extracted by default.
 - `.docx` extraction writes headings, paragraphs, list items, and table text.
@@ -632,8 +694,9 @@ Add focused tests before implementation:
 - `.eml` extraction writes message body text and minimal metadata.
 - `.msg` extraction writes Outlook message body text and minimal metadata when
   the Outlook parser dependency is installed.
-- `.msg` extraction reports a missing optional dependency when the email extra
-  is not installed.
+- `.msg` extraction reports a missing optional dependency in the normal log and
+  `--json` output, skips the affected `.msg` file, and continues processing
+  remaining lane sources when the email extra is not installed.
 - email attachments are not extracted by default.
 - email extraction warns when quoted history cannot be confidently trimmed.
 - `.png`, `.jpg`, and `.jpeg` files in lane folders produce a clear warning
@@ -641,6 +704,15 @@ Add focused tests before implementation:
 - screenshot extraction records the extraction method and review warnings.
 - text PDF extraction works without OCR when embedded text exists.
 - image-only PDF extraction reports that OCR/vision support is required.
+- `.docx` extraction creates records per heading section when headings are
+  available and falls back to deterministic paragraph chunks.
+- extraction reports are included in the default `--json` payload without a
+  separate report flag.
+- obfuscation runs automatically before LLM-backed portfolio generation.
+- deterministic reduction runs before every LLM-backed document-intake prompt,
+  and no LLM call is made if the prompt still exceeds the configured budget.
+- portfolio CLI/API exposes the prompt context format setting, defaulting to
+  Markdown/plain text while allowing later GCF or TOON values.
 - long `.docx`, transcript, deck, and email inputs are split into deterministic
   chunks before LLM-backed generation.
 - prompt assembly fails clearly or reduces input when extracted lane content
@@ -652,8 +724,8 @@ Add focused tests before implementation:
   other high-confidence identifiers with stable placeholders.
 - obfuscation reports replacement counts, confidence, and warnings without
   writing a reverse mapping by default.
-- obfuscation runs before chunking/reduction when enabled, so placeholders stay
-  stable across chunks.
+- obfuscation runs automatically before chunking/reduction for LLM-backed
+  portfolio document intake, so placeholders stay stable across chunks.
 - extracted Markdown contains source metadata.
 - lane folder inputs preserve lane assignment.
 - extraction reports are deterministic and JSON-serializable.
@@ -690,10 +762,12 @@ format-specific extractor runs.
 
 ### Step 2: PowerPoint In Lane Folders
 
-Build a minimal `.pptx` extractor that turns visible slide text into normalized
-source records. No OCR, no images, no hidden slides, no speaker notes by
-default. Lane assignment comes from the folder passed to `--objectives`,
-`--use-cases`, `--signals`, or `--products`.
+Build a minimal `.pptx` extractor that turns visible slide text into one
+normalized source record per deck. Preserve slide boundaries inside the record,
+but do not split the deck into multiple lane sources by default. No OCR, no
+images, no hidden slides, no speaker notes by default. Lane assignment comes
+from the folder passed to `--objectives`, `--use-cases`, `--signals`, or
+`--products`.
 
 ### Step 3: Word Documents In Lane Folders
 
@@ -731,17 +805,18 @@ to come from Outlook, not only standards-based `.eml` exports.
 
 ### Step 6: Report Extraction Details
 
-Add `--json` fields, and optionally a report flag, that show which source files
-were extracted, which units were skipped, and which warnings require review.
+Add default `--json` fields that show which source files were extracted, which
+units were skipped, and which warnings require review. Do not add a separate
+source-extraction report flag in v1.
 
 Example:
 
 ```bash
 open-data-products portfolio build \
-  --objectives inputs/objectives/ \
-  --use-cases inputs/use-cases/ \
-  --signals inputs/signals/ \
-  --products inputs/products/ \
+  --objectives sources/objectives/ \
+  --use-cases sources/use-cases/ \
+  --signals sources/signals/ \
+  --products sources/products/ \
   --output portfolio/
 ```
 
@@ -751,14 +826,17 @@ Add deterministic chunking, source size estimates, and lane-level reduction
 before any LLM-backed generation step. Long Word documents, Teams transcripts,
 slide decks, and email threads should never be silently truncated. The command
 should report chunk counts, omitted content, reduction method, and warnings.
+Use deterministic reduction only in v1. Expose a portfolio API and CLI
+`context_format` setting that defaults to Markdown/plain text. GCF and TOON
+renderers should use the same setting when implemented, but only after
+extraction, obfuscation, chunking, and deterministic reduction.
 
 ### Step 8: Add Personal Data Obfuscation
 
-Add `obfuscate_personal_data` and an opt-in command flag such as
-`--obfuscate-personal-data`. The function should mask clear personal data with
-stable placeholders, report what was replaced, and warn that the result is not
-guaranteed anonymization. Run it after extraction and before chunking/reduction
-when enabled.
+Add `obfuscate_personal_data` and run it automatically for LLM-backed portfolio
+document intake. The function should mask clear personal data with stable
+placeholders, report what was replaced, and warn that the result is not
+guaranteed anonymization. Run it after extraction and before chunking/reduction.
 
 ### Step 9: Add More Formats
 
@@ -780,14 +858,10 @@ core workflow, folder placement remains the classification mechanism.
 
 ## Open Questions
 
-- Should extraction create one Markdown file per slide/page/row or one combined
-  source record per source document?
 - Should sidecar metadata be one file per source, such as `deck.meta.yaml`, or
-  one lane-level manifest, such as `inputs/objectives/sources.yaml`?
+  one lane-level manifest, such as `sources/objectives/sources.yaml`?
 - Should MIME detection use an optional `python-magic` dependency, standard
   library signatures, or a small built-in detector for the supported formats?
-- Should extracted source sidecars be available through a debug/report flag, or
-  should the SDK only expose extraction details in JSON output?
 - Should speaker notes be opt-in per file, per command, or per config?
 - Should email reply-chain trimming be enabled by default, or should the SDK
   preserve the full visible body and warn the user to review it?
@@ -807,14 +881,8 @@ core workflow, folder placement remains the classification mechanism.
   mandatory?
 - What default context budget should v1 use for each LLM-backed generation
   workflow?
-- Should long-source reduction use deterministic extractive summaries only, or
-  allow optional LLM summarization as a separate explicit step?
-- Should over-budget runs fail by default, or continue with a reduced lane brief
-  and warnings?
 - Which personal data types should v1 obfuscate deterministically without
   creating too many false positives?
-- Should obfuscation be opt-in only, or enabled by default when a hosted LLM
-  provider is used?
 - Should reverse mappings ever be written to disk, or should they stay
   in-memory only for one command run?
 

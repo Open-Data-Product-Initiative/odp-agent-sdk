@@ -61,7 +61,7 @@ Common workflows:
     open-data-products odpg-generate graph.yaml --output graph-explorer.html
 
   Build a portfolio workspace:
-    open-data-products portfolio build --objectives inputs/objectives/ --use-cases inputs/use-cases/ --signals inputs/signals/ --products inputs/products/ --output portfolio/
+    open-data-products portfolio build --objectives sources/objectives/ --use-cases sources/use-cases/ --signals sources/signals/ --products sources/products/ --output portfolio/
 
   Exchange OKF context bundles:
     open-data-products okf-validate knowledge-bundle/ --json
@@ -195,7 +195,7 @@ Examples:
   open-data-products odpg-agent-context graph.yaml --node DATA-PRODUCT-001
   open-data-products odpg-generate graph.yaml --output graph-explorer.html
   open-data-products odpg-convert --input graph.graphml --output graph.yaml
-  open-data-products portfolio build --objectives inputs/objectives/ --use-cases inputs/use-cases/ --signals inputs/signals/ --products inputs/products/ --output generated/portfolio/
+  open-data-products portfolio build --objectives sources/objectives/ --use-cases sources/use-cases/ --signals sources/signals/ --products sources/products/ --output generated/portfolio/
   open-data-products portfolio sync generated/portfolio/
   open-data-products portfolio localize generated/portfolio/ --languages "fi,sv" --provider claude --model claude-sonnet-4-5
   open-data-products portfolio render generated/portfolio/
@@ -500,6 +500,7 @@ def _print_odpg_paths(start: str, paths: List[Dict[str, object]]) -> None:
 PORTFOLIO_HELP = """\
 Portfolio workflow commands:
   build       Build a portfolio workspace from source lanes
+  intake      Inspect source intake limits without calling an LLM
   refresh     Refresh a portfolio workspace from saved source lanes
   sync        Sync edited YAML artifacts without calling an LLM
   localize    Localize portfolio HTML without changing YAML artifacts
@@ -507,8 +508,9 @@ Portfolio workflow commands:
   explain     Summarize portfolio artifacts, counts, and browser entry point
 
 Examples:
-  open-data-products portfolio build --objectives inputs/objectives/ --use-cases inputs/use-cases/ --signals inputs/signals/ --products inputs/products/ --output generated/portfolio/
-  open-data-products portfolio build --objectives inputs/objectives/ --products inputs/products/ --output generated/portfolio/ --strict-validation
+  open-data-products portfolio build --objectives sources/objectives/ --use-cases sources/use-cases/ --signals sources/signals/ --products sources/products/ --output generated/portfolio/
+  open-data-products portfolio intake --objectives sources/objectives/ --use-cases sources/use-cases/ --signals sources/signals/ --products sources/products/ --config generation.config.yaml --json
+  open-data-products portfolio build --objectives sources/objectives/ --products sources/products/ --output generated/portfolio/ --strict-validation
   open-data-products portfolio refresh generated/portfolio/
   open-data-products portfolio refresh generated/portfolio/ --all-sources
   open-data-products portfolio sync generated/portfolio/
@@ -1294,6 +1296,12 @@ def main(argv: Optional[List[str]] = None) -> int:
         help="Reserved for portfolio prompt folder overrides.",
     )
     portfolio_build_parser.add_argument(
+        "--context-format",
+        default="markdown",
+        choices=("markdown", "gcf", "toon"),
+        help="Prompt context format for portfolio source content.",
+    )
+    portfolio_build_parser.add_argument(
         "--ollama-url",
         help="Local Ollama base URL. Defaults to http://localhost:11434.",
     )
@@ -1343,6 +1351,12 @@ def main(argv: Optional[List[str]] = None) -> int:
         help="Reserved for portfolio prompt folder overrides.",
     )
     portfolio_refresh_parser.add_argument(
+        "--context-format",
+        default="markdown",
+        choices=("markdown", "gcf", "toon"),
+        help="Prompt context format for portfolio source content.",
+    )
+    portfolio_refresh_parser.add_argument(
         "--ollama-url",
         help="Local Ollama base URL. Defaults to http://localhost:11434.",
     )
@@ -1357,6 +1371,27 @@ def main(argv: Optional[List[str]] = None) -> int:
     portfolio_refresh_parser.add_argument(
         "--json", action="store_true", help="Emit JSON"
     )
+    portfolio_intake_parser = portfolio_subparsers.add_parser(
+        "intake",
+        help="Inspect portfolio source intake without calling an LLM",
+    )
+    portfolio_intake_parser.add_argument(
+        "--objectives", help="Business objective source file or folder"
+    )
+    portfolio_intake_parser.add_argument(
+        "--use-cases", help="Use case source file or folder"
+    )
+    portfolio_intake_parser.add_argument(
+        "--signals", help="Signal source file or folder"
+    )
+    portfolio_intake_parser.add_argument(
+        "--products", help="Product source file or folder"
+    )
+    portfolio_intake_parser.add_argument(
+        "--config",
+        help="Generation config YAML file with portfolio source budget settings.",
+    )
+    portfolio_intake_parser.add_argument("--json", action="store_true", help="Emit JSON")
     portfolio_sync_parser = portfolio_subparsers.add_parser(
         "sync",
         help="Sync edited YAML artifacts without calling an LLM",
@@ -2600,6 +2635,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             from .portfolio import (
                 build_portfolio,
                 explain_portfolio,
+                inspect_portfolio_intake,
                 localize_portfolio,
                 refresh_portfolio,
                 render_portfolio,
@@ -2636,6 +2672,8 @@ def main(argv: Optional[List[str]] = None) -> int:
                         title=args.title,
                         client=client,
                         model=settings.model,
+                        context_format=args.context_format,
+                        source_budget=settings.portfolio_source_budget,
                     )
                 elif args.portfolio_command == "refresh":
                     from .generation import (
@@ -2664,6 +2702,19 @@ def main(argv: Optional[List[str]] = None) -> int:
                         client=client,
                         model=settings.model,
                         all_sources=args.all_sources,
+                        context_format=args.context_format,
+                        source_budget=settings.portfolio_source_budget,
+                    )
+                elif args.portfolio_command == "intake":
+                    from .generation import resolve_generation_settings
+
+                    settings = resolve_generation_settings(config_path=args.config)
+                    payload = inspect_portfolio_intake(
+                        objectives=args.objectives,
+                        use_cases=args.use_cases,
+                        signals=args.signals,
+                        products=args.products,
+                        source_budget=settings.portfolio_source_budget,
                     )
                 elif args.portfolio_command == "sync":
                     payload = sync_portfolio(args.workspace)
@@ -2712,6 +2763,14 @@ def main(argv: Optional[List[str]] = None) -> int:
             payload["validationMode"] = _portfolio_validation_mode(args)
             if args.json:
                 print(json.dumps(payload, indent=2))
+            elif payload.get("kind") == "PortfolioIntake":
+                print("Portfolio intake")
+                print(f"Sources: {len(payload.get('sources', []))}")
+                source_budget = payload.get("sourceBudget")
+                if isinstance(source_budget, dict):
+                    print(f"Max prompt chars: {source_budget.get('maxPromptChars')}")
+                    print(f"Omitted chunks: {source_budget.get('omittedChunkCount')}")
+                print(f"Validation mode: {payload['validationMode']}")
             else:
                 print(f"Workspace: {payload['workspace']}")
                 print(f"HTML: {payload['html']}")

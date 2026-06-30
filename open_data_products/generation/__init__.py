@@ -33,6 +33,7 @@ from .models import (
     GenerationTask,
     ModelClient,
     PathLike,
+    PortfolioSourceBudget,
 )
 from .prompts import (
     copy_generation_prompts,
@@ -704,6 +705,7 @@ def validate_config(
         "modelPath",
         "contextWindow",
         "gpuLayers",
+        "portfolio",
     }
     for key in config:
         if key not in allowed_top:
@@ -740,6 +742,7 @@ def validate_config(
     _validate_optional_positive_int(config, "maxTokens", "maxTokens", errors)
     _validate_optional_positive_int(config, "contextWindow", "contextWindow", errors)
     _validate_optional_int(config, "gpuLayers", "gpuLayers", errors)
+    _validate_portfolio_config(config.get("portfolio"), errors)
     _validate_generation_paths(config, source_path, errors, warnings)
     _find_secret_values(config, "", errors)
 
@@ -840,6 +843,40 @@ def _validate_provider_config(
         not isinstance(api_key_env, str) or _looks_like_secret(api_key_env)
     ):
         errors.append(f"{path}.apiKeyEnv must be an environment variable name")
+
+
+def _validate_portfolio_config(value: object, errors: List[str]) -> None:
+    if value is None:
+        return
+    if not isinstance(value, dict):
+        errors.append("portfolio must be a mapping")
+        return
+    allowed_portfolio = {"sourceBudget"}
+    for key in value:
+        if key not in allowed_portfolio:
+            errors.append(f"Unknown generation config key: portfolio.{key}")
+    source_budget = value.get("sourceBudget")
+    if source_budget is None:
+        return
+    if not isinstance(source_budget, dict):
+        errors.append("portfolio.sourceBudget must be a mapping")
+        return
+    allowed_budget = {"maxSourceChars", "maxPromptChars"}
+    for key in source_budget:
+        if key not in allowed_budget:
+            errors.append(f"Unknown generation config key: portfolio.sourceBudget.{key}")
+    _validate_optional_positive_int(
+        source_budget,
+        "maxSourceChars",
+        "portfolio.sourceBudget.maxSourceChars",
+        errors,
+    )
+    _validate_optional_positive_int(
+        source_budget,
+        "maxPromptChars",
+        "portfolio.sourceBudget.maxPromptChars",
+        errors,
+    )
 
 
 def _has_configured_model(
@@ -963,6 +1000,10 @@ def _generation_settings_dict(settings: GenerationSettings) -> Dict[str, Any]:
         "context_window": settings.context_window,
         "gpu_layers": settings.gpu_layers,
         "prompt_path": settings.prompt_path,
+        "portfolio_source_budget": {
+            "max_source_chars": settings.portfolio_source_budget.max_source_chars,
+            "max_prompt_chars": settings.portfolio_source_budget.max_prompt_chars,
+        },
     }
 
 
@@ -1014,6 +1055,7 @@ def resolve_generation_settings(
     resolved_output = str(output_path or config.get("output") or "")
     resolved_prompts = prompt_dir or config.get("prompts")
     resolved_prompt_path = str(resolved_prompts) if resolved_prompts else None
+    portfolio_source_budget = _resolve_portfolio_source_budget(config)
     api_version = None
     max_tokens = None
     model_path = None
@@ -1096,6 +1138,29 @@ def resolve_generation_settings(
         context_window=context_window,
         gpu_layers=gpu_layers,
         prompt_path=resolved_prompt_path,
+        portfolio_source_budget=portfolio_source_budget,
+    )
+
+
+def _resolve_portfolio_source_budget(config: Dict[str, Any]) -> PortfolioSourceBudget:
+    portfolio = config.get("portfolio")
+    portfolio = portfolio if isinstance(portfolio, dict) else {}
+    source_budget = portfolio.get("sourceBudget")
+    source_budget = source_budget if isinstance(source_budget, dict) else {}
+    default = PortfolioSourceBudget()
+    max_source_chars = source_budget.get("maxSourceChars")
+    max_prompt_chars = source_budget.get("maxPromptChars")
+    return PortfolioSourceBudget(
+        max_source_chars=(
+            int(max_source_chars)
+            if isinstance(max_source_chars, int) and max_source_chars > 0
+            else default.max_source_chars
+        ),
+        max_prompt_chars=(
+            int(max_prompt_chars)
+            if isinstance(max_prompt_chars, int) and max_prompt_chars > 0
+            else default.max_prompt_chars
+        ),
     )
 
 
@@ -2682,6 +2747,7 @@ __all__ = [
     "GeneratedArtifact",
     "GenerationSettings",
     "GenerationTask",
+    "PortfolioSourceBudget",
     "anthropic_generate",
     "copy_config_template",
     "copy_generation_prompts",

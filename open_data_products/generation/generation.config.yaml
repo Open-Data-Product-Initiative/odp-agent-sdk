@@ -18,6 +18,23 @@ model: qwen2.5
 input: open_data_products/generation/source_docs/
 output: open_data_products/generation/fragments/
 
+# Portfolio document intake budgets extracted text, not original file bytes.
+# Example: with maxSourceChars: 2000 and maxPromptChars: 32000, the SDK splits
+# each source into ~2k-character chunks, reserves about 16k characters for the
+# portfolio prompt instructions, and includes about 16k extracted characters
+# per source before omitting extra chunks with a warning. The final rendered
+# prompt is still gated at maxPromptChars before any LLM call.
+# Caution: original file size is only a rough signal. With the defaults, expect
+# full inclusion for about 15-25 KB of extracted UTF-8 text per source, or about
+# 2,500-4,000 words. Larger files can still be processed, but only the first
+# budgeted chunks are sent to the LLM. For .docx and .pptx, a multi-MB file may
+# be fine if it contains little text, while a smaller file with dense transcript
+# text may be reduced.
+portfolio:
+  sourceBudget:
+    maxSourceChars: 2000
+    maxPromptChars: 32000
+
 # To make Claude the default instead, set `provider: claude`. The selected
 # provider entry below supplies the Claude model and Anthropic API settings.
 # For any selected online provider, export the API key environment variable

@@ -552,6 +552,65 @@ providers:
     assert settings.api_key_env == "TEST_OPENAI_API_KEY"
 
 
+def test_resolve_generation_settings_reads_portfolio_source_budget(tmp_path):
+    """Test portfolio source reduction settings resolve from generation config."""
+    config = tmp_path / "generation.config.yaml"
+    config.write_text(
+        """
+provider: ollama
+model: qwen2.5
+portfolio:
+  sourceBudget:
+    maxSourceChars: 40
+    maxPromptChars: 80
+providers:
+  ollama:
+    type: ollama
+    model: qwen2.5
+""",
+        encoding="utf-8",
+    )
+
+    report = validate_config("generation", config)
+    settings = resolve_generation_settings(config)
+
+    assert report["valid"] is True
+    assert settings.portfolio_source_budget.max_source_chars == 40
+    assert settings.portfolio_source_budget.max_prompt_chars == 80
+
+
+def test_validate_generation_config_rejects_invalid_portfolio_source_budget(
+    tmp_path,
+):
+    """Test portfolio source budget config must be a positive integer mapping."""
+    config = tmp_path / "generation.config.yaml"
+    config.write_text(
+        """
+provider: ollama
+model: qwen2.5
+portfolio:
+  sourceBudget:
+    maxSourceChars: 0
+    maxPromptChars: many
+providers:
+  ollama:
+    type: ollama
+    model: qwen2.5
+""",
+        encoding="utf-8",
+    )
+
+    report = validate_config("generation", config)
+
+    assert report["valid"] is False
+    assert "portfolio.sourceBudget.maxSourceChars must be a positive integer" in report[
+        "errors"
+    ]
+    assert "portfolio.sourceBudget.maxPromptChars must be a positive integer" in report[
+        "errors"
+    ]
+
+
 def test_resolve_generation_settings_allows_overrides(tmp_path):
     """Test CLI-style overrides take precedence over config values."""
     config = tmp_path / "generation.config.yaml"

@@ -27,7 +27,7 @@ def _fake_localization_client(prompt: str, model: str) -> str:
         return """
 language: fi
 translations:
-  Open Data Products Portfolio: Open Data Products Portfolio FI
+  Data Products Portfolio: Data Products Portfolio FI
   Generated workspace summary: Generated workspace summary FI
   Overview: Overview FI
   Products: Products FI
@@ -37,7 +37,7 @@ translations:
     return """
 language: sv
 translations:
-  Open Data Products Portfolio: Open Data Products Portfolio SV
+  Data Products Portfolio: Data Products Portfolio SV
   Generated workspace summary: Generated workspace summary SV
   Overview: Overview SV
   Products: Products SV
@@ -248,7 +248,11 @@ def test_portfolio_cli_help_uses_human_first_examples(
     assert "usage: open-data-products portfolio [-h] PORTFOLIO_COMMAND ..." in help_text
     assert "Portfolio workflow commands:" in help_text
     assert (
-        "open-data-products portfolio build --objectives inputs/objectives/ --use-cases inputs/use-cases/ --signals inputs/signals/ --products inputs/products/ --output generated/portfolio/"
+        "open-data-products portfolio build --objectives sources/objectives/ --use-cases sources/use-cases/ --signals sources/signals/ --products sources/products/ --output generated/portfolio/"
+        in help_text
+    )
+    assert (
+        "open-data-products portfolio intake --objectives sources/objectives/ --use-cases sources/use-cases/ --signals sources/signals/ --products sources/products/ --config generation.config.yaml --json"
         in help_text
     )
     assert "open-data-products portfolio refresh generated/portfolio/" in help_text
@@ -258,7 +262,7 @@ def test_portfolio_cli_help_uses_human_first_examples(
         in help_text
     )
     assert (
-        "portfolio build --objectives inputs/objectives/ --use-cases inputs/use-cases/ --signals inputs/signals/ --products inputs/products/ --output generated/portfolio/ --json"
+        "portfolio build --objectives sources/objectives/ --use-cases sources/use-cases/ --signals sources/signals/ --products sources/products/ --output generated/portfolio/ --json"
         not in help_text
     )
 
@@ -806,11 +810,13 @@ recipe:
         client=None,
         model="",
         all_sources=False,
+        source_budget=None,
     ):
         assert workspace_path == workspace
         assert client == "fake-client"
         assert model == "test-model"
         assert all_sources is True
+        assert source_budget is not None
         return {
             "kind": "PortfolioRefresh",
             "valid": True,
@@ -908,6 +914,8 @@ recipe:
         title=None,
         client=None,
         model="",
+        context_format="markdown",
+        source_budget=None,
     ):
         assert workspace_path == workspace
         assert objectives == source_root / "objectives"
@@ -916,6 +924,8 @@ recipe:
         assert products == source_root / "products"
         assert client == "fake-client"
         assert model == "test-model"
+        assert context_format == "markdown"
+        assert source_budget is not None
         return {
             "kind": "PortfolioBuild",
             "valid": True,
@@ -1651,7 +1661,7 @@ recipe:
       command: portfolio.build
       with:
         products:
-          - inputs/products
+          - sources/products
         workspace: outputs/portfolio
 """,
         encoding="utf-8",

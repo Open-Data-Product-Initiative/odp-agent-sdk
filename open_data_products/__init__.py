@@ -121,6 +121,7 @@ from .pricing import pricing_to_402
 from .portfolio import (
     build_portfolio,
     explain_portfolio,
+    inspect_portfolio_intake,
     localize_portfolio,
     refresh_portfolio,
     render_portfolio,
@@ -237,6 +238,7 @@ __all__ = [
     "get_recipe_config_path",
     "get_recipe_guidance",
     "init_starter_recipe",
+    "inspect_portfolio_intake",
     "load_generation_config",
     "list_ollama_models",
     "list_recipes",

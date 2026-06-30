@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import html
+import hashlib
 import json
 import re
 import shutil
@@ -16,6 +17,7 @@ import yaml
 
 from . import __version__
 from ._io import load_mapping
+from .generation.models import PortfolioSourceBudget
 from .odpc import load_catalog
 from .odpc.catalog import text_value
 from .odpg import build_graph, build_graph_explorer_html, load_graph
@@ -31,12 +33,14 @@ from .odps._normalization import (
     hours_to_minutes,
 )
 from .portfolio_sources import (
+    SOURCE_WARNING_KEY,
     changed_source_lanes as _changed_source_lanes,
     collect_source_files as _collect_source_files,
     collect_source_lanes as _collect_source_lanes,
     resolve_source_lane_paths as _resolve_source_lane_paths,
     source_change_warnings as _source_change_warnings,
     source_changes as _source_changes,
+    source_extraction_warnings as _source_extraction_warnings,
     source_hashes as _source_hashes,
     source_hashes_by_lane as _source_hashes_by_lane,
 )
@@ -49,6 +53,9 @@ EXECUTIVE_SUMMARY_SCHEMA = (
 PORTFOLIO_ICON_ASSET_DIR = Path("assets") / "executive_summary_icons"
 PORTFOLIO_LOCALIZATION_BATCH_CHARS = 3500
 PORTFOLIO_LOCALIZATION_BATCH_ITEMS = 50
+PORTFOLIO_SOURCE_CHUNK_CHARS = 2000
+PORTFOLIO_SOURCE_PROMPT_CHARS = 32000
+PORTFOLIO_PROMPT_OVERHEAD_RESERVE_CHARS = 16000
 PortfolioBuildClient = Callable[[str, str], str]
 PortfolioLocalizationClient = Callable[[str, str], str]
 ODPC_STATUSES = {"draft", "active", "paused", "completed", "retired"}
@@ -197,6 +204,8 @@ def build_portfolio(
     model: str = "qwen2.5",
     run_kind: str = "PortfolioBuild",
     process_all_sources: bool = True,
+    context_format: str = "markdown",
+    source_budget: Optional[PortfolioSourceBudget] = None,
 ) -> Dict[str, object]:
     """Build a portfolio workspace from source lanes using an LLM client."""
     root = Path(workspace)
@@ -224,17 +233,38 @@ def build_portfolio(
         if process_all_sources or not has_previous_sources
         else _changed_source_lanes(lanes, source_changes)
     )
+    source_budget_settings = source_budget or PortfolioSourceBudget(
+        max_source_chars=PORTFOLIO_SOURCE_CHUNK_CHARS,
+        max_prompt_chars=PORTFOLIO_SOURCE_PROMPT_CHARS,
+    )
+    reduced_process_lanes, source_budget_report = _reduce_source_lanes_for_prompt(
+        process_lanes,
+        max_source_chars=source_budget_settings.max_source_chars,
+        max_prompt_chars=source_budget_settings.max_prompt_chars,
+        prompt_overhead_chars=PORTFOLIO_PROMPT_OVERHEAD_RESERVE_CHARS,
+    )
+    prompt_budget_report: Dict[str, object] = {
+        "method": "final-prompt-char-gate",
+        "maxPromptChars": source_budget_settings.max_prompt_chars,
+        "checkedPromptCount": 0,
+        "maxObservedPromptChars": 0,
+    }
     workspace_title = _resolve_workspace_title(title, previous_state)
     llm_call_count = 0
     llm_phases: List[str] = []
     written: List[Tuple[Path, str]] = []
-    if any(process_lanes.values()):
+    if _has_processable_sources(reduced_process_lanes):
         if client is None:
             raise ValueError("A model client is required to build a portfolio.")
+        guarded_client = _prompt_budget_guarded_client(
+            client,
+            max_prompt_chars=source_budget_settings.max_prompt_chars,
+            report=prompt_budget_report,
+        )
         lane_phases = _generate_portfolio_lane_fragments(
             root,
-            process_lanes,
-            client,
+            reduced_process_lanes,
+            guarded_client,
             model,
         )
         llm_call_count += len(lane_phases)
@@ -247,7 +277,7 @@ def build_portfolio(
         graph = build_graph(
             root / "odpc" / "fragments",
             output_path=root / "odpg" / "graph.yaml",
-            client=client,
+            client=guarded_client,
             model=model,
         )
         llm_call_count += 1
@@ -261,22 +291,30 @@ def build_portfolio(
     plan = _reconcile_plan_identity(plan, previous_state)
     plan = _normalize_portfolio_plan(plan)
     plan = _apply_workspace_title(plan, workspace_title)
-    if any(process_lanes.values()):
+    if _has_processable_sources(reduced_process_lanes):
         if client is None:
             raise ValueError("A model client is required to build a portfolio.")
+        guarded_client = _prompt_budget_guarded_client(
+            client,
+            max_prompt_chars=source_budget_settings.max_prompt_chars,
+            report=prompt_budget_report,
+        )
         summary_prompt = render_portfolio_executive_summary_prompt(plan)
         llm_call_count += 1
         llm_phases.append("executiveSummary")
-        raw_summary = client(summary_prompt, model)
+        raw_summary = guarded_client(summary_prompt, model)
         executive_summary, repaired = _parse_executive_summary_with_repair(
-            raw_summary, client, model
+            raw_summary, guarded_client, model
         )
         if repaired:
             llm_call_count += 1
             llm_phases.append("executiveSummaryRepair")
         plan["executiveSummary"] = executive_summary
+    extraction_warnings = _source_extraction_warnings(lanes)
     warnings = [str(item) for item in plan.get("warnings", []) if item]
+    warnings.extend(extraction_warnings)
     warnings.extend(_source_change_warnings(source_changes))
+    warnings.extend(str(item) for item in source_budget_report.get("warnings", []))
 
     created: List[str] = []
     updated: List[str] = []
@@ -289,6 +327,7 @@ def build_portfolio(
             lane_paths=lane_paths,
             title=workspace_title,
             model=model,
+            context_format=context_format,
         )
     )
     for path, state in written:
@@ -309,9 +348,13 @@ def build_portfolio(
         unchanged.append(str(path))
 
     artifact_counts = _artifact_counts(plan)
-    source_counts = {name: len(files) for name, files in lanes.items()}
+    source_counts = {
+        name: len(files) for name, files in lanes.items() if name != SOURCE_WARNING_KEY
+    }
     processed_source_counts = {
-        name: len(files) for name, files in process_lanes.items()
+        name: len(files)
+        for name, files in process_lanes.items()
+        if name != SOURCE_WARNING_KEY
     }
     result: Dict[str, object] = {
         "spec": "portfolio",
@@ -321,6 +364,13 @@ def build_portfolio(
         "snapshot": str(snapshot) if snapshot is not None else None,
         "sourceCounts": source_counts,
         "processedSourceCounts": processed_source_counts,
+        "contextFormat": context_format,
+        "sourceBudget": source_budget_report,
+        "promptBudget": prompt_budget_report,
+        "sourceExtraction": {
+            "warnings": extraction_warnings,
+            "skippedSourceCount": len(extraction_warnings),
+        },
         "llmCallCount": llm_call_count,
         "llmPhases": llm_phases,
         "artifactCounts": artifact_counts,
@@ -352,6 +402,8 @@ def refresh_portfolio(
     client: Optional[PortfolioBuildClient] = None,
     model: str = "qwen2.5",
     all_sources: bool = False,
+    context_format: str = "markdown",
+    source_budget: Optional[PortfolioSourceBudget] = None,
 ) -> Dict[str, object]:
     """Refresh an existing portfolio workspace from saved or supplied source lanes."""
     root = Path(workspace)
@@ -370,7 +422,103 @@ def refresh_portfolio(
         model=model,
         run_kind="PortfolioRefresh",
         process_all_sources=all_sources,
+        context_format=context_format,
+        source_budget=source_budget,
     )
+
+
+def inspect_portfolio_intake(
+    *,
+    objectives: Optional[Union[str, Path]] = None,
+    use_cases: Optional[Union[str, Path]] = None,
+    signals: Optional[Union[str, Path]] = None,
+    products: Optional[Union[str, Path]] = None,
+    source_budget: Optional[PortfolioSourceBudget] = None,
+) -> Dict[str, object]:
+    """Inspect portfolio source intake without calling an LLM."""
+    lanes = _collect_source_lanes(
+        objectives=Path(objectives) if objectives is not None else None,
+        use_cases=Path(use_cases) if use_cases is not None else None,
+        signals=Path(signals) if signals is not None else None,
+        products=Path(products) if products is not None else None,
+    )
+    source_budget_settings = source_budget or PortfolioSourceBudget(
+        max_source_chars=PORTFOLIO_SOURCE_CHUNK_CHARS,
+        max_prompt_chars=PORTFOLIO_SOURCE_PROMPT_CHARS,
+    )
+    reduced_lanes, source_budget_report = _reduce_source_lanes_for_prompt(
+        lanes,
+        max_source_chars=source_budget_settings.max_source_chars,
+        max_prompt_chars=source_budget_settings.max_prompt_chars,
+        prompt_overhead_chars=PORTFOLIO_PROMPT_OVERHEAD_RESERVE_CHARS,
+    )
+    reduced_by_id = {
+        str(source.get("sourceId")): source
+        for files in reduced_lanes.values()
+        for source in files
+        if source.get("sourceId")
+    }
+    sources = []
+    for lane_name, files in lanes.items():
+        if lane_name == SOURCE_WARNING_KEY:
+            continue
+        for source in files:
+            source_id = str(source.get("sourceId", ""))
+            reduced = reduced_by_id.get(source_id, {})
+            extracted_chars = len(str(source.get("text", "")))
+            included_chars = len(str(reduced.get("text", "")))
+            chunk_count = _int_value(reduced.get("chunkCount"), default=1)
+            included_chunk_count = _int_value(
+                reduced.get("includedChunkCount"), default=1
+            )
+            omitted_chunk_count = _int_value(
+                reduced.get("omittedChunkCount"), default=0
+            )
+            status = "included"
+            if omitted_chunk_count:
+                status = "reduced"
+            if extracted_chars == 0:
+                status = "empty"
+            sources.append(
+                {
+                    "lane": lane_name,
+                    "path": source.get("path", ""),
+                    "sourceId": source_id,
+                    "sourceType": source.get("sourceType", ""),
+                    "detectionMethod": source.get("detectionMethod", ""),
+                    "sourceUnit": source.get("sourceUnit", ""),
+                    "sourceUnitId": source.get("sourceUnitId", ""),
+                    "extractedChars": extracted_chars,
+                    "estimatedWords": _estimated_word_count(
+                        str(source.get("text", ""))
+                    ),
+                    "includedChars": included_chars,
+                    "omittedChars": max(extracted_chars - included_chars, 0),
+                    "chunkCount": chunk_count,
+                    "includedChunkCount": included_chunk_count,
+                    "omittedChunkCount": omitted_chunk_count,
+                    "status": status,
+                }
+            )
+
+    source_counts = {
+        name: len(files) for name, files in lanes.items() if name != SOURCE_WARNING_KEY
+    }
+    warnings = _source_extraction_warnings(lanes)
+    warnings.extend(str(item) for item in source_budget_report.get("warnings", []))
+    return {
+        "spec": "portfolio",
+        "kind": "PortfolioIntake",
+        "llmCallCount": 0,
+        "sourceCounts": source_counts,
+        "sourceBudget": source_budget_report,
+        "sourceExtraction": {
+            "warnings": _source_extraction_warnings(lanes),
+            "skippedSourceCount": len(_source_extraction_warnings(lanes)),
+        },
+        "sources": sources,
+        "warnings": warnings,
+    }
 
 
 def sync_portfolio(workspace: Union[str, Path]) -> Dict[str, object]:
@@ -522,6 +670,7 @@ def localize_portfolio(
 
 def render_portfolio_build_prompt(lanes: Dict[str, List[Dict[str, str]]]) -> str:
     """Render the internal portfolio build prompt from source lane content."""
+    reduced_lanes, _budget = _reduce_source_lanes_for_prompt(lanes)
     sections = [
         "Create one Open Data Products portfolio plan as YAML.",
         "Return only YAML. Do not include markdown fences, prose, or comments.",
@@ -768,7 +917,7 @@ def render_portfolio_build_prompt(lanes: Dict[str, List[Dict[str, str]]]) -> str
         "- x-* extension fields are allowed because they are ODPS extensions, but they must not replace schema fields like SLA, dataQuality, dataAccess, or pricingPlans.",
         "- If evidence is missing for a schema component, emit a minimal pending schema-shaped component and add a warning.",
     ]
-    for lane_name, files in lanes.items():
+    for lane_name, files in reduced_lanes.items():
         sections.append(f"\n# Source lane: {lane_name}")
         if not files:
             sections.append("(no files)")
@@ -776,6 +925,155 @@ def render_portfolio_build_prompt(lanes: Dict[str, List[Dict[str, str]]]) -> str
         for source in files:
             sections.append(f"\n## {source['path']}\n{source['text']}")
     return "\n".join(sections)
+
+
+def _reduce_source_lanes_for_prompt(
+    lanes: Dict[str, List[Dict[str, str]]],
+    *,
+    max_source_chars: int = PORTFOLIO_SOURCE_CHUNK_CHARS,
+    max_prompt_chars: int = PORTFOLIO_SOURCE_PROMPT_CHARS,
+    prompt_overhead_chars: int = 0,
+) -> Tuple[Dict[str, List[Dict[str, str]]], Dict[str, object]]:
+    """Reduce source lane text deterministically before LLM prompt rendering."""
+    if max_source_chars <= 0:
+        raise ValueError("max_source_chars must be a positive integer.")
+    if max_prompt_chars <= 0:
+        raise ValueError("max_prompt_chars must be a positive integer.")
+    if prompt_overhead_chars < 0:
+        raise ValueError("prompt_overhead_chars must be zero or a positive integer.")
+    chunk_limit = min(max_source_chars, max_prompt_chars)
+    source_prompt_chars = max(max_prompt_chars - prompt_overhead_chars, 0)
+    reduced: Dict[str, List[Dict[str, str]]] = {}
+    estimated_chars = 0
+    included_chars = 0
+    chunk_count = 0
+    included_chunk_count = 0
+    omitted_chunk_count = 0
+    reduced_source_count = 0
+    source_count = 0
+
+    for lane_name, files in lanes.items():
+        if lane_name == SOURCE_WARNING_KEY:
+            continue
+        reduced_files: List[Dict[str, str]] = []
+        for source in files:
+            source_count += 1
+            text = str(source.get("text", ""))
+            estimated_chars += len(text)
+            chunks = _chunk_source_text(text, chunk_limit)
+            chunk_count += len(chunks)
+            included_chunks: List[str] = []
+            remaining_prompt_chars = source_prompt_chars
+            for chunk in chunks:
+                chunk_size = len(chunk)
+                separator_size = 2 if included_chunks else 0
+                required_chars = chunk_size + separator_size
+                if required_chars > remaining_prompt_chars:
+                    break
+                included_chunks.append(chunk)
+                remaining_prompt_chars -= required_chars
+                included_chars += required_chars
+            omitted_chunks = len(chunks) - len(included_chunks)
+            included_chunk_count += len(included_chunks)
+            omitted_chunk_count += omitted_chunks
+            if omitted_chunks:
+                reduced_source_count += 1
+            reduced_source = dict(source)
+            reduced_source["text"] = "\n\n".join(included_chunks)
+            reduced_source["chunkCount"] = str(len(chunks))
+            reduced_source["includedChunkCount"] = str(len(included_chunks))
+            reduced_source["omittedChunkCount"] = str(omitted_chunks)
+            reduced_files.append(reduced_source)
+        reduced[lane_name] = reduced_files
+
+    warnings = []
+    if omitted_chunk_count:
+        warnings.append(
+            f"Content omitted from prompt: {omitted_chunk_count} chunks over context budget"
+        )
+    budget: Dict[str, object] = {
+        "method": "deterministic-chunk-budget",
+        "budgetScope": "per-source",
+        "maxSourceChars": max_source_chars,
+        "maxPromptChars": max_prompt_chars,
+        "promptOverheadReserveChars": prompt_overhead_chars,
+        "sourcePromptChars": source_prompt_chars,
+        "estimatedInputChars": estimated_chars,
+        "includedChars": included_chars,
+        "omittedChars": max(estimated_chars - included_chars, 0),
+        "sourceCount": source_count,
+        "reducedSourceCount": reduced_source_count,
+        "chunkCount": chunk_count,
+        "includedChunkCount": included_chunk_count,
+        "omittedChunkCount": omitted_chunk_count,
+        "warnings": warnings,
+    }
+    return reduced, budget
+
+
+def _chunk_source_text(text: str, max_chars: int) -> List[str]:
+    paragraphs = [part.strip() for part in text.split("\n\n") if part.strip()]
+    if not paragraphs and text.strip():
+        paragraphs = [text.strip()]
+    chunks: List[str] = []
+    current = ""
+    for paragraph in paragraphs:
+        paragraph_parts = _split_long_text(paragraph, max_chars)
+        for part in paragraph_parts:
+            candidate = part if not current else current + "\n\n" + part
+            if len(candidate) <= max_chars:
+                current = candidate
+                continue
+            if current:
+                chunks.append(current)
+            current = part
+    if current:
+        chunks.append(current)
+    return chunks
+
+
+def _split_long_text(text: str, max_chars: int) -> List[str]:
+    if len(text) <= max_chars:
+        return [text]
+    return [text[index : index + max_chars] for index in range(0, len(text), max_chars)]
+
+
+def _int_value(value: object, *, default: int) -> int:
+    try:
+        return int(str(value))
+    except (TypeError, ValueError):
+        return default
+
+
+def _estimated_word_count(text: str) -> int:
+    return len(re.findall(r"\S+", text))
+
+
+def _prompt_budget_guarded_client(
+    client: PortfolioBuildClient,
+    *,
+    max_prompt_chars: int,
+    report: Dict[str, object],
+) -> PortfolioBuildClient:
+    """Return a client wrapper that blocks over-budget prompts before LLM calls."""
+
+    def guarded(prompt: str, model: str) -> str:
+        prompt_chars = len(prompt)
+        report["checkedPromptCount"] = int(report.get("checkedPromptCount", 0)) + 1
+        report["maxObservedPromptChars"] = max(
+            int(report.get("maxObservedPromptChars", 0)),
+            prompt_chars,
+        )
+        if prompt_chars > max_prompt_chars:
+            raise ValueError(
+                "Portfolio prompt exceeds configured budget: "
+                f"estimatedPromptChars={prompt_chars}, "
+                f"maxPromptChars={max_prompt_chars}. "
+                "Increase portfolio.sourceBudget.maxPromptChars or reduce source input."
+            )
+        return client(prompt, model)
+
+    return guarded
 
 
 def render_portfolio_executive_summary_prompt(plan: Dict[str, Any]) -> str:
@@ -1253,6 +1551,7 @@ def _write_portfolio_metadata_artifacts(
     lane_paths: Optional[Dict[str, str]] = None,
     title: Optional[str] = None,
     model: Optional[str] = None,
+    context_format: str = "markdown",
 ) -> List[Tuple[Path, str]]:
     written: List[Tuple[Path, str]] = []
     written.append(_write_yaml(root / "portfolio.yaml", _portfolio_map(plan, lanes)))
@@ -1262,7 +1561,7 @@ def _write_portfolio_metadata_artifacts(
     written.append(
         _write_yaml(
             root / "portfolio-state.yaml",
-            _portfolio_state(plan, lanes, lane_paths or {}, title),
+            _portfolio_state(plan, lanes, lane_paths or {}, title, context_format),
         )
     )
     return written
@@ -1289,15 +1588,51 @@ def _generate_portfolio_lane_fragments(
             source_path = source.get("path")
             if not source_path:
                 continue
+            generation_source = _write_reduced_generation_source(
+                root, lane_name, source
+            )
             generate_local_artifacts_for_kind(
                 artifact_kind,
-                source_path,
+                generation_source,
                 fragments_dir,
                 model=model,
                 client=client,
             )
             phases.append(phase)
     return phases
+
+
+def _write_reduced_generation_source(
+    root: Path,
+    lane_name: str,
+    source: Dict[str, str],
+) -> Path:
+    source_id = source.get("sourceId") or source.get("path") or "source"
+    text = source.get("text", "")
+    digest = hashlib.sha256((source_id + "\n" + text).encode("utf-8")).hexdigest()
+    safe_lane = re.sub(r"[^A-Za-z0-9_-]+", "-", lane_name).strip("-") or "lane"
+    original_name = Path(source.get("path", "source")).stem or "source"
+    safe_name = re.sub(r"[^A-Za-z0-9_-]+", "-", original_name).strip("-") or "source"
+    output = (
+        root
+        / ".portfolio-sources"
+        / "reduced"
+        / f"{safe_lane}-{safe_name}-{digest[:16]}.md"
+    )
+    output.parent.mkdir(parents=True, exist_ok=True)
+    content = "\n".join(
+        [
+            f"Original source path: {source.get('path', '')}",
+            f"Source ID: {source_id}",
+            f"Source type: {source.get('sourceType', '')}",
+            f"Chunks included: {source.get('includedChunkCount', '1')} of {source.get('chunkCount', '1')}",
+            f"Chunks omitted: {source.get('omittedChunkCount', '0')}",
+            "",
+            text.strip(),
+        ]
+    ).strip()
+    output.write_text(content + "\n", encoding="utf-8")
+    return output
 
 
 def _write_yaml(path: Path, document: Dict[str, Any]) -> Tuple[Path, str]:
@@ -1477,7 +1812,11 @@ def _portfolio_map(
             "generatedAt": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
             "sdkVersion": __version__,
         },
-        "sources": {name: {"count": len(files)} for name, files in lanes.items()},
+        "sources": {
+            name: {"count": len(files)}
+            for name, files in lanes.items()
+            if name != SOURCE_WARNING_KEY
+        },
         "warnings": [str(item) for item in plan.get("warnings", []) if item],
     }
     if isinstance(plan.get("executiveSummary"), dict):
@@ -1490,25 +1829,34 @@ def _portfolio_state(
     lanes: Dict[str, List[Dict[str, str]]],
     lane_paths: Dict[str, str],
     title: Optional[str],
+    context_format: str = "markdown",
 ) -> Dict[str, Any]:
     state: Dict[str, Any] = {
         "version": 1,
+        "contextFormat": context_format,
         "sourceLanePaths": dict(lane_paths),
         "sources": {
             name: [
                 {
+                    "sourceId": source["sourceId"],
                     "path": source["path"],
                     "sha256": source["sha256"],
                 }
                 for source in files
             ]
             for name, files in lanes.items()
+            if name != SOURCE_WARNING_KEY
         },
         "identityRegistry": _identity_registry(plan),
     }
     if title:
         state["title"] = title
     return state
+
+
+def _has_processable_sources(lanes: Dict[str, List[Dict[str, str]]]) -> bool:
+    """Return whether any real source lane has files to process."""
+    return any(files for name, files in lanes.items() if name != SOURCE_WARNING_KEY)
 
 
 def _synced_portfolio_state(
@@ -3777,7 +4125,7 @@ def render_portfolio_html(data: Dict[str, Any]) -> str:
         "<body>",
         '<header class="topbar">',
         '<div class="topbar-inner">',
-        '<a class="brand" href="#overview" aria-label="Open Data Products portfolio">Open Data Products Portfolio</a>',
+        '<a class="brand" href="#overview" aria-label="Data products portfolio">Data Products Portfolio</a>',
         _render_language_selector(data, language),
         "</div>",
         "</header>",
@@ -5175,17 +5523,62 @@ def _render_about(data: Dict[str, Any]) -> str:
 
 
 def _render_footer(data: Dict[str, Any]) -> str:
+    versions = data.get("versions")
+    has_versions = isinstance(versions, list) and bool(versions)
+    latest_version = _latest_version(versions if isinstance(versions, list) else [])
+    version_link = _escape_attr(
+        _text(latest_version.get("html")) if isinstance(latest_version, dict) else "#overview"
+    )
+    version_action = (
+        f'<a href="{version_link}">Compare previous snapshot</a>'
+        if has_versions
+        else "<span>No previous snapshots yet</span>"
+    )
     return (
-        '<footer class="footer"><div class="wrap footer-inner">'
-        "<p>Generated with the Open Data Products SDK. This static portfolio keeps "
-        "catalog artifacts, ODPS product specs, ODPG graph data, version snapshots, "
-        "and review guidance together in one browser-openable file. Generated "
-        "product specs are drafts until reviewed and accepted by humans.</p>"
-        '<nav class="footer-links" aria-label="Portfolio artifact links">'
-        '<a href="odpc/catalog.yaml">Catalog YAML</a>'
-        '<a href="odpg/graph.yaml">Graph YAML</a>'
-        '<a href="#overview">Back to top</a>'
-        "</nav></div></footer>"
+        '<footer class="footer">'
+        '<div class="wrap footer-inner">'
+        '<p class="footer-status">Draft portfolio generated with the Data Products '
+        "SDK. Human review is required before product specs are treated as "
+        "production-ready.</p>"
+        '<div class="footer-columns">'
+        '<section class="footer-column">'
+        "<h2>Review status</h2>"
+        "<ul>"
+        "<li>Draft portfolio</li>"
+        "<li>Human acceptance required</li>"
+        f"<li>{'Latest snapshot available' if has_versions else 'No version snapshot yet'}</li>"
+        "</ul>"
+        "</section>"
+        '<nav class="footer-column" aria-label="Portfolio next actions">'
+        "<h2>Next actions</h2>"
+        "<ul>"
+        '<li><a href="#executive-summary">Review executive decisions</a></li>'
+        '<li><a href="#executive-summary">Resolve evidence gaps</a></li>'
+        '<li><a href="#products">Approve product specs</a></li>'
+        f"<li>{version_action}</li>"
+        "</ul>"
+        "</nav>"
+        '<nav class="footer-column" aria-label="Portfolio evidence links">'
+        "<h2>Evidence</h2>"
+        "<ul>"
+        '<li><a href="#about">Source summary</a></li>'
+        '<li><a href="#overview">Portfolio versions</a></li>'
+        '<li><a href="#graph">Graph view</a></li>'
+        '<li><a href="#objectives">Catalog objects</a></li>'
+        "</ul>"
+        "</nav>"
+        '<nav class="footer-column" aria-label="Portfolio artifact links">'
+        "<h2>Artifacts</h2>"
+        "<ul>"
+        '<li><a href="odpc/catalog.yaml">Catalog YAML</a></li>'
+        '<li><a href="odpg/graph.yaml">Graph YAML</a></li>'
+        '<li><a href="#products">Product specs</a></li>'
+        '<li><a href="#overview">Back to top</a></li>'
+        "</ul>"
+        "</nav>"
+        "</div>"
+        "</div>"
+        "</footer>"
     )
 
 
@@ -6768,7 +7161,7 @@ html[dir="rtl"] .odp-facts {
 }
 .footer {
   margin-top: 42px;
-  padding: 24px 0 34px;
+  padding: 28px 0 36px;
   color: rgba(255, 255, 255, .78);
   background: var(--odp-black);
   border-top: 4px solid var(--odps-violet);
@@ -6776,26 +7169,48 @@ html[dir="rtl"] .odp-facts {
 }
 .footer-inner {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 18px;
-  align-items: start;
+  gap: 22px;
 }
-.footer p {
-  max-width: 760px;
+.footer-status {
   margin: 0;
+  max-width: 880px;
+  color: rgba(255, 255, 255, .88);
 }
-.footer-links {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 12px;
+.footer-columns {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 20px;
+}
+.footer-column h2 {
+  margin: 0 0 10px;
+  color: #fff;
+  font-size: .82rem;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+.footer-column ul {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.footer-column li {
+  min-width: 0;
+}
+.footer-column a {
+  color: #fff;
   font-weight: 700;
 }
-.footer-links a { color: #fff; }
+.footer-column span {
+  color: rgba(255, 255, 255, .62);
+}
 @media (max-width: 900px) {
-  .overview-grid,
-  .footer-inner {
+  .overview-grid {
     grid-template-columns: 1fr;
+  }
+  .footer-columns {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .summary {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -6823,6 +7238,10 @@ html[dir="rtl"] .odp-facts {
     justify-content: flex-start;
   }
   .wide { grid-column: auto; }
-  .footer-links { justify-content: flex-start; }
+}
+@media (max-width: 640px) {
+  .footer-columns {
+    grid-template-columns: 1fr;
+  }
 }
 """

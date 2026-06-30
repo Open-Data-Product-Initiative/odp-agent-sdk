@@ -11,6 +11,14 @@ ModelClient = Callable[[str, str], str]
 
 
 @dataclass(frozen=True)
+class PortfolioSourceBudget:
+    """Portfolio document intake source reduction budget."""
+
+    max_source_chars: int = 2000
+    max_prompt_chars: int = 32000
+
+
+@dataclass(frozen=True)
 class GenerationTask:
     """Prompt and output mapping for one local generation artifact."""
 
@@ -40,6 +48,9 @@ class GenerationSettings:
     context_window: Optional[int] = None
     gpu_layers: Optional[int] = None
     prompt_path: Optional[str] = None
+    portfolio_source_budget: PortfolioSourceBudget = field(
+        default_factory=PortfolioSourceBudget
+    )
 
 
 @dataclass(frozen=True)

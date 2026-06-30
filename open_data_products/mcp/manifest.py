@@ -426,7 +426,7 @@ def _workflows() -> List[Dict[str, Any]]:
             "id": "build-portfolio",
             "title": "Build a static portfolio workspace",
             "commands": [
-                "open-data-products portfolio build --objectives inputs/objectives/ --use-cases inputs/use-cases/ --signals inputs/signals/ --products inputs/products/ --output portfolio/"
+                "open-data-products portfolio build --objectives sources/objectives/ --use-cases sources/use-cases/ --signals sources/signals/ --products sources/products/ --output portfolio/"
             ],
             "mcp_tools": ["search_objects", "search_graph_objects"],
         },

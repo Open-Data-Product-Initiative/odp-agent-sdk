@@ -15,7 +15,7 @@ open-data-products generate --input source_docs/ --kind product-reference --outp
 open-data-products odpc-build fragments/ --output catalog.yaml --html catalog.html --toon catalog.toon --gcf catalog.gcf
 open-data-products odpg-build fragments/ --output graph.yaml --toon graph.toon --gcf graph.gcf
 open-data-products okf-validate knowledge-bundle/ --json
-open-data-products portfolio build --objectives inputs/objectives/ --use-cases inputs/use-cases/ --signals inputs/signals/ --products inputs/products/ --output portfolio/
+open-data-products portfolio build --objectives sources/objectives/ --use-cases sources/use-cases/ --signals sources/signals/ --products sources/products/ --output portfolio/
 ```
 
 Use the command-specific sections below when you need more control or
@@ -358,10 +358,10 @@ Developer implementation notes for this workflow live in
 
 ```bash
 open-data-products portfolio build \
-  --objectives inputs/objectives/ \
-  --use-cases inputs/use-cases/ \
-  --signals inputs/signals/ \
-  --products inputs/products/ \
+  --objectives sources/objectives/ \
+  --use-cases sources/use-cases/ \
+  --signals sources/signals/ \
+  --products sources/products/ \
   --title "Customer Intelligence Portfolio" \
   --output generated/portfolio/
 ```
