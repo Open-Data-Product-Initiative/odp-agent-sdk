@@ -2717,6 +2717,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                         signals=args.signals,
                         products=args.products,
                         source_budget=settings.portfolio_source_budget,
+                        source_privacy=settings.portfolio_privacy,
                     )
                 elif args.portfolio_command == "sync":
                     payload = sync_portfolio(args.workspace)

@@ -24,10 +24,15 @@ identity, links, state, and browser output across reruns.
 
 Primary implementation files:
 
-- `open_data_products/portfolio.py`: source scanning, LLM prompt rendering,
-  plan parsing and repair, ID reconciliation, ODPC/ODPS/ODPG artifact writing,
-  sync, render, localize, explain, version snapshots, HTML/CSS/JS rendering,
-  graph embedding, validation reporting, and portfolio state handling.
+- `open_data_products/portfolio.py`: LLM prompt rendering, plan parsing and
+  repair, ID reconciliation, ODPC/ODPS/ODPG artifact writing, sync, render,
+  localize, explain, version snapshots, HTML/CSS/JS rendering, graph embedding,
+  validation reporting, and portfolio state handling.
+- `open_data_products/portfolio_sources.py`: lane scanning, deterministic
+  source IDs, source hashing, source reduction, and intake reports.
+- `open_data_products/source_documents/`: content-first source type detection
+  and normalized extraction for text, email, Office, PDF, CSV, spreadsheet, and
+  warning-only source classes.
 - `open_data_products/cli.py`: `open-data-products portfolio ...` command
   parsing, provider settings, strict-validation behavior, and JSON output.
 - `open_data_products/__init__.py`: public exports for portfolio helpers.
@@ -83,6 +88,7 @@ Deterministic helpers:
 Portfolio commands live under one CLI namespace:
 
 ```bash
+open-data-products portfolio intake ...
 open-data-products portfolio build ...
 open-data-products portfolio refresh ...
 open-data-products portfolio sync ...
@@ -181,14 +187,35 @@ Build and refresh support four source lanes:
 - `signals`
 - `products`
 
-Accepted source suffixes are defined by `PORTFOLIO_SOURCE_SUFFIXES`:
+Accepted source suffixes are defined by the portfolio source-document loader:
 
 ```text
-.md, .txt, .yaml, .yml, .json
+.md, .txt, .yaml, .yml, .json, .eml, .msg, .docx, .pptx, .pdf, .csv, .xlsx
 ```
 
-Source scanning and hashing are deterministic. If an input source folder is
-missing, fail early. If an output folder is missing, create it.
+`.msg` files are detected as source-lane inputs and extracted when the optional
+`open-data-products[email]` extra is installed. Without the extra, or when
+parsing fails, `.msg` remains a warning-only skipped source. `.png`, `.jpg`,
+and `.jpeg` are warning-only because OCR and vision extraction are not enabled.
+Text PDFs are extracted from embedded text; scanned or image-only PDFs return a
+warning.
+
+Each business file becomes one source record. A PowerPoint deck is one deck
+source, a Word or PDF file is one document source, a spreadsheet is one workbook
+source, and a CSV file is one table source. Extractors may preserve internal
+slide, page, sheet, or row boundaries inside the source text, but they must not
+turn one user-supplied business file into multiple lane sources by default.
+
+Source scanning and hashing are deterministic. File type detection uses content
+signatures and container inspection before extension fallback, and reports the
+detection method. If an input source folder is missing, fail early. If an output
+folder is missing, create it.
+
+Before any LLM-backed portfolio phase, source content is reduced with the
+configured `portfolio.sourceBudget` settings and gated by `maxPromptChars`.
+Budget warnings are part of the normal report. `portfolio intake --json` exposes
+the same source extraction, privacy masking, and budget metadata without making
+an LLM call.
 
 ## Build And Refresh Flow
 

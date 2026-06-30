@@ -207,12 +207,17 @@ helpers.
 Accepted source suffixes are defined by `PORTFOLIO_SOURCE_SUFFIXES`:
 
 ```text
-.md, .txt, .yaml, .yml, .json
+.md, .txt, .yaml, .yml, .json, .eml, .docx, .pptx, .pdf, .csv, .xlsx, .msg, .png, .jpg, .jpeg
 ```
 
-Source lane collection lives in `_collect_source_lanes`,
-`_resolve_source_lane_paths`, `_collect_source_files`, and `_iter_source_files`.
-Source hashes are tracked by `_source_changes` and `_source_hashes`.
+`.msg`, `.png`, `.jpg`, and `.jpeg` are accepted for detection and reporting.
+Outlook `.msg` extraction is available through `open-data-products[email]`;
+without the extra, or when parsing fails, `.msg` files are warning-only skipped
+sources. Image files are warning-only because OCR and vision extraction are not
+enabled.
+
+Source lane collection lives in `open_data_products.portfolio_sources`.
+Source hashes and source IDs remain deterministic.
 
 If an input source path is missing, fail early. If an output path is missing,
 create it.

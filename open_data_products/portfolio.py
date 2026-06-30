@@ -448,6 +448,7 @@ def inspect_portfolio_intake(
     signals: Optional[Union[str, Path]] = None,
     products: Optional[Union[str, Path]] = None,
     source_budget: Optional[PortfolioSourceBudget] = None,
+    source_privacy: Optional[PortfolioPrivacySettings] = None,
 ) -> Dict[str, object]:
     """Inspect portfolio source intake without calling an LLM."""
     lanes = _collect_source_lanes(
@@ -460,8 +461,13 @@ def inspect_portfolio_intake(
         max_source_chars=PORTFOLIO_SOURCE_CHUNK_CHARS,
         max_prompt_chars=PORTFOLIO_SOURCE_PROMPT_CHARS,
     )
-    reduced_lanes, source_budget_report = _reduce_source_lanes_for_prompt(
+    privacy_settings = source_privacy or PortfolioPrivacySettings()
+    private_lanes, source_privacy_report = _apply_source_privacy(
         lanes,
+        privacy_settings=privacy_settings,
+    )
+    reduced_lanes, source_budget_report = _reduce_source_lanes_for_prompt(
+        private_lanes,
         max_source_chars=source_budget_settings.max_source_chars,
         max_prompt_chars=source_budget_settings.max_prompt_chars,
         prompt_overhead_chars=PORTFOLIO_PROMPT_OVERHEAD_RESERVE_CHARS,
@@ -473,7 +479,7 @@ def inspect_portfolio_intake(
         if source.get("sourceId")
     }
     sources = []
-    for lane_name, files in lanes.items():
+    for lane_name, files in private_lanes.items():
         if lane_name == SOURCE_WARNING_KEY:
             continue
         for source in files:
@@ -502,6 +508,7 @@ def inspect_portfolio_intake(
                     "detectionMethod": source.get("detectionMethod", ""),
                     "sourceUnit": source.get("sourceUnit", ""),
                     "sourceUnitId": source.get("sourceUnitId", ""),
+                    "preview": str(source.get("text", ""))[:500],
                     "extractedChars": extracted_chars,
                     "estimatedWords": _estimated_word_count(
                         str(source.get("text", ""))
@@ -520,15 +527,30 @@ def inspect_portfolio_intake(
     }
     warnings = _source_extraction_warnings(lanes)
     warnings.extend(str(item) for item in source_budget_report.get("warnings", []))
+    warnings.extend(str(item) for item in source_privacy_report.get("warnings", []))
+    skipped_sources = [
+        {
+            "lane": source.get("lane", ""),
+            "path": source.get("path", ""),
+            "sourceId": source.get("sourceId", ""),
+            "sourceType": source.get("sourceType", ""),
+            "detectionMethod": source.get("detectionMethod", ""),
+            "warning": source.get("warning", ""),
+            "status": "skipped",
+        }
+        for source in lanes.get(SOURCE_WARNING_KEY, [])
+    ]
     return {
         "spec": "portfolio",
         "kind": "PortfolioIntake",
         "llmCallCount": 0,
         "sourceCounts": source_counts,
         "sourceBudget": source_budget_report,
+        "sourcePrivacy": source_privacy_report,
         "sourceExtraction": {
             "warnings": _source_extraction_warnings(lanes),
-            "skippedSourceCount": len(_source_extraction_warnings(lanes)),
+            "skippedSourceCount": len(skipped_sources),
+            "skippedSources": skipped_sources,
         },
         "sources": sources,
         "warnings": warnings,

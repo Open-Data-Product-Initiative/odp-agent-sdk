@@ -28,14 +28,22 @@ def collect_source_lanes(
     }
     collected: Dict[str, List[Dict[str, str]]] = {}
     warnings: List[str] = []
+    skipped_records: List[Dict[str, str]] = []
     for name, path in lanes.items():
         records = collect_source_records(path)
         warnings.extend(source_extraction_warnings({name: records}))
+        skipped_records.extend(
+            dict(source, lane=name)
+            for source in records
+            if source.get("skipped") == "true"
+        )
         collected[name] = [
             source for source in records if source.get("skipped") != "true"
         ]
     if warnings:
-        collected[SOURCE_WARNING_KEY] = [{"warning": item} for item in warnings]
+        collected[SOURCE_WARNING_KEY] = skipped_records or [
+            {"warning": item} for item in warnings
+        ]
     return collected
 
 
@@ -78,9 +86,25 @@ def collect_source_records(path: Optional[Path]) -> List[Dict[str, str]]:
     paths = [path] if path.is_file() else sorted(iter_source_files(path))
     files: List[Dict[str, str]] = []
     for source_path in paths:
-        for record in load_source_documents(source_path):
+        try:
+            records = load_source_documents(source_path)
+        except Exception as exc:
+            records = [_skipped_load_error_record(source_path, exc)]
+        for record in records:
             files.append(record)
     return files
+
+
+def _skipped_load_error_record(path: Path, exc: Exception) -> Dict[str, str]:
+    source_type = path.suffix.lower().lstrip(".") or "unknown"
+    return {
+        "path": str(path),
+        "sourceId": f"{path}#file-1",
+        "sourceType": source_type,
+        "detectionMethod": "load-error",
+        "skipped": "true",
+        "warning": f"Skipped source {path}: {type(exc).__name__}: {exc}",
+    }
 
 
 def source_changes(

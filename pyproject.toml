@@ -80,6 +80,9 @@ contracts-all = [
 measurements = [
     "tiktoken>=0.13.0; python_version >= '3.9'",
 ]
+email = [
+    "extract-msg>=0.54",
+]
 llama-cpp = [
     "llama-cpp-python>=0.3",
 ]
@@ -111,6 +114,7 @@ packages = [
     "open_data_products.generation.fragments",
     "open_data_products.generation.source_docs",
     "open_data_products.mcp",
+    "open_data_products.source_documents",
     "open_data_products.odpr",
     "open_data_products.odpr.data",
     "open_data_products.odpr.data.recipes",

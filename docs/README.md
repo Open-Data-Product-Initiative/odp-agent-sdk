@@ -4,6 +4,8 @@ This folder is organized by audience and purpose.
 
 ## User Guides
 
+- [Full SDK guide](user/full-sdk-guide.md): complete overview formerly kept in
+  the root README.
 - [Command guide](user/commands.md): common CLI workflows and outputs.
 - [ODPR recipe quick start](recipes/quick-start.md): create a project-local
   recipe workspace from packaged starters.

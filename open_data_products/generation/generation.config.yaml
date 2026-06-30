@@ -27,9 +27,10 @@ output: open_data_products/generation/fragments/
 # Caution: original file size is only a rough signal. With the defaults, expect
 # full inclusion for about 15-25 KB of extracted UTF-8 text per source, or about
 # 2,500-4,000 words. Larger files can still be processed, but only the first
-# budgeted chunks are sent to the LLM. For .docx and .pptx, a multi-MB file may
-# be fine if it contains little text, while a smaller file with dense transcript
-# text may be reduced.
+# budgeted chunks are sent to the LLM. For .docx, .pptx, .pdf, .csv, and .xlsx,
+# a multi-MB file may be fine if it contains little extracted text, while a
+# smaller file with dense transcript text may be reduced. Image files are
+# warning-only unless OCR or vision extraction is added later.
 portfolio:
   sourceBudget:
     maxSourceChars: 2000

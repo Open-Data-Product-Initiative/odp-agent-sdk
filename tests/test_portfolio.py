@@ -1,6 +1,8 @@
 """Tests for portfolio workspace rendering."""
 
 import json
+import sys
+import types
 from pathlib import Path
 from zipfile import ZipFile
 
@@ -1054,6 +1056,7 @@ def test_portfolio_source_helpers_collect_and_compare_lane_changes(
 
 def test_portfolio_source_helpers_extract_eml_and_warn_for_msg_without_extra(
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     from open_data_products.portfolio_sources import (
         collect_source_lanes,
@@ -1078,6 +1081,7 @@ def test_portfolio_source_helpers_extract_eml_and_warn_for_msg_without_extra(
     )
     msg_path = sources / "use-cases" / "outlook-request.msg"
     msg_path.write_bytes(b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1fake-msg")
+    monkeypatch.setitem(sys.modules, "extract_msg", None)
 
     lanes = collect_source_lanes(
         objectives=None,
@@ -1106,8 +1110,60 @@ def test_portfolio_source_helpers_extract_eml_and_warn_for_msg_without_extra(
     ]
 
 
+def test_portfolio_source_helpers_extract_msg_with_email_extra(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from open_data_products.portfolio_sources import (
+        collect_source_lanes,
+        source_extraction_warnings,
+    )
+
+    class FakeMessage:
+        subject = "Outlook retention request"
+        sender = "Customer Lead <customer@example.com>"
+        to = "Products <products@example.com>"
+        date = "2026-06-01 10:00:00+00:00"
+        body = "Please include Outlook requests in portfolio intake."
+
+        def __init__(self, path: str) -> None:
+            self.path = path
+
+        def close(self) -> None:
+            pass
+
+    fake_extract_msg = types.SimpleNamespace(Message=FakeMessage)
+    monkeypatch.setitem(sys.modules, "extract_msg", fake_extract_msg)
+
+    sources = tmp_path / "sources"
+    (sources / "use-cases").mkdir(parents=True)
+    msg_path = sources / "use-cases" / "outlook-request.msg"
+    msg_path.write_bytes(b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1fake-msg")
+
+    lanes = collect_source_lanes(
+        objectives=None,
+        use_cases=sources / "use-cases",
+        signals=None,
+        products=None,
+    )
+
+    assert source_extraction_warnings(lanes) == []
+    use_cases = lanes["useCases"]
+    assert len(use_cases) == 1
+    assert use_cases[0]["path"] == str(msg_path)
+    assert use_cases[0]["sourceType"] == "msg"
+    assert use_cases[0]["detectionMethod"] == "ole-compound-header"
+    assert use_cases[0]["sourceUnit"] == "message"
+    assert use_cases[0]["title"] == "Outlook retention request"
+    assert use_cases[0]["sourceId"] == f"{msg_path}#message-1"
+    assert "Subject: Outlook retention request" in use_cases[0]["text"]
+    assert "From: Customer Lead <customer@example.com>" in use_cases[0]["text"]
+    assert "Please include Outlook requests" in use_cases[0]["text"]
+
+
 def test_portfolio_source_helpers_detect_types_from_content_before_extension(
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     from open_data_products.portfolio_sources import (
         collect_source_lanes,
@@ -1131,6 +1187,7 @@ def test_portfolio_source_helpers_detect_types_from_content_before_extension(
     )
     renamed_msg = sources / "use-cases" / "outlook-request.txt"
     renamed_msg.write_bytes(b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1fake-msg")
+    monkeypatch.setitem(sys.modules, "extract_msg", None)
 
     lanes = collect_source_lanes(
         objectives=None,
@@ -1153,6 +1210,7 @@ def test_portfolio_source_helpers_detect_types_from_content_before_extension(
 
 def test_portfolio_source_helpers_scan_extensionless_supported_files(
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     from open_data_products.portfolio_sources import (
         collect_source_lanes,
@@ -1163,6 +1221,7 @@ def test_portfolio_source_helpers_scan_extensionless_supported_files(
     (sources / "use-cases").mkdir(parents=True)
     msg_path = sources / "use-cases" / "outlook-request"
     msg_path.write_bytes(b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1fake-msg")
+    monkeypatch.setitem(sys.modules, "extract_msg", None)
 
     lanes = collect_source_lanes(
         objectives=None,
@@ -1367,6 +1426,64 @@ def test_portfolio_source_helpers_limits_xlsx_rows_per_sheet(
     assert "Rows omitted: 5" in text
 
 
+def test_portfolio_source_helpers_warn_for_png_without_vision(
+    tmp_path: Path,
+) -> None:
+    from open_data_products.portfolio_sources import (
+        collect_source_lanes,
+        source_extraction_warnings,
+    )
+
+    sources = tmp_path / "sources"
+    (sources / "products").mkdir(parents=True)
+    image_path = sources / "products" / "whiteboard.png"
+    image_path.write_bytes(b"\x89PNG\r\n\x1a\nfake-image")
+
+    lanes = collect_source_lanes(
+        objectives=None,
+        use_cases=None,
+        signals=None,
+        products=sources / "products",
+    )
+
+    assert lanes["products"] == []
+    assert source_extraction_warnings(lanes) == [
+        (
+            f"Skipped image source {image_path}: OCR or vision extraction "
+            "is not enabled."
+        )
+    ]
+
+
+def test_portfolio_source_helpers_detect_jpeg_from_content_before_extension(
+    tmp_path: Path,
+) -> None:
+    from open_data_products.portfolio_sources import (
+        collect_source_lanes,
+        source_extraction_warnings,
+    )
+
+    sources = tmp_path / "sources"
+    (sources / "signals").mkdir(parents=True)
+    image_path = sources / "signals" / "signal-photo.txt"
+    image_path.write_bytes(b"\xff\xd8\xff\xe0fake-jpeg")
+
+    lanes = collect_source_lanes(
+        objectives=None,
+        use_cases=None,
+        signals=sources / "signals",
+        products=None,
+    )
+
+    assert lanes["signals"] == []
+    assert source_extraction_warnings(lanes) == [
+        (
+            f"Skipped image source {image_path}: OCR or vision extraction "
+            "is not enabled."
+        )
+    ]
+
+
 def test_portfolio_source_helpers_extract_text_pdf(
     tmp_path: Path,
 ) -> None:
@@ -1447,6 +1564,232 @@ def test_portfolio_source_helpers_detect_pdf_from_content_before_extension(
     assert lanes["products"][0]["sourceType"] == "pdf"
     assert lanes["products"][0]["detectionMethod"] == "pdf-header"
     assert "Customer analytics product" in lanes["products"][0]["text"]
+
+
+def test_portfolio_intake_zip_fixture_matches_embedded_expectations(
+    tmp_path: Path,
+) -> None:
+    fixture_zip = Path(__file__).with_name("intake-test-1.zip")
+    with ZipFile(fixture_zip) as archive:
+        archive.extractall(tmp_path)
+
+    fixture_root = tmp_path / "sdk-intake-test-materials"
+    assertions = json.loads(
+        (
+            fixture_root
+            / "expected-output-checks"
+            / "suggested_assertions.json"
+        ).read_text(encoding="utf-8")
+    )
+
+    result = inspect_portfolio_intake(
+        objectives=fixture_root / "sources" / "objectives",
+        use_cases=fixture_root / "sources" / "use-cases",
+        signals=fixture_root / "sources" / "signals",
+        products=fixture_root / "sources" / "products",
+    )
+
+    sources = result["sources"]
+    assert isinstance(sources, list)
+    source_by_name = {Path(str(source["path"])).name: source for source in sources}
+    source_types = {str(source["sourceType"]) for source in sources}
+
+    assert set(assertions["must_extract_types"]).issubset(source_types)
+    lane_names = {"use-cases": "useCases"}
+    for lane, filenames in assertions["lane_expectations"].items():
+        report_lane = lane_names.get(lane, lane)
+        lane_sources = {
+            Path(str(source["path"])).name
+            for source in sources
+            if source["lane"] == report_lane
+        }
+        assert set(filenames).issubset(lane_sources)
+
+    text_pdf = source_by_name["board-objectives-text-pdf.pdf"]
+    assert text_pdf["sourceType"] == "pdf"
+    assert text_pdf["detectionMethod"] == "pdf-header"
+    assert text_pdf["status"] == "included"
+
+    renamed_deck = source_by_name["strategy-priorities-no-extension"]
+    assert renamed_deck["sourceType"] == "pptx"
+    assert renamed_deck["detectionMethod"] == "ooxml-container"
+    assert renamed_deck["sourceUnit"] == "deck"
+
+    warnings = "\n".join(str(item) for item in result["warnings"])
+    assert "misleading-office-file.docx" in warnings
+    assert "outlook-request.msg" in warnings
+    assert "scanned-kpi-note-image-only.pdf" in warnings
+    assert "product-whiteboard.jpg" in warnings
+    assert "product-sketch.png" in warnings
+    assert "board-objectives-text-pdf.pdf" not in warnings
+    assert result["sourceExtraction"]["skippedSourceCount"] == 5
+    assert result["llmCallCount"] == 0
+
+
+def test_portfolio_long_content_zip_fixture_matches_embedded_expectations(
+    tmp_path: Path,
+) -> None:
+    fixture_zip = Path(__file__).with_name("intake-test-2.zip")
+    with ZipFile(fixture_zip) as archive:
+        archive.extractall(tmp_path)
+
+    fixture_root = tmp_path / "sdk-long-content-test-materials"
+    assertions = json.loads(
+        (
+            fixture_root
+            / "expected-output-checks"
+            / "suggested_assertions.json"
+        ).read_text(encoding="utf-8")
+    )
+
+    result = inspect_portfolio_intake(
+        objectives=fixture_root / "sources" / "objectives",
+        use_cases=fixture_root / "sources" / "use-cases",
+        signals=fixture_root / "sources" / "signals",
+        products=fixture_root / "sources" / "products",
+    )
+
+    sources = result["sources"]
+    assert isinstance(sources, list)
+    source_by_name = {Path(str(source["path"])).name: source for source in sources}
+    lanes = {str(source["lane"]) for source in sources}
+
+    assert result["llmCallCount"] == 0
+    assert result["sourceExtraction"]["skippedSourceCount"] == 0
+    assert result["sourceBudget"]["method"] == "deterministic-chunk-budget"
+    assert result["sourceBudget"]["estimatedInputChars"] > 200000
+    assert result["sourceBudget"]["chunkCount"] > result["sourceBudget"][
+        "includedChunkCount"
+    ]
+    assert result["sourceBudget"]["omittedChunkCount"] > 0
+    assert result["sourceBudget"]["reducedSourceCount"] > 0
+    assert result["sourcePrivacy"]["enabled"] is True
+    assert result["sourcePrivacy"]["replacementCounts"]["email"] > 0
+    assert "Personal data obfuscation is best effort" in "\n".join(
+        str(item) for item in result["warnings"]
+    )
+
+    assert {"objectives", "useCases", "signals", "products"}.issubset(lanes)
+    assert "lose_lane_assignment" in assertions["must_not"]
+    assert "drop_source_path_metadata" in assertions["must_not"]
+    assert all(source["path"] for source in sources)
+
+    long_strategy = source_by_name["long-strategy-document-with-headings.docx"]
+    assert long_strategy["sourceType"] == "docx"
+    assert long_strategy["detectionMethod"] == "ooxml-container"
+    assert long_strategy["chunkCount"] > long_strategy["includedChunkCount"]
+    assert long_strategy["omittedChunkCount"] > 0
+    assert long_strategy["status"] == "reduced"
+
+    email_thread = source_by_name["long-email-thread-with-quoted-history.eml"]
+    assert email_thread["sourceType"] == "eml"
+    assert email_thread["detectionMethod"] == "rfc822-headers"
+    assert email_thread["chunkCount"] > email_thread["includedChunkCount"]
+    assert email_thread["omittedChunkCount"] > 0
+
+    transcript = source_by_name["very-long-teams-transcript.txt"]
+    assert transcript["sourceType"] == "txt"
+    assert transcript["detectionMethod"] == "extension"
+    assert transcript["chunkCount"] > 1
+
+    many_small_notes = [
+        source
+        for source in sources
+        if Path(str(source["path"])).name.startswith("use-case-note-")
+    ]
+    assert len(many_small_notes) == 40
+    assert all(source["status"] == "included" for source in many_small_notes)
+
+
+def test_portfolio_edge_case_zip_fixture_matches_embedded_expectations(
+    tmp_path: Path,
+) -> None:
+    fixture_zip = Path(__file__).with_name("intake-test-3.zip")
+    with ZipFile(fixture_zip) as archive:
+        archive.extractall(tmp_path)
+
+    fixture_root = tmp_path / "sdk-edge-case-test-materials"
+    assertions = json.loads(
+        (
+            fixture_root
+            / "expected-output-checks"
+            / "suggested_assertions.json"
+        ).read_text(encoding="utf-8")
+    )
+
+    result = inspect_portfolio_intake(
+        objectives=fixture_root / "sources" / "objectives",
+        use_cases=fixture_root / "sources" / "use-cases",
+        signals=fixture_root / "sources" / "signals",
+        products=fixture_root / "sources" / "products",
+    )
+
+    sources = result["sources"]
+    assert isinstance(sources, list)
+    source_by_name = {Path(str(source["path"])).name: source for source in sources}
+    warnings = "\n".join(str(item) for item in result["warnings"])
+    skipped_sources = result["sourceExtraction"]["skippedSources"]
+    skipped_by_name = {
+        Path(str(source["path"])).name: source for source in skipped_sources
+    }
+
+    assert result["llmCallCount"] == 0
+    assert result["sourceExtraction"]["skippedSourceCount"] == 7
+    assert "All warnings appear in default --json output." in assertions[
+        "high_value_assertions"
+    ]
+    assert all(source["path"] for source in skipped_sources)
+    assert all(source["warning"] for source in skipped_sources)
+
+    latin1 = source_by_name["latin1-customer-objective.txt"]
+    assert "Café objective" in latin1["preview"]
+    assert latin1["status"] == "included"
+
+    bom = source_by_name["UTF8-BOM-strategy-notes.md"]
+    assert not bom["preview"].startswith("\ufeff")
+
+    control_chars = source_by_name["control-chars.txt"]
+    assert "\x00" not in control_chars["preview"]
+    assert "\x07" not in control_chars["preview"]
+
+    multilingual = source_by_name["arabic-vietnamese-finnish.md"]
+    assert "تحسين جودة الخدمات الحكومية" in multilingual["preview"]
+    assert "Nâng cao khả năng phát hiện nhu cầu dữ liệu" in multilingual["preview"]
+    assert "Päätöksenteko tarvitsee parempaa tilannekuvaa" in multilingual["preview"]
+
+    assert source_by_name["duplicate-content.md"]["lane"] == "products"
+    assert any(
+        source["lane"] == "objectives"
+        for source in sources
+        if Path(str(source["path"])).name == "duplicate-content.md"
+    )
+    assert "nested-product-note.md" in source_by_name
+    assert source_by_name["nested-product-note.md"]["lane"] == "products"
+
+    semicolon_csv = source_by_name["semicolon-latin1.csv"]
+    assert "Columns: kpi, description, owner" in semicolon_csv["preview"]
+
+    assert "corrupt-office-container.docx" in skipped_by_name
+    assert "corrupt-workbook.xlsx" in skipped_by_name
+    assert "corrupt-presentation.pptx" in skipped_by_name
+    assert "realistic-outlook-placeholder.msg" in skipped_by_name
+    assert "image-only-signal.pdf" in skipped_by_name
+    assert "password-protected.pdf" in skipped_by_name
+    assert "zero-byte.pdf" in skipped_by_name
+    assert "pdf-bytes-named-docx.docx" not in skipped_by_name
+    assert source_by_name["pdf-bytes-named-docx.docx"]["sourceType"] == "pdf"
+    assert source_by_name["pdf-bytes-named-docx.docx"][
+        "detectionMethod"
+    ] == "pdf-header"
+
+    hidden_sensitive_text = "hidden sensitive"
+    combined_preview = "\n".join(str(source["preview"]) for source in sources)
+    assert hidden_sensitive_text not in combined_preview.lower()
+    assert "HEADER SHOULD NOT BE EXTRACTED" not in combined_preview
+    assert "FOOTER SHOULD NOT BE EXTRACTED" not in combined_preview
+    assert "ATTACHMENT SHOULD NOT BE EXTRACTED" not in combined_preview
+    assert "OCR_ONLY_SLIDE_TEXT" not in combined_preview
+    assert "Skipped" in warnings
 
 
 def test_portfolio_source_helpers_extract_csv_as_one_source_record(
@@ -2208,12 +2551,14 @@ def test_build_portfolio_creates_workspace_artifacts_from_source_lanes(
 
 def test_build_portfolio_reports_skipped_msg_sources_without_counting_warning_lane(
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     sources = tmp_path / "sources"
     workspace = tmp_path / "generated" / "portfolio"
     write_source_lanes(sources)
     msg_path = sources / "use-cases" / "outlook-request.msg"
     msg_path.write_bytes(b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1fake-msg")
+    monkeypatch.setitem(sys.modules, "extract_msg", None)
 
     result = build_portfolio(
         workspace,

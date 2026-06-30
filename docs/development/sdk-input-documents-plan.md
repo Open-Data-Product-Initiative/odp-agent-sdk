@@ -1,9 +1,9 @@
 # SDK Input Documents Expansion Plan
 
-This plan describes how the SDK could expand from text-oriented source lanes to
-broader business document inputs such as PowerPoint decks, PDFs, Word
-documents, spreadsheets, screenshots, exported catalog records, saved emails,
-and pasted business notes.
+This note records the portfolio source-document intake plan and the implemented
+base behavior. The SDK has expanded from text-oriented source lanes to common
+business document inputs such as PowerPoint decks, text PDFs, Word documents,
+spreadsheets, saved emails, and pasted business notes.
 
 The immediate driver is the Maysano / SDK adoption motion: a customer may have
 useful material for a data product portfolio, but that material is often in
@@ -13,25 +13,27 @@ Markdown files.
 
 ## Current Boundary
 
-The SDK currently supports generation and portfolio workflows from text-like
-source files.
+The SDK currently supports `open-data-products generate` from text-like source
+files and portfolio workflows from mixed source-lane documents.
 
 Observed CLI behavior:
 
 - `open-data-products generate` accepts a Markdown/text source file or folder.
 - `open-data-products portfolio build` accepts source lanes for objectives,
   use cases, signals, and products.
+- `open-data-products portfolio intake --json` inspects portfolio source
+  extraction, warning-only files, privacy masking, and prompt budget metadata
+  without making an LLM call.
 
-The portfolio development notes define accepted source suffixes as:
+Portfolio source lanes accept:
 
 ```text
-.md, .txt, .yaml, .yml, .json
+.md, .txt, .yaml, .yml, .json, .eml, .docx, .pptx, .pdf, .csv, .xlsx
 ```
 
-That means PowerPoint, Outlook email, Word, PDF, spreadsheet, and image files
-are not currently direct lane inputs. Any sales, workshop, or Maysano
-onboarding language should say that these files need planned SDK support before
-they can be dropped into source lane folders directly.
+Outlook `.msg` files and image files (`.png`, `.jpg`, `.jpeg`) are detected in
+portfolio lanes but skipped with warnings. Scanned or image-only PDFs also warn
+because OCR and vision extraction are not enabled in the base SDK.
 
 ## Goal
 
@@ -76,7 +78,7 @@ open-data-products portfolio build \
 Those folders may contain a mixed set of supported source files:
 
 ```text
-inputs/
+sources/
   objectives/
     strategy-priorities.pptx
     quarterly-objectives.md
@@ -174,23 +176,27 @@ validation.
 
 ## Supported Inputs
 
-### Phase 1: Text, Word, Transcript Text, Outlook Email, And PowerPoint
+### Implemented Portfolio Lane Inputs
 
-Start with:
+Portfolio lane intake currently supports:
 
 - `.md`
 - `.txt`
+- `.yaml`
+- `.yml`
+- `.json`
 - `.docx`
 - `.eml`
-- `.msg`
 - `.pptx`
+- `.pdf` with embedded text
+- `.xlsx`
+- `.csv`
 
-Email should be in the first implementation phase because many data product
-ideas start as client-provider exchanges: a customer asks for data, a provider
-responds with feasibility or constraints, and the useful product shape emerges
-through the thread.
+Email is included because many data product ideas start as client-provider
+exchanges: a customer asks for data, a provider responds with feasibility or
+constraints, and the useful product shape emerges through the thread.
 
-PowerPoint support should extract:
+PowerPoint support extracts:
 
 - slide title
 - visible text boxes
@@ -198,17 +204,17 @@ PowerPoint support should extract:
 - table text
 - slide number and deck filename as metadata
 
-PowerPoint decks should remain one business source record in v1. The extractor
-may preserve slide boundaries inside that record, for example with `Slide 1:`
-markers, but it should not split one deck into multiple lane sources by
-default. The lane folder communicates the deck's business role: one deck can be
-one signal, one product need, one objective input, or similar.
+PowerPoint decks remain one business source record. The extractor preserves
+slide boundaries inside that record with `Slide 1:` markers, but it does not
+split one deck into multiple lane sources by default. The lane folder
+communicates the deck's business role: one deck can be one signal, one product
+need, one objective input, or similar.
 
 PowerPoint support should not extract speaker notes by default in v1 and should
 not attempt to interpret images in v1. Speaker-note extraction and OCR can be
 later optional capabilities.
 
-Word support should be conservative but included in v1. It should extract:
+Word support is conservative. It extracts:
 
 - headings
 - paragraphs
@@ -221,37 +227,25 @@ headers, footers, or images by default in v1. The goal is to capture useful
 business text from requirements, proposals, meeting notes, and workshop
 summaries, not to reproduce the full Word document.
 
-Teams and meeting transcripts should be supported in v1 when they are already
-text documents, such as `.txt`, `.docx`, or pasted Markdown. The SDK should
-not process audio or video recordings in v1. Transcript handling should focus
-on speaker turns, decisions, questions, requirements, candidate use cases, and
-follow-up actions.
+Teams and meeting transcripts are supported when they are already text
+documents, such as `.txt`, `.docx`, or pasted Markdown. The SDK does not process
+audio or video recordings. Transcript handling should focus on speaker turns,
+decisions, questions, requirements, candidate use cases, and follow-up actions.
 
 Email support should be oriented toward saved business requests, stakeholder
 needs, meeting follow-ups, decision notes, and product ideas. The extractor
 should create one normalized source record per message or thread, with minimal
 metadata and the sanitized message body.
 
-`.eml` can be handled with Python standard library email parsing. Outlook
-`.msg` must also be supported in v1 because many customers will save or forward
-business conversations directly from Outlook. The implementation should treat
-`.msg` as a required v1 capability, but keep its parser dependency optional so
-the base SDK stays lightweight. If the dependency is missing, the command
-should skip the affected `.msg` file, add a clear install-guidance warning to
-the normal command log and `--json` output, and continue processing the
-remaining lane sources. It must not silently skip Outlook files.
+`.eml` is handled with Python standard library email parsing. Outlook `.msg`
+is handled through the optional `open-data-products[email]` extra. Without the
+extra, or when parsing fails, the command skips the affected file, adds a clear
+warning to the normal command log and `--json` output, and continues processing
+the remaining lane sources. It must not silently skip Outlook files.
 
 Email extraction should not include attachments by default. Attachments can be
 listed in the extraction report and processed separately only when explicitly
 enabled.
-
-### Phase 2: Spreadsheet And Text PDF
-
-Add:
-
-- `.pdf`
-- `.xlsx`
-- `.csv`
 
 PDF support should be conservative. It should first support text PDFs where
 embedded text can be extracted deterministically. If pages appear image-only or
@@ -261,12 +255,9 @@ Excel and CSV support should be oriented toward notes, inventory lists,
 catalogs, KPI lists, and product/request tables. The extractor should create
 row summaries instead of dumping large sheets wholesale.
 
-Word `.docx` and Outlook `.msg` remain part of v1, not Phase 2. Phase 2 should
-only expand beyond the mandatory Word, email, and PowerPoint onboarding path.
+### Warning-Only Image Inputs
 
-### Phase 3: Screenshots And Image Documents
-
-Add:
+The SDK detects:
 
 - `.png`
 - `.jpg`
@@ -278,18 +269,19 @@ from text documents. They require OCR or a vision-capable model to produce
 usable text. The SDK should not silently pass image bytes into ordinary text
 generation prompts.
 
-Recommended first behavior:
+Implemented first behavior:
 
 1. Detect image files in lane folders.
 2. Return a clear warning if OCR/vision support is not enabled.
-3. When enabled, extract visible text into normalized source records.
+3. When enabled later, extract visible text into normalized source records.
 4. Preserve source metadata, image dimensions, and extraction method.
 5. Warn that OCR and vision extraction can miss, distort, or over-interpret
    visual content.
 
-Initial image support should focus on screenshots of slides, whiteboards,
+Future image extraction should focus on screenshots of slides, whiteboards,
 tables, product notes, dashboards, or catalog pages. It should not attempt to
-interpret complex charts beyond extracting visible labels and text in v1.
+interpret complex charts beyond extracting visible labels and text without
+explicit user control.
 
 ### Phase 4: Enterprise Exports
 
@@ -650,17 +642,18 @@ PowerPoint and Word extraction likely need optional dependencies:
 - `python-pptx` for `.pptx`
 - `python-docx` for `.docx`
 
-Email extraction should include both standard email files and Outlook messages:
+Email extraction includes standard email files and optional Outlook messages:
 
 - `email` from the Python standard library for `.eml`
-- `extract-msg` or equivalent for Outlook `.msg`
+- `extract-msg` through `open-data-products[email]` for Outlook `.msg`
 
-PDF and spreadsheet support may need optional extras later:
+PDF and spreadsheet support use lightweight built-in extraction today. Optional
+dependencies can improve fidelity later:
 
-- `pypdf` or equivalent for text PDF extraction
 - existing standard library `csv` for `.csv`
-- `openpyxl` for `.xlsx`
-- `Pillow` for basic image inspection
+- optional `pypdf` or equivalent for richer text PDF extraction
+- optional `openpyxl` for richer `.xlsx` extraction
+- optional `Pillow` for basic image inspection
 - `pytesseract` or equivalent OCR tooling for local screenshot text extraction
 - optional hosted/local vision-model support for image descriptions, if the
   user explicitly enables a provider
@@ -699,15 +692,11 @@ Add focused tests before implementation:
 - `.docx` extraction writes headings, paragraphs, list items, and table text.
 - `.docx` extraction does not include comments, tracked changes, embedded
   files, headers, footers, or images by default.
-- `.docx` extraction reports a missing optional dependency when the document
-  extra is not installed.
 - unsupported file suffixes produce a clear error or warning.
 - `.eml` extraction writes message body text and minimal metadata.
-- `.msg` extraction writes Outlook message body text and minimal metadata when
-  the Outlook parser dependency is installed.
-- `.msg` extraction reports a missing optional dependency in the normal log and
-  `--json` output, skips the affected `.msg` file, and continues processing
-  remaining lane sources when the email extra is not installed.
+- `.msg` extraction uses `open-data-products[email]`; missing optional support
+  or parse failures are reported in the normal log and `--json` output while
+  remaining lane sources continue processing.
 - email attachments are not extracted by default.
 - email extraction warns when quoted history cannot be confidently trimmed.
 - `.png`, `.jpg`, and `.jpeg` files in lane folders produce a clear warning
@@ -743,8 +732,8 @@ Add focused tests before implementation:
 - lane folder inputs preserve lane assignment.
 - extraction reports are deterministic and JSON-serializable.
 - portfolio build can consume mixed source folders containing `.md`, `.txt`,
-  `.docx`, `.pptx`, `.eml`, `.msg`, `.pdf`, `.png`, `.jpg`, and other
-  supported formats.
+  `.docx`, `.pptx`, `.eml`, `.msg`, `.pdf`, `.csv`, `.xlsx`, and warning-only
+  `.png`, `.jpg`, and `.jpeg` files.
 
 Test fixtures should use small generated files under `tmp_path`, not real
 customer documents.
@@ -761,21 +750,21 @@ If implemented, update:
 - Maysano / SDK analysis wording so it can say which document formats are
   directly supported in source folders and which still require pre-processing.
 
-## Suggested Roadmap
+## Implemented Sequence And Remaining Roadmap
 
 ### Step 1: Shared Source Loader
 
-Create one shared source loading API used by portfolio and generation
-workflows. It should preserve current behavior for `.md`, `.txt`, `.yaml`,
-`.yml`, and `.json` before adding new formats.
+Created one shared source loading API used by portfolio workflows. It preserves
+current behavior for `.md`, `.txt`, `.yaml`, `.yml`, and `.json` and adds
+portfolio-lane document formats.
 
-The source loader should include file type detection from content signatures,
-container inspection, parser probes, and optional sidecar metadata before any
-format-specific extractor runs.
+The source loader includes file type detection from content signatures,
+container inspection, and extension fallback before format-specific extraction
+runs.
 
 ### Step 2: PowerPoint In Lane Folders
 
-Build a minimal `.pptx` extractor that turns visible slide text into one
+Built a minimal `.pptx` extractor that turns visible slide text into one
 normalized source record per deck. Preserve slide boundaries inside the record,
 but do not split the deck into multiple lane sources by default. No OCR, no
 images, no hidden slides, no speaker notes by default. Lane assignment comes
@@ -784,7 +773,7 @@ from the folder passed to `--objectives`, `--use-cases`, `--signals`, or
 
 ### Step 3: Word Documents In Lane Folders
 
-Build a conservative `.docx` extractor that turns headings, paragraphs, lists,
+Built a conservative `.docx` extractor that turns headings, paragraphs, lists,
 and table text into normalized source records. Do not extract comments, tracked
 changes, embedded files, headers, footers, or images by default. Lane assignment
 comes from the folder passed to `--objectives`, `--use-cases`, `--signals`, or
@@ -795,30 +784,32 @@ notes, and meeting summaries are often stored in Word documents.
 
 ### Step 4: Text Meeting Transcripts In Lane Folders
 
-Support transcript text when it is already available as `.txt`, `.docx`, or
+Supported transcript text when it is already available as `.txt`, `.docx`, or
 Markdown. Extract speaker turns, decisions, questions, requirements, candidate
 use cases, and follow-up actions when those cues are visible in the text. Do
-not support audio or video ingestion in v1.
+not support audio or video ingestion.
 
 This is part of v1 because Teams transcripts can capture the same early
 customer-provider product discovery material as email threads and workshop
 documents, without requiring media processing.
 
-### Step 5: Email Threads And Outlook Messages In Lane Folders
+### Step 5: Email Threads And Outlook Message Warnings In Lane Folders
 
-Build `.eml` and Outlook `.msg` extraction into the same source loader. Extract
-subject, sent date, minimal message metadata, and the selected message body. Do
-not extract attachments, full recipient lists, or complete reply chains by
-default. Preserve warnings when reply-chain trimming is uncertain.
+Built `.eml` extraction and Outlook `.msg` warning handling into the same source
+loader. `.eml` extraction records subject, sent date, minimal message metadata,
+and the selected message body. It does not extract attachments, full recipient
+lists, or complete reply chains by default.
 
 This is part of v1 because email is often the first place where client needs,
 provider constraints, candidate data products, and follow-up questions appear.
-Outlook `.msg` is mandatory for v1 because customer-provided material is likely
-to come from Outlook, not only standards-based `.eml` exports.
+Outlook `.msg` is detected and, when `open-data-products[email]` is installed,
+extracted as message evidence. Without the extra or when parsing fails, it is
+skipped with guidance so customer files are visible in reports instead of being
+silently ignored.
 
 ### Step 6: Report Extraction Details
 
-Add default `--json` fields that show which source files were extracted, which
+Added default `--json` fields that show which source files were extracted, which
 units were skipped, and which warnings require review. Do not add a separate
 source-extraction report flag in v1.
 
@@ -835,18 +826,17 @@ open-data-products portfolio build \
 
 ### Step 7: Add Source Size And Context Control
 
-Add deterministic chunking, source size estimates, and lane-level reduction
+Added deterministic chunking, source size estimates, and lane-level reduction
 before any LLM-backed generation step. Long Word documents, Teams transcripts,
 slide decks, and email threads should never be silently truncated. The command
 should report chunk counts, omitted content, reduction method, and warnings.
-Use deterministic reduction only in v1. Expose a portfolio API and CLI
-`context_format` setting that defaults to Markdown/plain text. GCF and TOON
-renderers should use the same setting when implemented, but only after
-extraction, obfuscation, chunking, and deterministic reduction.
+Use deterministic reduction only in v1. GCF and TOON renderers can be evaluated
+later, but only after extraction, obfuscation, chunking, and deterministic
+reduction.
 
 ### Step 8: Add Personal Data Obfuscation
 
-Add `obfuscate_personal_data` and run it automatically for LLM-backed portfolio
+Added `obfuscate_personal_data` and run it automatically for LLM-backed portfolio
 document intake by default. Add a `portfolio.privacy.obfuscatePersonalData`
 setting in `generation.config.yaml` so the behavior can be switched off for
 local-only or controlled environments. The function should mask clear personal
@@ -856,15 +846,14 @@ chunking/reduction.
 
 ### Step 9: Add More Formats
 
-Add text `.pdf`, `.xlsx`, and `.csv` after the v1 lane workflow is stable.
-`.docx` and `.msg` should already be covered by the v1 document and email lane
-support, even if they use optional parser dependencies.
+Added text `.pdf`, `.xlsx`, and `.csv` support to portfolio lanes. `.msg`
+extraction is available through the optional `open-data-products[email]` extra.
 
 ### Step 10: Add Screenshots And Image PDFs
 
-Add `.png`, `.jpg`, `.jpeg`, and image-only PDF support after the text-document
-path is stable. Start with detection and clear warnings. Add OCR or
-vision-model extraction only behind explicit optional dependencies and config.
+Added `.png`, `.jpg`, `.jpeg`, and image-only PDF detection with clear warnings.
+Add OCR or vision-model extraction later only behind explicit optional
+dependencies and config.
 
 ### Step 11: Optional LLM-Assisted Classification
 
@@ -881,10 +870,10 @@ core workflow, folder placement remains the classification mechanism.
 - Should speaker notes be opt-in per file, per command, or per config?
 - Should email reply-chain trimming be enabled by default, or should the SDK
   preserve the full visible body and warn the user to review it?
-- Should `.msg` support be included in the general documents extra, kept in a
-  separate email extra, or included in both through a meta-extra?
-- Which Outlook `.msg` parser is acceptable for license, maintenance, and
-  cross-platform reliability?
+- Which optional Outlook `.msg` parser is acceptable for license, maintenance,
+  and cross-platform reliability?
+- Should `.msg` extraction live in a general documents extra, a separate email
+  extra, or both through a meta-extra?
 - Should screenshot support rely first on local OCR, hosted vision models, or
   both?
 - Should image extraction be disabled by default even when optional
@@ -928,12 +917,14 @@ user.
 
 Do not add a separate required ingestion command for the main workflow.
 
-The first useful version should let users drop Word `.docx` files, `.eml`
-email files, Outlook `.msg` files, Teams transcript text, and PowerPoint
-`.pptx` files into existing portfolio source folders and have the SDK detect
-and extract the useful text internally. That is enough to support the Maysano
-prospect-meeting story while preserving the simple user model: put source
-material in the right lane folder, then run the normal SDK workflow.
+The first useful version lets users drop Word `.docx` files, `.eml` email
+files, Teams transcript text, PowerPoint `.pptx` files, text PDFs, CSV files,
+and spreadsheets into existing portfolio source folders and have the SDK detect
+and extract the useful text internally. Outlook `.msg` files are detected and
+reported with install guidance instead of silently ignored. That is enough to
+support the Maysano prospect-meeting story while preserving the simple user
+model: put source material in the right lane folder, then run the normal SDK
+workflow.
 
 Screenshots, PNG/JPG files, and scanned PDFs should be planned, but they should
 not be the first implementation target unless the onboarding workflow depends

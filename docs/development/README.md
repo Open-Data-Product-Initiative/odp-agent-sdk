@@ -25,6 +25,12 @@ Use these pages when changing complex SDK behavior:
 - [ODPG graph development](odpg-graph.md): graph construction,
   validation, traversal, analysis, context extraction, and graph explorer
   generation.
+- [Portfolio development](portfolio.md): portfolio source lanes, document
+  intake, prompt budget gates, workspace orchestration, renderer, localization,
+  validation, and tests.
+- [SDK input documents plan](sdk-input-documents-plan.md): implemented
+  portfolio document formats, optional Outlook support, warning-only source
+  classes, and future intake adapters.
 - [MCP development](mcp.md): MCP tool registry, safe-class policy,
   stdio server behavior, ARWS manifest generation, and tests.
 - [SDK activity logging plan](sdk-activity-logging-plan.md): fixed-format

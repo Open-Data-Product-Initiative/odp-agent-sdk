@@ -354,7 +354,7 @@ GraphML, GraphSON, RDF/Turtle, OpenCypher, GQL, and Gremlin.
 ## Portfolio Workspaces
 
 Developer implementation notes for this workflow live in
-[`portfolio-development.md`](../development/portfolio.md).
+[`portfolio.md`](../development/portfolio.md).
 
 ```bash
 open-data-products portfolio build \
@@ -386,6 +386,31 @@ that title in `portfolio-state.yaml` and reuses it on reruns so the page title,
 catalog name, and graph name do not drift with LLM output.
 Use `--strict-validation` when a failing schema check should make the command
 return a non-zero exit code, for example in CI.
+
+Portfolio source lanes accept `.md`, `.txt`, `.yaml`, `.yml`, `.json`, `.eml`,
+`.docx`, `.pptx`, `.pdf`, `.csv`, and `.xlsx` files. Outlook `.msg` extraction
+is available when the SDK is installed with `open-data-products[email]`;
+otherwise `.msg` files are detected and skipped with install guidance. Image
+files (`.png`, `.jpg`, `.jpeg`) are detected but skipped with warnings because
+OCR and vision extraction are not enabled in the base SDK. Text PDFs are
+extracted from embedded text; scanned or image-only PDFs return a warning.
+
+Use `portfolio intake` to inspect source extraction, prompt budgets, privacy
+masking, lane counts, and warnings without making an LLM call:
+
+```bash
+open-data-products portfolio intake \
+  --objectives sources/objectives/ \
+  --use-cases sources/use-cases/ \
+  --signals sources/signals/ \
+  --products sources/products/ \
+  --config generation.config.yaml \
+  --json
+```
+
+See [Portfolio intake guide](portfolio-intake.md) for supported files, JSON
+fields, edge-case behavior, prompt budget reduction, privacy masking, and
+debugging steps.
 
 After the first build, the workspace can be rerun without repeating the source
 folder flags:
