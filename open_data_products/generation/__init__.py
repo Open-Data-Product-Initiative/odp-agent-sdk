@@ -33,6 +33,7 @@ from .models import (
     GenerationTask,
     ModelClient,
     PathLike,
+    PortfolioPrivacySettings,
     PortfolioSourceBudget,
 )
 from .prompts import (
@@ -851,32 +852,45 @@ def _validate_portfolio_config(value: object, errors: List[str]) -> None:
     if not isinstance(value, dict):
         errors.append("portfolio must be a mapping")
         return
-    allowed_portfolio = {"sourceBudget"}
+    allowed_portfolio = {"sourceBudget", "privacy"}
     for key in value:
         if key not in allowed_portfolio:
             errors.append(f"Unknown generation config key: portfolio.{key}")
     source_budget = value.get("sourceBudget")
-    if source_budget is None:
-        return
-    if not isinstance(source_budget, dict):
+    if source_budget is not None and not isinstance(source_budget, dict):
         errors.append("portfolio.sourceBudget must be a mapping")
+    elif isinstance(source_budget, dict):
+        allowed_budget = {"maxSourceChars", "maxPromptChars"}
+        for key in source_budget:
+            if key not in allowed_budget:
+                errors.append(
+                    f"Unknown generation config key: portfolio.sourceBudget.{key}"
+                )
+        _validate_optional_positive_int(
+            source_budget,
+            "maxSourceChars",
+            "portfolio.sourceBudget.maxSourceChars",
+            errors,
+        )
+        _validate_optional_positive_int(
+            source_budget,
+            "maxPromptChars",
+            "portfolio.sourceBudget.maxPromptChars",
+            errors,
+        )
+    privacy = value.get("privacy")
+    if privacy is None:
         return
-    allowed_budget = {"maxSourceChars", "maxPromptChars"}
-    for key in source_budget:
-        if key not in allowed_budget:
-            errors.append(f"Unknown generation config key: portfolio.sourceBudget.{key}")
-    _validate_optional_positive_int(
-        source_budget,
-        "maxSourceChars",
-        "portfolio.sourceBudget.maxSourceChars",
-        errors,
-    )
-    _validate_optional_positive_int(
-        source_budget,
-        "maxPromptChars",
-        "portfolio.sourceBudget.maxPromptChars",
-        errors,
-    )
+    if not isinstance(privacy, dict):
+        errors.append("portfolio.privacy must be a mapping")
+        return
+    allowed_privacy = {"obfuscatePersonalData"}
+    for key in privacy:
+        if key not in allowed_privacy:
+            errors.append(f"Unknown generation config key: portfolio.privacy.{key}")
+    obfuscate = privacy.get("obfuscatePersonalData")
+    if obfuscate is not None and not isinstance(obfuscate, bool):
+        errors.append("portfolio.privacy.obfuscatePersonalData must be a boolean")
 
 
 def _has_configured_model(
@@ -1004,6 +1018,11 @@ def _generation_settings_dict(settings: GenerationSettings) -> Dict[str, Any]:
             "max_source_chars": settings.portfolio_source_budget.max_source_chars,
             "max_prompt_chars": settings.portfolio_source_budget.max_prompt_chars,
         },
+        "portfolio_privacy": {
+            "obfuscate_personal_data": (
+                settings.portfolio_privacy.obfuscate_personal_data
+            ),
+        },
     }
 
 
@@ -1056,6 +1075,7 @@ def resolve_generation_settings(
     resolved_prompts = prompt_dir or config.get("prompts")
     resolved_prompt_path = str(resolved_prompts) if resolved_prompts else None
     portfolio_source_budget = _resolve_portfolio_source_budget(config)
+    portfolio_privacy = _resolve_portfolio_privacy(config)
     api_version = None
     max_tokens = None
     model_path = None
@@ -1139,6 +1159,7 @@ def resolve_generation_settings(
         gpu_layers=gpu_layers,
         prompt_path=resolved_prompt_path,
         portfolio_source_budget=portfolio_source_budget,
+        portfolio_privacy=portfolio_privacy,
     )
 
 
@@ -1161,6 +1182,20 @@ def _resolve_portfolio_source_budget(config: Dict[str, Any]) -> PortfolioSourceB
             if isinstance(max_prompt_chars, int) and max_prompt_chars > 0
             else default.max_prompt_chars
         ),
+    )
+
+
+def _resolve_portfolio_privacy(config: Dict[str, Any]) -> PortfolioPrivacySettings:
+    portfolio = config.get("portfolio")
+    portfolio = portfolio if isinstance(portfolio, dict) else {}
+    privacy = portfolio.get("privacy")
+    privacy = privacy if isinstance(privacy, dict) else {}
+    default = PortfolioPrivacySettings()
+    obfuscate = privacy.get("obfuscatePersonalData")
+    return PortfolioPrivacySettings(
+        obfuscate_personal_data=(
+            obfuscate if isinstance(obfuscate, bool) else default.obfuscate_personal_data
+        )
     )
 
 
@@ -2747,6 +2782,7 @@ __all__ = [
     "GeneratedArtifact",
     "GenerationSettings",
     "GenerationTask",
+    "PortfolioPrivacySettings",
     "PortfolioSourceBudget",
     "anthropic_generate",
     "copy_config_template",

@@ -811,12 +811,14 @@ recipe:
         model="",
         all_sources=False,
         source_budget=None,
+        source_privacy=None,
     ):
         assert workspace_path == workspace
         assert client == "fake-client"
         assert model == "test-model"
         assert all_sources is True
         assert source_budget is not None
+        assert source_privacy is not None
         return {
             "kind": "PortfolioRefresh",
             "valid": True,
@@ -916,6 +918,7 @@ recipe:
         model="",
         context_format="markdown",
         source_budget=None,
+        source_privacy=None,
     ):
         assert workspace_path == workspace
         assert objectives == source_root / "objectives"
@@ -926,6 +929,7 @@ recipe:
         assert model == "test-model"
         assert context_format == "markdown"
         assert source_budget is not None
+        assert source_privacy is not None
         return {
             "kind": "PortfolioBuild",
             "valid": True,

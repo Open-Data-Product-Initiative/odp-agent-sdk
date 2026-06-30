@@ -10,6 +10,7 @@ from jsonschema import Draft202012Validator
 
 from open_data_products._io import load_mapping
 from open_data_products.cli import main
+from open_data_products import obfuscate_personal_data
 from open_data_products.portfolio import (
     _chunk_localization_strings,
     _reduce_source_lanes_for_prompt,
@@ -24,7 +25,10 @@ from open_data_products.portfolio import (
     render_portfolio,
     sync_portfolio,
 )
-from open_data_products.generation.models import PortfolioSourceBudget
+from open_data_products.generation.models import (
+    PortfolioPrivacySettings,
+    PortfolioSourceBudget,
+)
 
 PORTFOLIO_PLAN_YAML = """
 metadata:
@@ -839,6 +843,32 @@ def write_source_lanes(root: Path) -> None:
     )
 
 
+def _write_minimal_text_pdf(path: Path, lines: list) -> None:
+    """Write a tiny PDF-like fixture with embedded text stream operators."""
+    escaped_lines = [
+        str(line).replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
+        for line in lines
+    ]
+    text_operators = "\n".join(
+        f"({line}) Tj" for line in escaped_lines
+    )
+    content = f"BT\n/F1 12 Tf\n72 720 Td\n{text_operators}\nET\n"
+    payload = "\n".join(
+        [
+            "%PDF-1.4",
+            "1 0 obj",
+            f"<< /Length {len(content.encode('latin-1'))} >>",
+            "stream",
+            content,
+            "endstream",
+            "endobj",
+            "%%EOF",
+            "",
+        ]
+    )
+    path.write_bytes(payload.encode("latin-1"))
+
+
 def write_customer_product_spec(workspace: Path) -> Path:
     """Write an ODPS product spec linked by the staged product reference."""
     product_path = workspace / "odps" / "products" / "customer-product.yaml"
@@ -1127,6 +1157,88 @@ def test_portfolio_source_helpers_detect_ooxml_from_container(
     assert "Weekly segment reporting" in lanes["products"][0]["text"]
     assert "Slide 2:" in lanes["products"][0]["text"]
     assert "Renewal risk signal" in lanes["products"][0]["text"]
+
+
+def test_portfolio_source_helpers_extract_text_pdf(
+    tmp_path: Path,
+) -> None:
+    from open_data_products.portfolio_sources import collect_source_lanes
+
+    sources = tmp_path / "sources"
+    (sources / "objectives").mkdir(parents=True)
+    pdf_path = sources / "objectives" / "strategy.pdf"
+    _write_minimal_text_pdf(
+        pdf_path,
+        ["Improve retention", "Prioritize churn reporting"],
+    )
+
+    lanes = collect_source_lanes(
+        objectives=sources / "objectives",
+        use_cases=None,
+        signals=None,
+        products=None,
+    )
+
+    assert len(lanes["objectives"]) == 1
+    assert lanes["objectives"][0]["sourceType"] == "pdf"
+    assert lanes["objectives"][0]["sourceId"] == f"{pdf_path}#document-1"
+    assert lanes["objectives"][0]["sourceUnit"] == "document"
+    assert lanes["objectives"][0]["sourceUnitId"] == "1"
+    assert lanes["objectives"][0]["detectionMethod"] == "pdf-header"
+    assert "Improve retention" in lanes["objectives"][0]["text"]
+    assert "Prioritize churn reporting" in lanes["objectives"][0]["text"]
+
+
+def test_portfolio_source_helpers_warn_for_image_only_pdf(
+    tmp_path: Path,
+) -> None:
+    from open_data_products.portfolio_sources import (
+        collect_source_lanes,
+        source_extraction_warnings,
+    )
+
+    sources = tmp_path / "sources"
+    (sources / "signals").mkdir(parents=True)
+    pdf_path = sources / "signals" / "scan.pdf"
+    _write_minimal_text_pdf(pdf_path, [])
+
+    lanes = collect_source_lanes(
+        objectives=None,
+        use_cases=None,
+        signals=sources / "signals",
+        products=None,
+    )
+
+    assert lanes["signals"] == []
+    assert source_extraction_warnings(lanes) == [
+        (
+            f"Skipped PDF source {pdf_path}: no embedded text found; "
+            "OCR or vision extraction is not enabled."
+        )
+    ]
+
+
+def test_portfolio_source_helpers_detect_pdf_from_content_before_extension(
+    tmp_path: Path,
+) -> None:
+    from open_data_products.portfolio_sources import collect_source_lanes
+
+    sources = tmp_path / "sources"
+    (sources / "products").mkdir(parents=True)
+    pdf_path = sources / "products" / "product-brief.txt"
+    _write_minimal_text_pdf(pdf_path, ["Customer analytics product"])
+
+    lanes = collect_source_lanes(
+        objectives=None,
+        use_cases=None,
+        signals=None,
+        products=sources / "products",
+    )
+
+    assert len(lanes["products"]) == 1
+    assert lanes["products"][0]["sourceType"] == "pdf"
+    assert lanes["products"][0]["detectionMethod"] == "pdf-header"
+    assert "Customer analytics product" in lanes["products"][0]["text"]
 
 
 def _is_executive_summary_prompt(prompt: str) -> bool:
@@ -2192,6 +2304,109 @@ def test_build_portfolio_blocks_llm_call_when_rendered_prompt_exceeds_budget(
     assert "maxPromptChars=100" in str(excinfo.value)
 
 
+def test_obfuscate_personal_data_masks_emails_and_phone_numbers() -> None:
+    result = obfuscate_personal_data(
+        "Contact Ada at ada@example.com or +358 40 123 4567. "
+        "Email ada@example.com again if needed. Review 2026-06-30."
+    )
+
+    assert "ada@example.com" not in result["text"]
+    assert "+358 40 123 4567" not in result["text"]
+    assert result["text"].count("[EMAIL_1]") == 2
+    assert "[PHONE_1]" in result["text"]
+    assert "2026-06-30" in result["text"]
+    assert result["replacementCounts"] == {"email": 1, "phone": 1}
+    assert {
+        "type": "email",
+        "placeholder": "[EMAIL_1]",
+        "confidence": "high",
+    } in result["replacements"]
+    assert {
+        "type": "phone",
+        "placeholder": "[PHONE_1]",
+        "confidence": "high",
+    } in result["replacements"]
+
+
+def test_build_portfolio_obfuscates_personal_data_before_llm_calls(
+    tmp_path: Path,
+) -> None:
+    sources = tmp_path / "sources"
+    workspace = tmp_path / "generated" / "portfolio"
+    write_source_lanes(sources)
+    (sources / "use-cases" / "retention.md").write_text(
+        "Use case: Retention workflow\n"
+        "Contact ada@example.com or +358 40 123 4567 about weekly churn review.",
+        encoding="utf-8",
+    )
+    prompts = []
+
+    def client(prompt: str, model: str) -> str:
+        prompts.append(prompt)
+        return staged_portfolio_client(prompt, model)
+
+    result = build_portfolio(
+        workspace,
+        objectives=sources / "objectives",
+        use_cases=sources / "use-cases",
+        signals=sources / "signals",
+        products=sources / "products",
+        client=client,
+        model="test-model",
+    )
+
+    assert "ada@example.com" not in "\n".join(prompts)
+    assert "+358 40 123 4567" not in "\n".join(prompts)
+    assert "[EMAIL_1]" in prompts[1]
+    assert "[PHONE_1]" in prompts[1]
+    assert result["sourcePrivacy"]["enabled"] is True
+    assert result["sourcePrivacy"]["replacementCounts"] == {"email": 1, "phone": 1}
+    assert result["sourcePrivacy"]["sourceCount"] == 4
+    assert result["sourcePrivacy"]["warnings"] == [
+        "Personal data obfuscation is best effort; review before external LLM use."
+    ]
+
+
+def test_build_portfolio_can_disable_personal_data_obfuscation(
+    tmp_path: Path,
+) -> None:
+    sources = tmp_path / "sources"
+    workspace = tmp_path / "generated" / "portfolio"
+    write_source_lanes(sources)
+    (sources / "use-cases" / "retention.md").write_text(
+        "Use case: Retention workflow\n"
+        "Contact ada@example.com about weekly churn review.",
+        encoding="utf-8",
+    )
+    prompts = []
+
+    def client(prompt: str, model: str) -> str:
+        prompts.append(prompt)
+        return staged_portfolio_client(prompt, model)
+
+    result = build_portfolio(
+        workspace,
+        objectives=sources / "objectives",
+        use_cases=sources / "use-cases",
+        signals=sources / "signals",
+        products=sources / "products",
+        client=client,
+        model="test-model",
+        source_privacy=PortfolioPrivacySettings(obfuscate_personal_data=False),
+    )
+
+    assert "ada@example.com" in "\n".join(prompts)
+    assert result["sourcePrivacy"]["enabled"] is False
+    assert result["sourcePrivacy"]["replacementCounts"] == {}
+    assert result["sourcePrivacy"]["warnings"] == [
+        "Personal data obfuscation is disabled for portfolio document intake."
+    ]
+    assert (
+        "Personal data obfuscation is disabled for portfolio document intake."
+        in result["warnings"]
+    )
+
+
 def test_inspect_portfolio_intake_reports_extraction_and_budget(
     tmp_path: Path,
 ) -> None:
@@ -2669,6 +2884,111 @@ providers:
 
     assert captured["source_budget"].max_source_chars == 40
     assert captured["source_budget"].max_prompt_chars == 80
+
+
+def test_portfolio_cli_build_passes_configured_privacy_setting(
+    tmp_path: Path,
+    capsys,
+    monkeypatch,
+) -> None:
+    from open_data_products import generation, portfolio
+
+    config = tmp_path / "generation.config.yaml"
+    config.write_text(
+        """
+provider: ollama
+model: qwen2.5
+portfolio:
+  privacy:
+    obfuscatePersonalData: false
+providers:
+  ollama:
+    type: ollama
+    model: qwen2.5
+""",
+        encoding="utf-8",
+    )
+    captured = {}
+
+    def fake_build_portfolio(*args, **kwargs):
+        captured.update(kwargs)
+        return {
+            "spec": "portfolio",
+            "kind": "PortfolioBuild",
+            "workspace": str(tmp_path / "workspace"),
+            "html": str(tmp_path / "workspace" / "index.html"),
+            "validationResults": {},
+            "created": [],
+            "updated": [],
+            "unchanged": [],
+            "valid": True,
+        }
+
+    monkeypatch.setattr(generation, "create_generation_client", lambda settings: None)
+    monkeypatch.setattr(portfolio, "build_portfolio", fake_build_portfolio)
+
+    assert (
+        main(
+            [
+                "portfolio",
+                "build",
+                "--config",
+                str(config),
+                "--output",
+                str(tmp_path / "workspace"),
+                "--json",
+            ]
+        )
+        == 0
+    )
+    json.loads(capsys.readouterr().out)
+
+    assert captured["source_privacy"].obfuscate_personal_data is False
+
+
+def test_portfolio_cli_build_prints_warnings_in_text_output(
+    tmp_path: Path,
+    capsys,
+    monkeypatch,
+) -> None:
+    from open_data_products import generation, portfolio
+
+    def fake_build_portfolio(*args, **kwargs):
+        return {
+            "spec": "portfolio",
+            "kind": "PortfolioBuild",
+            "workspace": str(tmp_path / "workspace"),
+            "html": str(tmp_path / "workspace" / "index.html"),
+            "validationResults": {},
+            "created": [],
+            "updated": [],
+            "unchanged": [],
+            "warnings": [
+                "Personal data obfuscation is disabled for portfolio document intake."
+            ],
+            "valid": True,
+        }
+
+    monkeypatch.setattr(generation, "create_generation_client", lambda settings: None)
+    monkeypatch.setattr(portfolio, "build_portfolio", fake_build_portfolio)
+
+    assert (
+        main(
+            [
+                "portfolio",
+                "build",
+                "--output",
+                str(tmp_path / "workspace"),
+            ]
+        )
+        == 0
+    )
+    output = capsys.readouterr().out
+
+    assert (
+        "Warning: Personal data obfuscation is disabled for portfolio document intake."
+        in output
+    )
 
 
 def test_portfolio_cli_intake_emits_budget_report(

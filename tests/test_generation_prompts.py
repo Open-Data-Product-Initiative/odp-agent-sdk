@@ -579,6 +579,31 @@ providers:
     assert settings.portfolio_source_budget.max_prompt_chars == 80
 
 
+def test_resolve_generation_settings_reads_portfolio_privacy(tmp_path):
+    """Test portfolio privacy settings resolve from generation config."""
+    config = tmp_path / "generation.config.yaml"
+    config.write_text(
+        """
+provider: ollama
+model: qwen2.5
+portfolio:
+  privacy:
+    obfuscatePersonalData: false
+providers:
+  ollama:
+    type: ollama
+    model: qwen2.5
+""",
+        encoding="utf-8",
+    )
+
+    report = validate_config("generation", config)
+    settings = resolve_generation_settings(config)
+
+    assert report["valid"] is True
+    assert settings.portfolio_privacy.obfuscate_personal_data is False
+
+
 def test_validate_generation_config_rejects_invalid_portfolio_source_budget(
     tmp_path,
 ):
@@ -607,6 +632,36 @@ providers:
         "errors"
     ]
     assert "portfolio.sourceBudget.maxPromptChars must be a positive integer" in report[
+        "errors"
+    ]
+
+
+def test_validate_generation_config_rejects_invalid_portfolio_privacy(tmp_path):
+    """Test portfolio privacy config accepts only known boolean settings."""
+    config = tmp_path / "generation.config.yaml"
+    config.write_text(
+        """
+provider: ollama
+model: qwen2.5
+portfolio:
+  privacy:
+    obfuscatePersonalData: sometimes
+    unknown: true
+providers:
+  ollama:
+    type: ollama
+    model: qwen2.5
+""",
+        encoding="utf-8",
+    )
+
+    report = validate_config("generation", config)
+
+    assert report["valid"] is False
+    assert "portfolio.privacy.obfuscatePersonalData must be a boolean" in report[
+        "errors"
+    ]
+    assert "Unknown generation config key: portfolio.privacy.unknown" in report[
         "errors"
     ]
 

@@ -6,14 +6,26 @@ from email import policy
 from email.parser import BytesParser
 import hashlib
 from pathlib import Path
+import re
 from typing import Dict, List, Tuple
 from xml.etree import ElementTree
+import zlib
 from zipfile import BadZipFile, ZipFile
 
 TEXT_SUFFIXES = (".md", ".txt", ".yaml", ".yml", ".json")
-PORTFOLIO_DOCUMENT_SUFFIXES = TEXT_SUFFIXES + (".eml", ".msg", ".docx", ".pptx")
+PORTFOLIO_DOCUMENT_SUFFIXES = TEXT_SUFFIXES + (
+    ".eml",
+    ".msg",
+    ".docx",
+    ".pptx",
+    ".pdf",
+)
 MSG_INSTALL_WARNING = "install open-data-products[email] to enable .msg extraction."
+PDF_TEXT_WARNING = "no embedded text found; OCR or vision extraction is not enabled."
 OLE_COMPOUND_HEADER = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"
+PDF_HEADER = b"%PDF-"
+PDF_STREAM_PATTERN = re.compile(rb"(<<.*?>>\s*)?stream\r?\n(.*?)\r?\nendstream", re.S)
+PDF_TEXT_BLOCK_PATTERN = re.compile(r"BT(.*?)ET", re.S)
 
 
 def load_source_documents(path: Path) -> List[Dict[str, str]]:
@@ -29,6 +41,8 @@ def load_source_documents(path: Path) -> List[Dict[str, str]]:
         return [_docx_record(path, detection_method=detection_method)]
     if source_type == ".pptx":
         return [_pptx_record(path, detection_method=detection_method)]
+    if source_type == ".pdf":
+        return [_pdf_record(path, detection_method=detection_method)]
     return []
 
 
@@ -38,6 +52,8 @@ def detect_source_type(path: Path) -> Tuple[str, str]:
         header = handle.read(4096)
     if header.startswith(OLE_COMPOUND_HEADER):
         return ".msg", "ole-compound-header"
+    if header.startswith(PDF_HEADER):
+        return ".pdf", "pdf-header"
     ooxml_type = _detect_ooxml_type(path)
     if ooxml_type:
         return ooxml_type, "ooxml-container"
@@ -129,6 +145,105 @@ def _pptx_record(path: Path, *, detection_method: str) -> Dict[str, str]:
     )
 
 
+def _pdf_record(path: Path, *, detection_method: str) -> Dict[str, str]:
+    text = "\n".join(_pdf_embedded_text(path)).strip()
+    if not text:
+        return _skipped_pdf_record(path, detection_method=detection_method)
+    return _source_record(
+        path,
+        text=text,
+        source_type="pdf",
+        source_unit="document",
+        source_unit_id="1",
+        title=path.stem,
+        detection_method=detection_method,
+    )
+
+
+def _pdf_embedded_text(path: Path) -> List[str]:
+    try:
+        content = path.read_bytes()
+    except OSError:
+        return []
+    parts: List[str] = []
+    for match in PDF_STREAM_PATTERN.finditer(content):
+        dictionary = match.group(1) or b""
+        stream = match.group(2)
+        if b"/FlateDecode" in dictionary:
+            try:
+                stream = zlib.decompress(stream)
+            except zlib.error:
+                continue
+        parts.extend(_pdf_text_from_stream(stream))
+    return parts
+
+
+def _pdf_text_from_stream(stream: bytes) -> List[str]:
+    try:
+        text = stream.decode("latin-1")
+    except UnicodeDecodeError:
+        return []
+    parts: List[str] = []
+    for block in PDF_TEXT_BLOCK_PATTERN.findall(text):
+        parts.extend(_pdf_literal_strings(block))
+    return [part.strip() for part in parts if part.strip()]
+
+
+def _pdf_literal_strings(text: str) -> List[str]:
+    literals: List[str] = []
+    index = 0
+    while index < len(text):
+        if text[index] != "(":
+            index += 1
+            continue
+        value, index = _read_pdf_literal(text, index + 1)
+        literals.append(value)
+    return literals
+
+
+def _read_pdf_literal(text: str, index: int) -> Tuple[str, int]:
+    value: List[str] = []
+    depth = 1
+    while index < len(text):
+        char = text[index]
+        if char == "\\":
+            if index + 1 >= len(text):
+                break
+            escaped = text[index + 1]
+            value.append(_pdf_escape_value(escaped))
+            index += 2
+            continue
+        if char == "(":
+            depth += 1
+            value.append(char)
+            index += 1
+            continue
+        if char == ")":
+            depth -= 1
+            if depth == 0:
+                return "".join(value), index + 1
+            value.append(char)
+            index += 1
+            continue
+        value.append(char)
+        index += 1
+    return "".join(value), index
+
+
+def _pdf_escape_value(value: str) -> str:
+    escapes = {
+        "n": "\n",
+        "r": "\r",
+        "t": "\t",
+        "b": "\b",
+        "f": "\f",
+        "\\": "\\",
+        "(": "(",
+        ")": ")",
+    }
+    return escapes.get(value, value)
+
+
 def _ooxml_text(path: Path, member: str) -> List[str]:
     try:
         with ZipFile(path) as archive:
@@ -198,6 +313,17 @@ def _skipped_msg_record(path: Path, *, detection_method: str) -> Dict[str, str]:
         "detectionMethod": detection_method,
         "skipped": "true",
         "warning": f"Skipped Outlook .msg source {path}: {MSG_INSTALL_WARNING}",
+    }
+
+
+def _skipped_pdf_record(path: Path, *, detection_method: str) -> Dict[str, str]:
+    return {
+        "path": str(path),
+        "sourceId": _source_id(path, "document", "1"),
+        "sourceType": "pdf",
+        "detectionMethod": detection_method,
+        "skipped": "true",
+        "warning": f"Skipped PDF source {path}: {PDF_TEXT_WARNING}",
     }
 
 

@@ -529,9 +529,20 @@ V1 should prioritize clear, high-confidence identifiers:
 Recommended behavior:
 
 - Enable obfuscation automatically for document intake before LLM-backed
-  portfolio generation. Keep the helper available as `obfuscate_personal_data`
-  and allow an explicit CLI/API override later only if a clear local-only use
-  case needs raw extracted content.
+  portfolio generation by default. Keep the helper available as
+  `obfuscate_personal_data`.
+- Add a `generation.config.yaml` setting that controls this behavior, for
+  example:
+
+  ```yaml
+  portfolio:
+    privacy:
+      obfuscatePersonalData: true
+  ```
+
+  The default should be `true` for LLM-backed portfolio document intake. Setting
+  it to `false` should send extracted content without this best-effort masking
+  and should add a warning to the normal command log and `--json` output.
 - Run obfuscation after extraction and before chunking/reduction so placeholder
   IDs remain stable across chunks.
 - Preserve placeholder consistency within one command run, so the same detected
@@ -708,7 +719,8 @@ Add focused tests before implementation:
   available and falls back to deterministic paragraph chunks.
 - extraction reports are included in the default `--json` payload without a
   separate report flag.
-- obfuscation runs automatically before LLM-backed portfolio generation.
+- obfuscation runs automatically before LLM-backed portfolio generation unless
+  disabled in config.
 - deterministic reduction runs before every LLM-backed document-intake prompt,
   and no LLM call is made if the prompt still exceeds the configured budget.
 - portfolio CLI/API exposes the prompt context format setting, defaulting to
@@ -725,7 +737,8 @@ Add focused tests before implementation:
 - obfuscation reports replacement counts, confidence, and warnings without
   writing a reverse mapping by default.
 - obfuscation runs automatically before chunking/reduction for LLM-backed
-  portfolio document intake, so placeholders stay stable across chunks.
+  portfolio document intake unless disabled in config, so placeholders stay
+  stable across chunks.
 - extracted Markdown contains source metadata.
 - lane folder inputs preserve lane assignment.
 - extraction reports are deterministic and JSON-serializable.
@@ -834,9 +847,12 @@ extraction, obfuscation, chunking, and deterministic reduction.
 ### Step 8: Add Personal Data Obfuscation
 
 Add `obfuscate_personal_data` and run it automatically for LLM-backed portfolio
-document intake. The function should mask clear personal data with stable
-placeholders, report what was replaced, and warn that the result is not
-guaranteed anonymization. Run it after extraction and before chunking/reduction.
+document intake by default. Add a `portfolio.privacy.obfuscatePersonalData`
+setting in `generation.config.yaml` so the behavior can be switched off for
+local-only or controlled environments. The function should mask clear personal
+data with stable placeholders, report what was replaced, and warn that the
+result is not guaranteed anonymization. Run it after extraction and before
+chunking/reduction.
 
 ### Step 9: Add More Formats
 

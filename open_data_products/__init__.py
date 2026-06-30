@@ -118,6 +118,7 @@ from .odpv import (
     resolve_vocabulary_term,
 )
 from .pricing import pricing_to_402
+from .privacy import obfuscate_personal_data
 from .portfolio import (
     build_portfolio,
     explain_portfolio,
@@ -246,6 +247,7 @@ __all__ = [
     "load_recipe_catalog",
     "openai_chat_generate",
     "openai_generate",
+    "obfuscate_personal_data",
     "print_config",
     "print_recipe_config",
     "search_recipe_guidance",

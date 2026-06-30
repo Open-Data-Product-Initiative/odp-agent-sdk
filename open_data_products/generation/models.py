@@ -19,6 +19,13 @@ class PortfolioSourceBudget:
 
 
 @dataclass(frozen=True)
+class PortfolioPrivacySettings:
+    """Portfolio document intake privacy settings."""
+
+    obfuscate_personal_data: bool = True
+
+
+@dataclass(frozen=True)
 class GenerationTask:
     """Prompt and output mapping for one local generation artifact."""
 
@@ -50,6 +57,9 @@ class GenerationSettings:
     prompt_path: Optional[str] = None
     portfolio_source_budget: PortfolioSourceBudget = field(
         default_factory=PortfolioSourceBudget
+    )
+    portfolio_privacy: PortfolioPrivacySettings = field(
+        default_factory=PortfolioPrivacySettings
     )
 
 

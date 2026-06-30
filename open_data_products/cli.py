@@ -2674,6 +2674,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                         model=settings.model,
                         context_format=args.context_format,
                         source_budget=settings.portfolio_source_budget,
+                        source_privacy=settings.portfolio_privacy,
                     )
                 elif args.portfolio_command == "refresh":
                     from .generation import (
@@ -2704,6 +2705,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                         all_sources=args.all_sources,
                         context_format=args.context_format,
                         source_budget=settings.portfolio_source_budget,
+                        source_privacy=settings.portfolio_privacy,
                     )
                 elif args.portfolio_command == "intake":
                     from .generation import resolve_generation_settings
@@ -2780,6 +2782,8 @@ def main(argv: Optional[List[str]] = None) -> int:
                 if "created" in payload:
                     print(f"Created: {len(payload['created'])}")
                     print(f"Updated: {len(payload['updated'])}")
+                for warning in payload.get("warnings", []):
+                    print(f"Warning: {warning}")
             return _finalize_activity(
                 args,
                 activity_context,

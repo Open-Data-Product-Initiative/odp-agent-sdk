@@ -17,7 +17,7 @@ import yaml
 
 from . import __version__
 from ._io import load_mapping
-from .generation.models import PortfolioSourceBudget
+from .generation.models import PortfolioPrivacySettings, PortfolioSourceBudget
 from .odpc import load_catalog
 from .odpc.catalog import text_value
 from .odpg import build_graph, build_graph_explorer_html, load_graph
@@ -44,6 +44,7 @@ from .portfolio_sources import (
     source_hashes as _source_hashes,
     source_hashes_by_lane as _source_hashes_by_lane,
 )
+from .privacy import OBFUSCATION_WARNING, _obfuscate_personal_data_with_state
 
 DEFAULT_PORTFOLIO_HTML = "index.html"
 DEFAULT_EXECUTIVE_SUMMARY = "executive-summary.yaml"
@@ -56,6 +57,9 @@ PORTFOLIO_LOCALIZATION_BATCH_ITEMS = 50
 PORTFOLIO_SOURCE_CHUNK_CHARS = 2000
 PORTFOLIO_SOURCE_PROMPT_CHARS = 32000
 PORTFOLIO_PROMPT_OVERHEAD_RESERVE_CHARS = 16000
+PORTFOLIO_PRIVACY_DISABLED_WARNING = (
+    "Personal data obfuscation is disabled for portfolio document intake."
+)
 PortfolioBuildClient = Callable[[str, str], str]
 PortfolioLocalizationClient = Callable[[str, str], str]
 ODPC_STATUSES = {"draft", "active", "paused", "completed", "retired"}
@@ -206,6 +210,7 @@ def build_portfolio(
     process_all_sources: bool = True,
     context_format: str = "markdown",
     source_budget: Optional[PortfolioSourceBudget] = None,
+    source_privacy: Optional[PortfolioPrivacySettings] = None,
 ) -> Dict[str, object]:
     """Build a portfolio workspace from source lanes using an LLM client."""
     root = Path(workspace)
@@ -237,8 +242,13 @@ def build_portfolio(
         max_source_chars=PORTFOLIO_SOURCE_CHUNK_CHARS,
         max_prompt_chars=PORTFOLIO_SOURCE_PROMPT_CHARS,
     )
-    reduced_process_lanes, source_budget_report = _reduce_source_lanes_for_prompt(
+    privacy_settings = source_privacy or PortfolioPrivacySettings()
+    private_process_lanes, source_privacy_report = _apply_source_privacy(
         process_lanes,
+        privacy_settings=privacy_settings,
+    )
+    reduced_process_lanes, source_budget_report = _reduce_source_lanes_for_prompt(
+        private_process_lanes,
         max_source_chars=source_budget_settings.max_source_chars,
         max_prompt_chars=source_budget_settings.max_prompt_chars,
         prompt_overhead_chars=PORTFOLIO_PROMPT_OVERHEAD_RESERVE_CHARS,
@@ -315,6 +325,7 @@ def build_portfolio(
     warnings.extend(extraction_warnings)
     warnings.extend(_source_change_warnings(source_changes))
     warnings.extend(str(item) for item in source_budget_report.get("warnings", []))
+    warnings.extend(str(item) for item in source_privacy_report.get("warnings", []))
 
     created: List[str] = []
     updated: List[str] = []
@@ -366,6 +377,7 @@ def build_portfolio(
         "processedSourceCounts": processed_source_counts,
         "contextFormat": context_format,
         "sourceBudget": source_budget_report,
+        "sourcePrivacy": source_privacy_report,
         "promptBudget": prompt_budget_report,
         "sourceExtraction": {
             "warnings": extraction_warnings,
@@ -404,6 +416,7 @@ def refresh_portfolio(
     all_sources: bool = False,
     context_format: str = "markdown",
     source_budget: Optional[PortfolioSourceBudget] = None,
+    source_privacy: Optional[PortfolioPrivacySettings] = None,
 ) -> Dict[str, object]:
     """Refresh an existing portfolio workspace from saved or supplied source lanes."""
     root = Path(workspace)
@@ -424,6 +437,7 @@ def refresh_portfolio(
         process_all_sources=all_sources,
         context_format=context_format,
         source_budget=source_budget,
+        source_privacy=source_privacy,
     )
 
 
@@ -1009,6 +1023,55 @@ def _reduce_source_lanes_for_prompt(
         "warnings": warnings,
     }
     return reduced, budget
+
+
+def _apply_source_privacy(
+    lanes: Dict[str, List[Dict[str, str]]],
+    *,
+    privacy_settings: PortfolioPrivacySettings,
+) -> Tuple[Dict[str, List[Dict[str, str]]], Dict[str, object]]:
+    """Apply configured source privacy controls before prompt reduction."""
+    source_count = sum(
+        len(files) for name, files in lanes.items() if name != SOURCE_WARNING_KEY
+    )
+    if not privacy_settings.obfuscate_personal_data:
+        return dict(lanes), {
+            "method": "deterministic-personal-data-obfuscation",
+            "enabled": False,
+            "sourceCount": source_count,
+            "replacementCounts": {},
+            "replacements": [],
+            "warnings": [PORTFOLIO_PRIVACY_DISABLED_WARNING],
+        }
+
+    value_to_placeholder: Dict[str, str] = {}
+    replacement_counts: Dict[str, int] = {}
+    replacements: List[Dict[str, str]] = []
+    private_lanes: Dict[str, List[Dict[str, str]]] = {}
+    for lane_name, files in lanes.items():
+        if lane_name == SOURCE_WARNING_KEY:
+            continue
+        private_files: List[Dict[str, str]] = []
+        for source in files:
+            private_source = dict(source)
+            private_source["text"] = _obfuscate_personal_data_with_state(
+                str(source.get("text", "")),
+                value_to_placeholder=value_to_placeholder,
+                replacement_counts=replacement_counts,
+                replacements=replacements,
+            )
+            private_files.append(private_source)
+        private_lanes[lane_name] = private_files
+
+    warnings = [OBFUSCATION_WARNING] if replacements else []
+    return private_lanes, {
+        "method": "deterministic-personal-data-obfuscation",
+        "enabled": True,
+        "sourceCount": source_count,
+        "replacementCounts": replacement_counts,
+        "replacements": replacements,
+        "warnings": warnings,
+    }
 
 
 def _chunk_source_text(text: str, max_chars: int) -> List[str]:

@@ -34,6 +34,11 @@ portfolio:
   sourceBudget:
     maxSourceChars: 2000
     maxPromptChars: 32000
+  privacy:
+    # Best-effort masking runs before LLM-backed portfolio document intake by
+    # default. Set to false only for local-only or controlled environments where
+    # raw extracted source content is acceptable.
+    obfuscatePersonalData: true
 
 # To make Claude the default instead, set `provider: claude`. The selected
 # provider entry below supplies the Claude model and Anthropic API settings.
