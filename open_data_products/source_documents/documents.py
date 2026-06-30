@@ -22,6 +22,7 @@ PORTFOLIO_DOCUMENT_SUFFIXES = TEXT_SUFFIXES + (
     ".msg",
     ".docx",
     ".pptx",
+    ".xlsx",
     ".pdf",
 )
 MSG_INSTALL_WARNING = "install open-data-products[email] to enable .msg extraction."
@@ -47,6 +48,8 @@ def load_source_documents(path: Path) -> List[Dict[str, str]]:
         return [_docx_record(path, detection_method=detection_method)]
     if source_type == ".pptx":
         return [_pptx_record(path, detection_method=detection_method)]
+    if source_type == ".xlsx":
+        return [_xlsx_record(path, detection_method=detection_method)]
     if source_type == ".pdf":
         return [_pdf_record(path, detection_method=detection_method)]
     return []
@@ -115,6 +118,11 @@ def _detect_ooxml_type(path: Path) -> str:
         return ""
     if "word/document.xml" in names:
         return ".docx"
+    if "xl/workbook.xml" in names and any(
+        name.startswith("xl/worksheets/sheet") and name.endswith(".xml")
+        for name in names
+    ):
+        return ".xlsx"
     if "ppt/presentation.xml" in names or any(
         name.startswith("ppt/slides/slide") and name.endswith(".xml")
         for name in names
@@ -235,6 +243,177 @@ def _pptx_record(path: Path, *, detection_method: str) -> Dict[str, str]:
         title=path.stem,
         detection_method=detection_method,
     )
+
+
+def _xlsx_record(path: Path, *, detection_method: str) -> Dict[str, str]:
+    text = "\n\n".join(_xlsx_sheet_sections(path)).strip()
+    return _source_record(
+        path,
+        text=text,
+        source_type="xlsx",
+        source_unit="workbook",
+        source_unit_id="1",
+        title=path.stem,
+        detection_method=detection_method,
+    )
+
+
+def _xlsx_sheet_sections(path: Path) -> List[str]:
+    try:
+        with ZipFile(path) as archive:
+            shared_strings = _xlsx_shared_strings(archive)
+            sheet_map = _xlsx_sheet_relationships(archive)
+            sheets = _xlsx_workbook_sheets(archive, sheet_map)
+            sections = []
+            for sheet_name, sheet_path in sheets:
+                rows = _xlsx_sheet_rows(archive, sheet_path, shared_strings)
+                if not rows:
+                    continue
+                sections.append(_xlsx_sheet_text(sheet_name, rows))
+            return sections
+    except (BadZipFile, OSError):
+        return []
+
+
+def _xlsx_shared_strings(archive: ZipFile) -> List[str]:
+    try:
+        content = archive.read("xl/sharedStrings.xml")
+    except KeyError:
+        return []
+    try:
+        root = ElementTree.fromstring(content)
+    except ElementTree.ParseError:
+        return []
+    strings = []
+    for item in root.iter():
+        if not item.tag.endswith("}si"):
+            continue
+        parts = [
+            text_element.text or ""
+            for text_element in item.iter()
+            if text_element.tag.endswith("}t")
+        ]
+        strings.append("".join(parts))
+    return strings
+
+
+def _xlsx_sheet_relationships(archive: ZipFile) -> Dict[str, str]:
+    try:
+        content = archive.read("xl/_rels/workbook.xml.rels")
+    except KeyError:
+        return {}
+    try:
+        root = ElementTree.fromstring(content)
+    except ElementTree.ParseError:
+        return {}
+    relationships = {}
+    for relationship in root:
+        relationship_id = relationship.attrib.get("Id")
+        target = relationship.attrib.get("Target")
+        if not relationship_id or not target:
+            continue
+        relationships[relationship_id] = _xlsx_target_path(target)
+    return relationships
+
+
+def _xlsx_target_path(target: str) -> str:
+    if target.startswith("/"):
+        return target.lstrip("/")
+    if target.startswith("xl/"):
+        return target
+    return "xl/" + target.lstrip("/")
+
+
+def _xlsx_workbook_sheets(
+    archive: ZipFile,
+    sheet_map: Dict[str, str],
+) -> List[Tuple[str, str]]:
+    try:
+        content = archive.read("xl/workbook.xml")
+    except KeyError:
+        return []
+    try:
+        root = ElementTree.fromstring(content)
+    except ElementTree.ParseError:
+        return []
+    sheets = []
+    for sheet in root.iter():
+        if not sheet.tag.endswith("}sheet"):
+            continue
+        name = sheet.attrib.get("name") or "Sheet"
+        relationship_id = (
+            sheet.attrib.get("{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id")
+            or sheet.attrib.get("r:id")
+        )
+        sheet_path = sheet_map.get(relationship_id or "")
+        if sheet_path:
+            sheets.append((name, sheet_path))
+    return sheets
+
+
+def _xlsx_sheet_rows(
+    archive: ZipFile,
+    sheet_path: str,
+    shared_strings: List[str],
+) -> List[List[str]]:
+    try:
+        content = archive.read(sheet_path)
+    except KeyError:
+        return []
+    try:
+        root = ElementTree.fromstring(content)
+    except ElementTree.ParseError:
+        return []
+    rows = []
+    for row in root.iter():
+        if not row.tag.endswith("}row"):
+            continue
+        values = []
+        for cell in row:
+            if cell.tag.endswith("}c"):
+                values.append(_xlsx_cell_value(cell, shared_strings))
+        if any(value.strip() for value in values):
+            rows.append(values)
+    return rows
+
+
+def _xlsx_cell_value(cell: ElementTree.Element, shared_strings: List[str]) -> str:
+    cell_type = cell.attrib.get("t", "")
+    if cell_type == "inlineStr":
+        parts = [
+            text_element.text or ""
+            for text_element in cell.iter()
+            if text_element.tag.endswith("}t")
+        ]
+        return "".join(parts).strip()
+    value = ""
+    for child in cell:
+        if child.tag.endswith("}v") and child.text is not None:
+            value = child.text
+            break
+    if cell_type == "s":
+        try:
+            return shared_strings[int(value)].strip()
+        except (IndexError, ValueError):
+            return ""
+    return value.strip()
+
+
+def _xlsx_sheet_text(sheet_name: str, rows: List[List[str]]) -> str:
+    header = [cell.strip() for cell in rows[0]]
+    data_rows = [[cell.strip() for cell in row] for row in rows[1:]]
+    included_rows = data_rows[:CSV_ROW_LIMIT]
+    lines = [
+        f"Sheet: {sheet_name}",
+        f"Columns: {', '.join(header)}",
+        f"Rows: {len(data_rows)}",
+        f"Rows included: {len(included_rows)}",
+    ]
+    omitted = max(len(data_rows) - len(included_rows), 0)
+    if omitted:
+        lines.append(f"Rows omitted: {omitted}")
+    lines.extend(_markdown_table(header, included_rows))
+    return "\n".join(lines)
 
 
 def _pdf_record(path: Path, *, detection_method: str) -> Dict[str, str]:

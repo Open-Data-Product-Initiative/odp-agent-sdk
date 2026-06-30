@@ -869,6 +869,100 @@ def _write_minimal_text_pdf(path: Path, lines: list) -> None:
     path.write_bytes(payload.encode("latin-1"))
 
 
+def _write_minimal_xlsx(path: Path, sheets: list) -> None:
+    """Write a tiny XLSX workbook fixture with inline string cells."""
+    workbook_sheets = []
+    relationships = []
+    with ZipFile(path, "w") as archive:
+        archive.writestr(
+            "[Content_Types].xml",
+            """<?xml version="1.0" encoding="UTF-8"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
+</Types>
+""",
+        )
+        archive.writestr(
+            "_rels/.rels",
+            """<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rIdWorkbook" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
+</Relationships>
+""",
+        )
+        for index, (name, rows) in enumerate(sheets, start=1):
+            workbook_sheets.append(
+                f'<sheet name="{_xml_escape(str(name))}" sheetId="{index}" r:id="rId{index}"/>'
+            )
+            relationships.append(
+                f'<Relationship Id="rId{index}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet{index}.xml"/>'
+            )
+            archive.writestr(
+                f"xl/worksheets/sheet{index}.xml",
+                _minimal_xlsx_sheet(rows),
+            )
+        archive.writestr(
+            "xl/workbook.xml",
+            """<?xml version="1.0" encoding="UTF-8"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+          xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <sheets>
+    %s
+  </sheets>
+</workbook>
+"""
+            % "\n    ".join(workbook_sheets),
+        )
+        archive.writestr(
+            "xl/_rels/workbook.xml.rels",
+            """<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  %s
+</Relationships>
+"""
+            % "\n  ".join(relationships),
+        )
+
+
+def _minimal_xlsx_sheet(rows: list) -> str:
+    row_xml = []
+    for row_index, row in enumerate(rows, start=1):
+        cells = []
+        for column_index, value in enumerate(row, start=1):
+            cell_ref = f"{_xlsx_column_name(column_index)}{row_index}"
+            cells.append(
+                f'<c r="{cell_ref}" t="inlineStr"><is><t>{_xml_escape(str(value))}</t></is></c>'
+            )
+        row_xml.append(f'<row r="{row_index}">{"".join(cells)}</row>')
+    return (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">\n'
+        "  <sheetData>\n"
+        f'    {"".join(row_xml)}\n'
+        "  </sheetData>\n"
+        "</worksheet>\n"
+    )
+
+
+def _xlsx_column_name(index: int) -> str:
+    name = ""
+    while index:
+        index, remainder = divmod(index - 1, 26)
+        name = chr(ord("A") + remainder) + name
+    return name
+
+
+def _xml_escape(value: str) -> str:
+    return (
+        value.replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace('"', "&quot;")
+    )
+
+
 def write_customer_product_spec(workspace: Path) -> Path:
     """Write an ODPS product spec linked by the staged product reference."""
     product_path = workspace / "odps" / "products" / "customer-product.yaml"
@@ -1157,6 +1251,120 @@ def test_portfolio_source_helpers_detect_ooxml_from_container(
     assert "Weekly segment reporting" in lanes["products"][0]["text"]
     assert "Slide 2:" in lanes["products"][0]["text"]
     assert "Renewal risk signal" in lanes["products"][0]["text"]
+
+
+def test_portfolio_source_helpers_extract_xlsx_as_one_workbook_source(
+    tmp_path: Path,
+) -> None:
+    from open_data_products.portfolio_sources import collect_source_lanes
+
+    sources = tmp_path / "sources"
+    (sources / "products").mkdir(parents=True)
+    xlsx_path = sources / "products" / "portfolio-input.xlsx"
+    _write_minimal_xlsx(
+        xlsx_path,
+        [
+            (
+                "Candidates",
+                [
+                    ["product", "need"],
+                    ["Customer Health", "retention visibility"],
+                    ["Renewal Risk", "weekly review"],
+                ],
+            ),
+            (
+                "Signals",
+                [
+                    ["signal", "priority"],
+                    ["churn pressure", "high"],
+                ],
+            ),
+        ],
+    )
+
+    lanes = collect_source_lanes(
+        objectives=None,
+        use_cases=None,
+        signals=None,
+        products=sources / "products",
+    )
+
+    assert len(lanes["products"]) == 1
+    assert lanes["products"][0]["sourceType"] == "xlsx"
+    assert lanes["products"][0]["sourceId"] == f"{xlsx_path}#workbook-1"
+    assert lanes["products"][0]["sourceUnit"] == "workbook"
+    assert lanes["products"][0]["sourceUnitId"] == "1"
+    assert lanes["products"][0]["detectionMethod"] == "ooxml-container"
+    text = lanes["products"][0]["text"]
+    assert "Sheet: Candidates" in text
+    assert "Columns: product, need" in text
+    assert "| Customer Health | retention visibility |" in text
+    assert "Sheet: Signals" in text
+    assert "Columns: signal, priority" in text
+    assert "| churn pressure | high |" in text
+
+
+def test_portfolio_source_helpers_detect_xlsx_from_container_before_extension(
+    tmp_path: Path,
+) -> None:
+    from open_data_products.portfolio_sources import collect_source_lanes
+
+    sources = tmp_path / "sources"
+    (sources / "signals").mkdir(parents=True)
+    xlsx_path = sources / "signals" / "signals-table.txt"
+    _write_minimal_xlsx(
+        xlsx_path,
+        [
+            (
+                "Signals",
+                [
+                    ["signal", "confidence"],
+                    ["renewal risk", "high"],
+                ],
+            )
+        ],
+    )
+
+    lanes = collect_source_lanes(
+        objectives=None,
+        use_cases=None,
+        signals=sources / "signals",
+        products=None,
+    )
+
+    assert len(lanes["signals"]) == 1
+    assert lanes["signals"][0]["sourceType"] == "xlsx"
+    assert lanes["signals"][0]["detectionMethod"] == "ooxml-container"
+    assert lanes["signals"][0]["sourceUnit"] == "workbook"
+    assert "| renewal risk | high |" in lanes["signals"][0]["text"]
+
+
+def test_portfolio_source_helpers_limits_xlsx_rows_per_sheet(
+    tmp_path: Path,
+) -> None:
+    from open_data_products.portfolio_sources import collect_source_lanes
+
+    sources = tmp_path / "sources"
+    (sources / "use-cases").mkdir(parents=True)
+    xlsx_path = sources / "use-cases" / "requests.xlsx"
+    rows = [["id", "request"]]
+    rows.extend([str(index), f"Request {index}"] for index in range(1, 56))
+    _write_minimal_xlsx(xlsx_path, [("Requests", rows)])
+
+    lanes = collect_source_lanes(
+        objectives=None,
+        use_cases=sources / "use-cases",
+        signals=None,
+        products=None,
+    )
+
+    text = lanes["useCases"][0]["text"]
+    assert "Sheet: Requests" in text
+    assert "Rows: 55" in text
+    assert "Rows included: 50" in text
+    assert "| 50 | Request 50 |" in text
+    assert "Request 51" not in text
+    assert "Rows omitted: 5" in text
 
 
 def test_portfolio_source_helpers_extract_text_pdf(
