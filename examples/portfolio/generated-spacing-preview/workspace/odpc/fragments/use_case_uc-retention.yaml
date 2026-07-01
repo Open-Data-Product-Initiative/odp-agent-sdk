@@ -1,0 +1,8 @@
+useCase:
+  id: UC-RETENTION
+  name:
+    en: Retention Workflow
+  description:
+    en: Help teams intervene before churn.
+  status: active
+  priority: high

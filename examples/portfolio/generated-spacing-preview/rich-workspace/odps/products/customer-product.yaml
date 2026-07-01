@@ -1,0 +1,27 @@
+
+schema: https://opendataproducts.org/v4.1/schema/odps.json
+version: "4.1"
+product:
+  details:
+    en:
+      name: Customer Product
+      productID: customer-product
+      description: Full product details from product discussions.
+      visibility: internal
+      status: production
+      type: dataset
+  pricingPlans:
+    declarative:
+      en:
+        - name: Internal Starter
+          priceCurrency: USD
+          price: "0"
+          unit: request
+  SLA:
+    declarative:
+      - dimension: availability
+        objective: Best effort
+  dataQuality:
+    declarative:
+      - dimension: freshness
+        objective: Daily

@@ -1,0 +1,28 @@
+schema: https://opendataproducts.org/odpg-v1.0/schema/odpg.yaml
+version: '1.0'
+kind: Graph
+graph:
+  metadata:
+    id: GRAPH-GENERATED
+    name:
+      en: Generated ODPG Graph
+    description:
+      en: Generated from ODPC fragments with LLM-inferred edges.
+  nodes:
+  - id: PR-CUSTOMER
+    type: DataProduct
+    $ref: product_reference_pr-customer.yaml
+  - id: UC-RETENTION
+    type: UseCase
+    $ref: use_case_uc-retention.yaml
+  - id: OBJ-RETENTION
+    type: BusinessObjective
+    $ref: business_objective_obj-retention.yaml
+  - id: churn-signal
+    type: Signal
+    $ref: signal_churn-signal.yaml
+  edges:
+  - from: UC-RETENTION
+    to: PR-CUSTOMER
+    type: uses
+    confidence: high

@@ -1,0 +1,8 @@
+businessObjective:
+  id: OBJ-RETENTION
+  name:
+    en: Improve Retention
+  description:
+    en: Reduce customer churn.
+  status: active
+  priority: high

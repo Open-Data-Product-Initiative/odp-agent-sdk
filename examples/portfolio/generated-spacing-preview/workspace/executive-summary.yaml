@@ -1,0 +1,163 @@
+schema: https://opendataproducts.org/sdk/portfolio-executive-summary/v1
+kind: PortfolioExecutiveSummary
+metadata:
+  generatedAt: 2026-06-28T00:00:00Z
+  generatedBy: open-data-products
+  sdkVersion: 0.0.0
+  model: test-model
+  workspaceTitle: Spacing Preview Portfolio
+portfolioPosition:
+  headline: Retention is the strongest near-term leadership topic.
+  narrative: 'The portfolio connects a retention objective, a retention workflow,
+    churn pressure signals, and a customer product candidate.
+
+    '
+priorityBriefing:
+  recommendation: Fund retention workflow validation first. Validate partner expansion
+    next. Strengthen signal coverage before final prioritization.
+  primaryFocus:
+    label: Priority 1
+    title: 'Focus first: Retention workflow validation'
+    message: Retention is the clearest funding candidate because it connects a business
+      objective, an operational use case, and a candidate product.
+    action: Fund validation of the retention workflow before assigning capacity to
+      other portfolio paths.
+    rationaleTitle: Why this is first
+    rationale:
+    - Strongest objective, use case, and product alignment
+    - 'Clear business outcome: reduce preventable churn'
+    - Best current evidence for near-term delivery
+    confidence: high
+    evidenceType: direct
+    evidence:
+    - type: businessObjective
+      label: Reduce preventable churn
+      id: OBJ-RETENTION
+    - type: useCase
+      label: Retention risk workflow
+      id: UC-RETENTION
+    - type: productReference
+      label: Customer health signals
+      id: PR-CUSTOMER
+  secondaryFocus:
+    label: Priority 2
+    title: 'Validate next: Partner expansion'
+    message: Partner expansion has enough evidence to stay in the leadership discussion,
+      but it is not ready to compete with retention for first delivery funding.
+    action: Validate the business case before assigning delivery capacity.
+    rationaleTitle: Why this is second
+    rationale:
+    - Has objective and use case alignment
+    - Candidate product exists
+    - Evidence is inferred, not yet strong enough for first priority
+    confidence: medium
+    evidenceType: inferred
+    evidence:
+    - type: businessObjective
+      label: Improve partner-led expansion planning
+      id: OBJ-PARTNER-EXPANSION
+    - type: useCase
+      label: Partner expansion planning
+      id: UC-PARTNER-EXPANSION
+    - type: productReference
+      label: Partner performance signals
+      id: PR-PARTNER
+  blocker:
+    label: Risk
+    title: 'Do not ignore: Signal coverage risk'
+    message: Signal coverage looks thin. This may make prioritization look more certain
+      than it is.
+    action: Improve signal coverage before using this portfolio view for final prioritization.
+    rationaleTitle: Why this matters
+    rationale:
+    - Weak evidence can distort funding decisions
+    - Thin signals reduce confidence
+    - Leadership may over-prioritize incomplete paths
+    confidence: low
+    evidenceType: inferred
+    evidence:
+    - type: signal
+      label: Churn market demand
+      id: SIG-CHURN
+  readinessCheck:
+    label: Readiness check
+    title: 'Before build starts: Commercial readiness review'
+    message: The customer health product still needs human review before production
+      commitment.
+    action: Confirm ownership, value model, operating model, and delivery readiness.
+    checklist:
+    - Business owner confirmed
+    - Value model reviewed
+    - Delivery owner assigned
+    - Operating model clear
+    - Production readiness reviewed
+    confidence: medium
+    evidenceType: inferred
+    evidence:
+    - type: productReference
+      label: Customer health signals
+      id: PR-CUSTOMER
+swot:
+  strengths:
+  - id: STR-RETENTION-DEMAND
+    statement: Retention has clear objective and use-case pull.
+    decisionImplication: Treat retention as the strongest candidate for first delivery
+      funding.
+    evidenceRefs:
+    - type: businessObjective
+      id: OBJ-RETENTION
+    - type: useCase
+      id: UC-RETENTION
+    confidence: high
+    inference: false
+  weaknesses:
+  - id: WEAK-OWNERSHIP-GAP
+    statement: Product ownership evidence needs review before delivery commitment.
+    decisionImplication: Confirm ownership, value model, and delivery readiness before
+      moving into build.
+    evidenceRefs:
+    - type: productReference
+      id: PR-CUSTOMER
+    confidence: medium
+    inference: true
+  opportunities:
+  - id: OPP-RETENTION-REVIEW
+    statement: Leadership can use the portfolio to prioritize retention interventions.
+    decisionImplication: Validate the next growth case before assigning delivery capacity.
+    evidenceRefs:
+    - type: signal
+      id: SIG-CHURN
+    confidence: medium
+    inference: true
+  threats:
+  - id: THREAT-THIN-SIGNALS
+    statement: Thin market signal coverage could overstate portfolio confidence.
+    decisionImplication: Strengthen signal coverage before using this view for final
+      prioritization.
+    evidenceRefs:
+    - type: signal
+      id: SIG-CHURN
+    confidence: low
+    inference: true
+leadershipDecisions:
+- id: DECIDE-RETENTION-FUNDING
+  question: Should leadership fund the retention product as the next delivery priority?
+  decisionType: invest
+  urgency: high
+  evidenceRefs:
+  - type: businessObjective
+    id: OBJ-RETENTION
+  - type: productReference
+    id: PR-CUSTOMER
+evidenceGaps:
+- id: GAP-OWNER
+  statement: Product owner and accountable business sponsor are not explicit.
+  evidenceRefs:
+  - type: productReference
+    id: PR-CUSTOMER
+confidenceNotes:
+- Priority items marked as inferred need human review before business action.
+leadershipSummary:
+  recommendedFirstMove: Fund retention workflow validation
+  secondGrowthPath: Validate partner expansion evidence
+  mainRisk: Signal coverage may be too thin for prioritization confidence

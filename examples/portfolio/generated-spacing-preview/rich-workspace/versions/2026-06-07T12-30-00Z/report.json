@@ -1,0 +1,44 @@
+{
+  "kind": "PortfolioRefresh",
+  "created": [
+    "odpc/fragments/use_case_UC-RETENTION.yaml"
+  ],
+  "updated": [
+    "index.html",
+    "odpg/graph.yaml"
+  ],
+  "unchanged": [
+    "portfolio-state.yaml"
+  ],
+  "removed": [
+    "old-source.md"
+  ],
+  "sourceChanges": {
+    "useCases": {
+      "created": [
+        "new-use-case.md"
+      ],
+      "updated": [],
+      "removed": []
+    },
+    "signals": {
+      "created": [],
+      "updated": [
+        "signal.txt"
+      ],
+      "removed": []
+    }
+  },
+  "artifactCounts": {
+    "businessObjectives": 1,
+    "useCases": 1,
+    "signals": 1,
+    "productReferences": 1,
+    "odpsProducts": 1,
+    "graphEdges": 1
+  },
+  "warnings": [
+    "Review generated pricing evidence."
+  ],
+  "valid": false
+}

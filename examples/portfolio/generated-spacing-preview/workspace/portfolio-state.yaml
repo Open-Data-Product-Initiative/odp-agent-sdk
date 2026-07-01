@@ -1,0 +1,39 @@
+version: 1
+contextFormat: markdown
+sourceLanePaths:
+  objectives: examples\portfolio\generated-spacing-preview\sources\objectives
+  useCases: examples\portfolio\generated-spacing-preview\sources\use-cases
+  signals: examples\portfolio\generated-spacing-preview\sources\signals
+  products: examples\portfolio\generated-spacing-preview\sources\products
+sources:
+  objectives:
+  - sourceId: examples\portfolio\generated-spacing-preview\sources\objectives\retention-objective.md#file-1
+    path: examples\portfolio\generated-spacing-preview\sources\objectives\retention-objective.md
+    sha256: 4091288cf51258d71dfd49d6cff0a062eee8608601c47c3f198a4105fce911f9
+  useCases:
+  - sourceId: examples\portfolio\generated-spacing-preview\sources\use-cases\retention.md#file-1
+    path: examples\portfolio\generated-spacing-preview\sources\use-cases\retention.md
+    sha256: e0a0e0f030062674aa697b45575964c968bf131b518e350fbc6da38ffe9c752a
+  signals:
+  - sourceId: examples\portfolio\generated-spacing-preview\sources\signals\market.txt#file-1
+    path: examples\portfolio\generated-spacing-preview\sources\signals\market.txt
+    sha256: 3e1824c36480aff22d8e42dd4ce1aacd0184d582449c8521fd5e5b0d9fddc553
+  products:
+  - sourceId: examples\portfolio\generated-spacing-preview\sources\products\customer.md#file-1
+    path: examples\portfolio\generated-spacing-preview\sources\products\customer.md
+    sha256: b66425a66aea5af17e68c9d47ca7dca2877e9cffd28479a74ae108bdc0152d9e
+identityRegistry:
+  businessObjectives:
+  - fingerprint: improve retention
+    id: OBJ-RETENTION
+  useCases:
+  - fingerprint: retention workflow
+    id: UC-RETENTION
+  signals:
+  - fingerprint: churn signal
+    id: churn-signal
+  products:
+  - fingerprint: customer product
+    id: PR-CUSTOMER
+    productID: customer-product
+title: Spacing Preview Portfolio

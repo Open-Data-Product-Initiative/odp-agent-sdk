@@ -1,0 +1,51 @@
+
+schema: https://opendataproducts.org/odpc-v1.0/schema/odpc.yaml
+version: "1.0"
+kind: Catalog
+catalog:
+  metadata:
+    id: CAT-DEMO
+    name:
+      en: Demo Catalog
+    description:
+      en: Demo catalog from sources.
+  businessObjectives:
+    - id: OBJ-RETENTION
+      name:
+        en: Improve Retention
+      description:
+        en: Reduce customer churn.
+      status: active
+      priority: high
+  useCases:
+    - id: UC-RETENTION
+      name:
+        en: Retention Workflow
+      description:
+        en: Help teams intervene before churn.
+      status: active
+      priority: high
+  signals:
+    - id: SIG-CHURN
+      name:
+        en: Churn Signal
+      description:
+        en: Market signal for retention risk.
+      type: market
+      confidence: high
+  productReferences:
+    - id: PR-CUSTOMER
+      productID: customer-product
+      productVersion: "4.1"
+      name:
+        en: Customer Product
+      description:
+        en: Customer analytics product.
+      status: production
+      visibility: internal
+      type: dataset
+      productModel:
+        standard: ODPS
+        version: "4.1"
+        format: yaml
+        $ref: ../odps/products/customer-product.yaml

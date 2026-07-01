@@ -2297,17 +2297,21 @@ def test_render_portfolio_creates_missing_parent_and_artifact_detail_views(
     assert "Inference" not in html
     assert "swot-grid" not in html
     assert "leadership-summary-bar" not in html
+    assert "--space-1: 4px;" in html
+    assert "--space-6: 24px;" in html
+    assert "--space-16: 64px;" in html
     intro_css = html.split(".executive-dashboard-intro {", 1)[1].split("}", 1)[0]
-    assert "padding: 24px 28px;" in intro_css
-    assert "margin-bottom: 24px;" in intro_css
+    assert "padding: var(--space-8);" in intro_css
+    assert "margin-bottom: var(--space-6);" in intro_css
     recommendation_css = html.split(".leadership-recommendation {", 1)[1].split("}", 1)[
         0
     ]
-    assert "margin: 0 0 28px;" in recommendation_css
+    assert "padding: var(--space-6);" in recommendation_css
+    assert "margin: 0 0 var(--space-8);" in recommendation_css
     dashboard_css = html.split(".decision-card-grid {", 1)[1].split("}", 1)[0]
     assert "grid-template-columns: repeat(2, minmax(0, 1fr));" in dashboard_css
     assert "align-items: start;" in dashboard_css
-    assert "gap: 28px;" in dashboard_css
+    assert "gap: var(--space-8);" in dashboard_css
     secondary_css = html.split(".secondary-focus {", 1)[1].split("}", 1)[0]
     assert "border-top-color: #3b82f6;" in secondary_css
     assert "border-top-color: #0f766e;" not in secondary_css
@@ -2353,7 +2357,7 @@ def test_render_portfolio_creates_missing_parent_and_artifact_detail_views(
     assert '<div class="overview-card-grid">' in html
     assert 'class="action-card overview-card versions-card"' in html
     assert ".overview-section {" in html
-    assert "margin-top: 28px;" in html
+    assert "margin-top: var(--space-8);" in html
     assert "Show all" in html
     assert "table-layout: fixed" in html
     assert "overflow-wrap: anywhere" in html

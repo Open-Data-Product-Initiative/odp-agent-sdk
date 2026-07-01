@@ -1,0 +1,16 @@
+productReference:
+  id: PR-CUSTOMER
+  productID: customer-product
+  productVersion: '4.1'
+  name:
+    en: Customer Product
+  description:
+    en: Customer analytics product.
+  status: production
+  visibility: internal
+  type: dataset
+  productModel:
+    standard: ODPS
+    version: '4.1'
+    format: yaml
+    $ref: ../odps/products/customer-product.yaml

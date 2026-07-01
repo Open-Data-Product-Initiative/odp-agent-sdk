@@ -1,0 +1,18 @@
+
+metadata:
+  id: demo-portfolio
+  name: Demo Portfolio
+  generatedAt: "2026-06-07T13:00:00Z"
+  sdkVersion: "0.2.0"
+sources:
+  useCases:
+    count: 1
+  signals:
+    count: 1
+  products:
+    count: 1
+versions:
+  - id: "2026-06-07T12-30-00Z"
+    type: refresh
+    summary: Previous snapshot
+    html: versions/2026-06-07T12-30-00Z/index.html

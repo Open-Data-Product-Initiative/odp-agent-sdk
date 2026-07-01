@@ -1,0 +1,18 @@
+metadata:
+  id: generated-portfolio
+  name: Spacing Preview Portfolio
+  description: Generated from portfolio source lanes.
+  generatedAt: 2026-07-01T04:59:59Z
+  sdkVersion: 0.3.4
+sources:
+  objectives:
+    count: 1
+  useCases:
+    count: 1
+  signals:
+    count: 1
+  products:
+    count: 1
+warnings: []
+artifacts:
+  executiveSummary: executive-summary.yaml

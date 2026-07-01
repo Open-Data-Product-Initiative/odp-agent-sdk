@@ -1,0 +1,2880 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Demo Catalog</title>
+<style>
+
+:root {
+  color-scheme: light;
+  --odps-violet: #6c2a8e;
+  --odpc-orange: #f28c28;
+  --odpg-green: #2f9b58;
+  --odpv-blue: #1f78d1;
+  --odp-ink: #1e0a2e;
+  --odp-soft: #f7f3fa;
+  --odp-line: #e7e1ec;
+  --odp-muted: #6d6175;
+  --odp-black: #050505;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --space-24: 96px;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  color: var(--odp-ink);
+  background: #fff;
+  font: 16px/1.55 Poppins, Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+html[dir="rtl"] body {
+  direction: rtl;
+  text-align: right;
+}
+a { color: inherit; text-decoration: none; }
+.topbar {
+  color: #fff;
+  background: var(--odp-black);
+  border-bottom: 4px solid var(--odps-violet);
+}
+.topbar-inner,
+.wrap {
+  width: min(1180px, calc(100% - (var(--space-6) * 2)));
+  margin: 0 auto;
+}
+.topbar-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  min-height: 58px;
+}
+.brand {
+  font-weight: 700;
+}
+.language-selector {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: .82rem;
+}
+.language-selector span {
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid rgba(255,255,255,.35);
+  border-radius: 8px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+.language-selector div {
+  display: flex;
+  gap: var(--space-2);
+}
+.language-selector a {
+  color: rgba(255,255,255,.76);
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.language-selector a[aria-current="true"] {
+  color: #fff;
+}
+html[dir="rtl"] .topbar-inner,
+html[dir="rtl"] .section-head,
+html[dir="rtl"] .product-modal-header {
+  direction: rtl;
+}
+html[dir="rtl"] .language-selector div {
+  flex-direction: row-reverse;
+}
+.hero {
+  color: #fff;
+  background:
+    linear-gradient(135deg, rgba(108, 42, 142, .96), rgba(30, 10, 46, .94)),
+    var(--odps-violet);
+}
+.hero .wrap {
+  padding-block: var(--space-16) var(--space-12);
+}
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-3);
+  color: var(--odps-violet);
+  font-size: .78rem;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.hero .eyebrow { color: rgba(255, 255, 255, .82); }
+h1 {
+  max-width: 780px;
+  margin: 0 0 var(--space-4);
+  font-size: clamp(2.25rem, 5vw, 4.55rem);
+  line-height: 1.02;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+h2 {
+  margin: 0;
+  font-size: clamp(1.35rem, 2.5vw, 2rem);
+  line-height: 1.12;
+  font-weight: 600;
+}
+h3 {
+  margin: 0 0 8px;
+  font-size: 1.08rem;
+  line-height: 1.25;
+}
+.lead {
+  max-width: 760px;
+  margin: 0;
+  color: rgba(255, 255, 255, .86);
+  font-size: clamp(1rem, 2vw, 1.18rem);
+}
+main {
+  padding-block: var(--space-6) var(--space-16);
+}
+.tab-radio {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+}
+.tabs {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  gap: var(--space-2);
+  overflow-x: auto;
+  padding-block: var(--space-3);
+  background: rgba(255, 255, 255, .96);
+  border-top: 1px solid var(--odp-line);
+  border-bottom: 1px solid var(--odp-line);
+  backdrop-filter: blur(10px);
+}
+.tabs label {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--odp-line);
+  border-radius: 8px;
+  color: var(--odp-muted);
+  background: #fff;
+  cursor: pointer;
+  font-size: .9rem;
+  font-weight: 700;
+}
+#tab-overview:checked ~ .tabs label[for="tab-overview"],
+#tab-executive-summary:checked ~ .tabs label[for="tab-executive-summary"],
+#tab-objectives:checked ~ .tabs label[for="tab-objectives"],
+#tab-use-cases:checked ~ .tabs label[for="tab-use-cases"],
+#tab-products:checked ~ .tabs label[for="tab-products"],
+#tab-signals:checked ~ .tabs label[for="tab-signals"],
+#tab-graph:checked ~ .tabs label[for="tab-graph"],
+#tab-about:checked ~ .tabs label[for="tab-about"] {
+  color: #fff;
+  border-color: var(--odps-violet);
+  background: var(--odps-violet);
+}
+.tab-panel {
+  display: none;
+  padding-top: var(--space-8);
+}
+#tab-overview:checked ~ .panels .overview-panel,
+#tab-executive-summary:checked ~ .panels .executive-summary-panel,
+#tab-objectives:checked ~ .panels .objectives-panel,
+#tab-use-cases:checked ~ .panels .use-cases-panel,
+#tab-products:checked ~ .panels .products-panel,
+#tab-signals:checked ~ .panels .signals-panel,
+#tab-graph:checked ~ .panels .graph-panel,
+#tab-about:checked ~ .panels .about-panel {
+  display: block;
+}
+.section-head {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: var(--space-6);
+  margin-bottom: var(--space-6);
+}
+.section-head p {
+  max-width: 540px;
+  margin: 0;
+  color: var(--odp-muted);
+}
+.summary {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: var(--space-6);
+  margin: 0 0 var(--space-8);
+}
+.metric,
+.card,
+.panel {
+  border: 1px solid var(--odp-line);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 16px 42px rgba(15, 23, 42, .09);
+}
+.metric {
+  min-height: 104px;
+  padding: var(--space-4);
+}
+.metric strong {
+  display: block;
+  font-size: 2.1rem;
+  line-height: 1;
+}
+.metric span {
+  display: block;
+  margin-top: var(--space-2);
+  color: var(--odp-muted);
+  font-size: .8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.grid,
+.actions-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-6);
+}
+.executive-dashboard-intro,
+.decision-card,
+.leadership-recommendation,
+.executive-list,
+.executive-empty {
+  border: 1px solid var(--odp-line);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 12px 32px rgba(30, 10, 46, .06);
+}
+.executive-dashboard-intro {
+  padding: var(--space-8);
+  margin-bottom: var(--space-6);
+}
+.leadership-recommendation {
+  padding: var(--space-6);
+  margin: 0 0 var(--space-8);
+  border-color: #c4b5fd;
+  border-left: 6px solid #6d28d9;
+  background: #f5f3ff;
+  box-shadow: 0 18px 44px rgba(88, 28, 135, .12);
+}
+.recommendation-label,
+.priority-label,
+.priority-action span {
+  display: block;
+  color: var(--odp-muted);
+  font-size: .76rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+.leadership-recommendation p {
+  margin: var(--space-2) 0 0;
+  color: var(--odp-ink);
+  font-size: 1.05rem;
+  font-weight: 800;
+  line-height: 1.35;
+}
+.executive-dashboard-intro p,
+.executive-empty p {
+  margin: 0;
+  color: var(--odp-muted);
+}
+.decision-card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: var(--space-8);
+  margin-bottom: var(--space-6);
+}
+.decision-card,
+.executive-list,
+.executive-empty {
+  padding: var(--space-6);
+}
+.decision-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 174px;
+  border-top: 6px solid #64748b;
+  box-shadow: 0 18px 44px rgba(15, 23, 42, .11);
+}
+.primary-focus {
+  border-color: #bfdbfe;
+  border-top-color: #2563eb;
+  background: linear-gradient(135deg, #eff6ff 0%, #f8fbff 100%);
+}
+.secondary-focus {
+  border-color: #bfdbfe;
+  border-top-color: #3b82f6;
+  background: linear-gradient(135deg, #f1f7ff 0%, #fbfdff 100%);
+}
+.risk-focus {
+  border-color: #fed7aa;
+  border-top-color: #d97706;
+  background: linear-gradient(135deg, #fff7ed 0%, #fffbf5 100%);
+}
+.readiness-focus {
+  border-color: #d8d6e4;
+  border-top-color: #6d5f9f;
+  background: linear-gradient(135deg, #f7f5fb 0%, #fcfbff 100%);
+}
+.decision-card-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+.decision-card-icon {
+  flex: 0 0 44px;
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: #dbeafe;
+  border: 1px solid rgba(37, 99, 235, .18);
+  box-shadow: 0 12px 26px rgba(37, 99, 235, .24);
+}
+.decision-card-icon img {
+  width: 30px;
+  height: 30px;
+  display: block;
+  object-fit: contain;
+}
+.secondary-focus .decision-card-icon {
+  background: #eff6ff;
+  border-color: rgba(59, 130, 246, .18);
+  box-shadow: 0 12px 26px rgba(59, 130, 246, .2);
+}
+.risk-focus .decision-card-icon {
+  background: #ffedd5;
+  border-color: rgba(217, 119, 6, .22);
+  box-shadow: 0 12px 26px rgba(217, 119, 6, .22);
+}
+.readiness-focus .decision-card-icon {
+  background: #ede9fe;
+  border-color: rgba(109, 95, 159, .2);
+  box-shadow: 0 12px 26px rgba(109, 95, 159, .2);
+}
+.decision-card h3 {
+  margin: var(--space-1) 0 0;
+  font-size: 1.2rem;
+}
+.decision-insight {
+  margin: var(--space-4) 0 0;
+  color: var(--odp-muted);
+  font-size: .95rem;
+  line-height: 1.4;
+}
+.priority-action {
+  display: flex;
+  gap: var(--space-2);
+  margin: var(--space-4) 0 0;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--odp-line);
+}
+.priority-action p {
+  margin: 0;
+  color: var(--odp-ink);
+  font-size: .92rem;
+}
+.primary-focus .priority-action span,
+.primary-focus .priority-label,
+.primary-focus .decision-details-trigger {
+  color: #1d4ed8;
+}
+.secondary-focus .priority-action span,
+.secondary-focus .priority-label,
+.secondary-focus .decision-details-trigger {
+  color: #2563eb;
+}
+.risk-focus .priority-action span,
+.risk-focus .priority-label,
+.risk-focus .decision-details-trigger {
+  color: #c2410c;
+}
+.readiness-focus .priority-action span,
+.readiness-focus .priority-label,
+.readiness-focus .decision-details-trigger {
+  color: #5b4f8a;
+}
+.decision-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-top: auto;
+  padding-top: var(--space-4);
+}
+.priority-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+}
+.metadata-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 26px;
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid #d7deea;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, .72);
+  color: var(--odp-ink);
+  font-size: .82rem;
+  font-weight: 800;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, .08);
+}
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #64748b;
+}
+.confidence-high .status-dot {
+  background: #059669;
+}
+.confidence-medium .status-dot {
+  background: #f59e0b;
+}
+.confidence-low .status-dot {
+  background: #e11d48;
+}
+.evidence-badge {
+  color: #1d4ed8;
+}
+.evidence-icon {
+  position: relative;
+  width: 12px;
+  height: 12px;
+  border: 2px solid currentColor;
+  border-radius: 999px;
+}
+.evidence-direct .evidence-icon::after {
+  content: "";
+  position: absolute;
+  left: 3px;
+  top: 3px;
+  width: 4px;
+  height: 4px;
+  border-radius: 999px;
+  background: currentColor;
+}
+.evidence-inferred .evidence-icon {
+  border-radius: 2px;
+}
+.evidence-inferred .evidence-icon::after {
+  content: "";
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  top: 4px;
+  border-top: 2px solid currentColor;
+}
+.decision-details-toggle {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.decision-details-trigger {
+  display: flex;
+  justify-content: flex-end;
+  cursor: pointer;
+  font-size: .86rem;
+  font-weight: 800;
+}
+.decision-details-label-open {
+  display: none;
+}
+.decision-details-toggle:checked ~ .decision-card-footer .decision-details-label-closed {
+  display: none;
+}
+.decision-details-toggle:checked ~ .decision-card-footer .decision-details-label-open {
+  display: inline;
+}
+.decision-details-dropdown {
+  display: none;
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--odp-line);
+  color: var(--odp-muted);
+  font-size: .86rem;
+}
+.decision-details-toggle:checked ~ .decision-details-dropdown {
+  display: block;
+}
+.decision-details-dropdown h4 {
+  margin: var(--space-3) 0 var(--space-2);
+  color: var(--odp-ink);
+  font-size: .82rem;
+}
+.decision-details-dropdown ul {
+  margin: 0;
+  padding-left: var(--space-6);
+}
+.decision-details-dropdown li {
+  margin: var(--space-1) 0;
+}
+.executive-list {
+  margin-top: var(--space-6);
+}
+.executive-item {
+  padding-block: var(--space-4);
+  border-top: 1px solid var(--odp-line);
+}
+.executive-item:first-of-type {
+  border-top: 0;
+  padding-top: 0;
+}
+.executive-item p {
+  margin: 0 0 var(--space-3);
+}
+.business-evidence {
+  margin-top: var(--space-4);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--odp-line);
+}
+.business-evidence h4 {
+  margin: 0 0 var(--space-2);
+  color: var(--odp-muted);
+  font-size: .8rem;
+  text-transform: uppercase;
+}
+.business-evidence ul,
+.technical-evidence ul {
+  margin: 0;
+  padding-left: var(--space-6);
+}
+.business-evidence li {
+  margin: var(--space-1) 0;
+}
+.priority-evidence {
+  color: var(--odp-ink);
+}
+.technical-evidence {
+  margin-top: var(--space-3);
+  color: var(--odp-muted);
+  font-size: .85rem;
+}
+.technical-evidence summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+.evidence-refs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+.evidence-ref small {
+  color: var(--odp-muted);
+  font-weight: 700;
+}
+.chip.warning {
+  border-color: #d97706;
+  color: #92400e;
+  background: #fffbeb;
+}
+.product-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-6);
+}
+.card {
+  position: relative;
+  min-height: 216px;
+  padding: var(--space-6);
+}
+.card::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  border-radius: 8px 0 0 8px;
+  background: var(--odpc-orange);
+}
+.card.product::before { background: var(--odps-violet); }
+.card.signal::before { background: var(--odpv-blue); }
+.wide { grid-column: span 2; }
+.product-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 280px;
+}
+.product-card-description {
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.product-card-counters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: var(--space-4) 0;
+}
+.product-card-counters span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  border-radius: 999px;
+  background: var(--odp-soft);
+  color: var(--odp-muted);
+  font-size: .78rem;
+  font-weight: 800;
+}
+.product-card-counters strong {
+  color: var(--odp-ink);
+}
+.product-card-actions {
+  margin-top: auto;
+}
+.product-detail-button,
+.product-modal-close {
+  min-height: 36px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--odps-violet);
+  color: #fff;
+  cursor: pointer;
+  font-weight: 800;
+}
+.product-detail-button {
+  width: 100%;
+}
+.product-modal-close {
+  padding-inline: var(--space-4);
+}
+.product-detail-button:hover,
+.product-modal-close:hover {
+  background: #4f1f68;
+}
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: var(--space-1) var(--space-2);
+  border-radius: 999px;
+  background: var(--odp-soft);
+  color: var(--odp-muted);
+  font-size: .74rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.chip.odps { color: #fff; background: var(--odps-violet); }
+.chip.odpc { color: #fff; background: var(--odpc-orange); }
+.chip.odpg { color: #fff; background: var(--odpg-green); }
+.chip.odpv { color: #fff; background: var(--odpv-blue); }
+.card p,
+.panel p,
+.action-card p {
+  margin: 0 0 var(--space-4);
+  color: var(--odp-muted);
+}
+.odp-facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--space-2) var(--space-3);
+  margin: 0;
+  font-size: .9rem;
+}
+html[dir="rtl"] .odp-facts {
+  grid-template-columns: 1fr max-content;
+}
+.odp-facts dt {
+  color: var(--odp-muted);
+  font-weight: 700;
+}
+.odp-facts dd { margin: 0; }
+.component-section {
+  margin-top: var(--space-6);
+}
+.component-section h4 {
+  margin: 0 0 var(--space-3);
+}
+.table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+}
+.pricing-table {
+  width: 100%;
+  border-collapse: collapse;
+  border: 1px solid var(--odp-line);
+  border-radius: 8px;
+  background: #fff;
+  font-size: .88rem;
+}
+.pricing-table th,
+.pricing-table td {
+  padding: var(--space-3);
+  border-bottom: 1px solid var(--odp-line);
+  text-align: left;
+  vertical-align: top;
+}
+.pricing-table th {
+  background: var(--odp-soft);
+  color: var(--odp-muted);
+  font-size: .76rem;
+  text-transform: uppercase;
+}
+.pricing-table tr:last-child td {
+  border-bottom: 0;
+}
+.pricing-table p {
+  margin: var(--space-1) 0 0;
+  font-size: .84rem;
+}
+.pricing-linked-row td {
+  padding: var(--space-3);
+  background: #fbf9fc;
+}
+.pricing-linked-components {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+.linked-component-card {
+  min-width: 0;
+  border: 1px solid var(--odp-line);
+  border-radius: 8px;
+  background: #fff;
+  padding: var(--space-3);
+}
+.linked-component-title {
+  margin: 0 0 var(--space-2);
+  color: var(--odps-violet);
+  font-size: .72rem;
+  font-weight: 900;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+.linked-component-card h5 {
+  margin: 0 0 var(--space-2);
+  font-size: .98rem;
+}
+.linked-component-card .odp-facts {
+  grid-template-columns: max-content minmax(0, 1fr);
+}
+.component-list,
+.dimension-list,
+.component-refs {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.component-list {
+  display: grid;
+  gap: var(--space-3);
+}
+.component-card {
+  border: 1px solid var(--odp-line);
+  border-radius: 8px;
+  background: #fff;
+  padding: var(--space-4);
+}
+.component-card h5 {
+  margin: 0 0 var(--space-2);
+  font-size: 1rem;
+}
+.profile-chip {
+  display: inline-flex;
+  margin-bottom: var(--space-3);
+  padding: var(--space-1) var(--space-2);
+  border-radius: 999px;
+  background: var(--odp-soft);
+  color: var(--odp-muted);
+  font-size: .72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+.dimension-list {
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+.dimension-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-3);
+  align-items: start;
+  padding: var(--space-3);
+  border: 1px solid var(--odp-line);
+  border-radius: 8px;
+  background: var(--odp-soft);
+}
+.dimension-description {
+  margin: var(--space-1) 0 0;
+  font-size: .86rem;
+}
+.dimension-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+.dimension-metric,
+.dimension-weight {
+  display: inline-flex;
+  padding: var(--space-1) var(--space-2);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--odp-ink);
+  font-size: .78rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.component-refs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  color: var(--odp-muted);
+  font-size: .82rem;
+}
+.modal-open {
+  overflow: hidden;
+}
+.product-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: none;
+  padding: var(--space-8);
+}
+.product-modal[aria-hidden="false"] {
+  display: block;
+}
+.product-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(5, 5, 5, .64);
+}
+.product-modal-panel {
+  position: relative;
+  width: min(1120px, calc(100vw - (var(--space-8) * 2)));
+  max-height: calc(100vh - (var(--space-8) * 2));
+  margin: 0 auto;
+  overflow: auto;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, .28);
+}
+.product-modal-header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-6);
+  border-bottom: 1px solid var(--odp-line);
+  background: #fff;
+}
+.product-modal-header h3 {
+  margin: 0;
+  font-size: 1.45rem;
+}
+.product-detail-layout {
+  margin: 0;
+  padding: var(--space-6);
+  border-top: 0;
+}
+.odp-muted { color: var(--odp-muted); }
+.odp-detail {
+  margin-top: var(--space-4);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--odp-line);
+}
+.action-card,
+.overview-card {
+  border: 1px solid #ded2e8;
+  border-radius: 8px;
+  background: var(--odp-soft);
+  box-shadow: 0 14px 34px rgba(30, 10, 46, .06);
+}
+.action-card {
+  padding: var(--space-6);
+}
+.action-card strong {
+  display: block;
+  margin: var(--space-2) 0;
+}
+.action-link,
+.version-action {
+  color: var(--odps-violet);
+  cursor: pointer;
+  font-weight: 700;
+}
+.overview-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: var(--space-6);
+}
+.overview-section {
+  margin-top: var(--space-8);
+}
+.overview-card-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-6);
+}
+.change-story-list {
+  display: grid;
+  gap: var(--space-2);
+  margin: var(--space-4) 0 0;
+  padding-left: var(--space-6);
+  color: var(--odp-muted);
+}
+.panel { padding: var(--space-6); }
+.version-list {
+  margin: 0;
+  padding: 0;
+}
+.version-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin: 0 0 var(--space-2);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--odp-line);
+  list-style: none;
+}
+.version-history {
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--odp-line);
+}
+.version-table {
+  width: 100%;
+  max-width: 100%;
+  margin-top: var(--space-3);
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: .9rem;
+}
+.version-table th,
+.version-table td {
+  padding: var(--space-2);
+  border-bottom: 1px solid var(--odp-line);
+  text-align: left;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.version-table th {
+  color: var(--odp-muted);
+  font-size: .76rem;
+  text-transform: uppercase;
+}
+.version-table th:nth-child(1),
+.version-table td:nth-child(1) {
+  width: 48%;
+}
+.version-table th:nth-child(2),
+.version-table td:nth-child(2) {
+  width: 24%;
+}
+.version-table th:nth-child(3),
+.version-table td:nth-child(3) {
+  display: none;
+}
+.version-table th:nth-child(4),
+.version-table td:nth-child(4) {
+  width: 28%;
+  text-align: right;
+}
+.version-row a:first-child,
+.version-row strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.graph-explorer-frame {
+  display: block;
+  width: 100%;
+  height: min(900px, calc(100vh - 180px));
+  min-height: 680px;
+  border: 1px solid var(--odp-line);
+  border-radius: 8px;
+  background: #eef2f7;
+  box-shadow: 0 12px 32px rgba(30, 10, 46, .06);
+}
+.about-card {
+  padding: var(--space-8);
+  border-radius: 8px;
+  color: #fff;
+  background: var(--odp-ink);
+}
+.about-card p {
+  max-width: 820px;
+  color: rgba(255, 255, 255, .82);
+}
+.about-card .chip {
+  color: #fff;
+  background: rgba(255, 255, 255, .12);
+}
+.footer {
+  margin-top: var(--space-12);
+  padding-block: var(--space-8);
+  color: rgba(255, 255, 255, .78);
+  background: var(--odp-black);
+  border-top: 4px solid var(--odps-violet);
+  font-size: .92rem;
+}
+.footer-inner {
+  display: grid;
+  gap: var(--space-6);
+}
+.footer-status {
+  margin: 0;
+  max-width: 880px;
+  color: rgba(255, 255, 255, .88);
+}
+.footer-columns {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-6);
+}
+.footer-column h2 {
+  margin: 0 0 var(--space-3);
+  color: #fff;
+  font-size: .82rem;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+.footer-column ul {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.footer-column li {
+  min-width: 0;
+}
+.footer-column a {
+  color: #fff;
+  font-weight: 700;
+}
+.footer-column span {
+  color: rgba(255, 255, 255, .62);
+}
+@media (max-width: 900px) {
+  .overview-grid {
+    grid-template-columns: 1fr;
+  }
+  .footer-columns {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .grid,
+  .actions-grid,
+  .decision-card-grid,
+  .product-grid {
+    grid-template-columns: 1fr;
+  }
+  .product-modal {
+    padding: var(--space-3);
+  }
+  .product-modal-panel {
+    width: calc(100vw - (var(--space-3) * 2));
+    max-height: calc(100vh - (var(--space-3) * 2));
+  }
+  .product-modal-header {
+    align-items: start;
+  }
+  .dimension-row {
+    grid-template-columns: 1fr;
+  }
+  .dimension-meta {
+    justify-content: flex-start;
+  }
+  .wide { grid-column: auto; }
+}
+@media (max-width: 640px) {
+  .wrap,
+  .topbar-inner {
+    width: min(100% - (var(--space-4) * 2), 1180px);
+  }
+  .hero .wrap {
+    padding-block: var(--space-12);
+  }
+  .card,
+  .panel,
+  .action-card,
+  .decision-card,
+  .executive-list,
+  .executive-empty {
+    padding: var(--space-4);
+  }
+  .executive-dashboard-intro,
+  .about-card {
+    padding: var(--space-6);
+  }
+  .footer-columns {
+    grid-template-columns: 1fr;
+  }
+}
+
+</style>
+</head>
+<body>
+<header class="topbar">
+<div class="topbar-inner">
+<a class="brand" href="#overview" aria-label="Data products portfolio">Data Products Portfolio</a>
+
+</div>
+</header>
+<section class="hero">
+<div class="wrap">
+<p class="eyebrow">AI Agent First Portfolio Workspace</p>
+<h1>Demo Catalog</h1>
+<p class="lead">Demo catalog from sources.</p>
+</div>
+</section>
+<main class="wrap">
+<input class="tab-radio" type="radio" name="portfolio-tab" id="tab-overview" checked><input class="tab-radio" type="radio" name="portfolio-tab" id="tab-executive-summary"><input class="tab-radio" type="radio" name="portfolio-tab" id="tab-objectives"><input class="tab-radio" type="radio" name="portfolio-tab" id="tab-use-cases"><input class="tab-radio" type="radio" name="portfolio-tab" id="tab-products"><input class="tab-radio" type="radio" name="portfolio-tab" id="tab-signals"><input class="tab-radio" type="radio" name="portfolio-tab" id="tab-graph"><input class="tab-radio" type="radio" name="portfolio-tab" id="tab-about">
+<nav class="tabs" aria-label="Portfolio tabs"><label for="tab-overview">Overview</label><label for="tab-executive-summary">Executive Summary</label><label for="tab-objectives">Objectives</label><label for="tab-use-cases">Use Cases</label><label for="tab-products">Products</label><label for="tab-signals">Signals</label><label for="tab-graph">Graph</label><label for="tab-about">About</label></nav>
+<div class="panels">
+<section class="tab-panel overview-panel" id="overview"><div class="section-head"><div><p class="eyebrow">Portfolio Overview</p><h2>Generated workspace summary</h2></div></div><section class="summary" aria-label="Portfolio summary"><article class="metric"><strong>1</strong><span>Objective</span></article><article class="metric"><strong>1</strong><span>Use Cases</span></article><article class="metric"><strong>1</strong><span>Signal</span></article><article class="metric"><strong>1</strong><span>Product</span></article><article class="metric"><strong>2</strong><span>Graph Nodes</span></article><article class="metric"><strong>1</strong><span>Graph Edges</span></article></section><section aria-label="Recommended next actions"><div class="section-head"><div><p class="eyebrow">Operational Guidance</p><h2>Recommended next actions</h2></div></div><div class="actions-grid"><article class="action-card"><span class="chip">Complete</span><strong>Expand product evidence</strong><p>Review commercial, SLA, and data quality evidence for generated products.</p><label class="action-link" for="tab-products">Open Products</label></article><article class="action-card"><span class="chip">Validate</span><strong>Check graph coverage</strong><p>Review whether every objective and signal has a useful relationship path.</p><label class="action-link" for="tab-graph">Open Graph</label></article></div></section><section class="overview-section" aria-label="What changed since last version"><div class="section-head"><div><p class="eyebrow">Latest delta</p><h2>What changed since last version</h2></div></div><div class="overview-card-grid"><article class="action-card overview-card changes-card"><div class="chip-row"><span class="chip">Latest portfolio snapshot</span></div><p>Previous snapshot</p><dl class="odp-facts"><dt>Version</dt><dd>2026-06-07T12-30-00Z</dd><dt>Run</dt><dd>PortfolioRefresh</dd><dt>Validation</dt><dd>Validation needs review</dd></dl><ul class="change-story-list"><li>1 artifact was created.</li><li>2 artifacts were updated.</li><li>1 artifact was removed.</li><li>Signal source evidence was updated.</li><li>New use case source evidence was added.</li><li>Validation needs review before production use.</li></ul></article></div></section><section class="overview-section" aria-label="Portfolio versions"><div class="section-head"><div><p class="eyebrow">Version history</p><h2>Portfolio versions</h2></div></div><div class="overview-card-grid"><article class="action-card overview-card versions-card"><p>Latest page is always this index.html; previous snapshots open from version folders.</p><ul class="version-list"><li class="version-row"><strong>Current</strong><span>latest</span></li><li class="version-row"><a href="versions/2026-06-07T12-30-00Z/index.html">2026-06-07T12-30-00Z</a><a class="version-action" href="versions/2026-06-07T12-30-00Z/index.html">Open</a></li></ul><details class="version-history"><summary>Show all 1 versions</summary><table class="version-table"><thead><tr><th>Version</th><th>Run</th><th>Summary</th><th></th></tr></thead><tbody><tr><td>2026-06-07T12-30-00Z</td><td>refresh</td><td>Previous snapshot</td><td><a class="version-action" href="versions/2026-06-07T12-30-00Z/index.html">Open</a></td></tr></tbody></table></details></article></div></section></section>
+<section class="tab-panel executive-summary-panel" id="executive-summary"><div class="section-head"><div><p class="eyebrow">Leadership Decision Support</p><h2>Executive Summary</h2></div></div><article class="action-card executive-empty"><p>Executive summary has not been generated for this workspace yet. Run a LLM-backed portfolio build or refresh to create executive-summary.yaml.</p></article></section>
+<section class="tab-panel objectives-panel" id="objectives"><div class="section-head"><div><p class="eyebrow">Business-Led Starting Point</p><h2>Business Objectives</h2></div><p>Objectives make the portfolio business-led before products become the center of gravity.</p></div><div class="grid"><article class="card"><div class="chip-row"><span class="chip odpc">ODPC</span></div><h3>Improve Retention</h3><p>Reduce customer churn.</p><dl class="odp-facts"><dt>ID</dt><dd>OBJ-RETENTION</dd><dt>Status</dt><dd>active</dd><dt>Priority</dt><dd>high</dd></dl></article></div></section>
+<section class="tab-panel use-cases-panel" id="use-cases"><div class="section-head"><div><p class="eyebrow">Operational Demand</p><h2>Use Cases</h2></div><p>Use cases are the practical starting points for deciding which data products should exist.</p></div><div class="grid"><article class="card"><div class="chip-row"><span class="chip odpc">ODPC</span></div><h3>Retention Workflow</h3><p>Help teams intervene before churn.</p><dl class="odp-facts"><dt>ID</dt><dd>UC-RETENTION</dd><dt>Status</dt><dd>active</dd><dt>Priority</dt><dd>high</dd></dl></article></div></section>
+<section class="tab-panel products-panel" id="products"><div class="section-head"><div><p class="eyebrow">Product Reference + ODPS Detail</p><h2>Products</h2></div><p>Product cards start from ODPC references and open into detailed ODPS product specifications.</p></div><div class="product-grid"><article class="card product product-card"><div class="chip-row"><span class="chip odps">ODPS</span><span class="chip odpc">ODPC Reference</span></div><h3>Customer Product</h3><p class="product-card-description">Customer analytics product.</p><dl class="odp-facts"><dt>Product ID</dt><dd>customer-product</dd><dt>Status</dt><dd>production</dd><dt>Visibility</dt><dd>internal</dd><dt>Type</dt><dd>dataset</dd></dl><div class="product-card-counters"><span><strong>1</strong>Pricing</span><span><strong>1</strong>SLA</span><span><strong>1</strong>DQ</span></div><div class="product-card-actions"><button class="product-detail-button" type="button" data-modal-target="product-modal-customer-product">Details</button></div></article></div><div class="product-modal" id="product-modal-customer-product" aria-hidden="true" role="dialog" aria-modal="true" aria-label="Customer Product details"><div class="product-modal-backdrop" data-modal-close></div><div class="product-modal-panel" role="document"><div class="product-modal-header"><div><p class="eyebrow">ODPS Product Detail</p><h3>Customer Product</h3></div><button class="product-modal-close" type="button" data-modal-close aria-label="Close product details">Close</button></div><div class="odp-detail product-detail-layout"><p>Full product details from product discussions.</p><dl class="odp-facts"><dt>Name</dt><dd>Customer Product</dd><dt>Product ID</dt><dd>customer-product</dd><dt>Status</dt><dd>production</dd><dt>Visibility</dt><dd>internal</dd><dt>Type</dt><dd>dataset</dd></dl><section class="component-section"><h4>Pricing</h4><div class="table-scroll"><table class="pricing-table"><thead><tr><th>Plan</th><th>Price</th><th>Billing Duration</th><th>Unit</th><th>References</th></tr></thead><tbody><tr class="pricing-plan-row"><td><strong>Internal Starter</strong></td><td>0 USD</td><td></td><td>request</td><td></td></tr></tbody></table></div></section><section class="component-section"><h4>Unlinked SLA profiles</h4><ul class="component-list"><li class="component-card"><h5>Default</h5><span class="profile-chip">default</span><dl class="odp-facts"><dt>Dimension</dt><dd>availability</dd><dt>Objective</dt><dd>Best effort</dd></dl></li></ul></section><section class="component-section"><h4>Unlinked Data Quality profiles</h4><ul class="component-list"><li class="component-card"><h5>Default</h5><span class="profile-chip">default</span><dl class="odp-facts"><dt>Dimension</dt><dd>freshness</dd><dt>Objective</dt><dd>Daily</dd></dl></li></ul></section><p class="odp-muted">Raw artifact: examples\portfolio\generated-spacing-preview\rich-workspace\odps\products\customer-product.yaml</p></div></div></div></section>
+<section class="tab-panel signals-panel" id="signals"><div class="section-head"><div><p class="eyebrow">Market And Portfolio Signals</p><h2>Signals</h2></div><p>Signals explain why a product or use case matters now, and how confident the evidence is.</p></div><div class="grid"><article class="card signal"><div class="chip-row"><span class="chip odpc">ODPC</span></div><h3>Churn Signal</h3><p>Market signal for retention risk.</p><dl class="odp-facts"><dt>ID</dt><dd>SIG-CHURN</dd><dt>Confidence</dt><dd>high</dd><dt>Type</dt><dd>market</dd></dl></article></div></section>
+<section class="tab-panel graph-panel" id="graph"><div class="section-head"><div><p class="eyebrow">ODPG Graph View</p><h2>Graph explorer</h2></div></div><iframe class="graph-explorer-frame" title="ODPG graph explorer" srcdoc="
+&lt;!DOCTYPE html&gt;
+&lt;html lang=&quot;en&quot;&gt;
+&lt;head&gt;
+  &lt;meta charset=&quot;UTF-8&quot; /&gt;
+  &lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot; /&gt;
+  &lt;title&gt;ODPG Graph Explorer — Demo Graph&lt;/title&gt;
+  &lt;script src=&quot;https://cdn.jsdelivr.net/npm/vis-network@9.1.9/standalone/umd/vis-network.min.js&quot;&gt;&lt;/script&gt;
+  &lt;style&gt;
+    :root {
+      --topbar-bg: #005316;
+      --topbar-fg: #f8fafc;
+      --topbar-muted: #fff;
+      --canvas-bg: #ffffff;
+      --border: #e2e8f0;
+      --inspector-bg: #f8fafc;
+      --accent: #2563eb;
+    }
+
+    * { box-sizing: border-box; }
+
+    html {
+      height: 100%;
+    }
+
+    body {
+      margin: 0;
+      font-family: &quot;Segoe UI&quot;, system-ui, -apple-system, sans-serif;
+      background: #eef2f7;
+      color: #0f172a;
+      height: 100%;
+      max-height: none;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    html:fullscreen {
+      width: 100%;
+      height: 100%;
+      background: #eef2f7;
+    }
+
+    html:fullscreen body {
+      max-height: none;
+      height: 100%;
+    }
+
+    .workspace:fullscreen {
+      width: 100%;
+      height: 100%;
+      background: var(--canvas-bg);
+    }
+
+    .workspace:fullscreen .workspace-main {
+      flex: 1 1 auto;
+      min-height: 0;
+    }
+
+    .workspace:fullscreen .odpg-footer {
+      display: none;
+    }
+
+    .topbar {
+      flex-shrink: 0;
+      display: grid;
+      grid-template-columns: minmax(160px, 1fr) minmax(0, 2.2fr) minmax(160px, 1fr);
+      align-items: center;
+      gap: 12px;
+      padding: 10px 20px;
+      background: var(--topbar-bg);
+      color: var(--topbar-fg);
+      border-bottom: 1px solid #003d10;
+      min-height: 52px;
+    }
+
+    .topbar-brand {
+      font-weight: 700;
+      font-size: 14px;
+      letter-spacing: 0.02em;
+      color: var(--topbar-fg);
+    }
+
+    .topbar-center {
+      display: grid;
+      gap: 6px;
+      text-align: center;
+      min-width: 0;
+    }
+
+    .topbar-graph-heading {
+      min-width: 0;
+    }
+
+    .topbar-search {
+      position: relative;
+      min-width: 220px;
+      max-width: 460px;
+      width: 100%;
+      justify-self: center;
+    }
+
+    .topbar-search input {
+      width: 100%;
+      height: 36px;
+      border: 1px solid rgba(255, 255, 255, 0.32);
+      border-radius: 8px;
+      padding: 0 12px 0 36px;
+      background: rgba(255, 255, 255, 0.12);
+      color: #ffffff;
+      font-size: 13px;
+      outline: none;
+    }
+
+    .topbar-search input::placeholder {
+      color: rgba(255, 255, 255, 0.76);
+    }
+
+    .topbar-search input:focus {
+      background: #ffffff;
+      color: #0f172a;
+      border-color: #bfdbfe;
+      box-shadow: 0 0 0 3px rgba(191, 219, 254, 0.22);
+    }
+
+    .topbar-search svg {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: rgba(255, 255, 255, 0.82);
+      pointer-events: none;
+    }
+
+    .topbar-search:focus-within svg {
+      color: #64748b;
+    }
+
+    .search-results {
+      position: absolute;
+      top: calc(100% + 8px);
+      left: 0;
+      right: 0;
+      z-index: 20;
+      display: none;
+      max-height: 280px;
+      overflow-y: auto;
+      padding: 6px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: #ffffff;
+      box-shadow: 0 12px 30px rgba(15, 23, 42, 0.18);
+    }
+
+    .search-result {
+      display: grid;
+      grid-template-columns: 10px 1fr;
+      gap: 9px;
+      align-items: center;
+      width: 100%;
+      padding: 8px;
+      border: none;
+      border-radius: 6px;
+      background: transparent;
+      color: #0f172a;
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .search-result:hover,
+    .search-result.is-active {
+      background: #f1f5f9;
+    }
+
+    .search-result-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+    }
+
+    .search-result strong {
+      display: block;
+      font-size: 12px;
+      line-height: 1.25;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .search-result span {
+      display: block;
+      margin-top: 2px;
+      font-size: 11px;
+      color: #64748b;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .topbar-graph-title {
+      display: block;
+      font-size: 17px;
+      font-weight: 600;
+      line-height: 1.25;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .topbar-graph-meta {
+      display: block;
+      font-size: 12px;
+      color: var(--topbar-muted);
+      margin-top: 2px;
+    }
+
+    .topbar-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 6px;
+    }
+
+    .icon-btn {
+      width: 36px;
+      height: 36px;
+      border: none;
+      border-radius: 8px;
+      background: transparent;
+      color: var(--topbar-muted);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .icon-btn:hover {
+      background: rgba(148, 163, 184, 0.15);
+      color: var(--topbar-fg);
+    }
+
+    .workspace {
+      flex: 1 1 auto;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .workspace-main {
+      flex: 1 1 auto;
+      min-height: 0;
+      display: grid;
+      grid-template-columns: 1fr minmax(280px, 380px);
+      grid-template-rows: 1fr;
+      overflow: hidden;
+    }
+
+    .canvas-col {
+      display: flex;
+      flex-direction: column;
+      background: var(--canvas-bg);
+      min-height: 0;
+      min-width: 0;
+      overflow: hidden;
+    }
+
+    .canvas-graph-area {
+      position: relative;
+      flex: 1 1 auto;
+      min-height: 120px;
+      min-width: 0;
+    }
+
+    #graph {
+      width: 100%;
+      height: 100%;
+      min-height: 0;
+    }
+
+    .vis-tooltip,
+    div.vis-network-tooltip {
+      white-space: pre-line !important;
+    }
+
+    .minimap {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      width: 200px;
+      height: 132px;
+      z-index: 5;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: #fff;
+      box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
+      overflow: hidden;
+    }
+
+    .graph-tools {
+      position: absolute;
+      top: 50%;
+      left: 12px;
+      transform: translateY(-50%);
+      z-index: 6;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      padding: 6px;
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
+    }
+
+    .graph-tools button {
+      width: 34px;
+      height: 34px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: #fff;
+      font-size: 18px;
+      line-height: 1;
+      cursor: pointer;
+      color: #334155;
+    }
+
+    .graph-tools button:hover {
+      background: #f1f5f9;
+    }
+
+    .graph-tools button.is-locked {
+      background: #e0f2fe;
+      border-color: #7dd3fc;
+      color: #0369a1;
+    }
+
+    .graph-legend {
+      flex-shrink: 0;
+      width: 100%;
+      background: #f8fafc;
+      border-top: 1px solid var(--border);
+      padding: 10px 18px 12px;
+      overflow-x: auto;
+      overflow-y: visible;
+    }
+
+    .graph-legend-inner {
+      display: grid;
+      grid-template-columns: 1fr auto 1.15fr;
+      gap: 0 20px;
+      align-items: stretch;
+      max-width: 100%;
+    }
+
+    .graph-legend-divider {
+      width: 1px;
+      background: #e2e8f0;
+      margin: 4px 0;
+    }
+
+    .graph-legend-title {
+      margin: 0 0 10px;
+      font-size: 11px;
+      font-weight: 700;
+      color: #475569;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .graph-legend-node-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px 14px;
+    }
+
+    .graph-legend-edge-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px 12px;
+    }
+
+    @media (max-width: 1100px) {
+      .graph-legend-node-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .graph-legend-edge-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+
+    .legend-node-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      font-weight: 500;
+      color: #1e293b;
+      white-space: nowrap;
+    }
+
+    .legend-node-dot {
+      width: 13px;
+      height: 13px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.18);
+    }
+
+    .legend-edge-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+      font-weight: 600;
+      color: #334155;
+      letter-spacing: 0.02em;
+    }
+
+    .legend-edge-item svg {
+      flex-shrink: 0;
+    }
+
+    .odpg-footer {
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      padding: 12px 20px 14px;
+      border-top: 1px solid rgba(255, 255, 255, 0.18);
+      background: linear-gradient(180deg, #0a6b22 0%, var(--topbar-bg) 100%);
+      color: #ecfdf5;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .odpg-footer-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .odpg-footer-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+      font-weight: 600;
+      color: #f0fdf4;
+      font-size: 24px;
+    }
+
+    .odpg-footer-mark {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      background: rgba(0, 0, 0, 0.25);
+      color: #ffffff;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      flex-shrink: 0;
+    }
+
+    .odpg-footer-link {
+      color: #bbf7d0;
+      font-weight: 700;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+
+    .odpg-footer-link:hover {
+      text-decoration: underline;
+      color: #ffffff;
+    }
+
+    .odpg-footer-resources {
+      display: flex;
+      flex-direction: row;
+      flex-wrap: nowrap;
+      align-items: center;
+      gap: 8px 14px;
+      min-width: 0;
+      width: 100%;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .odpg-footer-resources h3 {
+      margin: 0;
+      flex-shrink: 0;
+      font-size: 11px;
+      font-weight: 700;
+      color: #bbf7d0;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      white-space: nowrap;
+    }
+
+    .odpg-footer-resources a {
+      flex-shrink: 0;
+      white-space: nowrap;
+      color: #ffffff;
+      font-weight: 600;
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+
+    .odpg-footer-resources a:hover {
+      color: #fef08a;
+    }
+
+    @media (max-width: 760px) {
+      .odpg-footer-top {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 8px;
+      }
+    }
+
+    .inspector {
+      border-left: 1px solid var(--border);
+      background: var(--inspector-bg);
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      min-width: 0;
+    }
+
+    .inspector-tabs {
+      display: flex;
+      border-bottom: 1px solid var(--border);
+      background: #fff;
+    }
+
+    .inspector-tabs button {
+      flex: 1;
+      padding: 12px 10px;
+      border: none;
+      background: transparent;
+      font-size: 13px;
+      font-weight: 600;
+      color: #64748b;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+    }
+
+    .inspector-tabs button.is-active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+      background: #f8fafc;
+    }
+
+    .filter-panel {
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      max-height: min(44vh, 430px);
+      overflow-y: auto;
+      padding: 14px 16px;
+      border-top: 1px solid var(--border);
+      background: #ffffff;
+    }
+
+    .filter-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .filter-head h2 {
+      margin: 0;
+      font-size: 13px;
+      font-weight: 800;
+      color: #334155;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .filter-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+
+    .filter-reset {
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      background: #f8fafc;
+      color: #334155;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 6px 9px;
+    }
+
+    .filter-reset:hover {
+      background: #eef2f7;
+    }
+
+    .filter-status {
+      margin: -5px 0 0;
+      font-size: 12px;
+      color: #64748b;
+    }
+
+    .filter-group h3 {
+      margin: 0 0 8px;
+      font-size: 11px;
+      font-weight: 800;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .filter-options {
+      display: grid;
+      gap: 6px;
+    }
+
+    .filter-option {
+      display: grid;
+      grid-template-columns: 16px 12px minmax(0, 1fr) auto;
+      gap: 8px;
+      align-items: center;
+      min-height: 28px;
+      padding: 4px 6px;
+      border-radius: 6px;
+      color: #1e293b;
+      cursor: pointer;
+      font-size: 12px;
+      user-select: none;
+    }
+
+    .filter-option:hover {
+      background: #f8fafc;
+    }
+
+    .filter-option.is-muted {
+      opacity: 0.45;
+    }
+
+    .filter-option input {
+      width: 14px;
+      height: 14px;
+      margin: 0;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+
+    .filter-swatch {
+      width: 11px;
+      height: 11px;
+      border-radius: 999px;
+      box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.18);
+    }
+
+    .filter-label {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-weight: 600;
+    }
+
+    .filter-count {
+      color: #64748b;
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .inspector-panel {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px 18px 20px;
+    }
+
+    .inspector-panel.is-hidden {
+      display: none;
+    }
+
+    .panel-placeholder {
+      color: #64748b;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .panel-head {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      margin-bottom: 18px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .type-dot {
+      width: 40px;
+      height: 40px;
+      border-radius: 999px;
+      flex-shrink: 0;
+      border: 2px solid rgba(255, 255, 255, 0.95);
+      box-shadow: 0 2px 6px rgba(15, 23, 42, 0.12);
+    }
+
+    .panel-head h2 {
+      margin: 0;
+      font-size: 15px;
+      font-weight: 700;
+      line-height: 1.3;
+    }
+
+    .panel-head .sub {
+      margin: 4px 0 0;
+      font-size: 12px;
+      color: #64748b;
+      font-weight: 500;
+    }
+
+    .field {
+      margin-bottom: 14px;
+    }
+
+    .field label {
+      display: block;
+      font-size: 11px;
+      font-weight: 700;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .field span, .field p {
+      display: block;
+      margin-top: 5px;
+      font-size: 13px;
+      color: #0f172a;
+      word-break: break-word;
+      line-height: 1.45;
+    }
+  .topbar{display:none!important;}&lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+  &lt;header class=&quot;topbar&quot;&gt;
+    &lt;div class=&quot;topbar-brand&quot;&gt;&lt;img src=&quot;https://github.com/Open-Data-Product-Initiative/odpg-v1.0/blob/main/source/images/odpg-white.png?raw=true&quot; alt=&quot;ODPG Logo&quot; width=&quot;100&quot;&gt;&lt;/div&gt;
+    &lt;div class=&quot;topbar-center&quot;&gt;
+      &lt;div class=&quot;topbar-graph-heading&quot;&gt;
+        &lt;span class=&quot;topbar-graph-title&quot;&gt;Demo Graph&lt;/span&gt;
+        &lt;span class=&quot;topbar-graph-meta&quot;&gt;GRAPH-DEMO · ODPG 1.0 · Graph&lt;/span&gt;
+      &lt;/div&gt;
+      &lt;div class=&quot;topbar-search&quot;&gt;
+        &lt;svg width=&quot;17&quot; height=&quot;17&quot; viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;2&quot; aria-hidden=&quot;true&quot;&gt;&lt;circle cx=&quot;11&quot; cy=&quot;11&quot; r=&quot;7&quot;/&gt;&lt;path d=&quot;M21 21l-4.3-4.3&quot;/&gt;&lt;/svg&gt;
+        &lt;input id=&quot;node-search&quot; type=&quot;search&quot; placeholder=&quot;Search nodes in Demo Graph&quot; autocomplete=&quot;off&quot; aria-label=&quot;Search graph nodes&quot;&gt;
+        &lt;div id=&quot;search-results&quot; class=&quot;search-results&quot; role=&quot;listbox&quot; aria-label=&quot;Node search results&quot;&gt;&lt;/div&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+    &lt;div class=&quot;topbar-actions&quot;&gt;
+      &lt;button type=&quot;button&quot; class=&quot;icon-btn&quot; title=&quot;Fit graph&quot; id=&quot;btn-fit-top&quot;&gt;
+        &lt;svg width=&quot;18&quot; height=&quot;18&quot; viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;2&quot;&gt;&lt;path d=&quot;M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7&quot;/&gt;&lt;/svg&gt;
+      &lt;/button&gt;
+      &lt;button type=&quot;button&quot; class=&quot;icon-btn&quot; title=&quot;Fullscreen&quot; id=&quot;btn-fullscreen&quot;&gt;
+        &lt;svg width=&quot;18&quot; height=&quot;18&quot; viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;2&quot;&gt;&lt;path d=&quot;M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3&quot;/&gt;&lt;/svg&gt;
+      &lt;/button&gt;
+      &lt;button type=&quot;button&quot; class=&quot;icon-btn&quot; title=&quot;About&quot;&gt;
+        &lt;svg width=&quot;18&quot; height=&quot;18&quot; viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;2&quot;&gt;&lt;circle cx=&quot;12&quot; cy=&quot;12&quot; r=&quot;10&quot;/&gt;&lt;path d=&quot;M12 16v-4M12 8h.01&quot;/&gt;&lt;/svg&gt;
+      &lt;/button&gt;
+    &lt;/div&gt;
+  &lt;/header&gt;
+
+  &lt;div class=&quot;workspace&quot;&gt;
+    &lt;div class=&quot;workspace-main&quot;&gt;
+    &lt;div class=&quot;canvas-col&quot;&gt;
+      &lt;div class=&quot;canvas-graph-area&quot;&gt;
+      &lt;nav class=&quot;graph-tools&quot; aria-label=&quot;Zoom and layout&quot;&gt;
+        &lt;button type=&quot;button&quot; id=&quot;btn-zoom-in&quot; title=&quot;Zoom in&quot;&gt;+&lt;/button&gt;
+        &lt;button type=&quot;button&quot; id=&quot;btn-zoom-out&quot; title=&quot;Zoom out&quot;&gt;−&lt;/button&gt;
+        &lt;button type=&quot;button&quot; id=&quot;btn-fit&quot; title=&quot;Fit view&quot;&gt;⊙&lt;/button&gt;
+        &lt;button type=&quot;button&quot; id=&quot;btn-physics&quot; title=&quot;Toggle physics (layout)&quot;&gt;◎&lt;/button&gt;
+        &lt;button type=&quot;button&quot; id=&quot;btn-fullscreen-canvas&quot; title=&quot;Fullscreen&quot; aria-label=&quot;Fullscreen graph workspace&quot;&gt;⛶&lt;/button&gt;
+      &lt;/nav&gt;
+      &lt;div id=&quot;minimap&quot; class=&quot;minimap&quot; aria-label=&quot;Overview map&quot;&gt;&lt;/div&gt;
+      &lt;div id=&quot;graph&quot;&gt;&lt;/div&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+
+    &lt;aside class=&quot;inspector&quot;&gt;
+      &lt;div class=&quot;inspector-tabs&quot; role=&quot;tablist&quot;&gt;
+        &lt;button type=&quot;button&quot; id=&quot;tab-node&quot; class=&quot;is-active&quot; role=&quot;tab&quot; aria-selected=&quot;true&quot;&gt;Node details&lt;/button&gt;
+        &lt;button type=&quot;button&quot; id=&quot;tab-edge&quot; role=&quot;tab&quot; aria-selected=&quot;false&quot;&gt;Edge details&lt;/button&gt;
+      &lt;/div&gt;
+      &lt;div id=&quot;panel-node&quot; class=&quot;inspector-panel&quot; role=&quot;tabpanel&quot;&gt;
+        &lt;p class=&quot;panel-placeholder&quot; id=&quot;node-placeholder&quot;&gt;Select a node on the graph to see ID, type, reference, and description.&lt;/p&gt;
+        &lt;div id=&quot;node-detail&quot; style=&quot;display:none&quot;&gt;&lt;/div&gt;
+      &lt;/div&gt;
+      &lt;div id=&quot;panel-edge&quot; class=&quot;inspector-panel is-hidden&quot; role=&quot;tabpanel&quot;&gt;
+        &lt;p class=&quot;panel-placeholder&quot; id=&quot;edge-placeholder&quot;&gt;Select an edge to see relationship type and confidence.&lt;/p&gt;
+        &lt;div id=&quot;edge-detail&quot; style=&quot;display:none&quot;&gt;&lt;/div&gt;
+      &lt;/div&gt;
+      &lt;section class=&quot;filter-panel&quot; aria-label=&quot;Graph filters&quot;&gt;
+        &lt;div class=&quot;filter-head&quot;&gt;
+          &lt;h2&gt;Filters&lt;/h2&gt;
+          &lt;div class=&quot;filter-actions&quot;&gt;
+            &lt;button type=&quot;button&quot; id=&quot;btn-toggle-filters&quot; class=&quot;filter-reset&quot;&gt;Deselect all&lt;/button&gt;
+            &lt;button type=&quot;button&quot; id=&quot;btn-reset-filters&quot; class=&quot;filter-reset&quot;&gt;Reset&lt;/button&gt;
+          &lt;/div&gt;
+        &lt;/div&gt;
+        &lt;p id=&quot;filter-status&quot; class=&quot;filter-status&quot;&gt;&lt;/p&gt;
+        &lt;div class=&quot;filter-group&quot;&gt;
+          &lt;h3&gt;Node types&lt;/h3&gt;
+          &lt;div id=&quot;filter-node-types&quot; class=&quot;filter-options&quot;&gt;&lt;/div&gt;
+        &lt;/div&gt;
+        &lt;div class=&quot;filter-group&quot;&gt;
+          &lt;h3&gt;Relationship types&lt;/h3&gt;
+          &lt;div id=&quot;filter-edge-types&quot; class=&quot;filter-options&quot;&gt;&lt;/div&gt;
+        &lt;/div&gt;
+        &lt;div class=&quot;filter-group&quot;&gt;
+          &lt;h3&gt;Confidence&lt;/h3&gt;
+          &lt;div id=&quot;filter-confidence&quot; class=&quot;filter-options&quot;&gt;&lt;/div&gt;
+        &lt;/div&gt;
+      &lt;/section&gt;
+    &lt;/aside&gt;
+    &lt;/div&gt;
+
+    &lt;div class=&quot;graph-legend&quot; role=&quot;region&quot; aria-label=&quot;Graph legend&quot;&gt;
+        &lt;div class=&quot;graph-legend-inner&quot;&gt;
+          &lt;div class=&quot;graph-legend-col&quot;&gt;
+            &lt;h3 class=&quot;graph-legend-title&quot;&gt;Node Types&lt;/h3&gt;
+            &lt;div class=&quot;graph-legend-node-grid&quot;&gt;
+              &lt;div class=&quot;legend-node-item&quot;&gt;&lt;span class=&quot;legend-node-dot&quot; style=&quot;background:#16a34a&quot;&gt;&lt;/span&gt;UseCase&lt;/div&gt;
+              &lt;div class=&quot;legend-node-item&quot;&gt;&lt;span class=&quot;legend-node-dot&quot; style=&quot;background:#0284c7&quot;&gt;&lt;/span&gt;DataProduct&lt;/div&gt;
+              &lt;div class=&quot;legend-node-item&quot;&gt;&lt;span class=&quot;legend-node-dot&quot; style=&quot;background:#7c3aed&quot;&gt;&lt;/span&gt;API&lt;/div&gt;
+              &lt;div class=&quot;legend-node-item&quot;&gt;&lt;span class=&quot;legend-node-dot&quot; style=&quot;background:#ea580c&quot;&gt;&lt;/span&gt;BusinessObjective&lt;/div&gt;
+              &lt;div class=&quot;legend-node-item&quot;&gt;&lt;span class=&quot;legend-node-dot&quot; style=&quot;background:#0891b2&quot;&gt;&lt;/span&gt;Signal&lt;/div&gt;
+              &lt;div class=&quot;legend-node-item&quot;&gt;&lt;span class=&quot;legend-node-dot&quot; style=&quot;background:#0d9488&quot;&gt;&lt;/span&gt;KPI&lt;/div&gt;
+              &lt;div class=&quot;legend-node-item&quot;&gt;&lt;span class=&quot;legend-node-dot&quot; style=&quot;background:#db2777&quot;&gt;&lt;/span&gt;Policy&lt;/div&gt;
+              &lt;div class=&quot;legend-node-item&quot;&gt;&lt;span class=&quot;legend-node-dot&quot; style=&quot;background:#0e7490&quot;&gt;&lt;/span&gt;Agent&lt;/div&gt;
+              &lt;div class=&quot;legend-node-item&quot;&gt;&lt;span class=&quot;legend-node-dot&quot; style=&quot;background:#fb923c&quot;&gt;&lt;/span&gt;StrategicOpportunity&lt;/div&gt;
+            &lt;/div&gt;
+          &lt;/div&gt;
+          &lt;div class=&quot;graph-legend-divider&quot; aria-hidden=&quot;true&quot;&gt;&lt;/div&gt;
+          &lt;div class=&quot;graph-legend-col&quot;&gt;
+            &lt;h3 class=&quot;graph-legend-title&quot;&gt;Relationship Types&lt;/h3&gt;
+            &lt;div class=&quot;graph-legend-edge-grid&quot;&gt;
+              &lt;div class=&quot;legend-edge-item&quot;&gt;
+                &lt;svg viewBox=&quot;0 0 44 14&quot; width=&quot;44&quot; height=&quot;14&quot; aria-hidden=&quot;true&quot;&gt;&lt;line x1=&quot;2&quot; y1=&quot;7&quot; x2=&quot;34&quot; y2=&quot;7&quot; stroke=&quot;#16a34a&quot; stroke-width=&quot;2&quot;/&gt;&lt;polygon points=&quot;40,7 32,3 32,11&quot; fill=&quot;#16a34a&quot;/&gt;&lt;/svg&gt;
+                &lt;span&gt;uses&lt;/span&gt;
+              &lt;/div&gt;
+            &lt;/div&gt;
+          &lt;/div&gt;
+        &lt;/div&gt;
+      &lt;/div&gt;
+
+      
+  &lt;/div&gt;
+
+  &lt;script&gt;
+    (function () {
+    function escHtml(s) {
+      return String(s == null ? &quot;&quot; : s).replace(/&amp;/g,&quot;&amp;amp;&quot;).replace(/&lt;/g,&quot;&amp;lt;&quot;).replace(/&gt;/g,&quot;&amp;gt;&quot;).replace(/&quot;/g,&quot;&amp;quot;&quot;);
+    }
+
+    const TYPE_COLORS = {
+      UseCase: &quot;#16a34a&quot;,
+      BusinessObjective: &quot;#ea580c&quot;,
+      StrategicOpportunity: &quot;#f97316&quot;,
+      DataProduct: &quot;#0284c7&quot;,
+      Agent: &quot;#0e7490&quot;,
+      API: &quot;#7c3aed&quot;,
+      Policy: &quot;#db2777&quot;,
+      Signal: &quot;#0891b2&quot;,
+      KPI: &quot;#0d9488&quot;
+    };
+
+    const NODE_TYPES = [&quot;DataProduct&quot;, &quot;UseCase&quot;];
+    const RELATIONSHIP_TYPES = [&quot;uses&quot;];
+    const CONFIDENCE_LEVELS = [&quot;high&quot;];
+    const ODPG_SUPPORTED_EDGE_TYPES_ORDERED = [&quot;uses&quot;, &quot;supports&quot;, &quot;contributesTo&quot;, &quot;measures&quot;, &quot;tracks&quot;, &quot;dependsOn&quot;, &quot;produces&quot;, &quot;consumes&quot;, &quot;governedBy&quot;, &quot;ownedBy&quot;, &quot;alignsWith&quot;, &quot;alignWith&quot;, &quot;relatedTo&quot;, &quot;impacts&quot;, &quot;derivedFrom&quot;, &quot;exposes&quot;, &quot;monitors&quot;, &quot;identifies&quot;];
+    const ODPG_EDGE_TYPE_DESCRIPTIONS = {&quot;uses&quot;: &quot;A node uses another node as part of execution or operation&quot;, &quot;supports&quot;: &quot;A node supports a business objective&quot;, &quot;contributesto&quot;: &quot;A node contributes toward an outcome or objective&quot;, &quot;measures&quot;: &quot;A KPI measures an objective or outcome&quot;, &quot;tracks&quot;: &quot;A node tracks or provides KPI-related information&quot;, &quot;dependson&quot;: &quot;A node depends on another node&quot;, &quot;produces&quot;: &quot;A node produces data, outputs, or services&quot;, &quot;consumes&quot;: &quot;A node consumes data, APIs, or outputs&quot;, &quot;governedby&quot;: &quot;A node is governed by a policy or control&quot;, &quot;ownedby&quot;: &quot;A node is owned by a person, team, or domain&quot;, &quot;alignswith&quot;: &quot;A node aligns strategically or semantically with another node&quot;, &quot;alignwith&quot;: &quot;A node aligns strategically or semantically with another node&quot;, &quot;relatedto&quot;: &quot;A generic semantic relationship&quot;, &quot;impacts&quot;: &quot;A node impacts another node&quot;, &quot;derivedfrom&quot;: &quot;A node originates from another node&quot;, &quot;exposes&quot;: &quot;A node exposes an API or interface&quot;, &quot;monitors&quot;: &quot;A node monitors another node&quot;, &quot;identifies&quot;: &quot;A node identifies an opportunity or condition&quot;};
+
+    if (typeof vis === &quot;undefined&quot;) {
+      document.getElementById(&quot;graph&quot;).innerHTML =
+        &quot;&lt;p style=\&quot;padding:24px;font-family:sans-serif;line-height:1.5\&quot;&gt;&quot; +
+        &quot;The graph library did not load (network or CDN blocked). &quot; +
+        &quot;Serve this folder over HTTP or allow scripts from cdn.jsdelivr.net, then reload.&quot; +
+        &quot;&lt;/p&gt;&quot;;
+      return;
+    }
+
+    const nodes = new vis.DataSet([
+  {
+    &quot;id&quot;: &quot;UC-RETENTION&quot;,
+    &quot;label&quot;: &quot;Retention Workflow&quot;,
+    &quot;title&quot;: &quot;ID: UC-RETENTION\nType: UseCase\nRef: &quot;,
+    &quot;group&quot;: &quot;UseCase&quot;,
+    &quot;ref&quot;: &quot;&quot;,
+    &quot;type&quot;: &quot;UseCase&quot;,
+    &quot;displayName&quot;: &quot;&quot;
+  },
+  {
+    &quot;id&quot;: &quot;PR-CUSTOMER&quot;,
+    &quot;label&quot;: &quot;Customer Product&quot;,
+    &quot;title&quot;: &quot;ID: PR-CUSTOMER\nType: DataProduct\nRef: &quot;,
+    &quot;group&quot;: &quot;DataProduct&quot;,
+    &quot;ref&quot;: &quot;&quot;,
+    &quot;type&quot;: &quot;DataProduct&quot;,
+    &quot;displayName&quot;: &quot;&quot;
+  }
+]);
+    const edges = new vis.DataSet([
+  {
+    &quot;id&quot;: &quot;edge-0&quot;,
+    &quot;from&quot;: &quot;UC-RETENTION&quot;,
+    &quot;to&quot;: &quot;PR-CUSTOMER&quot;,
+    &quot;label&quot;: &quot;uses\n(high)&quot;,
+    &quot;type&quot;: &quot;uses&quot;,
+    &quot;title&quot;: &quot;Type: uses\nConfidence: high\nA node uses another node as part of execution or operation&quot;,
+    &quot;arrows&quot;: &quot;to&quot;,
+    &quot;confidence&quot;: &quot;high&quot;,
+    &quot;dashes&quot;: false,
+    &quot;color&quot;: {
+      &quot;color&quot;: &quot;#16a34a&quot;,
+      &quot;highlight&quot;: &quot;#16a34a&quot;,
+      &quot;hover&quot;: &quot;#16a34a&quot;,
+      &quot;inherit&quot;: false
+    }
+  }
+]);
+
+    const container = document.getElementById(&quot;graph&quot;);
+    const data = { nodes: nodes, edges: edges };
+
+    const groupCard = (border) =&gt; ({
+      color: {
+        background: &quot;#ffffff&quot;,
+        border: border,
+        highlight: { background: &quot;#ffffff&quot;, border: border },
+        hover: { background: &quot;#ffffff&quot;, border: border }
+      }
+    });
+
+    const options = {
+      autoResize: true,
+      nodes: {
+        shape: &quot;box&quot;,
+        margin: 16,
+        borderWidth: 2,
+        shadow: {
+          enabled: true,
+          color: &quot;rgba(15,23,42,0.1)&quot;,
+          size: 10,
+          x: 0,
+          y: 3
+        },
+        font: {
+          size: 13,
+          face: &quot;Segoe UI,system-ui,sans-serif&quot;,
+          color: &quot;#0f172a&quot;
+        },
+        shapeProperties: { borderRadius: 12 }
+      },
+      edges: {
+        width: 1.25,
+        smooth: { type: &quot;dynamic&quot; },
+        color: { inherit: false },
+        font: {
+          size: 10,
+          align: &quot;middle&quot;,
+          face: &quot;Segoe UI,system-ui,sans-serif&quot;,
+          color: &quot;#334155&quot;,
+          strokeWidth: 0,
+          background: &quot;rgba(255,255,255,0.92)&quot;
+        }
+      },
+      groups: {
+        DataProduct: groupCard(&quot;#0284c7&quot;),
+        UseCase: groupCard(&quot;#16a34a&quot;),
+        BusinessObjective: groupCard(&quot;#ea580c&quot;),
+        Signal: groupCard(&quot;#0891b2&quot;),
+        KPI: groupCard(&quot;#0d9488&quot;),
+        Policy: groupCard(&quot;#db2777&quot;),
+        API: groupCard(&quot;#7c3aed&quot;),
+        Agent: groupCard(&quot;#0e7490&quot;),
+        StrategicOpportunity: groupCard(&quot;#f97316&quot;)
+      },
+      physics: {
+        enabled: true,
+        stabilization: { iterations: 280, updateInterval: 25, fit: true },
+        barnesHut: {
+          gravitationalConstant: -3400,
+          centralGravity: 0.11,
+          springLength: 280,
+          springConstant: 0.032,
+          damping: 0.58,
+          avoidOverlap: 0.42
+        }
+      },
+      interaction: {
+        hover: true,
+        dragNodes: true,
+        dragView: true,
+        zoomView: true,
+        multiselect: false,
+        navigationButtons: false,
+        keyboard: true
+      }
+    };
+
+    const network = new vis.Network(container, data, options);
+    let minimapNetwork = null;
+    let physicsUserOn = false;
+    let selectedFocusNodeId = null;
+
+    const activeNodeTypes = new Set(NODE_TYPES);
+    const activeEdgeTypes = new Set(RELATIONSHIP_TYPES);
+    const activeConfidenceLevels = new Set(CONFIDENCE_LEVELS);
+
+    function valueCounts(items, key) {
+      return items.reduce(function (acc, item) {
+        const value = String(item[key] || &quot;&quot;);
+        if (value) acc[value] = (acc[value] || 0) + 1;
+        return acc;
+      }, {});
+    }
+
+    const nodeTypeCounts = valueCounts(nodes.get(), &quot;type&quot;);
+    const edgeTypeCounts = valueCounts(edges.get(), &quot;type&quot;);
+    const confidenceCounts = valueCounts(edges.get(), &quot;confidence&quot;);
+
+    function rgba(hex, alpha) {
+      const clean = String(hex || &quot;#64748b&quot;).replace(&quot;#&quot;, &quot;&quot;);
+      const bigint = parseInt(clean.length === 3
+        ? clean.split(&quot;&quot;).map(function (ch) { return ch + ch; }).join(&quot;&quot;)
+        : clean, 16);
+      const r = (bigint &gt;&gt; 16) &amp; 255;
+      const g = (bigint &gt;&gt; 8) &amp; 255;
+      const b = bigint &amp; 255;
+      return &quot;rgba(&quot; + r + &quot;,&quot; + g + &quot;,&quot; + b + &quot;,&quot; + alpha + &quot;)&quot;;
+    }
+
+    function nodeVisual(node, state) {
+      const border = TYPE_COLORS[node.type] || &quot;#64748b&quot;;
+      if (state === &quot;muted&quot;) {
+        return {
+          id: node.id,
+          color: {
+            background: &quot;rgba(248,250,252,0.48)&quot;,
+            border: rgba(border, 0.24),
+            highlight: { background: &quot;rgba(248,250,252,0.58)&quot;, border: rgba(border, 0.42) },
+            hover: { background: &quot;rgba(248,250,252,0.58)&quot;, border: rgba(border, 0.42) }
+          },
+          font: { color: &quot;rgba(100,116,139,0.42)&quot; },
+          shadow: false,
+          borderWidth: 1
+        };
+      }
+      if (state === &quot;selected&quot;) {
+        return {
+          id: node.id,
+          color: {
+            background: &quot;#ffffff&quot;,
+            border: &quot;#0f172a&quot;,
+            highlight: { background: &quot;#ffffff&quot;, border: &quot;#0f172a&quot; },
+            hover: { background: &quot;#ffffff&quot;, border: &quot;#0f172a&quot; }
+          },
+          font: { color: &quot;#0f172a&quot; },
+          shadow: { enabled: true, color: &quot;rgba(15,23,42,0.18)&quot;, size: 16, x: 0, y: 4 },
+          borderWidth: 3
+        };
+      }
+      return {
+        id: node.id,
+        color: {
+          background: &quot;#ffffff&quot;,
+          border: border,
+          highlight: { background: &quot;#ffffff&quot;, border: border },
+          hover: { background: &quot;#ffffff&quot;, border: border }
+        },
+        font: { color: &quot;#0f172a&quot; },
+        shadow: { enabled: true, color: &quot;rgba(15,23,42,0.1)&quot;, size: 10, x: 0, y: 3 },
+        borderWidth: 2
+      };
+    }
+
+    function edgeVisual(edge, state) {
+      const color = edgeColor(edge.type);
+      if (state === &quot;muted&quot;) {
+        return {
+          id: edge.id,
+          color: {
+            color: rgba(color, 0.16),
+            highlight: rgba(color, 0.24),
+            hover: rgba(color, 0.24),
+            inherit: false
+          },
+          font: { color: &quot;rgba(100,116,139,0.28)&quot;, background: &quot;rgba(255,255,255,0.55)&quot; },
+          width: 0.75
+        };
+      }
+      if (state === &quot;selected&quot;) {
+        return {
+          id: edge.id,
+          color: { color: color, highlight: color, hover: color, inherit: false },
+          font: { color: &quot;#0f172a&quot;, background: &quot;rgba(255,255,255,0.96)&quot; },
+          width: 2.25
+        };
+      }
+      return {
+        id: edge.id,
+        color: { color: color, highlight: color, hover: color, inherit: false },
+        font: { color: &quot;#334155&quot;, background: &quot;rgba(255,255,255,0.92)&quot; },
+        width: 1.25
+      };
+    }
+
+    function clearSelectionHighlight() {
+      selectedFocusNodeId = null;
+      nodes.update(nodes.get().map(function (node) {
+        return nodeVisual(node, &quot;normal&quot;);
+      }));
+      edges.update(edges.get().map(function (edge) {
+        return edgeVisual(edge, &quot;normal&quot;);
+      }));
+    }
+
+    function applySelectionHighlight(nodeId) {
+      const selected = nodes.get(nodeId);
+      if (!selected || selected.hidden) {
+        clearSelectionHighlight();
+        return;
+      }
+      selectedFocusNodeId = nodeId;
+      const visibleIncidentEdges = edges.get().filter(function (edge) {
+        return !edge.hidden &amp;&amp; (edge.from === nodeId || edge.to === nodeId);
+      });
+      const focusNodeIds = new Set([nodeId]);
+      visibleIncidentEdges.forEach(function (edge) {
+        focusNodeIds.add(edge.from);
+        focusNodeIds.add(edge.to);
+      });
+      nodes.update(nodes.get().map(function (node) {
+        if (node.hidden) return nodeVisual(node, &quot;normal&quot;);
+        if (node.id === nodeId) return nodeVisual(node, &quot;selected&quot;);
+        return nodeVisual(node, focusNodeIds.has(node.id) ? &quot;normal&quot; : &quot;muted&quot;);
+      }));
+      const focusEdgeIds = new Set(visibleIncidentEdges.map(function (edge) { return edge.id; }));
+      edges.update(edges.get().map(function (edge) {
+        if (edge.hidden) return edgeVisual(edge, &quot;normal&quot;);
+        return edgeVisual(edge, focusEdgeIds.has(edge.id) ? &quot;selected&quot; : &quot;muted&quot;);
+      }));
+    }
+
+    function renderFilterGroup(containerId, values, activeSet, counts, colorFor, onChange) {
+      const root = document.getElementById(containerId);
+      root.innerHTML = &quot;&quot;;
+      values.forEach(function (value) {
+        const label = document.createElement(&quot;label&quot;);
+        label.className = &quot;filter-option&quot;;
+        label.title = value;
+        const checkbox = document.createElement(&quot;input&quot;);
+        checkbox.type = &quot;checkbox&quot;;
+        checkbox.checked = activeSet.has(value);
+        checkbox.addEventListener(&quot;change&quot;, function () {
+          if (checkbox.checked) {
+            activeSet.add(value);
+            label.classList.remove(&quot;is-muted&quot;);
+          } else {
+            activeSet.delete(value);
+            label.classList.add(&quot;is-muted&quot;);
+          }
+          onChange();
+        });
+        const swatch = document.createElement(&quot;span&quot;);
+        swatch.className = &quot;filter-swatch&quot;;
+        swatch.style.background = colorFor(value);
+        const text = document.createElement(&quot;span&quot;);
+        text.className = &quot;filter-label&quot;;
+        text.textContent = value;
+        const count = document.createElement(&quot;span&quot;);
+        count.className = &quot;filter-count&quot;;
+        count.textContent = counts[value] || 0;
+        label.appendChild(checkbox);
+        label.appendChild(swatch);
+        label.appendChild(text);
+        label.appendChild(count);
+        if (!checkbox.checked) label.classList.add(&quot;is-muted&quot;);
+        root.appendChild(label);
+      });
+    }
+
+    function passesNodeFilters(node) {
+      return activeNodeTypes.has(node.type);
+    }
+
+    function passesEdgeFilters(edge, hiddenNodeIds) {
+      return activeEdgeTypes.has(edge.type) &amp;&amp;
+        activeConfidenceLevels.has(String(edge.confidence || &quot;&quot;)) &amp;&amp;
+        !hiddenNodeIds.has(edge.from) &amp;&amp;
+        !hiddenNodeIds.has(edge.to);
+    }
+
+    function updateFilterStatus(visibleNodeCount, visibleEdgeCount) {
+      document.getElementById(&quot;filter-status&quot;).textContent =
+        visibleNodeCount + &quot; of &quot; + nodes.length + &quot; nodes · &quot; +
+        visibleEdgeCount + &quot; of &quot; + edges.length + &quot; relationships visible&quot;;
+    }
+
+    function allFiltersSelected() {
+      return activeNodeTypes.size === NODE_TYPES.length &amp;&amp;
+        activeEdgeTypes.size === RELATIONSHIP_TYPES.length &amp;&amp;
+        activeConfidenceLevels.size === CONFIDENCE_LEVELS.length;
+    }
+
+    function updateFilterToggleButton() {
+      const btn = document.getElementById(&quot;btn-toggle-filters&quot;);
+      if (btn) btn.textContent = allFiltersSelected() ? &quot;Deselect all&quot; : &quot;Select all&quot;;
+    }
+
+    function setAllFilters(selected) {
+      activeNodeTypes.clear();
+      activeEdgeTypes.clear();
+      activeConfidenceLevels.clear();
+      if (selected) {
+        NODE_TYPES.forEach(function (value) { activeNodeTypes.add(value); });
+        RELATIONSHIP_TYPES.forEach(function (value) { activeEdgeTypes.add(value); });
+        CONFIDENCE_LEVELS.forEach(function (value) { activeConfidenceLevels.add(value); });
+      }
+      document.querySelectorAll(&quot;.filter-option&quot;).forEach(function (label) {
+        label.classList.toggle(&quot;is-muted&quot;, !selected);
+        const cb = label.querySelector(&quot;input&quot;);
+        if (cb) cb.checked = selected;
+      });
+      updateFilterToggleButton();
+    }
+
+    function applyFilters() {
+      const hiddenNodeIds = new Set();
+      const nodeUpdates = nodes.get().map(function (node) {
+        const hidden = !passesNodeFilters(node);
+        if (hidden) hiddenNodeIds.add(node.id);
+        return { id: node.id, hidden: hidden };
+      });
+      nodes.update(nodeUpdates);
+
+      let visibleEdgeCount = 0;
+      const edgeUpdates = edges.get().map(function (edge) {
+        const hidden = !passesEdgeFilters(edge, hiddenNodeIds);
+        if (!hidden) visibleEdgeCount += 1;
+        return { id: edge.id, hidden: hidden };
+      });
+      edges.update(edgeUpdates);
+      updateFilterStatus(nodes.length - hiddenNodeIds.size, visibleEdgeCount);
+      if (selectedFocusNodeId) applySelectionHighlight(selectedFocusNodeId);
+      updateFilterToggleButton();
+      renderSearchResults();
+      if (minimapNetwork) minimapNetwork.fit({ animation: false });
+    }
+
+    renderFilterGroup(
+      &quot;filter-node-types&quot;,
+      NODE_TYPES,
+      activeNodeTypes,
+      nodeTypeCounts,
+      function (value) { return TYPE_COLORS[value] || &quot;#64748b&quot;; },
+      applyFilters
+    );
+    renderFilterGroup(
+      &quot;filter-edge-types&quot;,
+      RELATIONSHIP_TYPES,
+      activeEdgeTypes,
+      edgeTypeCounts,
+      function (value) { return edgeColor(value); },
+      applyFilters
+    );
+    renderFilterGroup(
+      &quot;filter-confidence&quot;,
+      CONFIDENCE_LEVELS,
+      activeConfidenceLevels,
+      confidenceCounts,
+      function (value) {
+        const lo = String(value).toLowerCase();
+        if (lo === &quot;high&quot;) return &quot;#16a34a&quot;;
+        if (lo === &quot;medium&quot;) return &quot;#f59e0b&quot;;
+        if (lo === &quot;low&quot;) return &quot;#ef4444&quot;;
+        return &quot;#64748b&quot;;
+      },
+      applyFilters
+    );
+
+    document.getElementById(&quot;btn-toggle-filters&quot;).addEventListener(&quot;click&quot;, function () {
+      setAllFilters(!allFiltersSelected());
+      applyFilters();
+    });
+
+    document.getElementById(&quot;btn-reset-filters&quot;).addEventListener(&quot;click&quot;, function () {
+      setAllFilters(true);
+      applyFilters();
+      network.fit({ animation: true });
+    });
+
+    function edgeColor(value) {
+      const raw = String(value || &quot;&quot;).toLowerCase();
+      const colors = {
+        uses: &quot;#16a34a&quot;,
+        supports: &quot;#ea580c&quot;,
+        contributesto: &quot;#0284c7&quot;,
+        measures: &quot;#0d9488&quot;,
+        tracks: &quot;#14b8a6&quot;,
+        dependson: &quot;#6366f1&quot;,
+        produces: &quot;#059669&quot;,
+        consumes: &quot;#a855f7&quot;,
+        governedby: &quot;#db2777&quot;,
+        ownedby: &quot;#ca8a04&quot;,
+        alignswith: &quot;#f97316&quot;,
+        alignwith: &quot;#f97316&quot;,
+        relatedto: &quot;#64748b&quot;,
+        impacts: &quot;#dc2626&quot;,
+        derivedfrom: &quot;#78716c&quot;,
+        exposes: &quot;#7c3aed&quot;,
+        monitors: &quot;#0891b2&quot;,
+        identifies: &quot;#475569&quot;
+      };
+      return colors[raw] || &quot;#94a3b8&quot;;
+    }
+
+    const searchInput = document.getElementById(&quot;node-search&quot;);
+    const searchResults = document.getElementById(&quot;search-results&quot;);
+    let activeSearchIndex = -1;
+    let currentSearchMatches = [];
+
+    function searchableNodeText(node) {
+      return [node.id, node.type, node.ref, node.displayName].join(&quot; &quot;).toLowerCase();
+    }
+
+    function visibleSearchMatches() {
+      const q = searchInput.value.trim().toLowerCase();
+      if (!q) return [];
+      return nodes.get().filter(function (node) {
+        return !node.hidden &amp;&amp; searchableNodeText(node).indexOf(q) !== -1;
+      }).slice(0, 20);
+    }
+
+    function focusNode(nodeId) {
+      const node = nodes.get(nodeId);
+      if (!node || node.hidden) return;
+      network.selectNodes([nodeId]);
+      applySelectionHighlight(nodeId);
+      network.focus(nodeId, { scale: 1.35, animation: true });
+      showNodePanel(node);
+    }
+
+    function renderSearchResults(nextActiveIndex) {
+      if (!searchInput) return;
+      currentSearchMatches = visibleSearchMatches();
+      if (currentSearchMatches.length) {
+        activeSearchIndex = typeof nextActiveIndex === &quot;number&quot;
+          ? Math.max(0, Math.min(nextActiveIndex, currentSearchMatches.length - 1))
+          : Math.max(0, activeSearchIndex);
+      } else {
+        activeSearchIndex = -1;
+      }
+      searchResults.innerHTML = &quot;&quot;;
+      if (!searchInput.value.trim()) {
+        searchResults.style.display = &quot;none&quot;;
+        return;
+      }
+      if (!currentSearchMatches.length) {
+        const empty = document.createElement(&quot;div&quot;);
+        empty.className = &quot;search-result&quot;;
+        empty.innerHTML = &#x27;&lt;span class=&quot;search-result-dot&quot; style=&quot;background:#cbd5e1&quot;&gt;&lt;/span&gt;&lt;div&gt;&lt;strong&gt;No visible nodes found&lt;/strong&gt;&lt;span&gt;Try changing filters or using another term.&lt;/span&gt;&lt;/div&gt;&#x27;;
+        searchResults.appendChild(empty);
+        searchResults.style.display = &quot;block&quot;;
+        return;
+      }
+      currentSearchMatches.forEach(function (node, index) {
+        const item = document.createElement(&quot;button&quot;);
+        item.type = &quot;button&quot;;
+        item.className = &quot;search-result&quot; + (index === activeSearchIndex ? &quot; is-active&quot; : &quot;&quot;);
+        item.setAttribute(&quot;role&quot;, &quot;option&quot;);
+        item.innerHTML =
+          &#x27;&lt;span class=&quot;search-result-dot&quot; style=&quot;background:&#x27; + (TYPE_COLORS[node.type] || &quot;#64748b&quot;) + &#x27;&quot;&gt;&lt;/span&gt;&#x27; +
+          &quot;&lt;div&gt;&lt;strong&gt;&quot; + escHtml(node.id) + &quot;&lt;/strong&gt;&lt;span&gt;&quot; + escHtml(node.type + &quot; · &quot; + (node.displayName || node.ref || &quot;&quot;)) + &quot;&lt;/span&gt;&lt;/div&gt;&quot;;
+        item.addEventListener(&quot;click&quot;, function () {
+          focusNode(node.id);
+          searchInput.value = &quot;&quot;;
+          searchResults.style.display = &quot;none&quot;;
+        });
+        searchResults.appendChild(item);
+      });
+      searchResults.style.display = &quot;block&quot;;
+    }
+
+    searchInput.addEventListener(&quot;input&quot;, function () {
+      activeSearchIndex = -1;
+      renderSearchResults();
+    });
+    searchInput.addEventListener(&quot;keydown&quot;, function (event) {
+      if (!currentSearchMatches.length &amp;&amp; event.key !== &quot;Escape&quot;) return;
+      if (event.key === &quot;ArrowDown&quot;) {
+        event.preventDefault();
+        activeSearchIndex = Math.min(activeSearchIndex + 1, currentSearchMatches.length - 1);
+        renderSearchResults(activeSearchIndex);
+      } else if (event.key === &quot;ArrowUp&quot;) {
+        event.preventDefault();
+        activeSearchIndex = Math.max(activeSearchIndex - 1, 0);
+        renderSearchResults(activeSearchIndex);
+      } else if (event.key === &quot;Enter&quot;) {
+        event.preventDefault();
+        if (currentSearchMatches[activeSearchIndex]) {
+          focusNode(currentSearchMatches[activeSearchIndex].id);
+          searchInput.value = &quot;&quot;;
+          searchResults.style.display = &quot;none&quot;;
+        }
+      } else if (event.key === &quot;Escape&quot;) {
+        searchInput.value = &quot;&quot;;
+        searchResults.style.display = &quot;none&quot;;
+      }
+    });
+
+    document.addEventListener(&quot;click&quot;, function (event) {
+      if (!searchResults.contains(event.target) &amp;&amp; event.target !== searchInput) {
+        searchResults.style.display = &quot;none&quot;;
+      }
+    });
+
+    applyFilters();
+
+    const fullscreenTarget = document.querySelector(&quot;.workspace&quot;);
+    const fullscreenButtons = [
+      document.getElementById(&quot;btn-fullscreen&quot;),
+      document.getElementById(&quot;btn-fullscreen-canvas&quot;)
+    ].filter(Boolean);
+
+    function setFullscreenButtonState(isFullscreen) {
+      fullscreenButtons.forEach(function (button) {
+        const label = isFullscreen ? &quot;Exit fullscreen&quot; : &quot;Fullscreen&quot;;
+        button.title = label;
+        button.setAttribute(&quot;aria-label&quot;, isFullscreen
+          ? &quot;Exit graph workspace fullscreen&quot;
+          : &quot;Fullscreen graph workspace&quot;);
+      });
+    }
+
+    document.addEventListener(&quot;fullscreenchange&quot;, function () {
+      setFullscreenButtonState(document.fullscreenElement === fullscreenTarget);
+      window.requestAnimationFrame(function () {
+        network.redraw();
+        if (minimapNetwork) minimapNetwork.redraw();
+      });
+    });
+
+    function persistAllNodePositions() {
+      network.stopSimulation();
+      const ids = nodes.getIds();
+      if (!ids.length) return;
+      const pos = network.getPositions(ids);
+      const upd = ids.map(function (id) {
+        const pt = pos[id];
+        if (!pt) return null;
+        return { id: id, x: pt.x, y: pt.y, fixed: false };
+      }).filter(Boolean);
+      if (upd.length) nodes.update(upd);
+    }
+
+    function persistNodePositions(ids) {
+      if (!ids || !ids.length) return;
+      const pos = network.getPositions(ids);
+      const upd = ids.map(function (id) {
+        const pt = pos[id];
+        if (!pt) return null;
+        return { id: id, x: pt.x, y: pt.y, fixed: false };
+      }).filter(Boolean);
+      if (upd.length) nodes.update(upd);
+    }
+
+    function disablePhysicsAfterLayout() {
+      network.stopSimulation();
+      network.setOptions({ physics: { enabled: false } });
+      physicsUserOn = false;
+      document.getElementById(&quot;btn-physics&quot;).classList.add(&quot;is-locked&quot;);
+      persistAllNodePositions();
+      if (!minimapNetwork) {
+        minimapNetwork = new vis.Network(document.getElementById(&quot;minimap&quot;), data, {
+          autoResize: false,
+          width: &quot;200px&quot;,
+          height: &quot;132px&quot;,
+          nodes: options.nodes,
+          edges: Object.assign({}, options.edges, { smooth: { type: &quot;continuous&quot; } }),
+          groups: options.groups,
+          physics: false,
+          interaction: { zoomView: true, dragView: true, dragNodes: false, selectable: true }
+        });
+        minimapNetwork.fit({ animation: false });
+      } else {
+        minimapNetwork.fit({ animation: false });
+      }
+    }
+
+    let layoutDone = false;
+    function onLayoutStable() {
+      if (layoutDone) return;
+      layoutDone = true;
+      disablePhysicsAfterLayout();
+    }
+    network.once(&quot;stabilizationIterationsDone&quot;, onLayoutStable);
+    network.once(&quot;stabilized&quot;, function () {
+      setTimeout(function () {
+        if (!layoutDone) onLayoutStable();
+      }, 300);
+    });
+
+    network.on(&quot;dragStart&quot;, function () {
+      if (!physicsUserOn) network.stopSimulation();
+    });
+
+    network.on(&quot;dragEnd&quot;, function (p) {
+      if (!p.nodes || !p.nodes.length) return;
+      network.stopSimulation();
+      window.setTimeout(function () {
+        if (physicsUserOn) {
+          persistNodePositions(p.nodes);
+        } else {
+          persistAllNodePositions();
+        }
+      }, 0);
+    });
+
+    document.getElementById(&quot;btn-zoom-in&quot;).addEventListener(&quot;click&quot;, function () {
+      const s = network.getScale();
+      network.moveTo({ scale: s * 1.25, animation: true });
+    });
+    document.getElementById(&quot;btn-zoom-out&quot;).addEventListener(&quot;click&quot;, function () {
+      const s = network.getScale();
+      network.moveTo({ scale: s * 0.8, animation: true });
+    });
+    document.getElementById(&quot;btn-fit&quot;).addEventListener(&quot;click&quot;, function () {
+      network.fit({ animation: true });
+      if (minimapNetwork) minimapNetwork.fit({ animation: false });
+    });
+    document.getElementById(&quot;btn-fit-top&quot;).addEventListener(&quot;click&quot;, function () {
+      network.fit({ animation: true });
+    });
+
+    document.getElementById(&quot;btn-physics&quot;).addEventListener(&quot;click&quot;, function () {
+      const btn = document.getElementById(&quot;btn-physics&quot;);
+      physicsUserOn = !physicsUserOn;
+      network.setOptions({ physics: { enabled: physicsUserOn } });
+      if (physicsUserOn) {
+        nodes.update(nodes.get().map(function (n) {
+          return { id: n.id, fixed: false };
+        }));
+        btn.classList.remove(&quot;is-locked&quot;);
+      } else {
+        network.stopSimulation();
+        network.setOptions({ physics: { enabled: false } });
+        btn.classList.add(&quot;is-locked&quot;);
+        persistAllNodePositions();
+      }
+    });
+
+    function toggleFullscreen() {
+      if (!document.fullscreenElement) {
+        if (fullscreenTarget &amp;&amp; fullscreenTarget.requestFullscreen) {
+          fullscreenTarget.requestFullscreen();
+        }
+      } else if (document.exitFullscreen) {
+        document.exitFullscreen();
+      }
+    }
+
+    fullscreenButtons.forEach(function (button) {
+      button.addEventListener(&quot;click&quot;, toggleFullscreen);
+    });
+
+    const tabNode = document.getElementById(&quot;tab-node&quot;);
+    const tabEdge = document.getElementById(&quot;tab-edge&quot;);
+    const panelNode = document.getElementById(&quot;panel-node&quot;);
+    const panelEdge = document.getElementById(&quot;panel-edge&quot;);
+
+    tabNode.addEventListener(&quot;click&quot;, function () {
+      tabNode.classList.add(&quot;is-active&quot;);
+      tabEdge.classList.remove(&quot;is-active&quot;);
+      tabNode.setAttribute(&quot;aria-selected&quot;, &quot;true&quot;);
+      tabEdge.setAttribute(&quot;aria-selected&quot;, &quot;false&quot;);
+      panelNode.classList.remove(&quot;is-hidden&quot;);
+      panelEdge.classList.add(&quot;is-hidden&quot;);
+    });
+    tabEdge.addEventListener(&quot;click&quot;, function () {
+      tabEdge.classList.add(&quot;is-active&quot;);
+      tabNode.classList.remove(&quot;is-active&quot;);
+      tabEdge.setAttribute(&quot;aria-selected&quot;, &quot;true&quot;);
+      tabNode.setAttribute(&quot;aria-selected&quot;, &quot;false&quot;);
+      panelEdge.classList.remove(&quot;is-hidden&quot;);
+      panelNode.classList.add(&quot;is-hidden&quot;);
+    });
+
+    function showNodePanel(node) {
+      document.getElementById(&quot;node-placeholder&quot;).style.display = &quot;none&quot;;
+      const wrap = document.getElementById(&quot;node-detail&quot;);
+      wrap.style.display = &quot;block&quot;;
+      const dot = TYPE_COLORS[node.type] || &quot;#64748b&quot;;
+      const desc = escHtml(node.displayName || node.type);
+      wrap.innerHTML =
+        &#x27;&lt;div class=&quot;panel-head&quot;&gt;&#x27; +
+          &#x27;&lt;span class=&quot;type-dot&quot; style=&quot;background:&#x27; + dot + &#x27;&quot;&gt;&lt;/span&gt;&#x27; +
+          &quot;&lt;div&gt;&lt;h2&gt;&quot; + escHtml(node.id) + &#x27;&lt;/h2&gt;&lt;p class=&quot;sub&quot;&gt;&#x27; + desc + &quot;&lt;/p&gt;&lt;/div&gt;&quot; +
+        &quot;&lt;/div&gt;&quot; +
+        &#x27;&lt;div class=&quot;field&quot;&gt;&lt;label&gt;ID&lt;/label&gt;&lt;span&gt;&#x27; + escHtml(node.id) + &quot;&lt;/span&gt;&lt;/div&gt;&quot; +
+        &#x27;&lt;div class=&quot;field&quot;&gt;&lt;label&gt;Type&lt;/label&gt;&lt;span&gt;&#x27; + escHtml(node.type) + &quot;&lt;/span&gt;&lt;/div&gt;&quot; +
+        &#x27;&lt;div class=&quot;field&quot;&gt;&lt;label&gt;Reference&lt;/label&gt;&lt;span&gt;&#x27; + escHtml(node.ref) + &quot;&lt;/span&gt;&lt;/div&gt;&quot; +
+        &#x27;&lt;div class=&quot;field&quot;&gt;&lt;label&gt;Description&lt;/label&gt;&lt;p&gt;&#x27; + desc + &quot;&lt;/p&gt;&lt;/div&gt;&quot;;
+      tabNode.click();
+    }
+
+    function showEdgePanel(edge) {
+      document.getElementById(&quot;edge-placeholder&quot;).style.display = &quot;none&quot;;
+      const wrap = document.getElementById(&quot;edge-detail&quot;);
+      wrap.style.display = &quot;block&quot;;
+      const lines = String(edge.label || &quot;&quot;).split(&quot;\n&quot;);
+      const rawTypeKey = (lines[0] || &quot;&quot;).trim();
+      const typeLine = escHtml(rawTypeKey);
+      const confLine = escHtml(lines[1] || &quot;(&quot; + edge.confidence + &quot;)&quot;);
+      const odpgDesc = ODPG_EDGE_TYPE_DESCRIPTIONS[(rawTypeKey || &quot;&quot;).toLowerCase()] || &quot;&quot;;
+      const descHtml = odpgDesc
+        ? &#x27;&lt;div class=&quot;field&quot;&gt;&lt;label&gt;ODPG definition&lt;/label&gt;&lt;p&gt;&#x27; + escHtml(odpgDesc) + &quot;&lt;/p&gt;&lt;/div&gt;&quot;
+        : &quot;&quot;;
+      wrap.innerHTML =
+        &#x27;&lt;div class=&quot;panel-head&quot;&gt;&lt;div&gt;&lt;h2&gt;Relationship&lt;/h2&gt;&lt;p class=&quot;sub&quot;&gt;&#x27; + typeLine + &quot; &quot; + confLine + &quot;&lt;/p&gt;&lt;/div&gt;&lt;/div&gt;&quot; +
+        &#x27;&lt;div class=&quot;field&quot;&gt;&lt;label&gt;From&lt;/label&gt;&lt;span&gt;&#x27; + escHtml(edge.from) + &quot;&lt;/span&gt;&lt;/div&gt;&quot; +
+        &#x27;&lt;div class=&quot;field&quot;&gt;&lt;label&gt;To&lt;/label&gt;&lt;span&gt;&#x27; + escHtml(edge.to) + &quot;&lt;/span&gt;&lt;/div&gt;&quot; +
+        &#x27;&lt;div class=&quot;field&quot;&gt;&lt;label&gt;Type&lt;/label&gt;&lt;span&gt;&#x27; + typeLine + &quot;&lt;/span&gt;&lt;/div&gt;&quot; +
+        &#x27;&lt;div class=&quot;field&quot;&gt;&lt;label&gt;Confidence&lt;/label&gt;&lt;span&gt;&#x27; + escHtml(edge.confidence) + &quot;&lt;/span&gt;&lt;/div&gt;&quot; +
+        descHtml;
+      tabEdge.click();
+    }
+
+    network.on(&quot;selectNode&quot;, function (params) {
+      if (!params.nodes.length) return;
+      const node = nodes.get(params.nodes[0]);
+      applySelectionHighlight(node.id);
+      showNodePanel(node);
+    });
+
+    network.on(&quot;selectEdge&quot;, function (params) {
+      if (!params.edges.length) return;
+      const edge = edges.get(params.edges[0]);
+      showEdgePanel(edge);
+    });
+
+    network.on(&quot;deselectNode&quot;, function () {
+      if (network.getSelectedNodes().length === 0 &amp;&amp; network.getSelectedEdges().length === 0) {
+        clearSelectionHighlight();
+        document.getElementById(&quot;node-placeholder&quot;).style.display = &quot;&quot;;
+        document.getElementById(&quot;node-detail&quot;).style.display = &quot;none&quot;;
+      }
+    });
+
+    network.on(&quot;deselectEdge&quot;, function () {
+      if (network.getSelectedEdges().length === 0 &amp;&amp; network.getSelectedNodes().length === 0) {
+        clearSelectionHighlight();
+        document.getElementById(&quot;edge-placeholder&quot;).style.display = &quot;&quot;;
+        document.getElementById(&quot;edge-detail&quot;).style.display = &quot;none&quot;;
+      }
+    });
+    })();
+  &lt;/script&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+"></iframe></section>
+<section class="tab-panel about-panel" id="about"><article class="about-card"><div class="chip-row"><span class="chip">SDK 0.2.0</span><span class="chip">ODPC</span><span class="chip">ODPS</span><span class="chip">ODPG</span><span class="chip">ODPV</span></div><h2>About this portfolio</h2><p>This portfolio was generated with the Open Data Products SDK and is grounded in the OpenDataProducts.org standards family: ODPC for catalog objects, ODPS for product specifications, ODPG for graph relationships, and ODPV for shared vocabulary where used.</p><p>Generated ODPS products are drafts. They are intended to give teams a quick start from source material such as text files, emails, briefs, and transcripts. Human review and acceptance are required before any generated product specification is treated as production-ready.</p><p>Generation timestamp: 2026-06-07T13:00:00Z</p><ul><li>products: 1</li><li>signals: 1</li><li>useCases: 1</li></ul></article></section>
+</div>
+</main>
+<footer class="footer"><div class="wrap footer-inner"><p class="footer-status">Draft portfolio generated with the Data Products SDK. Human review is required before product specs are treated as production-ready.</p><div class="footer-columns"><section class="footer-column"><h2>Review status</h2><ul><li>Draft portfolio</li><li>Human acceptance required</li><li>Latest snapshot available</li></ul></section><nav class="footer-column" aria-label="Portfolio next actions"><h2>Next actions</h2><ul><li><a href="#executive-summary">Review executive decisions</a></li><li><a href="#executive-summary">Resolve evidence gaps</a></li><li><a href="#products">Approve product specs</a></li><li><a href="versions/2026-06-07T12-30-00Z/index.html">Compare previous snapshot</a></li></ul></nav><nav class="footer-column" aria-label="Portfolio evidence links"><h2>Evidence</h2><ul><li><a href="#about">Source summary</a></li><li><a href="#overview">Portfolio versions</a></li><li><a href="#graph">Graph view</a></li><li><a href="#objectives">Catalog objects</a></li></ul></nav><nav class="footer-column" aria-label="Portfolio artifact links"><h2>Artifacts</h2><ul><li><a href="odpc/catalog.yaml">Catalog YAML</a></li><li><a href="odpg/graph.yaml">Graph YAML</a></li><li><a href="#products">Product specs</a></li><li><a href="#overview">Back to top</a></li></ul></nav></div></div></footer>
+<script>
+(function () {
+  var activeModal = null;
+  function closeModal() {
+    if (!activeModal) return;
+    activeModal.setAttribute("aria-hidden", "true");
+    document.body.classList.remove("modal-open");
+    activeModal = null;
+  }
+  function openModal(id) {
+    var modal = document.getElementById(id);
+    if (!modal) return;
+    closeModal();
+    modal.setAttribute("aria-hidden", "false");
+    document.body.classList.add("modal-open");
+    activeModal = modal;
+    var closeButton = modal.querySelector("[data-modal-close]");
+    if (closeButton) closeButton.focus();
+  }
+  document.addEventListener("click", function (event) {
+    var trigger = event.target.closest("[data-modal-target]");
+    if (trigger) {
+      openModal(trigger.getAttribute("data-modal-target"));
+      return;
+    }
+    if (event.target.closest("[data-modal-close]")) {
+      closeModal();
+    }
+  });
+  document.addEventListener("keydown", function (event) {
+    if (event.key === "Escape") closeModal();
+  });
+}());
+</script>
+</body>
+</html>

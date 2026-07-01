@@ -1,0 +1,23 @@
+
+schema: https://opendataproducts.org/odpg-v1.0/schema/odpg.yaml
+version: "1.0"
+kind: Graph
+graph:
+  metadata:
+    id: GRAPH-DEMO
+    name:
+      en: Demo Graph
+  nodes:
+    - id: UC-RETENTION
+      type: UseCase
+      label:
+        en: Retention Workflow
+    - id: PR-CUSTOMER
+      type: DataProduct
+      label:
+        en: Customer Product
+  edges:
+    - source: UC-RETENTION
+      target: PR-CUSTOMER
+      type: uses
+      confidence: high

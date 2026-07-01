@@ -32,6 +32,8 @@ from .odps._normalization import (
     ODPS_SLA_UNITS,
     hours_to_minutes,
 )
+from . import portfolio_budget as _portfolio_budget
+from . import portfolio_privacy as _portfolio_privacy
 from .portfolio_sources import (
     SOURCE_WARNING_KEY,
     changed_source_lanes as _changed_source_lanes,
@@ -44,7 +46,6 @@ from .portfolio_sources import (
     source_hashes as _source_hashes,
     source_hashes_by_lane as _source_hashes_by_lane,
 )
-from .privacy import OBFUSCATION_WARNING, _obfuscate_personal_data_with_state
 
 DEFAULT_PORTFOLIO_HTML = "index.html"
 DEFAULT_EXECUTIVE_SUMMARY = "executive-summary.yaml"
@@ -54,14 +55,23 @@ EXECUTIVE_SUMMARY_SCHEMA = (
 PORTFOLIO_ICON_ASSET_DIR = Path("assets") / "executive_summary_icons"
 PORTFOLIO_LOCALIZATION_BATCH_CHARS = 3500
 PORTFOLIO_LOCALIZATION_BATCH_ITEMS = 50
-PORTFOLIO_SOURCE_CHUNK_CHARS = 2000
-PORTFOLIO_SOURCE_PROMPT_CHARS = 32000
-PORTFOLIO_PROMPT_OVERHEAD_RESERVE_CHARS = 16000
+PORTFOLIO_SOURCE_CHUNK_CHARS = _portfolio_budget.PORTFOLIO_SOURCE_CHUNK_CHARS
+PORTFOLIO_SOURCE_PROMPT_CHARS = _portfolio_budget.PORTFOLIO_SOURCE_PROMPT_CHARS
+PORTFOLIO_PROMPT_OVERHEAD_RESERVE_CHARS = (
+    _portfolio_budget.PORTFOLIO_PROMPT_OVERHEAD_RESERVE_CHARS
+)
 PORTFOLIO_PRIVACY_DISABLED_WARNING = (
-    "Personal data obfuscation is disabled for portfolio document intake."
+    _portfolio_privacy.PORTFOLIO_PRIVACY_DISABLED_WARNING
 )
 PortfolioBuildClient = Callable[[str, str], str]
 PortfolioLocalizationClient = Callable[[str, str], str]
+_chunk_source_text = _portfolio_budget.chunk_source_text
+_estimated_word_count = _portfolio_budget.estimated_word_count
+_int_value = _portfolio_budget.int_value
+_prompt_budget_guarded_client = _portfolio_budget.prompt_budget_guarded_client
+_reduce_source_lanes_for_prompt = _portfolio_budget.reduce_source_lanes_for_prompt
+_split_long_text = _portfolio_budget.split_long_text
+_apply_source_privacy = _portfolio_privacy.apply_source_privacy
 ODPC_STATUSES = {"draft", "active", "paused", "completed", "retired"}
 ODPC_STATUS_ALIASES = {
     "proposed": "draft",
@@ -961,204 +971,6 @@ def render_portfolio_build_prompt(lanes: Dict[str, List[Dict[str, str]]]) -> str
         for source in files:
             sections.append(f"\n## {source['path']}\n{source['text']}")
     return "\n".join(sections)
-
-
-def _reduce_source_lanes_for_prompt(
-    lanes: Dict[str, List[Dict[str, str]]],
-    *,
-    max_source_chars: int = PORTFOLIO_SOURCE_CHUNK_CHARS,
-    max_prompt_chars: int = PORTFOLIO_SOURCE_PROMPT_CHARS,
-    prompt_overhead_chars: int = 0,
-) -> Tuple[Dict[str, List[Dict[str, str]]], Dict[str, object]]:
-    """Reduce source lane text deterministically before LLM prompt rendering."""
-    if max_source_chars <= 0:
-        raise ValueError("max_source_chars must be a positive integer.")
-    if max_prompt_chars <= 0:
-        raise ValueError("max_prompt_chars must be a positive integer.")
-    if prompt_overhead_chars < 0:
-        raise ValueError("prompt_overhead_chars must be zero or a positive integer.")
-    chunk_limit = min(max_source_chars, max_prompt_chars)
-    source_prompt_chars = max(max_prompt_chars - prompt_overhead_chars, 0)
-    reduced: Dict[str, List[Dict[str, str]]] = {}
-    estimated_chars = 0
-    included_chars = 0
-    chunk_count = 0
-    included_chunk_count = 0
-    omitted_chunk_count = 0
-    reduced_source_count = 0
-    source_count = 0
-
-    for lane_name, files in lanes.items():
-        if lane_name == SOURCE_WARNING_KEY:
-            continue
-        reduced_files: List[Dict[str, str]] = []
-        for source in files:
-            source_count += 1
-            text = str(source.get("text", ""))
-            estimated_chars += len(text)
-            chunks = _chunk_source_text(text, chunk_limit)
-            chunk_count += len(chunks)
-            included_chunks: List[str] = []
-            remaining_prompt_chars = source_prompt_chars
-            for chunk in chunks:
-                chunk_size = len(chunk)
-                separator_size = 2 if included_chunks else 0
-                required_chars = chunk_size + separator_size
-                if required_chars > remaining_prompt_chars:
-                    break
-                included_chunks.append(chunk)
-                remaining_prompt_chars -= required_chars
-                included_chars += required_chars
-            omitted_chunks = len(chunks) - len(included_chunks)
-            included_chunk_count += len(included_chunks)
-            omitted_chunk_count += omitted_chunks
-            if omitted_chunks:
-                reduced_source_count += 1
-            reduced_source = dict(source)
-            reduced_source["text"] = "\n\n".join(included_chunks)
-            reduced_source["chunkCount"] = str(len(chunks))
-            reduced_source["includedChunkCount"] = str(len(included_chunks))
-            reduced_source["omittedChunkCount"] = str(omitted_chunks)
-            reduced_files.append(reduced_source)
-        reduced[lane_name] = reduced_files
-
-    warnings = []
-    if omitted_chunk_count:
-        warnings.append(
-            f"Content omitted from prompt: {omitted_chunk_count} chunks over context budget"
-        )
-    budget: Dict[str, object] = {
-        "method": "deterministic-chunk-budget",
-        "budgetScope": "per-source",
-        "maxSourceChars": max_source_chars,
-        "maxPromptChars": max_prompt_chars,
-        "promptOverheadReserveChars": prompt_overhead_chars,
-        "sourcePromptChars": source_prompt_chars,
-        "estimatedInputChars": estimated_chars,
-        "includedChars": included_chars,
-        "omittedChars": max(estimated_chars - included_chars, 0),
-        "sourceCount": source_count,
-        "reducedSourceCount": reduced_source_count,
-        "chunkCount": chunk_count,
-        "includedChunkCount": included_chunk_count,
-        "omittedChunkCount": omitted_chunk_count,
-        "warnings": warnings,
-    }
-    return reduced, budget
-
-
-def _apply_source_privacy(
-    lanes: Dict[str, List[Dict[str, str]]],
-    *,
-    privacy_settings: PortfolioPrivacySettings,
-) -> Tuple[Dict[str, List[Dict[str, str]]], Dict[str, object]]:
-    """Apply configured source privacy controls before prompt reduction."""
-    source_count = sum(
-        len(files) for name, files in lanes.items() if name != SOURCE_WARNING_KEY
-    )
-    if not privacy_settings.obfuscate_personal_data:
-        return dict(lanes), {
-            "method": "deterministic-personal-data-obfuscation",
-            "enabled": False,
-            "sourceCount": source_count,
-            "replacementCounts": {},
-            "replacements": [],
-            "warnings": [PORTFOLIO_PRIVACY_DISABLED_WARNING],
-        }
-
-    value_to_placeholder: Dict[str, str] = {}
-    replacement_counts: Dict[str, int] = {}
-    replacements: List[Dict[str, str]] = []
-    private_lanes: Dict[str, List[Dict[str, str]]] = {}
-    for lane_name, files in lanes.items():
-        if lane_name == SOURCE_WARNING_KEY:
-            continue
-        private_files: List[Dict[str, str]] = []
-        for source in files:
-            private_source = dict(source)
-            private_source["text"] = _obfuscate_personal_data_with_state(
-                str(source.get("text", "")),
-                value_to_placeholder=value_to_placeholder,
-                replacement_counts=replacement_counts,
-                replacements=replacements,
-            )
-            private_files.append(private_source)
-        private_lanes[lane_name] = private_files
-
-    warnings = [OBFUSCATION_WARNING] if replacements else []
-    return private_lanes, {
-        "method": "deterministic-personal-data-obfuscation",
-        "enabled": True,
-        "sourceCount": source_count,
-        "replacementCounts": replacement_counts,
-        "replacements": replacements,
-        "warnings": warnings,
-    }
-
-
-def _chunk_source_text(text: str, max_chars: int) -> List[str]:
-    paragraphs = [part.strip() for part in text.split("\n\n") if part.strip()]
-    if not paragraphs and text.strip():
-        paragraphs = [text.strip()]
-    chunks: List[str] = []
-    current = ""
-    for paragraph in paragraphs:
-        paragraph_parts = _split_long_text(paragraph, max_chars)
-        for part in paragraph_parts:
-            candidate = part if not current else current + "\n\n" + part
-            if len(candidate) <= max_chars:
-                current = candidate
-                continue
-            if current:
-                chunks.append(current)
-            current = part
-    if current:
-        chunks.append(current)
-    return chunks
-
-
-def _split_long_text(text: str, max_chars: int) -> List[str]:
-    if len(text) <= max_chars:
-        return [text]
-    return [text[index : index + max_chars] for index in range(0, len(text), max_chars)]
-
-
-def _int_value(value: object, *, default: int) -> int:
-    try:
-        return int(str(value))
-    except (TypeError, ValueError):
-        return default
-
-
-def _estimated_word_count(text: str) -> int:
-    return len(re.findall(r"\S+", text))
-
-
-def _prompt_budget_guarded_client(
-    client: PortfolioBuildClient,
-    *,
-    max_prompt_chars: int,
-    report: Dict[str, object],
-) -> PortfolioBuildClient:
-    """Return a client wrapper that blocks over-budget prompts before LLM calls."""
-
-    def guarded(prompt: str, model: str) -> str:
-        prompt_chars = len(prompt)
-        report["checkedPromptCount"] = int(report.get("checkedPromptCount", 0)) + 1
-        report["maxObservedPromptChars"] = max(
-            int(report.get("maxObservedPromptChars", 0)),
-            prompt_chars,
-        )
-        if prompt_chars > max_prompt_chars:
-            raise ValueError(
-                "Portfolio prompt exceeds configured budget: "
-                f"estimatedPromptChars={prompt_chars}, "
-                f"maxPromptChars={max_prompt_chars}. "
-                "Increase portfolio.sourceBudget.maxPromptChars or reduce source input."
-            )
-        return client(prompt, model)
-
-    return guarded
 
 
 def render_portfolio_executive_summary_prompt(plan: Dict[str, Any]) -> str:
@@ -6234,6 +6046,15 @@ def _portfolio_css() -> str:
   --odp-line: #e7e1ec;
   --odp-muted: #6d6175;
   --odp-black: #050505;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --space-24: 96px;
 }
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
@@ -6255,14 +6076,14 @@ a { color: inherit; text-decoration: none; }
 }
 .topbar-inner,
 .wrap {
-  width: min(1180px, calc(100% - 32px));
+  width: min(1180px, calc(100% - (var(--space-6) * 2)));
   margin: 0 auto;
 }
 .topbar-inner {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: var(--space-4);
   min-height: 58px;
 }
 .brand {
@@ -6271,11 +6092,11 @@ a { color: inherit; text-decoration: none; }
 .language-selector {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-3);
   font-size: .82rem;
 }
 .language-selector span {
-  padding: 4px 8px;
+  padding: var(--space-1) var(--space-2);
   border: 1px solid rgba(255,255,255,.35);
   border-radius: 8px;
   font-weight: 800;
@@ -6283,7 +6104,7 @@ a { color: inherit; text-decoration: none; }
 }
 .language-selector div {
   display: flex;
-  gap: 8px;
+  gap: var(--space-2);
 }
 .language-selector a {
   color: rgba(255,255,255,.76);
@@ -6308,13 +6129,13 @@ html[dir="rtl"] .language-selector div {
     var(--odps-violet);
 }
 .hero .wrap {
-  padding: 46px 0 30px;
+  padding-block: var(--space-16) var(--space-12);
 }
 .eyebrow {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  margin: 0 0 14px;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-3);
   color: var(--odps-violet);
   font-size: .78rem;
   font-weight: 700;
@@ -6324,7 +6145,7 @@ html[dir="rtl"] .language-selector div {
 .hero .eyebrow { color: rgba(255, 255, 255, .82); }
 h1 {
   max-width: 780px;
-  margin: 0 0 14px;
+  margin: 0 0 var(--space-4);
   font-size: clamp(2.25rem, 5vw, 4.55rem);
   line-height: 1.02;
   font-weight: 600;
@@ -6348,7 +6169,7 @@ h3 {
   font-size: clamp(1rem, 2vw, 1.18rem);
 }
 main {
-  padding: 26px 0 64px;
+  padding-block: var(--space-6) var(--space-16);
 }
 .tab-radio {
   position: absolute;
@@ -6362,9 +6183,9 @@ main {
   top: 0;
   z-index: 10;
   display: flex;
-  gap: 8px;
+  gap: var(--space-2);
   overflow-x: auto;
-  padding: 12px 0;
+  padding-block: var(--space-3);
   background: rgba(255, 255, 255, .96);
   border-top: 1px solid var(--odp-line);
   border-bottom: 1px solid var(--odp-line);
@@ -6376,7 +6197,7 @@ main {
   align-items: center;
   justify-content: center;
   min-height: 40px;
-  padding: 8px 13px;
+  padding: var(--space-2) var(--space-4);
   border: 1px solid var(--odp-line);
   border-radius: 8px;
   color: var(--odp-muted);
@@ -6399,7 +6220,7 @@ main {
 }
 .tab-panel {
   display: none;
-  padding-top: 28px;
+  padding-top: var(--space-8);
 }
 #tab-overview:checked ~ .panels .overview-panel,
 #tab-executive-summary:checked ~ .panels .executive-summary-panel,
@@ -6415,8 +6236,8 @@ main {
   display: flex;
   align-items: end;
   justify-content: space-between;
-  gap: 18px;
-  margin-bottom: 16px;
+  gap: var(--space-6);
+  margin-bottom: var(--space-6);
 }
 .section-head p {
   max-width: 540px;
@@ -6426,8 +6247,8 @@ main {
 .summary {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 12px;
-  margin: 0 0 26px;
+  gap: var(--space-6);
+  margin: 0 0 var(--space-8);
 }
 .metric,
 .card,
@@ -6439,7 +6260,7 @@ main {
 }
 .metric {
   min-height: 104px;
-  padding: 16px;
+  padding: var(--space-4);
 }
 .metric strong {
   display: block;
@@ -6448,7 +6269,7 @@ main {
 }
 .metric span {
   display: block;
-  margin-top: 8px;
+  margin-top: var(--space-2);
   color: var(--odp-muted);
   font-size: .8rem;
   font-weight: 700;
@@ -6458,7 +6279,7 @@ main {
 .actions-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
+  gap: var(--space-6);
 }
 .executive-dashboard-intro,
 .decision-card,
@@ -6471,12 +6292,12 @@ main {
   box-shadow: 0 12px 32px rgba(30, 10, 46, .06);
 }
 .executive-dashboard-intro {
-  padding: 24px 28px;
-  margin-bottom: 24px;
+  padding: var(--space-8);
+  margin-bottom: var(--space-6);
 }
 .leadership-recommendation {
-  padding: 20px 24px;
-  margin: 0 0 28px;
+  padding: var(--space-6);
+  margin: 0 0 var(--space-8);
   border-color: #c4b5fd;
   border-left: 6px solid #6d28d9;
   background: #f5f3ff;
@@ -6492,8 +6313,8 @@ main {
   text-transform: uppercase;
 }
 .leadership-recommendation p {
-  margin: 6px 0 0;
-  color: var(--odp-text);
+  margin: var(--space-2) 0 0;
+  color: var(--odp-ink);
   font-size: 1.05rem;
   font-weight: 800;
   line-height: 1.35;
@@ -6507,13 +6328,13 @@ main {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: start;
-  gap: 28px;
-  margin-bottom: 24px;
+  gap: var(--space-8);
+  margin-bottom: var(--space-6);
 }
 .decision-card,
 .executive-list,
 .executive-empty {
-  padding: 18px;
+  padding: var(--space-6);
 }
 .decision-card {
   display: flex;
@@ -6545,7 +6366,7 @@ main {
 .decision-card-head {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: var(--space-4);
 }
 .decision-card-icon {
   flex: 0 0 44px;
@@ -6580,25 +6401,25 @@ main {
   box-shadow: 0 12px 26px rgba(109, 95, 159, .2);
 }
 .decision-card h3 {
-  margin: 5px 0 0;
+  margin: var(--space-1) 0 0;
   font-size: 1.2rem;
 }
 .decision-insight {
-  margin: 14px 0 0;
+  margin: var(--space-4) 0 0;
   color: var(--odp-muted);
   font-size: .95rem;
   line-height: 1.4;
 }
 .priority-action {
   display: flex;
-  gap: 8px;
-  margin: 16px 0 0;
-  padding-top: 12px;
+  gap: var(--space-2);
+  margin: var(--space-4) 0 0;
+  padding-top: var(--space-3);
   border-top: 1px solid var(--odp-line);
 }
 .priority-action p {
   margin: 0;
-  color: var(--odp-text);
+  color: var(--odp-ink);
   font-size: .92rem;
 }
 .primary-focus .priority-action span,
@@ -6625,26 +6446,26 @@ main {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-3);
   margin-top: auto;
-  padding-top: 14px;
+  padding-top: var(--space-4);
 }
 .priority-meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--space-2);
   margin: 0;
 }
 .metadata-badge {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
+  gap: var(--space-2);
   min-height: 26px;
-  padding: 4px 10px;
+  padding: var(--space-1) var(--space-3);
   border: 1px solid #d7deea;
   border-radius: 7px;
   background: rgba(255, 255, 255, .72);
-  color: var(--odp-text);
+  color: var(--odp-ink);
   font-size: .82rem;
   font-weight: 800;
   box-shadow: 0 4px 12px rgba(15, 23, 42, .08);
@@ -6718,8 +6539,8 @@ main {
 }
 .decision-details-dropdown {
   display: none;
-  margin-top: 12px;
-  padding-top: 12px;
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
   border-top: 1px solid var(--odp-line);
   color: var(--odp-muted);
   font-size: .86rem;
@@ -6728,22 +6549,22 @@ main {
   display: block;
 }
 .decision-details-dropdown h4 {
-  margin: 12px 0 6px;
-  color: var(--odp-text);
+  margin: var(--space-3) 0 var(--space-2);
+  color: var(--odp-ink);
   font-size: .82rem;
 }
 .decision-details-dropdown ul {
   margin: 0;
-  padding-left: 18px;
+  padding-left: var(--space-6);
 }
 .decision-details-dropdown li {
-  margin: 4px 0;
+  margin: var(--space-1) 0;
 }
 .executive-list {
-  margin-top: 16px;
+  margin-top: var(--space-6);
 }
 .executive-item {
-  padding: 14px 0;
+  padding-block: var(--space-4);
   border-top: 1px solid var(--odp-line);
 }
 .executive-item:first-of-type {
@@ -6751,15 +6572,15 @@ main {
   padding-top: 0;
 }
 .executive-item p {
-  margin: 0 0 10px;
+  margin: 0 0 var(--space-3);
 }
 .business-evidence {
-  margin-top: 16px;
-  padding-top: 12px;
+  margin-top: var(--space-4);
+  padding-top: var(--space-3);
   border-top: 1px solid var(--odp-line);
 }
 .business-evidence h4 {
-  margin: 0 0 8px;
+  margin: 0 0 var(--space-2);
   color: var(--odp-muted);
   font-size: .8rem;
   text-transform: uppercase;
@@ -6767,16 +6588,16 @@ main {
 .business-evidence ul,
 .technical-evidence ul {
   margin: 0;
-  padding-left: 18px;
+  padding-left: var(--space-6);
 }
 .business-evidence li {
-  margin: 4px 0;
+  margin: var(--space-1) 0;
 }
 .priority-evidence {
-  color: var(--odp-text);
+  color: var(--odp-ink);
 }
 .technical-evidence {
-  margin-top: 12px;
+  margin-top: var(--space-3);
   color: var(--odp-muted);
   font-size: .85rem;
 }
@@ -6787,8 +6608,8 @@ main {
 .evidence-refs {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 10px;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
 }
 .evidence-ref small {
   color: var(--odp-muted);
@@ -6802,12 +6623,12 @@ main {
 .product-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
+  gap: var(--space-6);
 }
 .card {
   position: relative;
   min-height: 216px;
-  padding: 18px;
+  padding: var(--space-6);
 }
 .card::before {
   content: "";
@@ -6834,14 +6655,14 @@ main {
 .product-card-counters {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin: 14px 0;
+  gap: var(--space-2);
+  margin: var(--space-4) 0;
 }
 .product-card-counters span {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 5px 8px;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-2);
   border-radius: 999px;
   background: var(--odp-soft);
   color: var(--odp-muted);
@@ -6868,7 +6689,7 @@ main {
   width: 100%;
 }
 .product-modal-close {
-  padding: 0 14px;
+  padding-inline: var(--space-4);
 }
 .product-detail-button:hover,
 .product-modal-close:hover {
@@ -6877,14 +6698,14 @@ main {
 .chip-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 14px;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
 }
 .chip {
   display: inline-flex;
   align-items: center;
   min-height: 24px;
-  padding: 4px 8px;
+  padding: var(--space-1) var(--space-2);
   border-radius: 999px;
   background: var(--odp-soft);
   color: var(--odp-muted);
@@ -6899,13 +6720,13 @@ main {
 .card p,
 .panel p,
 .action-card p {
-  margin: 0 0 14px;
+  margin: 0 0 var(--space-4);
   color: var(--odp-muted);
 }
 .odp-facts {
   display: grid;
   grid-template-columns: max-content 1fr;
-  gap: 6px 12px;
+  gap: var(--space-2) var(--space-3);
   margin: 0;
   font-size: .9rem;
 }
@@ -6918,10 +6739,10 @@ html[dir="rtl"] .odp-facts {
 }
 .odp-facts dd { margin: 0; }
 .component-section {
-  margin-top: 18px;
+  margin-top: var(--space-6);
 }
 .component-section h4 {
-  margin: 0 0 10px;
+  margin: 0 0 var(--space-3);
 }
 .table-scroll {
   max-width: 100%;
@@ -6937,7 +6758,7 @@ html[dir="rtl"] .odp-facts {
 }
 .pricing-table th,
 .pricing-table td {
-  padding: 10px;
+  padding: var(--space-3);
   border-bottom: 1px solid var(--odp-line);
   text-align: left;
   vertical-align: top;
@@ -6952,27 +6773,27 @@ html[dir="rtl"] .odp-facts {
   border-bottom: 0;
 }
 .pricing-table p {
-  margin: 4px 0 0;
+  margin: var(--space-1) 0 0;
   font-size: .84rem;
 }
 .pricing-linked-row td {
-  padding: 12px;
+  padding: var(--space-3);
   background: #fbf9fc;
 }
 .pricing-linked-components {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
+  gap: var(--space-3);
 }
 .linked-component-card {
   min-width: 0;
   border: 1px solid var(--odp-line);
   border-radius: 8px;
   background: #fff;
-  padding: 12px;
+  padding: var(--space-3);
 }
 .linked-component-title {
-  margin: 0 0 6px;
+  margin: 0 0 var(--space-2);
   color: var(--odps-violet);
   font-size: .72rem;
   font-weight: 900;
@@ -6980,7 +6801,7 @@ html[dir="rtl"] .odp-facts {
   text-transform: uppercase;
 }
 .linked-component-card h5 {
-  margin: 0 0 8px;
+  margin: 0 0 var(--space-2);
   font-size: .98rem;
 }
 .linked-component-card .odp-facts {
@@ -6995,22 +6816,22 @@ html[dir="rtl"] .odp-facts {
 }
 .component-list {
   display: grid;
-  gap: 12px;
+  gap: var(--space-3);
 }
 .component-card {
   border: 1px solid var(--odp-line);
   border-radius: 8px;
   background: #fff;
-  padding: 14px;
+  padding: var(--space-4);
 }
 .component-card h5 {
-  margin: 0 0 8px;
+  margin: 0 0 var(--space-2);
   font-size: 1rem;
 }
 .profile-chip {
   display: inline-flex;
-  margin-bottom: 10px;
-  padding: 3px 8px;
+  margin-bottom: var(--space-3);
+  padding: var(--space-1) var(--space-2);
   border-radius: 999px;
   background: var(--odp-soft);
   color: var(--odp-muted);
@@ -7020,33 +6841,33 @@ html[dir="rtl"] .odp-facts {
 }
 .dimension-list {
   display: grid;
-  gap: 8px;
-  margin-top: 12px;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
 }
 .dimension-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 12px;
+  gap: var(--space-3);
   align-items: start;
-  padding: 10px;
+  padding: var(--space-3);
   border: 1px solid var(--odp-line);
   border-radius: 8px;
   background: var(--odp-soft);
 }
 .dimension-description {
-  margin: 4px 0 0;
+  margin: var(--space-1) 0 0;
   font-size: .86rem;
 }
 .dimension-meta {
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
-  gap: 6px;
+  gap: var(--space-2);
 }
 .dimension-metric,
 .dimension-weight {
   display: inline-flex;
-  padding: 3px 8px;
+  padding: var(--space-1) var(--space-2);
   border-radius: 999px;
   background: #fff;
   color: var(--odp-ink);
@@ -7057,8 +6878,8 @@ html[dir="rtl"] .odp-facts {
 .component-refs {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 12px;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
   color: var(--odp-muted);
   font-size: .82rem;
 }
@@ -7070,7 +6891,7 @@ html[dir="rtl"] .odp-facts {
   inset: 0;
   z-index: 50;
   display: none;
-  padding: 28px;
+  padding: var(--space-8);
 }
 .product-modal[aria-hidden="false"] {
   display: block;
@@ -7082,8 +6903,8 @@ html[dir="rtl"] .odp-facts {
 }
 .product-modal-panel {
   position: relative;
-  width: min(1120px, calc(100vw - 56px));
-  max-height: calc(100vh - 56px);
+  width: min(1120px, calc(100vw - (var(--space-8) * 2)));
+  max-height: calc(100vh - (var(--space-8) * 2));
   margin: 0 auto;
   overflow: auto;
   border-radius: 8px;
@@ -7097,8 +6918,8 @@ html[dir="rtl"] .odp-facts {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  padding: 20px 22px;
+  gap: var(--space-4);
+  padding: var(--space-6);
   border-bottom: 1px solid var(--odp-line);
   background: #fff;
 }
@@ -7108,13 +6929,13 @@ html[dir="rtl"] .odp-facts {
 }
 .product-detail-layout {
   margin: 0;
-  padding: 22px;
+  padding: var(--space-6);
   border-top: 0;
 }
 .odp-muted { color: var(--odp-muted); }
 .odp-detail {
-  margin-top: 14px;
-  padding-top: 12px;
+  margin-top: var(--space-4);
+  padding-top: var(--space-3);
   border-top: 1px solid var(--odp-line);
 }
 .action-card,
@@ -7125,11 +6946,11 @@ html[dir="rtl"] .odp-facts {
   box-shadow: 0 14px 34px rgba(30, 10, 46, .06);
 }
 .action-card {
-  padding: 16px;
+  padding: var(--space-6);
 }
 .action-card strong {
   display: block;
-  margin: 6px 0;
+  margin: var(--space-2) 0;
 }
 .action-link,
 .version-action {
@@ -7140,24 +6961,24 @@ html[dir="rtl"] .odp-facts {
 .overview-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 340px;
-  gap: 16px;
+  gap: var(--space-6);
 }
 .overview-section {
-  margin-top: 28px;
+  margin-top: var(--space-8);
 }
 .overview-card-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 16px;
+  gap: var(--space-6);
 }
 .change-story-list {
   display: grid;
-  gap: 8px;
-  margin: 14px 0 0;
-  padding-left: 18px;
+  gap: var(--space-2);
+  margin: var(--space-4) 0 0;
+  padding-left: var(--space-6);
   color: var(--odp-muted);
 }
-.panel { padding: 18px; }
+.panel { padding: var(--space-6); }
 .version-list {
   margin: 0;
   padding: 0;
@@ -7165,28 +6986,28 @@ html[dir="rtl"] .odp-facts {
 .version-list li {
   display: flex;
   justify-content: space-between;
-  gap: 12px;
-  margin: 0 0 8px;
-  padding: 10px 0;
+  gap: var(--space-3);
+  margin: 0 0 var(--space-2);
+  padding: var(--space-3) 0;
   border-bottom: 1px solid var(--odp-line);
   list-style: none;
 }
 .version-history {
-  margin-top: 12px;
-  padding-top: 12px;
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
   border-top: 1px solid var(--odp-line);
 }
 .version-table {
   width: 100%;
   max-width: 100%;
-  margin-top: 12px;
+  margin-top: var(--space-3);
   border-collapse: collapse;
   table-layout: fixed;
   font-size: .9rem;
 }
 .version-table th,
 .version-table td {
-  padding: 9px 6px;
+  padding: var(--space-2);
   border-bottom: 1px solid var(--odp-line);
   text-align: left;
   vertical-align: top;
@@ -7231,7 +7052,7 @@ html[dir="rtl"] .odp-facts {
   box-shadow: 0 12px 32px rgba(30, 10, 46, .06);
 }
 .about-card {
-  padding: 26px;
+  padding: var(--space-8);
   border-radius: 8px;
   color: #fff;
   background: var(--odp-ink);
@@ -7245,8 +7066,8 @@ html[dir="rtl"] .odp-facts {
   background: rgba(255, 255, 255, .12);
 }
 .footer {
-  margin-top: 42px;
-  padding: 28px 0 36px;
+  margin-top: var(--space-12);
+  padding-block: var(--space-8);
   color: rgba(255, 255, 255, .78);
   background: var(--odp-black);
   border-top: 4px solid var(--odps-violet);
@@ -7254,7 +7075,7 @@ html[dir="rtl"] .odp-facts {
 }
 .footer-inner {
   display: grid;
-  gap: 22px;
+  gap: var(--space-6);
 }
 .footer-status {
   margin: 0;
@@ -7264,10 +7085,10 @@ html[dir="rtl"] .odp-facts {
 .footer-columns {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 20px;
+  gap: var(--space-6);
 }
 .footer-column h2 {
-  margin: 0 0 10px;
+  margin: 0 0 var(--space-3);
   color: #fff;
   font-size: .82rem;
   letter-spacing: .04em;
@@ -7275,7 +7096,7 @@ html[dir="rtl"] .odp-facts {
 }
 .footer-column ul {
   display: grid;
-  gap: 8px;
+  gap: var(--space-2);
   margin: 0;
   padding: 0;
   list-style: none;
@@ -7307,11 +7128,11 @@ html[dir="rtl"] .odp-facts {
     grid-template-columns: 1fr;
   }
   .product-modal {
-    padding: 12px;
+    padding: var(--space-3);
   }
   .product-modal-panel {
-    width: calc(100vw - 24px);
-    max-height: calc(100vh - 24px);
+    width: calc(100vw - (var(--space-3) * 2));
+    max-height: calc(100vh - (var(--space-3) * 2));
   }
   .product-modal-header {
     align-items: start;
@@ -7325,6 +7146,25 @@ html[dir="rtl"] .odp-facts {
   .wide { grid-column: auto; }
 }
 @media (max-width: 640px) {
+  .wrap,
+  .topbar-inner {
+    width: min(100% - (var(--space-4) * 2), 1180px);
+  }
+  .hero .wrap {
+    padding-block: var(--space-12);
+  }
+  .card,
+  .panel,
+  .action-card,
+  .decision-card,
+  .executive-list,
+  .executive-empty {
+    padding: var(--space-4);
+  }
+  .executive-dashboard-intro,
+  .about-card {
+    padding: var(--space-6);
+  }
   .footer-columns {
     grid-template-columns: 1fr;
   }
