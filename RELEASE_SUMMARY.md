@@ -11,3 +11,12 @@
 - Added developer guidance for future portfolio spacing work in
   `docs/development/portfolio_spacing_guidance.md`.
 
+## Portfolio Refactor
+
+- Split deterministic portfolio source budgeting helpers into
+  `open_data_products.portfolio_budget`.
+- Split portfolio source privacy handling into
+  `open_data_products.portfolio_privacy`.
+- Updated `docs/development/portfolio-refactor-note.md` to document the current
+  module boundaries and remaining future extraction candidates.
+
