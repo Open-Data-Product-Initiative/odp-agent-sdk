@@ -28,6 +28,9 @@ Use these pages when changing complex SDK behavior:
 - [Portfolio development](portfolio.md): portfolio source lanes, document
   intake, prompt budget gates, workspace orchestration, renderer, localization,
   validation, and tests.
+- [Testing strategy](testing-strategy.md): baseline checks, focused test
+  selection, portfolio intake ZIP regressions, and fixture rules for
+  contributors.
 - [SDK input documents plan](sdk-input-documents-plan.md): implemented
   portfolio document formats, optional Outlook support, warning-only source
   classes, and future intake adapters.
@@ -39,7 +42,8 @@ Use these pages when changing complex SDK behavior:
 
 Keep these pages focused on implementation rules and contributor workflows.
 User setup, beginner commands, and runnable examples belong in the user-facing
-guides such as [commands.md](../user/commands.md), [generation.md](../user/generation.md), and
+guides such as [commands.md](../user/commands.md),
+[generation.md](../user/generation.md), and
 [data-contracts.md](../user/data-contracts.md).
 
 ## Refactor Compatibility Posture
