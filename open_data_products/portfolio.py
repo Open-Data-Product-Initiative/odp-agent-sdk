@@ -5257,49 +5257,34 @@ def _render_product_detail(product_info: Dict[str, Any]) -> str:
     details = _product_details(document)
     product = document.get("product", {}) if isinstance(document, dict) else {}
     facts = [
-        ("Name", details.get("name")),
         ("Product ID", details.get("productID")),
         ("Status", details.get("status")),
         ("Visibility", details.get("visibility")),
         ("Type", details.get("type")),
     ]
     pricing_items = _pricing_items(product)
-    referenced_profiles = _referenced_pricing_profiles(pricing_items)
-    sections = [_render_pricing_section(pricing_items, product)]
-    if not pricing_items:
-        sections.extend(
-            [
-                _render_declarative_section(
-                    "SLA", _declarative_items(product.get("SLA"))
-                ),
-                _render_declarative_section(
-                    "Data Quality", _declarative_items(product.get("dataQuality"))
-                ),
-            ]
-        )
-    else:
-        sections.extend(
-            [
-                _render_declarative_section(
-                    "Unlinked SLA profiles",
-                    _unreferenced_declarative_items(
-                        product.get("SLA"), referenced_profiles["SLA"]
-                    ),
-                ),
-                _render_declarative_section(
-                    "Unlinked Data Quality profiles",
-                    _unreferenced_declarative_items(
-                        product.get("dataQuality"), referenced_profiles["dataQuality"]
-                    ),
-                ),
-            ]
-        )
     product_model_path = _escape(str(path))
+    description = _text(details.get("description"))
+    description_html = (
+        f'<p class="product-detail-description">{_escape(description)}</p>'
+        if description
+        else ""
+    )
+    sections = [
+        _render_pricing_section(pricing_items, product),
+        _render_market_profile_section(
+            "Data Quality", _declarative_items(product.get("dataQuality"))
+        ),
+        _render_market_profile_section("SLA", _declarative_items(product.get("SLA"))),
+        _render_license_section(product.get("license")),
+    ]
     return (
         '<div class="odp-detail product-detail-layout">'
-        f'<p>{_escape(_text(details.get("description")))}</p>'
-        f"{_render_facts(facts)}"
-        f"{''.join(sections)}"
+        '<section class="product-detail-hero">'
+        f"{description_html}"
+        f'<div class="product-detail-meta">{_render_facts(facts)}</div>'
+        "</section>"
+        f'<div class="product-marketplace-segments">{"".join(sections)}</div>'
         f'<p class="odp-muted">Raw artifact: {product_model_path}</p>'
         "</div>"
     )
@@ -5424,7 +5409,9 @@ def _render_footer(data: Dict[str, Any]) -> str:
     has_versions = isinstance(versions, list) and bool(versions)
     latest_version = _latest_version(versions if isinstance(versions, list) else [])
     version_link = _escape_attr(
-        _text(latest_version.get("html")) if isinstance(latest_version, dict) else "#overview"
+        _text(latest_version.get("html"))
+        if isinstance(latest_version, dict)
+        else "#overview"
     )
     version_action = (
         f'<a href="{version_link}">Compare previous snapshot</a>'
@@ -5688,154 +5675,122 @@ def _declarative_items(value: Any) -> List[Dict[str, Any]]:
 def _render_pricing_section(
     items: List[Dict[str, Any]], product: Dict[str, Any]
 ) -> str:
-    if not items:
-        return ""
-    rows = []
+    cards = []
     for item in items:
         name = _text(item.get("name"), "Pricing plan")
         description = _text(item.get("description"))
         price = _text(item.get("price"), "0")
         currency = _text(item.get("priceCurrency"))
         amount = " ".join(part for part in (price, currency) if part)
-        rows.append(
-            '<tr class="pricing-plan-row">'
-            f"<td><strong>{_escape(name)}</strong>"
-            f"{f'<p>{_escape(description)}</p>' if description else ''}</td>"
-            f"<td>{_escape(amount)}</td>"
-            f"<td>{_escape(_text(item.get('billingDuration')))}</td>"
-            f"<td>{_escape(_text(item.get('unit')))}</td>"
-            f"<td>{_render_component_refs(item)}</td>"
-            "</tr>"
+        plan_facts = [
+            ("Price", amount),
+            ("Billing", item.get("billingDuration")),
+            ("Unit", item.get("unit")),
+            ("Access", _named_ref_label(item.get("access"), product.get("dataAccess"))),
+        ]
+        description_html = f"<p>{_escape(description)}</p>" if description else ""
+        cards.append(
+            '<article class="market-plan-card">'
+            f"<h5>{_escape(name)}</h5>"
+            f"{description_html}"
+            f"{_render_facts(plan_facts)}"
+            f"{_render_component_refs(item)}"
+            "</article>"
         )
-        linked_components = _render_pricing_linked_components(item, product)
-        if linked_components:
-            rows.append(
-                '<tr class="pricing-linked-row">'
-                f'<td colspan="5">{linked_components}</td>'
-                "</tr>"
-            )
+    content = (
+        "".join(cards)
+        if cards
+        else '<p class="odp-muted">No pricing plans are defined yet.</p>'
+    )
     return (
-        '<section class="component-section">'
+        '<section class="market-segment">'
         "<h4>Pricing</h4>"
-        '<div class="table-scroll"><table class="pricing-table">'
-        "<thead><tr><th>Plan</th><th>Price</th><th>Billing Duration</th>"
-        "<th>Unit</th><th>References</th></tr></thead>"
-        f"<tbody>{''.join(rows)}</tbody>"
-        "</table></div>"
+        f'<div class="market-plan-list">{content}</div>'
         "</section>"
     )
 
 
-def _referenced_pricing_profiles(items: List[Dict[str, Any]]) -> Dict[str, Set[str]]:
-    references = {"SLA": set(), "dataQuality": set()}
+def _render_market_profile_section(title: str, items: List[Dict[str, Any]]) -> str:
+    cards = []
     for item in items:
-        for key in references:
-            profile = _profile_key_from_ref(_component_ref(item.get(key)))
-            if profile:
-                references[key].add(profile)
-    return references
-
-
-def _unreferenced_declarative_items(
-    value: Any, referenced: Set[str]
-) -> List[Dict[str, Any]]:
-    return [
-        item
-        for item in _declarative_items(value)
-        if _text(item.get("profile"), "default") not in referenced
-    ]
-
-
-def _render_pricing_linked_components(
-    item: Dict[str, Any], product: Dict[str, Any]
-) -> str:
-    components = [
-        _render_pricing_linked_profile(
-            "Included SLA", item.get("SLA"), product.get("SLA")
-        ),
-        _render_pricing_linked_profile(
-            "Included Data Quality",
-            item.get("dataQuality"),
-            product.get("dataQuality"),
-        ),
-        _render_pricing_linked_access(item.get("access"), product.get("dataAccess")),
-        _render_pricing_linked_gateway(
-            item.get("paymentGateway"), product.get("paymentGateways")
-        ),
-    ]
-    rendered = [component for component in components if component]
-    if not rendered:
-        return ""
-    return f'<div class="pricing-linked-components">{"".join(rendered)}</div>'
-
-
-def _render_pricing_linked_profile(title: str, reference: Any, value: Any) -> str:
-    profile = _resolve_declarative_ref(reference, value)
-    if profile is None:
-        return ""
-    name = _text(profile.get("name"), _title_from_text(_text(profile.get("profile"))))
-    description = _text(profile.get("description"))
-    description_html = f"<p>{_escape(description)}</p>" if description else ""
+        profile = _text(item.get("profile"), "default")
+        name = _text(item.get("name"), _title_from_text(profile))
+        description = _text(item.get("description"))
+        description_html = f"<p>{_escape(description)}</p>" if description else ""
+        cards.append(
+            '<article class="market-profile-card">'
+            f"<h5>{_escape(name)}</h5>"
+            f'<span class="profile-chip">{_escape(profile)}</span>'
+            f"{description_html}"
+            f"{_render_dimension_summary(_profile_dimensions(item))}"
+            "</article>"
+        )
+    content = (
+        "".join(cards)
+        if cards
+        else f'<p class="odp-muted">No {title.lower()} profile is defined yet.</p>'
+    )
     return (
-        '<article class="linked-component-card">'
-        f'<p class="linked-component-title">{_escape(title)}</p>'
-        f"<h5>{_escape(name)}</h5>"
-        f'<span class="profile-chip">{_escape(_text(profile.get("profile"), "default"))}</span>'
-        f"{description_html}"
-        f"{_render_dimensions(profile.get('dimensions'))}"
-        "</article>"
+        '<section class="market-segment">'
+        f"<h4>{_escape(title)}</h4>"
+        f'<div class="market-profile-list">{content}</div>'
+        "</section>"
     )
 
 
-def _render_pricing_linked_access(reference: Any, value: Any) -> str:
-    access = _resolve_named_ref(reference, value)
-    if access is None:
-        return ""
-    facts = [
-        ("Description", access.get("description")),
-        (
-            "Output Port Type",
-            access.get("outputPortType") or access.get("outputPorttype"),
-        ),
-        ("Format", access.get("format")),
-        ("Authentication", access.get("authenticationMethod")),
-    ]
+def _render_license_section(value: Any) -> str:
+    if not isinstance(value, dict):
+        content = '<p class="odp-muted">No licensing terms are defined yet.</p>'
+    else:
+        scope = value.get("scope") if isinstance(value.get("scope"), dict) else {}
+        facts = [
+            ("Type", value.get("type")),
+            ("Scope", scope.get("definition") if isinstance(scope, dict) else None),
+            (
+                "Restrictions",
+                (
+                    _short_text(scope.get("restrictions"))
+                    if isinstance(scope, dict)
+                    else None
+                ),
+            ),
+        ]
+        content = (
+            _render_facts(facts)
+            or '<p class="odp-muted">No licensing terms are defined yet.</p>'
+        )
     return (
-        '<article class="linked-component-card">'
-        '<p class="linked-component-title">Included Access</p>'
-        f"<h5>{_escape(_title_from_text(_profile_key_from_ref(_component_ref(reference)) or 'access'))}</h5>"
-        f"{_render_facts(facts)}"
-        "</article>"
+        '<section class="market-segment">'
+        "<h4>Licensing</h4>"
+        f'<div class="market-license-card">{content}</div>'
+        "</section>"
     )
 
 
-def _render_pricing_linked_gateway(reference: Any, value: Any) -> str:
-    gateway = _resolve_named_ref(reference, value)
-    if gateway is None:
-        return ""
-    facts = [
-        ("Name", gateway.get("name")),
-        ("Type", gateway.get("type")),
-        ("Provider", gateway.get("provider")),
-        ("Description", gateway.get("description")),
-    ]
-    return (
-        '<article class="linked-component-card">'
-        '<p class="linked-component-title">Included Payment</p>'
-        f"<h5>{_escape(_title_from_text(_profile_key_from_ref(_component_ref(reference)) or 'payment'))}</h5>"
-        f"{_render_facts(facts)}"
-        "</article>"
+def _profile_dimensions(item: Dict[str, Any]) -> Any:
+    dimensions = item.get("dimensions")
+    if isinstance(dimensions, list):
+        return dimensions
+    if item.get("dimension") is not None or item.get("objective") is not None:
+        return [item]
+    return []
+
+
+def _short_text(value: Any, limit: int = 180) -> str:
+    text = _text(value)
+    if len(text) <= limit:
+        return text
+    return f"{text[: limit - 1].rstrip()}..."
+
+
+def _named_ref_label(reference: Any, value: Any) -> str:
+    item = _resolve_named_ref(reference, value)
+    if item is None:
+        return _title_from_text(_profile_key_from_ref(_component_ref(reference)))
+    return _text(
+        item.get("name"),
+        _title_from_text(_profile_key_from_ref(_component_ref(reference))),
     )
-
-
-def _resolve_declarative_ref(reference: Any, value: Any) -> Optional[Dict[str, Any]]:
-    profile_key = _profile_key_from_ref(_component_ref(reference))
-    if not profile_key:
-        return None
-    for item in _declarative_items(value):
-        if _text(item.get("profile"), "default") == profile_key:
-            return item
-    return None
 
 
 def _resolve_named_ref(reference: Any, value: Any) -> Optional[Dict[str, Any]]:
@@ -5870,38 +5825,6 @@ def _profile_key_from_ref(ref: str) -> str:
     return ref.rstrip("/").split("/")[-1]
 
 
-def _render_declarative_section(title: str, items: List[Dict[str, Any]]) -> str:
-    if not items:
-        return ""
-    rendered = []
-    for item in items:
-        profile = _text(item.get("profile"), "default")
-        name = _text(item.get("name"), _title_from_text(profile))
-        description = _text(item.get("description"))
-        facts = [
-            (str(key), value)
-            for key, value in item.items()
-            if key not in {"name", "description", "dimensions", "profile"}
-            and not isinstance(value, (dict, list))
-        ]
-        description_html = f"<p>{_escape(description)}</p>" if description else ""
-        rendered.append(
-            '<li class="component-card">'
-            f"<h5>{_escape(name)}</h5>"
-            f'<span class="profile-chip">{_escape(profile)}</span>'
-            f"{description_html}"
-            f"{_render_facts(facts)}"
-            f"{_render_dimensions(item.get('dimensions'))}"
-            "</li>"
-        )
-    return (
-        '<section class="component-section">'
-        f"<h4>{_escape(title)}</h4>"
-        f'<ul class="component-list">{"".join(rendered)}</ul>'
-        "</section>"
-    )
-
-
 def _render_component_refs(item: Dict[str, Any]) -> str:
     refs = []
     for label, key in (
@@ -5914,48 +5837,45 @@ def _render_component_refs(item: Dict[str, Any]) -> str:
         if isinstance(value, dict):
             ref = _text(value.get("$ref") or value.get("ref"))
             if ref:
+                profile = _profile_key_from_ref(ref)
+                ref_label = _title_from_text(profile) if profile else ref
                 refs.append(
-                    f"<li><strong>{_escape(label)}</strong> {_escape(ref)}</li>"
+                    f"<li><strong>{_escape(label)}</strong> {_escape(ref_label)}</li>"
                 )
     if not refs:
         return ""
     return f'<ul class="component-refs">{"".join(refs)}</ul>'
 
 
-def _render_dimensions(value: Any) -> str:
+def _render_dimension_summary(value: Any, limit: int = 3) -> str:
     if not isinstance(value, list):
         return ""
-    rows = []
-    for item in value:
+    items = []
+    for item in value[:limit]:
         if not isinstance(item, dict):
             continue
         label = _dimension_label(item)
         objective = _text(item.get("objective"))
         unit = _text(item.get("unit"))
         metric = " ".join(part for part in (objective, unit) if part and part != "null")
-        weight = _text(item.get("weight"))
-        description = _text(item.get("description"))
-        meta = []
-        if metric:
-            meta.append(f'<span class="dimension-metric">{_escape(metric)}</span>')
-        if weight:
-            meta.append(
-                f'<span class="dimension-weight">{_escape(weight)} weight</span>'
-            )
-        description_html = (
-            f'<p class="dimension-description">{_escape(description)}</p>'
-            if description
-            else ""
+        metric_html = (
+            f'<span class="dimension-metric">{_escape(metric)}</span>' if metric else ""
         )
-        rows.append(
-            '<li class="dimension-row">'
-            f"<div><strong>{_escape(label)}</strong>{description_html}</div>"
-            f'<div class="dimension-meta">{"".join(meta)}</div>'
+        items.append(
+            '<li class="dimension-summary-item">'
+            f"<span>{_escape(label)}</span>{metric_html}"
             "</li>"
         )
-    if not rows:
+    if not items:
         return ""
-    return f'<ul class="dimension-list">{"".join(rows)}</ul>'
+    if len(value) > limit:
+        remaining = len(value) - limit
+        items.append(
+            '<li class="dimension-summary-item muted">'
+            f"<span>+{remaining} more checks</span>"
+            "</li>"
+        )
+    return f'<ul class="dimension-summary-list">{"".join(items)}</ul>'
 
 
 def _dimension_label(item: Dict[str, Any]) -> str:
@@ -6744,89 +6664,74 @@ html[dir="rtl"] .odp-facts {
 .component-section h4 {
   margin: 0 0 var(--space-3);
 }
-.table-scroll {
-  max-width: 100%;
-  overflow-x: auto;
+.product-detail-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 320px);
+  gap: 18px;
+  align-items: start;
+  margin-bottom: 22px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--odp-line);
 }
-.pricing-table {
-  width: 100%;
-  border-collapse: collapse;
+.product-detail-description {
+  margin: 0;
+  color: var(--odp-ink);
+  font-size: 1.02rem;
+  line-height: 1.55;
+}
+.product-detail-meta {
+  padding: 14px;
   border: 1px solid var(--odp-line);
   border-radius: 8px;
-  background: #fff;
-  font-size: .88rem;
-}
-.pricing-table th,
-.pricing-table td {
-  padding: var(--space-3);
-  border-bottom: 1px solid var(--odp-line);
-  text-align: left;
-  vertical-align: top;
-}
-.pricing-table th {
   background: var(--odp-soft);
-  color: var(--odp-muted);
-  font-size: .76rem;
-  text-transform: uppercase;
 }
-.pricing-table tr:last-child td {
-  border-bottom: 0;
-}
-.pricing-table p {
-  margin: var(--space-1) 0 0;
-  font-size: .84rem;
-}
-.pricing-linked-row td {
-  padding: var(--space-3);
-  background: #fbf9fc;
-}
-.pricing-linked-components {
+.product-marketplace-segments {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--space-3);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
 }
-.linked-component-card {
+.market-segment {
   min-width: 0;
   border: 1px solid var(--odp-line);
   border-radius: 8px;
   background: #fff;
-  padding: var(--space-3);
+  padding: 16px;
 }
-.linked-component-title {
-  margin: 0 0 var(--space-2);
-  color: var(--odps-violet);
-  font-size: .72rem;
-  font-weight: 900;
+.market-segment h4 {
+  margin: 0 0 12px;
+  font-size: .86rem;
   letter-spacing: .04em;
   text-transform: uppercase;
 }
-.linked-component-card h5 {
-  margin: 0 0 var(--space-2);
-  font-size: .98rem;
+.market-plan-list,
+.market-profile-list {
+  display: grid;
+  gap: 12px;
 }
-.linked-component-card .odp-facts {
-  grid-template-columns: max-content minmax(0, 1fr);
+.market-plan-card,
+.market-profile-card,
+.market-license-card {
+  min-width: 0;
 }
-.component-list,
-.dimension-list,
+.market-plan-card + .market-plan-card,
+.market-profile-card + .market-profile-card {
+  padding-top: 12px;
+  border-top: 1px solid var(--odp-line);
+}
+.market-plan-card h5,
+.market-profile-card h5 {
+  margin: 0 0 6px;
+  font-size: 1rem;
+}
+.market-plan-card p,
+.market-profile-card p {
+  margin: 0 0 10px;
+  color: var(--odp-muted);
+}
 .component-refs {
   list-style: none;
   margin: 0;
   padding: 0;
-}
-.component-list {
-  display: grid;
-  gap: var(--space-3);
-}
-.component-card {
-  border: 1px solid var(--odp-line);
-  border-radius: 8px;
-  background: #fff;
-  padding: var(--space-4);
-}
-.component-card h5 {
-  margin: 0 0 var(--space-2);
-  font-size: 1rem;
 }
 .profile-chip {
   display: inline-flex;
@@ -6838,31 +6743,6 @@ html[dir="rtl"] .odp-facts {
   font-size: .72rem;
   font-weight: 800;
   text-transform: uppercase;
-}
-.dimension-list {
-  display: grid;
-  gap: var(--space-2);
-  margin-top: var(--space-3);
-}
-.dimension-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: var(--space-3);
-  align-items: start;
-  padding: var(--space-3);
-  border: 1px solid var(--odp-line);
-  border-radius: 8px;
-  background: var(--odp-soft);
-}
-.dimension-description {
-  margin: var(--space-1) 0 0;
-  font-size: .86rem;
-}
-.dimension-meta {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: var(--space-2);
 }
 .dimension-metric,
 .dimension-weight {
@@ -6882,6 +6762,38 @@ html[dir="rtl"] .odp-facts {
   margin-top: var(--space-3);
   color: var(--odp-muted);
   font-size: .82rem;
+}
+.component-refs li {
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: var(--odp-soft);
+}
+.dimension-summary-list {
+  display: grid;
+  gap: 8px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.dimension-summary-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--odp-soft);
+  font-size: .88rem;
+  font-weight: 700;
+}
+.dimension-summary-item span:first-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.dimension-summary-item.muted {
+  color: var(--odp-muted);
+  font-weight: 700;
 }
 .modal-open {
   overflow: hidden;
@@ -7137,11 +7049,9 @@ html[dir="rtl"] .odp-facts {
   .product-modal-header {
     align-items: start;
   }
-  .dimension-row {
+  .product-detail-hero,
+  .product-marketplace-segments {
     grid-template-columns: 1fr;
-  }
-  .dimension-meta {
-    justify-content: flex-start;
   }
   .wide { grid-column: auto; }
 }

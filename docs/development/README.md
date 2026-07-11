@@ -31,6 +31,13 @@ Use these pages when changing complex SDK behavior:
 - [Testing strategy](testing-strategy.md): baseline checks, focused test
   selection, portfolio intake ZIP regressions, and fixture rules for
   contributors.
+- [Portfolio fragment root compatibility issue](portfolio-fragment-root-issue.md):
+  known SDK-side defect where plural-root generated ODPC fragments can be
+  dropped by singular-root catalog collection.
+- [AI-assisted data product delivery plan](data-product-delivery-plan.md):
+  proposed ODPR-backed build-plan workflow for turning structured product
+  context into an operational delivery recipe, readiness score, risk register,
+  and AI-agent brief without defaulting to dashboard generation.
 - [SDK input documents plan](sdk-input-documents-plan.md): implemented
   portfolio document formats, optional Outlook support, warning-only source
   classes, and future intake adapters.

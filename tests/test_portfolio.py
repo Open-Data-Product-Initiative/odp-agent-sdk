@@ -851,9 +851,7 @@ def _write_minimal_text_pdf(path: Path, lines: list) -> None:
         str(line).replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
         for line in lines
     ]
-    text_operators = "\n".join(
-        f"({line}) Tj" for line in escaped_lines
-    )
+    text_operators = "\n".join(f"({line}) Tj" for line in escaped_lines)
     content = f"BT\n/F1 12 Tf\n72 720 Td\n{text_operators}\nET\n"
     payload = "\n".join(
         [
@@ -914,8 +912,7 @@ def _write_minimal_xlsx(path: Path, sheets: list) -> None:
     %s
   </sheets>
 </workbook>
-"""
-            % "\n    ".join(workbook_sheets),
+""" % "\n    ".join(workbook_sheets),
         )
         archive.writestr(
             "xl/_rels/workbook.xml.rels",
@@ -923,8 +920,7 @@ def _write_minimal_xlsx(path: Path, sheets: list) -> None:
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
   %s
 </Relationships>
-"""
-            % "\n  ".join(relationships),
+""" % "\n  ".join(relationships),
         )
 
 
@@ -1576,9 +1572,7 @@ def test_portfolio_intake_zip_fixture_matches_embedded_expectations(
     fixture_root = tmp_path / "sdk-intake-test-materials"
     assertions = json.loads(
         (
-            fixture_root
-            / "expected-output-checks"
-            / "suggested_assertions.json"
+            fixture_root / "expected-output-checks" / "suggested_assertions.json"
         ).read_text(encoding="utf-8")
     )
 
@@ -1636,9 +1630,7 @@ def test_portfolio_long_content_zip_fixture_matches_embedded_expectations(
     fixture_root = tmp_path / "sdk-long-content-test-materials"
     assertions = json.loads(
         (
-            fixture_root
-            / "expected-output-checks"
-            / "suggested_assertions.json"
+            fixture_root / "expected-output-checks" / "suggested_assertions.json"
         ).read_text(encoding="utf-8")
     )
 
@@ -1658,9 +1650,10 @@ def test_portfolio_long_content_zip_fixture_matches_embedded_expectations(
     assert result["sourceExtraction"]["skippedSourceCount"] == 0
     assert result["sourceBudget"]["method"] == "deterministic-chunk-budget"
     assert result["sourceBudget"]["estimatedInputChars"] > 200000
-    assert result["sourceBudget"]["chunkCount"] > result["sourceBudget"][
-        "includedChunkCount"
-    ]
+    assert (
+        result["sourceBudget"]["chunkCount"]
+        > result["sourceBudget"]["includedChunkCount"]
+    )
     assert result["sourceBudget"]["omittedChunkCount"] > 0
     assert result["sourceBudget"]["reducedSourceCount"] > 0
     assert result["sourcePrivacy"]["enabled"] is True
@@ -1711,9 +1704,7 @@ def test_portfolio_edge_case_zip_fixture_matches_embedded_expectations(
     fixture_root = tmp_path / "sdk-edge-case-test-materials"
     assertions = json.loads(
         (
-            fixture_root
-            / "expected-output-checks"
-            / "suggested_assertions.json"
+            fixture_root / "expected-output-checks" / "suggested_assertions.json"
         ).read_text(encoding="utf-8")
     )
 
@@ -1735,9 +1726,10 @@ def test_portfolio_edge_case_zip_fixture_matches_embedded_expectations(
 
     assert result["llmCallCount"] == 0
     assert result["sourceExtraction"]["skippedSourceCount"] == 7
-    assert "All warnings appear in default --json output." in assertions[
-        "high_value_assertions"
-    ]
+    assert (
+        "All warnings appear in default --json output."
+        in assertions["high_value_assertions"]
+    )
     assert all(source["path"] for source in skipped_sources)
     assert all(source["warning"] for source in skipped_sources)
 
@@ -1778,9 +1770,9 @@ def test_portfolio_edge_case_zip_fixture_matches_embedded_expectations(
     assert "zero-byte.pdf" in skipped_by_name
     assert "pdf-bytes-named-docx.docx" not in skipped_by_name
     assert source_by_name["pdf-bytes-named-docx.docx"]["sourceType"] == "pdf"
-    assert source_by_name["pdf-bytes-named-docx.docx"][
-        "detectionMethod"
-    ] == "pdf-header"
+    assert (
+        source_by_name["pdf-bytes-named-docx.docx"]["detectionMethod"] == "pdf-header"
+    )
 
     hidden_sensitive_text = "hidden sensitive"
     combined_preview = "\n".join(str(source["preview"]) for source in sources)
@@ -1834,8 +1826,7 @@ def test_portfolio_source_helpers_detect_csv_from_content_before_extension(
     (sources / "products").mkdir(parents=True)
     csv_path = sources / "products" / "product-candidates.txt"
     csv_path.write_text(
-        "product,need\n"
-        "Customer Health,retention visibility\n",
+        "product,need\n" "Customer Health,retention visibility\n",
         encoding="utf-8",
     )
 
@@ -4313,6 +4304,12 @@ def test_render_portfolio_formats_odps_component_dimensions_for_humans(
             }
         }
     }
+    product["product"]["license"] = {
+        "scope": {
+            "definition": "Internal product use for customer success.",
+            "restrictions": "No external redistribution.",
+        }
+    }
     product_path.write_text(
         yaml.safe_dump(product, sort_keys=False),
         encoding="utf-8",
@@ -4322,18 +4319,21 @@ def test_render_portfolio_formats_odps_component_dimensions_for_humans(
 
     html = (workspace / "index.html").read_text(encoding="utf-8")
     assert "Internal Starter" in html
-    assert 'class="pricing-table"' in html
-    assert "<th>Plan</th>" in html
-    assert "<th>Price</th>" in html
-    assert "Billing Duration" in html
+    assert 'class="product-marketplace-segments"' in html
+    assert 'class="market-plan-card"' in html
+    assert '<section class="market-segment"><h4>Pricing</h4>' in html
+    assert '<section class="market-segment"><h4>Data Quality</h4>' in html
+    assert '<section class="market-segment"><h4>SLA</h4>' in html
+    assert '<section class="market-segment"><h4>Licensing</h4>' in html
     assert "The Basic SLA" in html
     assert "Data Freshness" in html
     assert "Availability" in html
     assert "Account ID Completeness" in html
-    assert "Internal API access during pilot." in html
-    assert "Included SLA" in html
-    assert "Included Data Quality" in html
-    assert "Included Access" in html
+    assert "Internal product use for customer success." in html
+    assert "No external redistribution." in html
+    assert "Included SLA" not in html
+    assert "Included Data Quality" not in html
+    assert "Included Access" not in html
     assert '<section class="component-section"><h4>SLA</h4>' not in html
     assert '<section class="component-section"><h4>Data Quality</h4>' not in html
     assert "1440 minutes" in html
