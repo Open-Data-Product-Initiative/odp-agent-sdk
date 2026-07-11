@@ -26,8 +26,13 @@ Output rules:
   `productModel.format: yaml`, and a stable relative `$ref` for the future ODPS
   product file.
 - Use the product name, product identifier, version, status, visibility, owner,
-  access limits, refresh cadence, source systems, fields, and intended users
-  when they are present in the source documents.
+  source systems, fields, and intended users when they are present in the
+  source documents.
+- Do not invent ProductReference fields such as `accessLimits`,
+  `refreshCadence`, `pricing`, `SLA`, `dataQuality`, or `license`. Those belong
+  in the linked ODPS product spec, not in ODPC ProductReference.
+- If operational notes must be preserved on the reference, use `x-*` extension
+  fields only, such as `x-accessLimits` or `x-refreshCadence`.
 - Keep field names and identifiers stable and machine-readable.
 - Do not include Markdown fences or explanatory prose.
 - Do not create unrelated products. Do not include use cases, signals, or

@@ -1978,6 +1978,146 @@ def staged_portfolio_client(prompt: str, model: str) -> str:
     format: yaml
     $ref: ../odps/products/customer-product.yaml
 """
+    if prompt.startswith("# Extract ODPS Product Facts"):
+        assert "customer.md" in prompt
+        return """product:
+  productID: customer-health-signals
+  name: Customer Product
+  description: Customer analytics product.
+  visibility: organisation
+  status: production
+  type: dataset
+evidenceGaps: []
+"""
+    if prompt.startswith("# Generate Minimal ODPS Product YAML"):
+        return """schema: https://opendataproducts.org/v4.1/schema/odps.json
+version: "4.1"
+product:
+  details:
+    en:
+      productID: customer-health-signals
+      name: Customer Product
+      description: Customer analytics product.
+      visibility: organisation
+      status: production
+      type: dataset
+      valueProposition: Customer analytics product.
+"""
+    if prompt.startswith("# Draft ODPS Product Components"):
+        return """components:
+  SLA:
+    declarative:
+      default:
+        name:
+          en: Default SLA
+        dimensions:
+          - dimension: uptime
+            objective: 99
+            unit: percent
+  dataQuality:
+    declarative:
+      default:
+        dimensions:
+          - dimension: completeness
+            objective: 95
+            unit: percentage
+  pricingPlans:
+    declarative:
+      en:
+        - name: Internal Review
+          priceCurrency: XXX
+          price: "0"
+          billingDuration: month
+          unit: On-request
+  dataAccess:
+    API:
+      outputPortType: API
+      format: JSON
+      authenticationMethod: OAuth
+  license:
+    scope:
+      definition: Internal use.
+      restrictions: No external redistribution.
+      geographicalArea:
+        - EU
+      permanent: false
+      exclusive: false
+      rights:
+        - Display
+    termination:
+      noticePeriod: 30
+      terminationConditions: Access ends when approved use ends.
+    governance:
+      ownership: Business owner governs use.
+      audit: Access reviewed periodically.
+draftedComponents:
+  - SLA
+  - dataQuality
+  - pricingPlans
+  - dataAccess
+  - license
+reviewNotes: []
+evidenceGaps: []
+"""
+    if prompt.startswith("# Assemble ODPS Product YAML"):
+        return """schema: https://opendataproducts.org/v4.1/schema/odps.json
+version: "4.1"
+product:
+  details:
+    en:
+      productID: customer-health-signals
+      name: Customer Product
+      description: Customer analytics product.
+      visibility: organisation
+      status: production
+      type: dataset
+      valueProposition: Customer analytics product.
+  SLA:
+    declarative:
+      default:
+        name:
+          en: Default SLA
+        dimensions:
+          - dimension: uptime
+            objective: 99
+            unit: percent
+  dataQuality:
+    declarative:
+      default:
+        dimensions:
+          - dimension: completeness
+            objective: 95
+            unit: percentage
+  pricingPlans:
+    declarative:
+      en:
+        - name: Internal Review
+          priceCurrency: XXX
+          price: "0"
+          billingDuration: month
+          unit: On-request
+  dataAccess:
+    API:
+      outputPortType: API
+      format: JSON
+      authenticationMethod: OAuth
+  license:
+    scope:
+      definition: Internal use.
+      restrictions: No external redistribution.
+      geographicalArea:
+        - EU
+      permanent: false
+      exclusive: false
+      rights:
+        - Display
+    termination:
+      noticePeriod: 30
+      terminationConditions: Access ends when approved use ends.
+    governance:
+      ownership: Business owner governs use.
+      audit: Access reviewed periodically.
+"""
     if prompt.startswith("# Infer ODPG Edges"):
         assert "OBJ-RETENTION" in prompt
         assert "UC-RETENTION" in prompt
@@ -2496,17 +2636,21 @@ def test_build_portfolio_creates_workspace_artifacts_from_source_lanes(
         "signals": 1,
         "products": 1,
     }
-    assert result["llmCallCount"] == 6
+    assert result["llmCallCount"] == 10
     assert result["llmPhases"] == [
         "objective",
         "useCase",
         "signal",
         "productReference",
+        "odpsProductFacts",
+        "odpsProductMinimal",
+        "odpsProductComponents",
+        "odpsProductAssemble",
         "graph",
         "executiveSummary",
     ]
     assert result["artifactCounts"]["productReferences"] == 1
-    assert result["artifactCounts"]["odpsProducts"] == 0
+    assert result["artifactCounts"]["odpsProducts"] == 1
     assert result["artifactCounts"]["priorityItems"] == 4
     assert result["artifactCounts"]["swotItems"] == 4
     assert result["artifactCounts"]["leadershipDecisions"] == 1
@@ -2514,7 +2658,7 @@ def test_build_portfolio_creates_workspace_artifacts_from_source_lanes(
     assert "validationResults" in result
     assert "catalog" in result["validationResults"]
     assert "graph" in result["validationResults"]
-    assert len(result["validationResults"]["products"]) == 0
+    assert len(result["validationResults"]["products"]) == 1
     assert (workspace / "portfolio.yaml").exists()
     assert (workspace / "executive-summary.yaml").exists()
     assert (workspace / "portfolio-state.yaml").exists()
@@ -2522,6 +2666,15 @@ def test_build_portfolio_creates_workspace_artifacts_from_source_lanes(
     assert (
         workspace / "odpc" / "fragments" / "product_reference_pr-customer.yaml"
     ).exists()
+    assert (workspace / "odps" / "products" / "customer-product.yaml").exists()
+    generated_product = load_mapping(
+        workspace / "odps" / "products" / "customer-product.yaml"
+    )
+    assert (
+        generated_product["product"]["details"]["en"]["productID"]
+        == "customer-product"
+    )
+    assert not (workspace / "odps" / "products" / "customer-health-signals.yaml").exists()
     assert (workspace / "odpg" / "graph.yaml").exists()
     html = (workspace / "index.html").read_text(encoding="utf-8")
     assert "Portfolio" in html
@@ -2633,15 +2786,23 @@ def test_build_portfolio_generates_lanes_before_graph_and_summary(
         "# Generate ODPC Use Case Fragments",
         "# Generate ODPC Signal Fragments",
         "# Generate ODPS Data Product Fragments",
+        "# Extract ODPS Product Facts",
+        "# Generate Minimal ODPS Product YAML",
+        "# Draft ODPS Product Components",
+        "# Assemble ODPS Product YAML",
         "# Infer ODPG Edges from ODPC Fragments",
         "# Create Portfolio Executive Summary",
     ]
-    assert result["llmCallCount"] == 6
+    assert result["llmCallCount"] == 10
     assert result["llmPhases"] == [
         "objective",
         "useCase",
         "signal",
         "productReference",
+        "odpsProductFacts",
+        "odpsProductMinimal",
+        "odpsProductComponents",
+        "odpsProductAssemble",
         "graph",
         "executiveSummary",
     ]
@@ -3139,12 +3300,16 @@ def test_build_portfolio_repairs_malformed_plan_yaml(tmp_path: Path) -> None:
     )
 
     assert result["valid"] is True
-    assert result["llmCallCount"] == 6
+    assert result["llmCallCount"] == 10
     assert result["llmPhases"] == [
         "objective",
         "useCase",
         "signal",
         "productReference",
+        "odpsProductFacts",
+        "odpsProductMinimal",
+        "odpsProductComponents",
+        "odpsProductAssemble",
         "graph",
         "executiveSummary",
     ]
@@ -3171,12 +3336,16 @@ def test_build_portfolio_repairs_malformed_executive_summary_yaml(
     )
 
     assert result["valid"] is True
-    assert result["llmCallCount"] == 7
+    assert result["llmCallCount"] == 11
     assert result["llmPhases"] == [
         "objective",
         "useCase",
         "signal",
         "productReference",
+        "odpsProductFacts",
+        "odpsProductMinimal",
+        "odpsProductComponents",
+        "odpsProductAssemble",
         "graph",
         "executiveSummary",
         "executiveSummaryRepair",
@@ -3300,6 +3469,7 @@ translations:
     assert i18n["defaultLanguage"] == "en"
     assert i18n["languages"] == ["en", "fi", "sv"]
     assert i18n["translations"]["fi"]["html"]["Products"] == "Tuotteet"
+    assert "customer-product" not in i18n["translations"]["fi"]["html"]
     assert (
         "This tab embeds the generated ODPG graph explorer without the standalone explorer header and footer."
         not in i18n["translations"]["fi"]["html"]
@@ -3318,8 +3488,10 @@ translations:
     assert "Johdon yhteenveto" in finnish_html
     assert "Retention is the strongest near-term leadership topic." in finnish_html
     assert "Asiakastuote" in finnish_html
+    assert "customer-product" in finnish_html
     assert "Ledningssammanfattning" in swedish_html
     assert "Kundprodukt" in swedish_html
+    assert "customer-product" in swedish_html
 
     english_style = english_html.split("<style>", 1)[1].split("</style>", 1)[0]
     finnish_style = finnish_html.split("<style>", 1)[1].split("</style>", 1)[0]

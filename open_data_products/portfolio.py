@@ -1488,7 +1488,7 @@ def _generate_portfolio_lane_fragments(
             generation_source = _write_reduced_generation_source(
                 root, lane_name, source
             )
-            generate_local_artifacts_for_kind(
+            reference_artifacts = generate_local_artifacts_for_kind(
                 artifact_kind,
                 generation_source,
                 fragments_dir,
@@ -1496,7 +1496,75 @@ def _generate_portfolio_lane_fragments(
                 client=client,
             )
             phases.append(phase)
+            if lane_name == "products":
+                odps_artifacts = generate_local_artifacts_for_kind(
+                    "odps-product",
+                    generation_source,
+                    root / "odps" / "products",
+                    model=model,
+                    client=client,
+                    profile="complete-draft",
+                    include_components=("dataAccess", "license"),
+                )
+                _align_generated_odps_products_to_reference(
+                    odps_artifacts, reference_artifacts
+                )
+                phases.extend(
+                    [
+                        "odpsProductFacts",
+                        "odpsProductMinimal",
+                        "odpsProductComponents",
+                        "odpsProductAssemble",
+                    ]
+                )
     return phases
+
+
+def _align_generated_odps_products_to_reference(
+    artifacts: List[Any], reference_artifacts: List[Any]
+) -> None:
+    """Make generated ODPS specs use the ProductReference productID."""
+    reference_product_id = _first_product_reference_id(reference_artifacts)
+    for artifact in artifacts:
+        output_path = getattr(artifact, "output_path", None)
+        if not isinstance(output_path, Path) or not output_path.exists():
+            continue
+        try:
+            document = load_mapping(output_path, root_name="ODPS product")
+        except ValueError:
+            continue
+        details = _product_details(document)
+        product_id = reference_product_id or _text(
+            details.get("productID") or details.get("id")
+        )
+        if not product_id:
+            continue
+        _set_odps_product_id(document, product_id)
+        target = output_path.with_name(f"{_path_id(product_id)}.yaml")
+        target.write_text(
+            yaml.safe_dump(document, sort_keys=False, allow_unicode=False),
+            encoding="utf-8",
+        )
+        if target != output_path:
+            output_path.unlink()
+
+
+def _first_product_reference_id(reference_artifacts: List[Any]) -> str:
+    for artifact in reference_artifacts:
+        output_path = getattr(artifact, "output_path", None)
+        if not isinstance(output_path, Path) or not output_path.exists():
+            continue
+        try:
+            document = load_mapping(output_path, root_name="ODPC product reference")
+        except ValueError:
+            continue
+        reference = document.get("productReference")
+        if not isinstance(reference, dict):
+            continue
+        product_id = _text(reference.get("productID") or reference.get("id"))
+        if product_id:
+            return product_id
+    return ""
 
 
 def _write_reduced_generation_source(
@@ -3977,6 +4045,8 @@ class _HTMLTextTranslator(HTMLParser):
 def _translatable_html_text(text: str) -> bool:
     if not text or len(text) > 900:
         return False
+    if _identifier_like_text(text):
+        return False
     if not re.search(r"[A-Za-zÀ-ÖØ-öø-ÿ]", text):
         return False
     if "/" in text and re.search(r"\.(yaml|yml|json|html)\b", text):
@@ -3984,6 +4054,12 @@ def _translatable_html_text(text: str) -> bool:
     if re.fullmatch(r"\d{4}-\d{2}-\d{2}T[\d:-]+Z", text):
         return False
     return True
+
+
+def _identifier_like_text(text: str) -> bool:
+    return bool(
+        re.fullmatch(r"[A-Za-z][A-Za-z0-9]*(?:[-_.][A-Za-z0-9]+)+", text.strip())
+    )
 
 
 def render_portfolio_html(data: Dict[str, Any]) -> str:
