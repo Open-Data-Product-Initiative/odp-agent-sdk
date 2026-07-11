@@ -8,6 +8,10 @@
 - Refined generated portfolio HTML so related content reads as tighter groups,
   sibling cards and panels have more consistent separation, and mobile stacked
   layouts preserve clearer visual hierarchy.
+- Reworked generated ODPS product detail modals into a marketplace-style
+  product card view with a clear metadata header and compact Pricing, Data
+  Quality, SLA, and Licensing sections instead of repeated linked-component
+  blocks inside every pricing plan.
 - Added developer guidance for future portfolio spacing work in
   `docs/development/portfolio_spacing_guidance.md`.
 
@@ -19,4 +23,3 @@
   `open_data_products.portfolio_privacy`.
 - Updated `docs/development/portfolio-refactor-note.md` to document the current
   module boundaries and remaining future extraction candidates.
-
