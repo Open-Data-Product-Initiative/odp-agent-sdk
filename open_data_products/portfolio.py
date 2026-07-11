@@ -5248,7 +5248,47 @@ def _resolve_product(
             path = product["path"]
             if isinstance(path, Path) and path.name == Path(ref).name:
                 return product
+    reference_keys = _product_reference_match_keys(reference)
+    for product in products.values():
+        product_keys = _product_spec_match_keys(product)
+        if reference_keys & product_keys:
+            return product
     return None
+
+
+def _product_reference_match_keys(reference: Dict[str, Any]) -> Set[str]:
+    keys: Set[str] = set()
+    for value in (reference.get("productID"), reference.get("id")):
+        keys.update(_product_slug_variants(_text(value)))
+    product_model = reference.get("productModel")
+    if isinstance(product_model, dict):
+        ref = _text(product_model.get("$ref") or product_model.get("ref"))
+        if ref:
+            keys.update(_product_slug_variants(Path(ref).stem))
+    return keys
+
+
+def _product_spec_match_keys(product_info: Dict[str, Any]) -> Set[str]:
+    keys: Set[str] = set()
+    document = product_info.get("document")
+    details = _product_details(document) if isinstance(document, dict) else {}
+    for value in (details.get("productID"), details.get("id")):
+        keys.update(_product_slug_variants(_text(value)))
+    path = product_info.get("path")
+    if isinstance(path, Path):
+        keys.update(_product_slug_variants(path.stem))
+    return keys
+
+
+def _product_slug_variants(value: str) -> Set[str]:
+    slug = _path_id(value).lower()
+    if not slug:
+        return set()
+    variants = {slug}
+    for suffix in ("-odps-product", "-data-product", "-product"):
+        if slug.endswith(suffix):
+            variants.add(slug[: -len(suffix)])
+    return {variant for variant in variants if variant}
 
 
 def _render_product_detail(product_info: Dict[str, Any]) -> str:

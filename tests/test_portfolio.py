@@ -4368,6 +4368,27 @@ def test_render_portfolio_uses_product_cards_with_detail_modals(
     assert '<details class="odp-detail" open>' not in html
 
 
+def test_render_portfolio_matches_generated_product_id_suffix(
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "workspace"
+    write_sample_workspace(workspace)
+    catalog_path = workspace / "odpc" / "catalog.yaml"
+    catalog = yaml.safe_load(catalog_path.read_text(encoding="utf-8"))
+    reference = catalog["catalog"]["productReferences"][0]
+    reference["productID"] = "customer-product-product"
+    reference.pop("productModel")
+    catalog_path.write_text(yaml.safe_dump(catalog, sort_keys=False), encoding="utf-8")
+
+    render_portfolio(workspace)
+
+    html = (workspace / "index.html").read_text(encoding="utf-8")
+    assert 'class="product-detail-button"' in html
+    assert 'data-modal-target="product-modal-customer-product"' in html
+    assert 'id="product-modal-customer-product"' in html
+    assert "No linked ODPS detail" not in html
+
+
 def test_sync_portfolio_repairs_odps_data_access_from_yaml(
     tmp_path: Path,
 ) -> None:
