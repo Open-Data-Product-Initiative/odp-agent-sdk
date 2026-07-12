@@ -2697,6 +2697,66 @@ def test_build_portfolio_creates_workspace_artifacts_from_source_lanes(
     assert "sha256" in state_text
 
 
+def test_build_portfolio_continues_after_one_product_source_fails(
+    tmp_path: Path,
+) -> None:
+    sources = tmp_path / "sources"
+    workspace = tmp_path / "generated" / "portfolio"
+    write_source_lanes(sources)
+    (sources / "products" / "aaa-bad-product.md").write_text(
+        "Product discussion: malformed source that fails product reference generation.\n",
+        encoding="utf-8",
+    )
+
+    def partially_failing_client(prompt: str, model: str) -> str:
+        if prompt.startswith("# Generate ODPS Data Product") and "aaa-bad-product.md" in prompt:
+            return "productReferences: []\n"
+        return staged_portfolio_client(prompt, model)
+
+    result = build_portfolio(
+        workspace,
+        objectives=sources / "objectives",
+        use_cases=sources / "use-cases",
+        signals=sources / "signals",
+        products=sources / "products",
+        client=partially_failing_client,
+        model="test-model",
+    )
+
+    warnings = "\n".join(str(item) for item in result["warnings"])
+    assert "Created fallback product reference for aaa-bad-product.md" in warnings
+    assert "No artifacts generated for kind: product-reference" in warnings
+    assert result["artifactCounts"]["productReferences"] == 2
+    assert result["artifactCounts"]["odpsProducts"] == 2
+    assert result["artifactCounts"]["leadershipDecisions"] == 1
+    assert (workspace / "executive-summary.yaml").exists()
+    assert (
+        workspace / "odpc" / "fragments" / "product_reference_pr-customer.yaml"
+    ).exists()
+    assert (workspace / "odps" / "products" / "customer-product.yaml").exists()
+    assert (
+        workspace / "odpc" / "fragments" / "product_reference_product-discussion-malformed-source-that-fails-product-reference-generation.yaml"
+    ).exists()
+    portfolio_doc = load_mapping(workspace / "portfolio.yaml")
+    assert any(
+        "Created fallback product reference for aaa-bad-product.md" in str(item)
+        for item in portfolio_doc["warnings"]
+    )
+    fallback_reference = load_mapping(
+        workspace
+        / "odpc"
+        / "fragments"
+        / "product_reference_product-discussion-malformed-source-that-fails-product-reference-generation.yaml"
+    )["productReference"]
+    assert fallback_reference["tags"] == ["fallback-generated", "needs-review"]
+    assert fallback_reference["x-generation"]["fallback"] is True
+    html = (workspace / "index.html").read_text(encoding="utf-8")
+    assert "Review portfolio warnings" in html
+    assert "Needs review" in html
+    assert "Fallback generated" in html
+    assert "Fallback reason:" in html
+
+
 def test_build_portfolio_reports_skipped_msg_sources_without_counting_warning_lane(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

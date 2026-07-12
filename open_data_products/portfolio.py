@@ -272,6 +272,7 @@ def build_portfolio(
     workspace_title = _resolve_workspace_title(title, previous_state)
     llm_call_count = 0
     llm_phases: List[str] = []
+    lane_generation_warnings: List[str] = []
     written: List[Tuple[Path, str]] = []
     if _has_processable_sources(reduced_process_lanes):
         if client is None:
@@ -281,7 +282,7 @@ def build_portfolio(
             max_prompt_chars=source_budget_settings.max_prompt_chars,
             report=prompt_budget_report,
         )
-        lane_phases = _generate_portfolio_lane_fragments(
+        lane_phases, lane_generation_warnings = _generate_portfolio_lane_fragments(
             root,
             reduced_process_lanes,
             guarded_client,
@@ -332,10 +333,13 @@ def build_portfolio(
         plan["executiveSummary"] = executive_summary
     extraction_warnings = _source_extraction_warnings(lanes)
     warnings = [str(item) for item in plan.get("warnings", []) if item]
+    warnings.extend(lane_generation_warnings)
     warnings.extend(extraction_warnings)
     warnings.extend(_source_change_warnings(source_changes))
     warnings.extend(str(item) for item in source_budget_report.get("warnings", []))
     warnings.extend(str(item) for item in source_privacy_report.get("warnings", []))
+    if warnings:
+        plan["warnings"] = list(dict.fromkeys(warnings))
 
     created: List[str] = []
     updated: List[str] = []
@@ -1469,7 +1473,7 @@ def _generate_portfolio_lane_fragments(
     lanes: Dict[str, List[Dict[str, str]]],
     client: PortfolioBuildClient,
     model: str,
-) -> List[str]:
+) -> Tuple[List[str], List[str]]:
     from .generation import generate_local_artifacts_for_kind
 
     fragments_dir = root / "odpc" / "fragments"
@@ -1480,6 +1484,7 @@ def _generate_portfolio_lane_fragments(
         ("products", "product-reference", "productReference"),
     )
     phases: List[str] = []
+    warnings: List[str] = []
     for lane_name, artifact_kind, phase in lane_specs:
         for source in lanes.get(lane_name, []):
             source_path = source.get("path")
@@ -1488,24 +1493,58 @@ def _generate_portfolio_lane_fragments(
             generation_source = _write_reduced_generation_source(
                 root, lane_name, source
             )
-            reference_artifacts = generate_local_artifacts_for_kind(
-                artifact_kind,
-                generation_source,
-                fragments_dir,
-                model=model,
-                client=client,
-            )
-            phases.append(phase)
-            if lane_name == "products":
-                odps_artifacts = generate_local_artifacts_for_kind(
-                    "odps-product",
+            try:
+                reference_artifacts = generate_local_artifacts_for_kind(
+                    artifact_kind,
                     generation_source,
-                    root / "odps" / "products",
+                    fragments_dir,
                     model=model,
                     client=client,
-                    profile="complete-draft",
-                    include_components=("dataAccess", "license"),
                 )
+            except Exception as exc:
+                if lane_name == "products":
+                    fallback_id = _write_fallback_product_artifacts(
+                        root, source, generation_error=str(exc)
+                    )
+                    phases.extend(
+                        [
+                            "productReference",
+                            "odpsProductFacts",
+                            "odpsProductMinimal",
+                            "odpsProductComponents",
+                            "odpsProductAssemble",
+                        ]
+                    )
+                    warnings.append(
+                        "Created fallback product reference for "
+                        f"{Path(str(source_path)).name} as {fallback_id} after "
+                        f"generation failed: {_compact_warning(str(exc))}"
+                    )
+                    continue
+                warnings.append(
+                    "Skipped "
+                    f"{phase} generation for {Path(str(source_path)).name}: "
+                    f"{_compact_warning(str(exc))}"
+                )
+                continue
+            phases.append(phase)
+            if lane_name == "products":
+                try:
+                    odps_artifacts = generate_local_artifacts_for_kind(
+                        "odps-product",
+                        generation_source,
+                        root / "odps" / "products",
+                        model=model,
+                        client=client,
+                        profile="complete-draft",
+                        include_components=("dataAccess", "license"),
+                    )
+                except Exception as exc:
+                    warnings.append(
+                        "Skipped ODPS product generation for "
+                        f"{Path(str(source_path)).name}: {_compact_warning(str(exc))}"
+                    )
+                    continue
                 _align_generated_odps_products_to_reference(
                     odps_artifacts, reference_artifacts
                 )
@@ -1517,7 +1556,110 @@ def _generate_portfolio_lane_fragments(
                         "odpsProductAssemble",
                     ]
                 )
-    return phases
+    return phases, warnings
+
+
+def _write_fallback_product_artifacts(
+    root: Path, source: Dict[str, str], *, generation_error: str
+) -> str:
+    title = _fallback_title_from_source(source, fallback="Generated Data Product")
+    product_id = _slug_id(title)
+    description = _fallback_description_from_source(source, title=title)
+    reference = {
+        "id": product_id,
+        "productID": product_id,
+        "productVersion": "0.1.0",
+        "name": {"en": title},
+        "description": {"en": description},
+        "visibility": "private",
+        "status": "draft",
+        "type": "dataset",
+        "tags": ["fallback-generated", "needs-review"],
+        "productModel": {
+            "standard": "ODPS",
+            "version": "4.1",
+            "format": "yaml",
+            "$ref": f"../odps/products/{product_id}.yaml",
+        },
+        "x-generation": {
+            "fallback": True,
+            "sourcePath": source.get("path", ""),
+            "reason": _compact_warning(generation_error),
+        },
+    }
+    product = {
+        "schema": "https://opendataproducts.org/v4.1/schema/odps.json",
+        "version": "4.1",
+        "product": {
+            "details": {
+                "en": {
+                    "productID": product_id,
+                    "name": title,
+                    "description": description,
+                    "visibility": "private",
+                    "status": "draft",
+                    "type": "dataset",
+                    "valueProposition": description,
+                }
+            }
+        },
+        "reviewNotes": [
+            "Fallback product draft generated because LLM product-reference generation failed."
+        ],
+        "evidenceGaps": [
+            "Review and complete ownership, SLA, data quality, licensing, and access terms."
+        ],
+    }
+    _write_yaml(
+        root / "odpc" / "fragments" / f"product_reference_{product_id}.yaml",
+        {"productReference": reference},
+    )
+    _write_yaml(root / "odps" / "products" / f"{product_id}.yaml", product)
+    return product_id
+
+
+def _fallback_title_from_source(source: Dict[str, str], *, fallback: str) -> str:
+    text = str(source.get("text") or "").strip()
+    for line in text.splitlines():
+        stripped = line.strip().strip("|").strip()
+        if not stripped:
+            continue
+        if stripped.lower().startswith("lane:"):
+            continue
+        if stripped.startswith("#"):
+            candidate = stripped.lstrip("#").strip()
+        elif "|" in line:
+            cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+            candidate = cells[0] if cells else ""
+        else:
+            candidate = stripped
+        if candidate and not set(candidate) <= {"-", ":"}:
+            return candidate[:80]
+    return fallback
+
+
+def _fallback_description_from_source(source: Dict[str, str], *, title: str) -> str:
+    text = str(source.get("text") or "").strip()
+    lines = [
+        line.strip().strip("|").strip()
+        for line in text.splitlines()
+        if line.strip() and not line.strip().startswith("#")
+    ]
+    for line in lines:
+        if line.lower().startswith(("purpose", "the ", "provide ", "required ")):
+            return line[:240]
+    return f"{title} product draft generated from source material."
+
+
+def _slug_id(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-") or "generated-product"
+
+
+def _compact_warning(message: str, *, limit: int = 180) -> str:
+    compact = " ".join(message.split())
+    if len(compact) <= limit:
+        return compact
+    return compact[: limit - 1].rstrip() + "..."
 
 
 def _align_generated_odps_products_to_reference(
@@ -3592,8 +3734,13 @@ def load_portfolio_workspace(workspace: Union[str, Path]) -> Dict[str, Any]:
     portfolio_path = root / "portfolio.yaml"
     executive_summary_path = root / DEFAULT_EXECUTIVE_SUMMARY
     i18n = _load_portfolio_i18n(root)
-    warnings: List[str] = []
     portfolio = _load_optional_mapping(portfolio_path)
+    portfolio_warnings = portfolio.get("warnings") if isinstance(portfolio, dict) else []
+    warnings = [
+        str(item)
+        for item in (portfolio_warnings if isinstance(portfolio_warnings, list) else [])
+        if item
+    ]
     executive_summary = (
         load_mapping(executive_summary_path, root_name="Portfolio executive summary")
         if executive_summary_path.exists()
@@ -5249,6 +5396,27 @@ def _render_product_card(
         ("SLA", sla_count),
         ("DQ", quality_count),
     ]
+    tags = _string_list(reference.get("tags"))
+    generation = reference.get("x-generation")
+    fallback_generation = isinstance(generation, dict) and bool(generation.get("fallback"))
+    generation_reason = _text(generation.get("reason")) if isinstance(generation, dict) else ""
+    review_chips = []
+    if fallback_generation:
+        review_chips.append('<span class="chip warning">Needs review</span>')
+    if "fallback-generated" in tags:
+        review_chips.append('<span class="chip warning">Fallback generated</span>')
+    review_html = (
+        f'<div class="product-review-chips">{"".join(review_chips)}</div>'
+        if review_chips
+        else ""
+    )
+    reason_html = (
+        '<p class="product-review-note">'
+        f"Fallback reason: {_escape(generation_reason)}"
+        "</p>"
+        if fallback_generation and generation_reason
+        else ""
+    )
     counter_html = "".join(
         f"<span><strong>{count}</strong>{_escape(label)}</span>"
         for label, count in counters
@@ -5266,6 +5434,8 @@ def _render_product_card(
         '<span class="chip odpc">ODPC Reference</span></div>'
         f"<h3>{_escape(name)}</h3>"
         f'<p class="product-card-description">{_escape(_text(reference.get("description")))}</p>'
+        f"{review_html}"
+        f"{reason_html}"
         f"{_render_facts(details)}"
         f'<div class="product-card-counters">{counter_html}</div>'
         f'<div class="product-card-actions">{button}</div>'
@@ -6687,6 +6857,18 @@ main {
   -webkit-line-clamp: 4;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+.product-review-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: var(--space-2) 0;
+}
+.product-review-note {
+  margin: 0 0 var(--space-3);
+  color: #92400e;
+  font-size: .85rem;
+  font-weight: 700;
 }
 .product-card-counters {
   display: flex;
