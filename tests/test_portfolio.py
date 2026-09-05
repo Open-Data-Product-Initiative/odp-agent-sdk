@@ -14,6 +14,10 @@ from open_data_products._io import load_mapping
 from open_data_products.cli import main
 from open_data_products import obfuscate_personal_data
 from open_data_products.portfolio import (
+    PortfolioBuildRequest,
+    PortfolioBuildResult,
+    PortfolioPipeline,
+    PortfolioSourceLanes,
     _chunk_localization_strings,
     _reduce_source_lanes_for_prompt,
     build_portfolio,
@@ -2330,6 +2334,13 @@ def test_render_portfolio_creates_missing_parent_and_artifact_detail_views(
         not in html
     )
     assert "Business Objectives" in html
+    objective_section = html[
+        html.index(
+            '<section class="tab-panel objectives-panel" id="objectives">'
+        ) : html.index('<section class="tab-panel use-cases-panel" id="use-cases">')
+    ]
+    assert "Improve Retention" in objective_section
+    assert "OBJ-RETENTION" not in objective_section
     assert "Use Cases" in html
     assert "Signals" in html
     assert "Products" in html
@@ -2671,10 +2682,11 @@ def test_build_portfolio_creates_workspace_artifacts_from_source_lanes(
         workspace / "odps" / "products" / "customer-product.yaml"
     )
     assert (
-        generated_product["product"]["details"]["en"]["productID"]
-        == "customer-product"
+        generated_product["product"]["details"]["en"]["productID"] == "customer-product"
     )
-    assert not (workspace / "odps" / "products" / "customer-health-signals.yaml").exists()
+    assert not (
+        workspace / "odps" / "products" / "customer-health-signals.yaml"
+    ).exists()
     assert (workspace / "odpg" / "graph.yaml").exists()
     html = (workspace / "index.html").read_text(encoding="utf-8")
     assert "Portfolio" in html
@@ -2697,6 +2709,80 @@ def test_build_portfolio_creates_workspace_artifacts_from_source_lanes(
     assert "sha256" in state_text
 
 
+def test_portfolio_pipeline_builds_workspace_from_typed_source_lanes(
+    tmp_path: Path,
+) -> None:
+    sources = tmp_path / "sources"
+    workspace = tmp_path / "generated" / "portfolio"
+    write_source_lanes(sources)
+
+    result = PortfolioPipeline().build(
+        PortfolioBuildRequest(
+            workspace=workspace,
+            source_lanes=PortfolioSourceLanes(
+                objectives=sources / "objectives",
+                use_cases=sources / "use-cases",
+                signals=sources / "signals",
+                products=sources / "products",
+            ),
+            client=fake_portfolio_client,
+            model="test-model",
+        )
+    )
+
+    assert isinstance(result, PortfolioBuildResult)
+    assert result["kind"] == "PortfolioBuild"
+    assert result.workspace == str(workspace)
+    assert result.valid is True
+    assert result.phases == [
+        "objective",
+        "useCase",
+        "signal",
+        "productReference",
+        "odpsProductFacts",
+        "odpsProductMinimal",
+        "odpsProductComponents",
+        "odpsProductAssemble",
+        "graph",
+        "executiveSummary",
+    ]
+    assert result.artifacts["counts"]["productReferences"] == 1
+    assert result.source_budget["method"] == "deterministic-chunk-budget"
+    assert result.to_dict()["workspace"] == str(workspace)
+
+
+def test_portfolio_pipeline_accepts_lane_aliases_and_bundled_mode(
+    tmp_path: Path,
+) -> None:
+    sources = tmp_path / "sources"
+    workspace = tmp_path / "generated" / "portfolio"
+    write_source_lanes(sources)
+
+    result = PortfolioPipeline().build(
+        PortfolioBuildRequest(
+            workspace=workspace,
+            source_lanes={
+                "objectives": sources / "objectives",
+                "use-cases": sources / "use-cases",
+                "signals": sources / "signals",
+                "products": sources / "products",
+            },
+            client=fake_portfolio_client,
+            model="test-model",
+            processing_mode="bundled",
+        )
+    )
+
+    assert result["sourceCounts"] == {
+        "objectives": 1,
+        "useCases": 1,
+        "signals": 1,
+        "products": 1,
+    }
+    assert result["llmCallCount"] == 10
+    assert result.valid is True
+
+
 def test_build_portfolio_continues_after_one_product_source_fails(
     tmp_path: Path,
 ) -> None:
@@ -2709,7 +2795,10 @@ def test_build_portfolio_continues_after_one_product_source_fails(
     )
 
     def partially_failing_client(prompt: str, model: str) -> str:
-        if prompt.startswith("# Generate ODPS Data Product") and "aaa-bad-product.md" in prompt:
+        if (
+            prompt.startswith("# Generate ODPS Data Product")
+            and "aaa-bad-product.md" in prompt
+        ):
             return "productReferences: []\n"
         return staged_portfolio_client(prompt, model)
 
@@ -2735,7 +2824,10 @@ def test_build_portfolio_continues_after_one_product_source_fails(
     ).exists()
     assert (workspace / "odps" / "products" / "customer-product.yaml").exists()
     assert (
-        workspace / "odpc" / "fragments" / "product_reference_product-discussion-malformed-source-that-fails-product-reference-generation.yaml"
+        workspace
+        / "odpc"
+        / "fragments"
+        / "product_reference_product-discussion-malformed-source-that-fails-product-reference-generation.yaml"
     ).exists()
     portfolio_doc = load_mapping(workspace / "portfolio.yaml")
     assert any(
@@ -4738,6 +4830,10 @@ def test_portfolio_cli_sync_emits_one_final_json_report(
 
 
 def test_portfolio_helpers_are_public_exports() -> None:
+    from open_data_products import PortfolioBuildRequest as public_build_request
+    from open_data_products import PortfolioBuildResult as public_build_result
+    from open_data_products import PortfolioPipeline as public_pipeline
+    from open_data_products import PortfolioSourceLanes as public_source_lanes
     from open_data_products import build_portfolio as public_build_portfolio
     from open_data_products import explain_portfolio as public_explain_portfolio
     from open_data_products import localize_portfolio as public_localize_portfolio
@@ -4745,6 +4841,10 @@ def test_portfolio_helpers_are_public_exports() -> None:
     from open_data_products import render_portfolio as public_render_portfolio
     from open_data_products import sync_portfolio as public_sync_portfolio
 
+    assert public_build_request is PortfolioBuildRequest
+    assert public_build_result is PortfolioBuildResult
+    assert public_pipeline is PortfolioPipeline
+    assert public_source_lanes is PortfolioSourceLanes
     assert public_build_portfolio is build_portfolio
     assert public_localize_portfolio is localize_portfolio
     assert public_refresh_portfolio is refresh_portfolio

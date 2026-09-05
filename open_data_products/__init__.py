@@ -11,7 +11,7 @@ family. Each standard lives in its own namespace:
 
 # flake8: noqa: E402
 
-__version__ = "0.3.5"
+__version__ = "0.3.6"
 version = __version__
 
 from . import odpc
@@ -120,6 +120,10 @@ from .odpv import (
 from .pricing import pricing_to_402
 from .privacy import obfuscate_personal_data
 from .portfolio import (
+    PortfolioBuildRequest,
+    PortfolioBuildResult,
+    PortfolioPipeline,
+    PortfolioSourceLanes,
     build_portfolio,
     explain_portfolio,
     inspect_portfolio_intake,
@@ -167,6 +171,10 @@ __all__ = [
     "odpv",
     "OkfConcept",
     "OkfValidationResult",
+    "PortfolioBuildRequest",
+    "PortfolioBuildResult",
+    "PortfolioPipeline",
+    "PortfolioSourceLanes",
     "Reference",
     "Resource",
     "RecipeDocument",

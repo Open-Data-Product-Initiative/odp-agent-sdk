@@ -46,6 +46,9 @@ Use these pages when changing complex SDK behavior:
 - [SDK activity logging plan](sdk-activity-logging-plan.md): fixed-format
   command activity events, classification, rotation, redaction, and CLI
   integration planning.
+- [Studio-derived SDK improvement plan](studio-sdk-improvement-plan.md):
+  application-grade SDK public API, diagnostics, recovery, progress, source-lane,
+  and runtime-configuration improvements learned from Portfolio Studio.
 
 Keep these pages focused on implementation rules and contributor workflows.
 User setup, beginner commands, and runnable examples belong in the user-facing

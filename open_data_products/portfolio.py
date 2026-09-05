@@ -7,11 +7,25 @@ import hashlib
 import json
 import re
 import shutil
+from collections.abc import Mapping as MappingABC
 from copy import deepcopy
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from html.parser import HTMLParser
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterable, List, Optional, Set, Tuple, Union
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Iterable,
+    Iterator,
+    List,
+    Mapping,
+    Optional,
+    Set,
+    Tuple,
+    Union,
+)
 
 import yaml
 
@@ -206,6 +220,185 @@ EXECUTIVE_SUMMARY_CARD_ICONS = {
 }
 
 
+@dataclass(frozen=True)
+class PortfolioSourceLanes:
+    """Source lane paths for portfolio generation."""
+
+    objectives: Optional[Union[str, Path]] = None
+    use_cases: Optional[Union[str, Path]] = None
+    signals: Optional[Union[str, Path]] = None
+    products: Optional[Union[str, Path]] = None
+
+    @classmethod
+    def from_mapping(
+        cls, lanes: Mapping[str, Union[str, Path, None]]
+    ) -> "PortfolioSourceLanes":
+        """Create source lanes from canonical IDs or accepted aliases."""
+        values: Dict[str, Optional[Union[str, Path]]] = {
+            "objectives": None,
+            "use_cases": None,
+            "signals": None,
+            "products": None,
+        }
+        aliases = {
+            "objectives": "objectives",
+            "objective": "objectives",
+            "use_cases": "use_cases",
+            "use-cases": "use_cases",
+            "useCases": "use_cases",
+            "usecases": "use_cases",
+            "signals": "signals",
+            "signal": "signals",
+            "products": "products",
+            "product": "products",
+        }
+        for key, value in lanes.items():
+            canonical = aliases.get(str(key))
+            if canonical is None:
+                raise ValueError(f"Unsupported portfolio source lane: {key}")
+            values[canonical] = value
+        return cls(**values)
+
+    def to_build_kwargs(self) -> Dict[str, Optional[Path]]:
+        """Return paths using the existing build_portfolio keyword names."""
+        return {
+            "objectives": (
+                Path(self.objectives) if self.objectives is not None else None
+            ),
+            "use_cases": Path(self.use_cases) if self.use_cases is not None else None,
+            "signals": Path(self.signals) if self.signals is not None else None,
+            "products": Path(self.products) if self.products is not None else None,
+        }
+
+
+@dataclass(frozen=True)
+class PortfolioBuildRequest:
+    """Application-grade portfolio build request."""
+
+    workspace: Union[str, Path]
+    source_lanes: Union[PortfolioSourceLanes, Mapping[str, Union[str, Path, None]]] = (
+        field(default_factory=PortfolioSourceLanes)
+    )
+    title: Optional[str] = None
+    description: Optional[str] = None
+    languages: Tuple[str, ...] = ()
+    client: Optional[PortfolioBuildClient] = None
+    model: str = "qwen2.5"
+    run_kind: str = "PortfolioBuild"
+    process_all_sources: bool = True
+    context_format: str = "markdown"
+    source_budget: Optional[PortfolioSourceBudget] = None
+    privacy: Optional[PortfolioPrivacySettings] = None
+    progress: Optional[Callable[[Mapping[str, object]], None]] = None
+    processing_mode: str = "lane-by-lane"
+
+    def normalized_source_lanes(self) -> PortfolioSourceLanes:
+        """Return source lanes as a typed lane model."""
+        if isinstance(self.source_lanes, PortfolioSourceLanes):
+            return self.source_lanes
+        return PortfolioSourceLanes.from_mapping(self.source_lanes)
+
+
+@dataclass(frozen=True)
+class PortfolioBuildResult(MappingABC):
+    """Typed portfolio build result with mapping compatibility."""
+
+    valid: bool
+    workspace: str
+    artifacts: Dict[str, object]
+    warnings: List[str]
+    recoveries: List[Dict[str, object]]
+    phases: List[str]
+    source_budget: Dict[str, object]
+    source_privacy: Dict[str, object]
+    render: Dict[str, object]
+    localization: Dict[str, object]
+    sdk_version: str
+    model: Optional[str]
+    provider: Optional[str]
+    _payload: Dict[str, object] = field(default_factory=dict, repr=False)
+
+    @classmethod
+    def from_mapping(
+        cls,
+        payload: Mapping[str, object],
+        *,
+        model: Optional[str] = None,
+        provider: Optional[str] = None,
+    ) -> "PortfolioBuildResult":
+        """Create a typed result from the legacy mapping payload."""
+        data = dict(payload)
+        artifacts = {
+            "created": list(data.get("created", [])),
+            "updated": list(data.get("updated", [])),
+            "unchanged": list(data.get("unchanged", [])),
+            "removed": list(data.get("removed", [])),
+            "counts": dict(data.get("artifactCounts", {})),
+        }
+        render = {
+            "html": data.get("html"),
+            "validation_results": data.get("validationResults", {}),
+        }
+        return cls(
+            valid=bool(data.get("valid")),
+            workspace=str(data.get("workspace", "")),
+            artifacts=artifacts,
+            warnings=[str(item) for item in data.get("warnings", [])],
+            recoveries=[],
+            phases=[str(item) for item in data.get("llmPhases", [])],
+            source_budget=dict(data.get("sourceBudget", {})),
+            source_privacy=dict(data.get("sourcePrivacy", {})),
+            render=render,
+            localization={},
+            sdk_version=__version__,
+            model=model,
+            provider=provider,
+            _payload=data,
+        )
+
+    def __getitem__(self, key: str) -> object:
+        return self._payload[key]
+
+    def __iter__(self) -> Iterator[str]:
+        return iter(self._payload)
+
+    def __len__(self) -> int:
+        return len(self._payload)
+
+    def to_dict(self) -> Dict[str, object]:
+        """Return the legacy JSON-ready mapping."""
+        return dict(self._payload)
+
+
+class PortfolioPipeline:
+    """Public application API for portfolio builds."""
+
+    _PROCESSING_MODES = {"lane-by-lane", "bundled"}
+
+    def build(self, request: PortfolioBuildRequest) -> PortfolioBuildResult:
+        """Build a portfolio workspace from a typed application request."""
+        if request.processing_mode not in self._PROCESSING_MODES:
+            allowed = ", ".join(sorted(self._PROCESSING_MODES))
+            raise ValueError(
+                f"Unsupported portfolio processing mode: "
+                f"{request.processing_mode}. Expected one of: {allowed}"
+            )
+        lanes = request.normalized_source_lanes()
+        payload = _build_portfolio_mapping(
+            request.workspace,
+            **lanes.to_build_kwargs(),
+            title=request.title,
+            client=request.client,
+            model=request.model,
+            run_kind=request.run_kind,
+            process_all_sources=request.process_all_sources,
+            context_format=request.context_format,
+            source_budget=request.source_budget,
+            source_privacy=request.privacy,
+        )
+        return PortfolioBuildResult.from_mapping(payload, model=request.model)
+
+
 def build_portfolio(
     workspace: Union[str, Path],
     *,
@@ -223,6 +416,45 @@ def build_portfolio(
     source_privacy: Optional[PortfolioPrivacySettings] = None,
 ) -> Dict[str, object]:
     """Build a portfolio workspace from source lanes using an LLM client."""
+    result = PortfolioPipeline().build(
+        PortfolioBuildRequest(
+            workspace=workspace,
+            source_lanes=PortfolioSourceLanes(
+                objectives=objectives,
+                use_cases=use_cases,
+                signals=signals,
+                products=products,
+            ),
+            title=title,
+            client=client,
+            model=model,
+            run_kind=run_kind,
+            process_all_sources=process_all_sources,
+            context_format=context_format,
+            source_budget=source_budget,
+            privacy=source_privacy,
+        )
+    )
+    return result.to_dict()
+
+
+def _build_portfolio_mapping(
+    workspace: Union[str, Path],
+    *,
+    objectives: Optional[Union[str, Path]] = None,
+    use_cases: Optional[Union[str, Path]] = None,
+    signals: Optional[Union[str, Path]] = None,
+    products: Optional[Union[str, Path]] = None,
+    title: Optional[str] = None,
+    client: Optional[PortfolioBuildClient] = None,
+    model: str = "qwen2.5",
+    run_kind: str = "PortfolioBuild",
+    process_all_sources: bool = True,
+    context_format: str = "markdown",
+    source_budget: Optional[PortfolioSourceBudget] = None,
+    source_privacy: Optional[PortfolioPrivacySettings] = None,
+) -> Dict[str, object]:
+    """Build a portfolio workspace and return the legacy mapping payload."""
     root = Path(workspace)
     previous_state = _load_optional_mapping(root / "portfolio-state.yaml")
     snapshot = _snapshot_existing_workspace(root, run_kind)
@@ -3735,7 +3967,9 @@ def load_portfolio_workspace(workspace: Union[str, Path]) -> Dict[str, Any]:
     executive_summary_path = root / DEFAULT_EXECUTIVE_SUMMARY
     i18n = _load_portfolio_i18n(root)
     portfolio = _load_optional_mapping(portfolio_path)
-    portfolio_warnings = portfolio.get("warnings") if isinstance(portfolio, dict) else []
+    portfolio_warnings = (
+        portfolio.get("warnings") if isinstance(portfolio, dict) else []
+    )
     warnings = [
         str(item)
         for item in (portfolio_warnings if isinstance(portfolio_warnings, list) else [])
@@ -4278,6 +4512,7 @@ def render_portfolio_html(data: Dict[str, Any]) -> str:
             "Business-Led Starting Point",
             "Objectives make the portfolio business-led before products become the center of gravity.",
             business_objectives,
+            show_id=False,
         ),
         _render_artifact_panel(
             "use-cases",
@@ -5308,9 +5543,11 @@ def _render_artifact_panel(
     items: List[Dict[str, Any]],
     *,
     card_class: str = "",
+    show_id: bool = True,
 ) -> str:
     cards = "".join(
-        _render_artifact_card(item, card_class=card_class) for item in items
+        _render_artifact_card(item, card_class=card_class, show_id=show_id)
+        for item in items
     )
     if not cards:
         cards = "<p>No entries.</p>"
@@ -5325,15 +5562,18 @@ def _render_artifact_panel(
     )
 
 
-def _render_artifact_card(item: Dict[str, Any], *, card_class: str = "") -> str:
+def _render_artifact_card(
+    item: Dict[str, Any], *, card_class: str = "", show_id: bool = True
+) -> str:
     name = _text(item.get("name"), _text(item.get("id"), "(unnamed)"))
     details = [
-        ("ID", item.get("id")),
         ("Status", item.get("status")),
         ("Priority", item.get("priority")),
         ("Confidence", item.get("confidence")),
         ("Type", item.get("type")),
     ]
+    if show_id:
+        details.insert(0, ("ID", item.get("id")))
     return (
         f'<article class="card{card_class}">'
         '<div class="chip-row"><span class="chip odpc">ODPC</span></div>'
@@ -5398,8 +5638,12 @@ def _render_product_card(
     ]
     tags = _string_list(reference.get("tags"))
     generation = reference.get("x-generation")
-    fallback_generation = isinstance(generation, dict) and bool(generation.get("fallback"))
-    generation_reason = _text(generation.get("reason")) if isinstance(generation, dict) else ""
+    fallback_generation = isinstance(generation, dict) and bool(
+        generation.get("fallback")
+    )
+    generation_reason = (
+        _text(generation.get("reason")) if isinstance(generation, dict) else ""
+    )
     review_chips = []
     if fallback_generation:
         review_chips.append('<span class="chip warning">Needs review</span>')
