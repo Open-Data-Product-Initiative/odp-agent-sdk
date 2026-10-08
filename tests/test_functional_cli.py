@@ -17,6 +17,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 ODPS_PRODUCT = (
     REPO_ROOT / "examples" / "apps" / "pricing_402_builder" / "priced_product.yaml"
 )
+ODPS_V42_PRODUCT = REPO_ROOT / "tests" / "fixtures" / "odps_v42_profiles.yaml"
 ODPG_GRAPH = REPO_ROOT / "open_data_products" / "odpg" / "data" / "graph" / "graph.yaml"
 GENERATION_SOURCE_DOCS = REPO_ROOT / "open_data_products" / "generation" / "source_docs"
 EXAMPLE_RECIPES = REPO_ROOT / "examples" / "recipes"
@@ -1924,6 +1925,33 @@ def test_unified_cli_validate_human_output_is_step_report(
     assert "Resources are valid" not in output
     assert "Relationships are valid" not in output
     assert "Validation successful!" in output
+
+
+def test_unified_cli_supports_odps_v42_validation_references_and_resources(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    assert main(["validate", str(ODPS_V42_PRODUCT), "--json"]) == 0
+    validation = _json_output(capsys)
+    assert validation["valid"] is True
+    assert validation["spec"] == "odps"
+    assert validation["version"] == "4.2"
+
+    assert main(["explain", str(ODPS_V42_PRODUCT), "--json"]) == 0
+    explanation = _json_output(capsys)
+    assert explanation["version"] == "4.2"
+    assert explanation["schema"].endswith("/v4.2/schema/odps.yaml")
+
+    assert main(["refs", str(ODPS_V42_PRODUCT), "--json"]) == 0
+    references = _json_output(capsys)
+    assert {reference["ref_type"] for reference in references} >= {
+        "contract-profile",
+        "contract-binding",
+    }
+
+    assert main(["resources", "--id", "odps.v4.2.schema.yaml", "--json"]) == 0
+    resource = _json_output(capsys)[0]
+    assert resource["id"] == "odps.v4.2.schema.yaml"
+    assert resource["description"].startswith("Bundled canonical ODPS v4.2")
 
 
 def test_unified_cli_resources_and_manifest(capsys: pytest.CaptureFixture[str]) -> None:

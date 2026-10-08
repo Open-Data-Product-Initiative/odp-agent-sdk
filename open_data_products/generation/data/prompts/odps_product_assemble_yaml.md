@@ -28,7 +28,7 @@ Output rules:
   final ODPS YAML document.
 - Do not include Markdown fences or explanatory prose.
 
-Target ODPS v4.1 component shape:
+Target ODPS v4.2 component shape:
 
 ```yaml
 product:
@@ -53,7 +53,7 @@ product:
     email: data-products@example.com
     businessDomain: Revenue Operations
   dataAccess:
-    API:
+    default:
       name:
         en: API
       description:
@@ -126,14 +126,14 @@ product:
           SLA:
             $ref: "#/product/SLA/declarative/default"
           access:
-            $ref: "#/product/dataAccess/API"
+            $ref: "#/product/dataAccess/default"
 ```
 
 Complete-draft example for the default component set:
 
 ```yaml
-schema: https://opendataproducts.org/v4.1/schema/odps.json
-version: "4.1"
+schema: https://opendataproducts.org/v4.2/schema/odps.json
+version: "4.2"
 product:
   details:
     en:

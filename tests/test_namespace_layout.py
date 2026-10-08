@@ -19,10 +19,23 @@ def test_public_spec_namespaces_are_importable():
 
 def test_top_level_package_exposes_version_alias():
     import open_data_products
+    import open_data_products.odps
 
     assert isinstance(open_data_products.__version__, str)
     assert open_data_products.__version__
     assert open_data_products.version == open_data_products.__version__
+    assert open_data_products.odps.__version__ == open_data_products.__version__
+
+
+def test_release_summary_matches_package_version():
+    import open_data_products
+
+    summary = (REPO_ROOT / "RELEASE_SUMMARY.md").read_text(encoding="utf-8")
+    assert summary.startswith(
+        "# Open Data Products Python SDK {0} Release Notes".format(
+            open_data_products.__version__
+        )
+    )
 
 
 def test_top_level_package_exposes_stable_workflow_facades():

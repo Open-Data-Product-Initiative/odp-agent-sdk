@@ -22,7 +22,7 @@ Output rules:
   `productVersion`, nested `name: {en: ...}`, nested `description: {en: ...}`,
   and `productModel`.
 - Do not use dotted keys such as `name.en` or `description.en`.
-- Use `productModel.standard: ODPS`, `productModel.version: "4.1"`,
+- Use `productModel.standard: ODPS`, `productModel.version: "4.2"`,
   `productModel.format: yaml`, and a stable relative `$ref` for the future ODPS
   product file.
 - Use the product name, product identifier, version, status, visibility, owner,
@@ -59,7 +59,7 @@ productReferences:
       team: Airport Data Platform Team
     productModel:
       standard: ODPS
-      version: "4.1"
+      version: "4.2"
       format: yaml
       $ref: products/airport-operations-performance.yaml
 ```

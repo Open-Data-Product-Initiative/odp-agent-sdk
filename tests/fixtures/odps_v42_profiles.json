@@ -1,0 +1,21 @@
+{
+  "schema": "https://opendataproducts.org/v4.2/schema/odps.json",
+  "version": "4.2",
+  "product": {
+    "details": {
+      "en": {
+        "productID": "external-profiles",
+        "name": "External Profiles",
+        "visibility": "public",
+        "status": "draft",
+        "type": "dataset"
+      }
+    },
+    "contract": {
+      "$ref": "https://example.org/contracts/profiles.yaml"
+    },
+    "dataAccess": {
+      "$ref": "https://example.org/access/profiles.yaml"
+    }
+  }
+}

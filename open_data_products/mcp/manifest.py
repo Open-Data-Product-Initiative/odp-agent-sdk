@@ -173,7 +173,7 @@ def _capabilities() -> List[Dict[str, Any]]:
             "id": "portfolio-workspaces",
             "title": "Portfolio workspace workflows",
             "standards": ["odpc", "odpg", "odps"],
-            "interfaces": ["cli"],
+            "interfaces": ["cli", "mcp"],
             "lifecycle": [
                 "build",
                 "refresh",
@@ -428,7 +428,7 @@ def _workflows() -> List[Dict[str, Any]]:
             "commands": [
                 "open-data-products portfolio build --objectives sources/objectives/ --use-cases sources/use-cases/ --signals sources/signals/ --products sources/products/ --output portfolio/"
             ],
-            "mcp_tools": ["search_objects", "search_graph_objects"],
+            "mcp_tools": ["build_portfolio"],
         },
         {
             "id": "refresh-portfolio",
@@ -576,10 +576,10 @@ def _safety() -> Dict[str, Any]:
     return {
         "mcp_tool_class": "mixed",
         "mcp_is_read_only": False,
-        "mcp_state_changing_tools": ["init_starter_recipe"],
+        "mcp_state_changing_tools": ["init_starter_recipe", "build_portfolio"],
         "mcp_note": (
-            "MCP tools are safe/read-only except explicit workspace "
-            "initialization tools classified as state-changing."
+            "MCP tools are safe/read-only except explicitly approved workspace "
+            "initialization and portfolio build tools classified as state-changing."
         ),
         "cli_note": (
             "Some CLI workflows are state-changing because they write generated "

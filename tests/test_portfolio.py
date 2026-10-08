@@ -13,6 +13,7 @@ from jsonschema import Draft202012Validator
 from open_data_products._io import load_mapping
 from open_data_products.cli import main
 from open_data_products import obfuscate_personal_data
+from open_data_products.agent import validate_document
 from open_data_products.portfolio import (
     PortfolioBuildRequest,
     PortfolioBuildResult,
@@ -2684,6 +2685,13 @@ def test_build_portfolio_creates_workspace_artifacts_from_source_lanes(
     assert (
         generated_product["product"]["details"]["en"]["productID"] == "customer-product"
     )
+    assert generated_product["schema"] == "https://opendataproducts.org/v4.2/schema/odps.json"
+    assert generated_product["version"] == "4.2"
+    assert validate_document(generated_product).valid is True
+    generated_reference = load_mapping(
+        workspace / "odpc" / "fragments" / "product_reference_pr-customer.yaml"
+    )["productReference"]
+    assert generated_reference["productModel"]["version"] == "4.2"
     assert not (
         workspace / "odps" / "products" / "customer-health-signals.yaml"
     ).exists()
@@ -2842,6 +2850,15 @@ def test_build_portfolio_continues_after_one_product_source_fails(
     )["productReference"]
     assert fallback_reference["tags"] == ["fallback-generated", "needs-review"]
     assert fallback_reference["x-generation"]["fallback"] is True
+    fallback_product = load_mapping(
+        workspace
+        / "odps"
+        / "products"
+        / "product-discussion-malformed-source-that-fails-product-reference-generation.yaml"
+    )
+    assert fallback_reference["productModel"]["version"] == "4.2"
+    assert fallback_product["version"] == "4.2"
+    assert validate_document(fallback_product).valid is True
     html = (workspace / "index.html").read_text(encoding="utf-8")
     assert "Review portfolio warnings" in html
     assert "Needs review" in html
@@ -3132,6 +3149,11 @@ def test_portfolio_build_prompt_defines_schema_and_linking_rules() -> None:
     assert "productReference.productID must match odpsProduct" in prompt
     assert 'productModel.$ref must be "../odps/products/<productID>.yaml"' in prompt
     assert "Graph edge source and target values must use generated stable IDs" in prompt
+    assert "https://opendataproducts.org/v4.2/schema/odps.json" in prompt
+    assert 'version: "4.2"' in prompt
+    assert "dataAccess.default" in prompt
+    assert "#/product/dataAccess/default" in prompt
+    assert "ODPS v4.1 product component rules" not in prompt
 
 
 def test_reduce_source_lanes_chunks_and_reports_budget_metadata() -> None:
@@ -3561,6 +3583,15 @@ def test_portfolio_cli_build_emits_one_final_json_report(
     assert payload["contextFormat"] == "gcf"
     assert payload["artifactCounts"]["graphEdges"] == 1
     assert "validationResults" in payload
+    generated_product = load_mapping(
+        workspace / "odps" / "products" / "customer-product.yaml"
+    )
+    assert generated_product["version"] == "4.2"
+    assert validate_document(generated_product).valid is True
+    generated_reference = load_mapping(
+        workspace / "odpc" / "fragments" / "product_reference_pr-customer.yaml"
+    )["productReference"]
+    assert generated_reference["productModel"]["version"] == "4.2"
     assert (workspace / "index.html").exists()
     assert "CLI Controlled Portfolio" in (workspace / "index.html").read_text(
         encoding="utf-8"

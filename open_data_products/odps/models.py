@@ -210,6 +210,22 @@ class DataContract:
 
 
 @dataclass
+class ContractReference:
+    """Reference-only binding to a named ODPS v4.2 Contract profile."""
+
+    dollar_ref: str
+
+
+@dataclass
+class ContractProfiles:
+    """ODPS v4.2 named Contract profiles or one external profile package."""
+
+    default: Optional[DataContract] = None
+    additional_profiles: Dict[str, DataContract] = field(default_factory=dict)
+    dollar_ref: Optional[str] = None
+
+
+@dataclass
 class SLADimension:
     """SLA dimension with objectives and units"""
 
@@ -346,17 +362,18 @@ class DataAccessMethod:
     authentication_method: Optional[str] = None
     specs_url: Optional[str] = None
     documentation_url: Optional[str] = None
-    specification: Optional[Dict[str, Any]] = None
+    specification: Optional[Union[str, Dict[str, Any]]] = None
     version: Optional[str] = None  # Version of the access method
     reference: Optional[str] = None  # Reference details
     dollar_ref: Optional[str] = None  # JSON Reference ($ref) - New in v4.1
+    contract: Optional[ContractReference] = None
 
 
 @dataclass
 class DataAccess:
     """Data access specifications with required default method and v4.1 $ref support"""
 
-    default: DataAccessMethod
+    default: Optional[DataAccessMethod] = None
     additional_methods: Dict[str, DataAccessMethod] = field(default_factory=dict)
     dollar_ref: Optional[str] = None  # JSON Reference ($ref) - New in v4.1
 

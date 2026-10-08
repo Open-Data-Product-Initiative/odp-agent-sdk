@@ -6,6 +6,8 @@ from dataclasses import asdict
 from typing import Any, Dict, List, cast
 
 from .models import (
+    ContractProfiles,
+    ContractReference,
     DataAccess,
     DataAccessMethod,
     DataContract,
@@ -336,6 +338,21 @@ def parse_data_contract(data: Dict[str, Any]) -> DataContract:
     )
 
 
+def parse_contract_profiles(data: Dict[str, Any]) -> ContractProfiles:
+    """Parse ODPS v4.2 named Contract profiles without resolving references."""
+    if set(data) == {"$ref"}:
+        return ContractProfiles(dollar_ref=data["$ref"])
+    default = parse_data_contract(data["default"]) if "default" in data else None
+    return ContractProfiles(
+        default=default,
+        additional_profiles={
+            name: parse_data_contract(profile)
+            for name, profile in data.items()
+            if name != "default" and isinstance(profile, dict)
+        },
+    )
+
+
 def parse_sla_dimension(data: Dict[str, Any]) -> SLADimension:
     """Parse an SLA dimension."""
     return SLADimension(
@@ -447,10 +464,16 @@ def parse_data_access_method(data: Dict[str, Any]) -> DataAccessMethod:
         version=data.get("version"),
         reference=data.get("reference"),
         dollar_ref=data.get("$ref"),
+        contract=(
+            ContractReference(dollar_ref=data["contract"]["$ref"])
+            if isinstance(data.get("contract"), dict)
+            and set(data["contract"]) == {"$ref"}
+            else None
+        ),
     )
 
 
-def parse_data_access(data: Any) -> DataAccess:
+def parse_data_access(data: Any, version: str = "4.1") -> DataAccess:
     """Parse data access configuration."""
     if isinstance(data, list):
         methods = [method for method in data if isinstance(method, dict)]
@@ -460,6 +483,8 @@ def parse_data_access(data: Any) -> DataAccess:
             for index, method in enumerate(methods[1:], start=2)
         }
         return DataAccess(default=default_method, additional_methods=additional_methods)
+    if version == "4.2" and set(data) == {"$ref"}:
+        return DataAccess(dollar_ref=data["$ref"])
     if "default" in data:
         default_key = "default"
     else:
@@ -556,7 +581,7 @@ def serialize_product_details(product_details: ProductDetails) -> Dict[str, Any]
     """Serialize product details to ODPS dictionary keys."""
     product = asdict(product_details)
     convert_snake_to_camel(product, PRODUCT_DETAILS_MAPPING)
-    return product
+    return cast(Dict[str, Any], clean_none(product))
 
 
 def serialize_product_strategy(product_strategy: ProductStrategy) -> Dict[str, Any]:
@@ -571,6 +596,18 @@ def serialize_data_contract(data_contract: DataContract) -> Dict[str, Any]:
     data = asdict(data_contract)
     convert_snake_to_camel(data, DATA_CONTRACT_MAPPING)
     return data
+
+
+def serialize_contract_profiles(profiles: ContractProfiles) -> Dict[str, Any]:
+    """Serialize ODPS v4.2 Contract profiles without flattening references."""
+    if profiles.dollar_ref is not None:
+        return {"$ref": profiles.dollar_ref}
+    result: Dict[str, Any] = {}
+    if profiles.default is not None:
+        result["default"] = clean_none(serialize_data_contract(profiles.default))
+    for name, profile in profiles.additional_profiles.items():
+        result[name] = clean_none(serialize_data_contract(profile))
+    return result
 
 
 def serialize_sla(sla: SLA) -> Dict[str, Any]:
@@ -593,15 +630,36 @@ def serialize_data_quality(data_quality: DataQuality) -> Dict[str, Any]:
     return cast(Dict[str, Any], clean_none(data))
 
 
-def serialize_data_access(data_access: DataAccess) -> List[Dict[str, Any]]:
+def _serialize_data_access_method(method: DataAccessMethod) -> Dict[str, Any]:
+    """Serialize one Data Access profile."""
+    data = asdict(method)
+    contract = data.pop("contract", None)
+    convert_snake_to_camel(data, DATA_ACCESS_MAPPING)
+    if contract is not None:
+        data["contract"] = {"$ref": contract["dollar_ref"]}
+    return cast(Dict[str, Any], clean_none(data))
+
+
+def serialize_data_access(
+    data_access: DataAccess, version: str = "4.1"
+) -> Any:
     """Serialize data access configuration."""
-    default = asdict(data_access.default)
-    convert_snake_to_camel(default, DATA_ACCESS_MAPPING)
-    methods = [default]
-    for method in data_access.additional_methods.values():
-        method_dict = asdict(method)
-        convert_snake_to_camel(method_dict, DATA_ACCESS_MAPPING)
-        methods.append(method_dict)
+    if version == "4.2":
+        if data_access.dollar_ref is not None:
+            return {"$ref": data_access.dollar_ref}
+        result: Dict[str, Any] = {}
+        if data_access.default is not None:
+            result["default"] = _serialize_data_access_method(data_access.default)
+        for name, method in data_access.additional_methods.items():
+            result[name] = _serialize_data_access_method(method)
+        return result
+    methods = []
+    if data_access.default is not None:
+        methods.append(_serialize_data_access_method(data_access.default))
+    methods.extend(
+        _serialize_data_access_method(method)
+        for method in data_access.additional_methods.values()
+    )
     return methods
 
 

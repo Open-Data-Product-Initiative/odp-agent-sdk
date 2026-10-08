@@ -1,0 +1,1356 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "ODPS schema",
+    "description": "This is the schema for ODPS v4.2.",
+    "type": "object",
+    "properties": {
+        "schema": {
+            "type": "string",
+            "description": "Defines the URL of Schema. Used often for validation purposes.",
+            "format": "uri"
+        },
+        "version": {
+            "type": [
+                "string",
+                "number"
+            ],
+            "description": "Current ODPS version.",
+            "examples": [
+                "v4.2",
+                "dev"
+            ]
+        },
+        "product": {
+            "type": "object",
+            "properties": {
+                "details": {
+                    "type": "object",
+                    "description": "Root element to tie all together.",
+                    "patternProperties": {
+                        "^[a-z]{2}$": {
+                            "type": "object",
+                            "description": "Language-specific detail block keyed by ISO 639-1 code.",
+                            "properties": {
+                                "name": {
+                                    "type": "string",
+                                    "description": "The name of the product."
+                                },
+                                "productID": {
+                                    "type": "string",
+                                    "description": "Product identifier."
+                                },
+                                "governanceProfile": {
+                                    "type": "string",
+                                    "description": "Indicates the governance maturity applied to the data product. The value describes the expected level of governance enforcement, automation, and operational control associated with the product.",
+                                    "enum": [
+                                        "structured",
+                                        "enforced",
+                                        "automated",
+                                        "audit_ready"
+                                    ]
+                                },
+                                "portfolioPriority": {
+                                    "type": "string",
+                                    "description": "Indicates the importance of the data product within the organization's data product portfolio. Helps organizations prioritize development, governance, and investment decisions across multiple data products.",
+                                    "enum": [
+                                        "critical",
+                                        "high",
+                                        "medium",
+                                        "low"
+                                    ]
+                                    },
+                                "visibility": {
+                                    "type": "string",
+                                    "description": "The publicity level i.e. who can see this product.",
+                                    "enum": [
+                                        "private",
+                                        "invitation",
+                                        "organisation",
+                                        "dataspace",
+                                        "public",
+                                        "internal"
+                                    ]
+                                },
+                                "status": {
+                                    "type": "string",
+                                    "description": "The status of the product.",
+                                    "enum": [
+                                        "announcement",
+                                        "draft",
+                                        "development",
+                                        "testing",
+                                        "acceptance",
+                                        "production",
+                                        "sunset",
+                                        "retired"
+                                    ]
+                                },
+                                "type": {
+                                    "type": "string",
+                                    "description": "The type of the product.",
+                                    "enum": [
+                                        "raw data",
+                                        "derived data",
+                                        "dataset",
+                                        "reports",
+                                        "analytic view",
+                                        "3D visualisation",
+                                        "algorithm",
+                                        "decision support",
+                                        "automated decision-making",
+                                        "data-enhanced product",
+                                        "data-driven service",
+                                        "data-enabled performance",
+                                        "bi-directional"
+                                    ]
+                                },
+                                "created": {
+                                    "type": "string",
+                                    "format": "date",
+                                    "description": "When product was created."
+                                },
+                                "updated": {
+                                    "type": "string",
+                                    "format": "date",
+                                    "description": "When product was last updated."
+                                },
+                                "valueProposition": {
+                                    "type": "string",
+                                    "description": "This is the product's value proposition.",
+                                    "maxLength": 512
+                                },
+                                "description": {
+                                    "type": "string",
+                                    "description": "The description of the product."
+                                },
+                                "productSeries": {
+                                    "type": "string",
+                                    "description": "A group of products in the product mix which are associated with each other and they can be obtained for the same type of customers or they are marketable for the same type of market place."
+                                },
+                                "categories": {
+                                    "type": "array",
+                                    "description": "Categories."
+                                },
+                                "standards": {
+                                    "type": "array",
+                                    "description": "Comma separated array of standards related e.g. to data content or quality, such as ISO 8000 or ISO 19131."
+                                },
+                                "tags": {
+                                    "type": "array",
+                                    "description": "Tags"
+                                },
+                                "productVersion": {
+                                    "type": "string",
+                                    "description": "The version of the data product.",
+                                    "examples": [
+                                        "v1.0.1"
+                                    ]
+                                },
+                                "versionNotes": {
+                                    "type": "string",
+                                    "description": "Additional information about the version."
+                                },
+                                "issues": {
+                                    "type": "string",
+                                    "description": "There may be errors in the data product that require corrections. These issues will be briefly described to users, along with information about when the fixes will be implemented."
+                                },
+                                "contentSample": {
+                                    "type": "string",
+                                    "format": "uri",
+                                    "description": "Sample content of the data product, for example JSON/XML output. This sample should match the actual data product output and give the data consumer an idea what to expect. Obviously if the data product is pure service for example dashboard or algorithm, then consider providing preview version or alike"
+                                },
+                                "logoURL": {
+                                    "type": "string",
+                                    "format": "uri",
+                                    "description": "Valid URL of the logo."
+                                },
+                                "outputFileFormats": {
+                                    "type": "array",
+                                    "description": "Output file formats for data product."
+                                },
+                                "brandSlogan": {
+                                    "type": "string",
+                                    "description": "Brand related slogan."
+                                },
+                                "useCases": {
+                                    "type": "array",
+                                    "description": "List of Use Cases.",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "useCase": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "useCaseTitle": {
+                                                        "type": "string",
+                                                        "description": "Title of the usecase."
+                                                    },
+                                                    "useCaseDescription": {
+                                                        "type": "string",
+                                                        "description": "Brief description of the usecase."
+                                                    },
+                                                    "useCaseURL": {
+                                                        "type": "string",
+                                                        "format": "uri",
+                                                        "description": "Valid URL of the more detailed usecase description."
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                "recommendedDataProducts": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string"
+                                    }
+                                }
+                            },
+                            "required": [
+                                "name",
+                                "productID",
+                                "visibility",
+                                "status",
+                                "type"
+                            ]
+                        }
+                    }
+                },
+                "contract": {
+                    "type": "object",
+                    "$ref": "#/$defs/ContractProfiles"
+                },
+                "SLA": {
+                    "type": "object",
+                    "$ref": "#/$defs/Sla"
+                },
+                "dataQuality": {
+                    "type": "object",
+                    "$ref": "#/$defs/DataQuality"
+                },
+                "pricingPlans": {
+                    "type": "object",
+                    "$ref": "#/$defs/PricingPlans"
+                },
+                "license": {
+                    "type": "object",
+                    "$ref": "#/$defs/License"
+                },
+                "dataAccess": {
+                    "type": "object",
+                    "$ref": "#/$defs/DataAccessConfiguration"
+                },
+                "dataHolder": {
+                    "type": "object",
+                    "$ref": "#/$defs/DataHolder"
+                },
+                "paymentGateways": {
+                    "type": "object",
+                    "$ref": "#/$defs/PaymentGateway"
+                },
+                "productStrategy": {
+                    "type": "object",
+                    "$ref": "#/$defs/ProductStrategy"
+                }
+            }
+        }
+    },
+    "required": [
+        "schema",
+        "version",
+        "product"
+    ],
+    "additionalProperties": false,
+    "$defs": {
+        "Contract": {
+            "type": "object",
+            "description": "Defines one data contract, either by external reference, metadata and URL, or inline specification.",
+            "properties": {
+                "$ref": {
+                    "type": "string",
+                    "format": "uri-reference",
+                    "description": "Points to the content of this individual contract profile in a local or external file."
+                },
+                "id": {
+                    "type": "string",
+                    "description": "UUID of the data contract"
+                },
+                "type": {
+                    "type": "string",
+                    "description": "Defines the standard used in data contract.",
+                    "enum": [
+                        "ODCS",
+                        "DCS"
+                    ]
+                },
+                "contractVersion": {
+                    "type": "string",
+                    "description": "Version of the standard used to define the Data Contract. Type attribute defines the standard/specification."
+                },
+                "contractURL": {
+                    "type": "string",
+                    "format": "uri",
+                    "description": "URL pointing to a data contract in a contract management service or similar system."
+                },
+                "spec": {
+                    "type": "object",
+                    "description": "Inline YAML element to add data contract details instead of using URL."
+                }
+            },
+            "minProperties": 1,
+            "additionalProperties": false
+        },
+        "ContractProfilePackageReference": {
+            "type": "object",
+            "description": "References an external package containing named data contract profiles. The referenced package must contain a default profile.",
+            "properties": {
+                "$ref": {
+                    "type": "string",
+                    "format": "uri-reference"
+                }
+            },
+            "required": [
+                "$ref"
+            ],
+            "additionalProperties": false
+        },
+        "ContractProfileCollection": {
+            "type": "object",
+            "description": "Inline collection of one or more named data contract profiles. The default profile is required.",
+            "properties": {
+                "default": {
+                    "$ref": "#/$defs/Contract"
+                }
+            },
+            "required": [
+                "default"
+            ],
+            "additionalProperties": {
+                "$ref": "#/$defs/Contract"
+            }
+        },
+        "ContractProfiles": {
+            "description": "Named data contract profiles defined inline or supplied as an external package.",
+            "oneOf": [
+                {
+                    "$ref": "#/$defs/ContractProfileCollection"
+                },
+                {
+                    "$ref": "#/$defs/ContractProfilePackageReference"
+                }
+            ]
+        },
+        "ContractReference": {
+            "type": "object",
+            "description": "Reference from a Data Access profile to a named data contract profile.",
+            "properties": {
+                "$ref": {
+                    "type": "string",
+                    "format": "uri-reference"
+                }
+            },
+            "required": [
+                "$ref"
+            ],
+            "additionalProperties": false
+        },
+        "Sla": {
+            "type": "object",
+            "properties": {
+                "declarative": {
+                    "type": "object",
+                    "description": "defines the dimensions and aimed/intended SLA levels in defined unit.",
+                    "additionalProperties": {
+                        "$ref": "#/$defs/SlaDefinition"
+                    }
+                },
+                "executable": {
+                    "type": "array",
+                    "description": "Grouping element for SLA monitoring logic. Monitoring definitions are provided as code in the spec field for each dimension.",
+                    "items": {
+                        "$ref": "#/$defs/SlaDefinition"
+                    }
+                }
+            }
+        },
+        "DataQuality": {
+            "type": "object",
+            "description": "Contains array of data quality dimensions with optional computational monitoring object. Under this element Data Quality is divided into declarative and executable parts.",
+            "properties": {
+                "declarative": {
+                    "type": "object",
+                    "description": "Captures target levels for defined quality dimensions.",
+                    "additionalProperties": {
+                        "$ref": "#/$defs/DQDefinition"
+                    }
+                },
+                "executable": {
+                    "type": "array",
+                    "description": "Allows integration with supported Everything as Code tools.",
+                    "items": {
+                        "$ref": "#/$defs/DQDefinition"
+                    }
+                }
+            }
+        },
+        "DataAccess": {
+            "type": "object",
+            "description": "Named data access definitions. The default access profile is required.",
+            "properties": {
+                "default": {
+                    "$ref": "#/$defs/DataAccessProfile"
+                }
+            },
+            "required": [
+                "default"
+            ],
+            "additionalProperties": {
+                "$ref": "#/$defs/DataAccessProfile"
+            }
+        },
+        "DataAccessProfilePackageReference": {
+            "type": "object",
+            "description": "References an external package containing named data access profiles. The referenced package must contain a default profile.",
+            "properties": {
+                "$ref": {
+                    "type": "string",
+                    "format": "uri-reference"
+                }
+            },
+            "required": [
+                "$ref"
+            ],
+            "additionalProperties": false
+        },
+        "DataAccessConfiguration": {
+            "description": "Named data access profiles defined inline or supplied as an external package.",
+            "oneOf": [
+                {
+                    "$ref": "#/$defs/DataAccess"
+                },
+                {
+                    "$ref": "#/$defs/DataAccessProfilePackageReference"
+                }
+            ]
+        },
+        "DataAccessProfileReference": {
+            "type": "object",
+            "description": "References one external data access profile.",
+            "properties": {
+                "$ref": {
+                    "type": "string",
+                    "format": "uri-reference"
+                }
+            },
+            "required": [
+                "$ref"
+            ],
+            "additionalProperties": false
+        },
+        "DataAccessProfile": {
+            "oneOf": [
+                {
+                    "$ref": "#/$defs/DataAccessItem"
+                },
+                {
+                    "$ref": "#/$defs/DataAccessProfileReference"
+                }
+            ]
+        },
+        "PaymentGateway": {
+            "type": "object",
+            "description": "Named payment gateway definitions, commonly including default.",
+            "additionalProperties": {
+                "$ref": "#/$defs/PaymentGateways"
+            }
+        },
+        "ProductStrategy": {
+            "type": "object",
+            "description": "Connects the data product to business objectives and KPIs.",
+            "properties": {
+                "status": {
+                "type": "string",
+                "description": "Execution status of the product strategy.",
+                "enum": [
+                    "Planned",
+                    "Active",
+                    "At Risk",
+                    "Achieved",
+                    "Partially Achieved",
+                    "Cancelled",
+                    "Expired"
+                ]
+                },
+                "startDate": {
+                "type": "string",
+                "format": "date",
+                "description": "Date when the product strategy becomes active. Used for timeline and Gantt chart visualizations."
+                },
+                "endDate": {
+                "type": "string",
+                "format": "date",
+                "description": "Date when the product strategy ends or is planned to end. Used for timeline and Gantt chart visualizations."
+                },
+                "objectives": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "$ref": "#/$defs/Languages"
+                    },
+                    "description": "Business objectives the product supports, written in natural language."
+                },
+                "contributesToKPI": {
+                    "type": "object",
+                    "description": "Single higher-level business KPI (from SMART objectives) that this product is accountable for.",
+                    "$ref": "#/$defs/KPI"
+                },
+                "productKPIs": {
+                    "type": "array",
+                    "description": "KPIs measured at product level that influence contributesToKPI. Useful for contribution analysis and governance checks.",
+                    "items": {
+                        "type": "object",
+                        "$ref": "#/$defs/KPI",
+                        "required": [
+                            "id",
+                            "name",
+                            "unit",
+                            "target",
+                            "calculation"
+                        ]
+                    }
+                },
+                "relatedKPIs": {
+                    "type": "array",
+                    "description": "Secondary/cross-unit KPIs to monitor side-effects and additional value (informational; not for prioritization).",
+                    "items": {
+                        "type": "object",
+                        "$ref": "#/$defs/KPI"
+                    }
+                },
+                "strategicAlignment": {
+                    "type": "array",
+                    "description": "Strategic initiatives, policies, or visions the product aligns with.",
+                    "items": {
+                        "type": "object",
+                        "$ref": "#/$defs/Languages"
+                    }
+                }
+            },
+            "required": [
+                "productKPIs",
+                "contributesToKPI"
+            ]
+        },
+        "PricingPlans": {
+            "type": "object",
+            "properties": {
+                "declarative": {
+                    "type": "object",
+                    "patternProperties": {
+                        "^[a-z]{2}$": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/$defs/PricingPlan"
+                            }
+                        }
+                    }
+                },
+                "executable": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/$defs/PricingPlan"
+                    }
+                }
+            }
+        },
+        "SlaDefinition": {
+            "properties": {
+                "name": {
+                    "type": "object",
+                    "$ref": "#/$defs/Languages"
+                },
+                "description": {
+                    "type": "object",
+                    "$ref": "#/$defs/Languages",
+                    "description": "Description of the SLA package."
+                },
+                "type": {
+                    "type": "string",
+                    "description": "Name of the monitoring system. Must support SLA-as-code."
+                },
+                "spec": {
+                    "type": "string",
+                    "description": "Monitoring logic for the defined dimension. Can be inline YAML, plain string, or URL to code file."
+                },
+                "reference": {
+                    "type": "string",
+                    "format": "uri",
+                    "description": "Link to documentation about the monitoring system used."
+                },
+                "support": {
+                    "type": "object",
+                    "description": "Describes how users can get help with usage, billing, or other issues.",
+                    "properties": {
+                        "phoneNumber": {
+                            "type": "string",
+                            "description": "The phone number for support "
+                        },
+                        "phoneServiceHours": {
+                            "type": "string",
+                            "description": "Description of phone support hours."
+                        },
+                        "email": {
+                            "type": "string",
+                            "format": "email",
+                            "description": "Email address for support requests."
+                        },
+                        "emailServiceHours": {
+                            "type": "string",
+                            "description": "Description of email support hours."
+                        },
+                        "documentationURL": {
+                            "type": "string",
+                            "format": "uri",
+                            "description": "Link to documentation describing the support process or SLA handling."
+                        }
+                    }
+                },
+                "dimensions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/$defs/SLADimension"
+                    }
+                }
+            }
+        },
+        "DQDefinition": {
+            "properties": {
+                "displaytitle": {
+                    "type": "object",
+                    "description": "Dimension title to be shown in UIs.",
+                    "$ref": "#/$defs/Languages"
+                },
+                "description": {
+                    "oneOf": [
+                        {
+                            "type": "string"
+                        },
+                        {
+                            "$ref": "#/$defs/Languages"
+                        }
+                    ],
+                    "description": "Describe the dimension so that it can be used for example in info boxes in UI."
+                },
+                "type": {
+                    "type": "string",
+                    "description": "Data Quality Monitoring as code system name. Use one of the predefined options only. With Custom type you can use your in-house solution.",
+                    "enum": [
+                        "SodaCL",
+                        "Montecarlo",
+                        "DQOps",
+                        "Great Expectations",
+                        "OpenMetadata",
+                        "Custom"
+                    ]
+                },
+                "version": {
+                    "type": "string",
+                    "description": "The version of DQ monitoring tool used."
+                },
+                "reference": {
+                    "type": "string",
+                    "format": "uri",
+                    "description": "Provide URL pointing to the reference documentation."
+                },
+                "spec": {
+                    "type": "object",
+                    "description": "The content for Data Quality monitoring expressed as code. Accepted as inline YAML, a valid URL pointing to YAML, or a plain string if type is Custom."
+                },
+                "dimensions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/$defs/DQDimension"
+                    }
+                }
+            }
+        },
+        "SLADimension": {
+            "type": "object",
+            "description": "Defines the SLA dimension.",
+            "properties": {
+                "dimension": {
+                    "type": "string",
+                    "description": "Defines the SLA dimension.",
+                    "enum": [
+                        "latency",
+                        "uptime",
+                        "responseTime",
+                        "errorRate",
+                        "endOfSupport",
+                        "endOfLife",
+                        "updateFrequency",
+                        "timeToDetect",
+                        "timeToNotify",
+                        "timeToRepair",
+                        "emailResponseTime"
+                    ]
+                },
+                "objective": {
+                    "type": [
+                        "string",
+                        "integer"
+                    ],
+                    "description": "Target level to be achieved for the dimension."
+                },
+                "weight": {
+                    "type": "integer",
+                    "description": "Relative importance of this SLA dimension for product-level scoring. User-editable integer (no decimals)."
+                },
+                "unit": {
+                    "type": "string",
+                    "enum": [
+                        "percent",
+                        "milliseconds",
+                        "seconds",
+                        "minutes",
+                        "days",
+                        "weeks",
+                        "months",
+                        "years",
+                        "never",
+                        "date",
+                        "null"
+                    ],
+                    "description": "Measurement unit for the SLA objective."
+                },
+                "description": {
+                    "type": "string",
+                    "description": "the description of the SLA dimension"
+                },
+                "displaytitle": {
+                    "type": "object",
+                    "description": "Dimension title to be shown in UIs.",
+                    "$ref": "#/$defs/Languages"
+                }
+            }
+        },
+        "DQDimension": {
+            "type": "object",
+            "description": "Defines the Data Quality dimension.",
+            "properties": {
+                "displaytitle": {
+                    "type": "object",
+                    "$ref": "#/$defs/Languages",
+                    "description": "Dimension title to be shown in various UIs.."
+                },
+                "dimension": {
+                    "type": "string",
+                    "description": "Defines the Data Quality dimension.",
+                    "enum": [
+                        "accuracy",
+                        "completeness",
+                        "conformity",
+                        "consistency",
+                        "coverage",
+                        "timeliness",
+                        "validity",
+                        "uniqueness"
+                    ]
+                },
+                "objective": {
+                    "type": "integer",
+                    "description": "Defines the target value for the data quality dimension."
+                },
+                "weight": {
+                    "type": "integer",
+                    "description": "Relative importance of this Data Quality dimension when calculating the product's overall Data Quality score. User-editable integer (no decimals)."
+                },
+                "unit": {
+                    "type": "string",
+                    "enum": [
+                        "percentage",
+                        "number"
+                    ]
+                },
+                "description": {
+                    "oneOf": [
+                        {
+                            "type": "string"
+                        },
+                        {
+                            "$ref": "#/$defs/Languages"
+                        }
+                    ],
+                    "description": "Describe the dimension so that it can be used for example in info boxes in UI."
+                }
+            }
+        },
+        "PricingPlan": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "description": "The name of the pricing plan."
+                },
+                "priceCurrency": {
+                    "type": "string",
+                    "description": "The primary currency used in pricing. Platforms are assumed to use this as primary currency if currency conversions are used to display product pricing in different locations for various currencies. If the unit is revenue-sharing, then this attribute value MUST be percentage."
+                },
+                "price": {
+                    "type": [
+                        "string",
+                        "number"
+                    ],
+                    "description": "he offer price of a product, or of a price component, or revenue-sharing percentage."
+                },
+                "billingDuration": {
+                    "type": "string",
+                    "description": "Specifies for how long this price (or price component) will be billed.",
+                    "enum": [
+                        "instant",
+                        "day",
+                        "week",
+                        "month",
+                        "year"
+                    ]
+                },
+                "unit": {
+                    "type": "string",
+                    "description": "Read more about the Pricing plans from ODPS wiki",
+                    "enum": [
+                        "One-time-payment",
+                        "Pay-per-use",
+                        "Recurring",
+                        "Revenue-sharing",
+                        "Data-volume",
+                        "Pay-what-you-want",
+                        "Freemium",
+                        "Open-data",
+                        "Value-based",
+                        "On-request",
+                        "Trial",
+                        "recurring"
+                    ]
+                },
+                "maxTransactionQuantity": {
+                    "type": "integer",
+                    "description": "The maximum transaction quantity for the given billing duration. Use this to define for example monthly (or any other period) request limit to the data product. Note! If you want to set unlimited use, value must be 0 (zero)."
+                },
+                "offering": {
+                    "type": "array",
+                    "description": "The element that contains pricing plan content as array of strings. Think of this as the list of what is included in the pricing plan and what you offer in return to the price asked. Use the language defined in the plan",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "minPrice": {
+                    "type": "string",
+                    "description": "he lowest price if the price is a range. If dynamic pricing is used with this product, this is the lowest price allowed. In dynamic pricing businesses are able to change prices based on algorithms that take into account competitor pricing, supply and demand, and other external factors in the market."
+                },
+                "maxPrice": {
+                    "type": "string",
+                    "description": "The highest price if the price is a range. If dynamic pricing is used with this product, this is the highest price allowed."
+                },
+                "valueAddedTaxIncluded": {
+                    "type": "boolean",
+                    "description": "Specifies whether the applicable value-added tax (VAT) is included in the price specification or not."
+                },
+                "valueAddedTaxPercentage": {
+                    "type": "integer",
+                    "description": "Value Added Tax Percentage"
+                },
+                "validFrom": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "The date when the item becomes valid."
+                },
+                "validTo": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "The date after when the item is not valid."
+                },
+                "additionalPrice": {
+                    "type": "string",
+                    "description": "This is used to define fees for usage which exceeds the defined max transaction quantity. This value is for each additional transaction."
+                },
+                "maxDataQuantity": {
+                    "type": "integer",
+                    "description": "The maximum amount of data transferred during the billing duration. Unit is GB."
+                },
+                "valueSimulator": {
+                    "type": "string",
+                    "format": "uri",
+                    "description": "Intended to be used with value-based pricing plan. Provide url to value simulator in which customer can see the value in various cases. In the simulator customer might be able to input own variables to match their exact case and see the gained value."
+                },
+                "notes": {
+                    "type": "string",
+                    "description": "Optional free-text explanatory note associated with the pricing plan. Often used for disclaimers, internal remarks, or elaborating on intent."
+                },
+                "paymentGateway": {
+                    "type": "object",
+                    "description": "Reference to an available payment gateway definition."
+                },
+                "dataQuality": {
+                    "type": "object",
+                    "description": "Reference to a defined data quality package."
+                },
+                "SLA": {
+                    "type": "object",
+                    "description": "Reference to a defined SLA specification."
+                },
+                "access": {
+                    "type": "object",
+                    "description": "Reference to a defined data access method."
+                },
+                "type": {
+                    "type": "string",
+                    "enum": [
+                        "Stripe",
+                        "Checkout",
+                        "Custom"
+                    ],
+                    "description": "Payment gateway system name."
+                },
+                "version": {
+                    "type": "string",
+                    "description": "The version of the payment gateway tool used."
+                },
+                "reference": {
+                    "type": "string",
+                    "format": "uri",
+                    "description": "Provide URL pointing to the reference documentation"
+                },
+                "spec": {
+                    "type": "object",
+                    "description": "The content the as code part for the pricing plan. Content is intended to be in a form that can be injected as is to type defined payment gateway system. Content depends of the system used and reference attribute is expected to provide more information."
+                }
+            }
+        },
+        "License": {
+            "type": "object",
+            "properties": {
+                "scope": {
+                    "type": "object",
+                    "properties": {
+                        "definition": {
+                            "type": "string",
+                            "maxLength": 512,
+                            "description": "Background and purpose of the license."
+                        },
+                        "restrictions": {
+                            "type": "string",
+                            "maxLength": 255,
+                            "description": "Restrictions of the license."
+                        },
+                        "geographicalArea": {
+                            "type": "array",
+                            "description": "License right restricted to the geographical area.",
+                            "items": {
+                                "type": "string"
+                            }
+                        },
+                        "permanent": {
+                            "type": "boolean",
+                            "description": "License with no expiration date."
+                        },
+                        "exclusive": {
+                            "type": "boolean",
+                            "description": "The exclusive license holder is given complete control over the use of the data product, and no other person or organization is allowed to use it during the term of the license agreement."
+                        },
+                        "rights": {
+                            "type": "array",
+                            "items": {
+                                "type": "string",
+                                "enum": [
+                                    "Reproduction",
+                                    "Display",
+                                    "Distribution",
+                                    "Adaptation",
+                                    "Reselling",
+                                    "Transferring",
+                                    "Sublicensing"
+                                ]
+                            }
+                        }
+                    }
+                },
+                "termination": {
+                    "type": "object",
+                    "description": "Licence termination and continuity related conditions.",
+                    "properties": {
+                        "noticePeriod": {
+                            "type": "integer",
+                            "description": "Days. The notice period is a particular time that an data product provider or consumer must give before ending the contract. This time window allows both sides to make the necessary preparations, guaranteeing an unhindered transfer."
+                        },
+                        "terminationConditions": {
+                            "type": "string",
+                            "maxLength": 512,
+                            "description": "Cancellation conditions of the license."
+                        },
+                        "continuityConditions": {
+                            "type": "string",
+                            "maxLength": 512,
+                            "description": "Continuity conditions of the license."
+                        }
+                    }
+                },
+                "governance": {
+                    "type": "object",
+                    "description": "Governance is the approach taken to ensure that the agreed outcomes are being fulfilled.",
+                    "properties": {
+                        "ownership": {
+                            "type": "string",
+                            "maxLength": 512,
+                            "description": "Data product licensing ownership."
+                        },
+                        "audit": {
+                            "type": "string",
+                            "maxLength": 512,
+                            "description": "License auditing terms."
+                        },
+                        "warranties": {
+                            "type": "string",
+                            "maxLength": 512,
+                            "description": "License warranties."
+                        },
+                        "damages": {
+                            "type": "string",
+                            "maxLength": 512,
+                            "description": "Damages refers to the sum of money (i.e. indemnifications) for a breach of some duty or violation of license right."
+                        },
+                        "confidentiality": {
+                            "type": "string",
+                            "maxLength": 512,
+                            "description": "Restrictions and requirements imposed on the Data User regarding e.g. the use and disclosure of the Data Holder's confidential information."
+                        },
+                        "applicableLaws": {
+                            "type": "string",
+                            "maxLength": 512,
+                            "description": "Applicable laws, i.e local acts, degrees or law."
+                        },
+                        "forceMajeure": {
+                            "type": "string",
+                            "maxLength": 512,
+                            "description": "Force majeure is a clause that is included in contracts to remove liability for unforeseeable and unavoidable catastrophes that interrupt the expected course of events and prevent participants from fulfilling obligations. These clauses generally cover both natural disasters and catastrophes created by humans."
+                        }
+                    }
+                }
+            }
+        },
+        "DataAccessItem": {
+            "type": "object",
+            "required": [
+                "outputPortType"
+            ],
+            "properties": {
+                "name": {
+                    "type": "object",
+                    "$ref": "#/$defs/Languages",
+                    "description": "Name for the access interface. Can be shown in UIs."
+                },
+                "description": {
+                    "type": "object",
+                    "$ref": "#/$defs/Languages",
+                    "description": "Description for the access interface. Supports user understanding."
+                },
+                "outputPortType": {
+                    "type": "string",
+                    "examples": [
+                        "file",
+                        "API",
+                        "SQL",
+                        "AI",
+                        "gRPC",
+                        "sFTP"
+                    ],
+                    "description": "Describes the technical method for delivering data."
+                },
+                "format": {
+                    "type": "string",
+                    "enum": [
+                        "TOON",
+                        "JSON",
+                        "XML",
+                        "CSV",
+                        "Excel",
+                        "zip",
+                        "plain text",
+                        "GraphQL",
+                        "MCP"
+                    ],
+                    "description": "Specifies the data format made available through this access channel."
+                },
+                "authenticationMethod": {
+                    "type": "string",
+                    "enum": [
+                        "OAuth",
+                        "Token",
+                        "API key",
+                        "HTTP Basic",
+                        "none"
+                    ],
+                    "description": "Security model required to access the data."
+                },
+                "specification": {
+                    "type": "string",
+                    "enum": [
+                        "OAS",
+                        "RAML",
+                        "Slate",
+                        "MCP"
+                    ],
+                    "description": "Defines the type of API or protocol specification used to describe access (e.g., OpenAPI, RAML, or a custom protocol like MCP)."
+                },
+                "specsURL": {
+                    "type": "string",
+                    "format": "uri",
+                    "description": "Points to the machine-readable technical documentation."
+                },
+                "accessURL": {
+                    "type": "string",
+                    "format": "uri",
+                    "description": "The direct access point to retrieve the data – can be for example an API endpoint or a file link."
+                },
+                "documentationURL": {
+                    "type": "string",
+                    "format": "uri",
+                    "description": "A human-readable documentation or guide for access setup, authentication steps, or onboarding."
+                },
+                "contract": {
+                    "$ref": "#/$defs/ContractReference",
+                    "description": "Optional reference to the named data contract profile governing this access interface."
+                },
+                "hashType": {
+                    "type": "string",
+                    "examples": [
+                        "SHA-1",
+                        "SHA-2",
+                        "SHA-256",
+                        "MD5"
+                    ],
+                    "description": "Defines hash algorithm used when providing file integrity verification."
+                },
+                "checksum": {
+                    "type": "string",
+                    "description": "File hash/checksum value, useful for verifying data integrity after download."
+                }
+            }
+        },
+        "DataHolder": {
+            "type": "object",
+            "patternProperties": {
+                "^[a-z]{2}$": {
+                    "$ref": "#/$defs/DataHolderDetails"
+                }
+            },
+            "minProperties": 1
+        },
+        "DataHolderDetails": {
+            "type": "object",
+            "properties": {
+                "legalName": {
+                    "type": "string",
+                    "maxLength": 256,
+                    "description": "The official name of the organization, e.g. the registered company name."
+                },
+                "businessID": {
+                    "type": "string",
+                    "description": "The business identifier code of the company. Often this is given to the company by authorized public sector organization managing register of businesses."
+                },
+                "contactName": {
+                    "type": "string",
+                    "description": "Contact person name."
+                },
+                "email": {
+                    "type": "string",
+                    "format": "email",
+                    "description": "Email to be used in contacting the organization."
+                },
+                "taxID": {
+                    "type": "string",
+                    "description": "The Tax / Fiscal ID of the organization or person, e.g. the TIN in the US or the CIF/NIF in Spain."
+                },
+                "vatID": {
+                    "type": "string",
+                    "description": "The Value-added Tax ID of the organization or person."
+                },
+                "businessDomain": {
+                    "type": "string",
+                    "description": "In a data mesh architecture, data (or data product) ownership and management are distributed across self-contained business domains."
+                },
+                "logoURL": {
+                    "type": "string",
+                    "format": "uri",
+                    "description": "The URL pointing to organisation logo."
+                },
+                "description": {
+                    "type": "string",
+                    "maxLength": 512,
+                    "description": "The introduction to the organization. Often contains information of what the organisation does and focuses on."
+                },
+                "URL": {
+                    "type": "string",
+                    "format": "uri",
+                    "description": "The URL of the organization's website."
+                },
+                "telephone": {
+                    "type": "string",
+                    "description": "The telephone number."
+                },
+                "streetAddress": {
+                    "type": "string",
+                    "description": "The street address."
+                },
+                "postalCode": {
+                    "type": "string",
+                    "description": "The postal code."
+                },
+                "addressRegion": {
+                    "type": "string",
+                    "description": "The region in which the locality is, and which is in the country. For example, California or another appropriate first-level Administrative division"
+                },
+                "addressLocality": {
+                    "type": "string",
+                    "description": "The locality in which the street address is, and which is in the region."
+                },
+                "addressCountry": {
+                    "type": "string",
+                    "description": "The country."
+                },
+                "aggregateRating": {
+                    "type": "string",
+                    "description": "The average rating based on multiple ratings or reviews."
+                },
+                "ratingCount": {
+                    "type": "integer",
+                    "description": "The amount of ratigns and reviews used in calculating the aggregateRating."
+                },
+                "slogan": {
+                    "type": "string",
+                    "maxLength": 256,
+                    "description": "The slogan of the organization. This is often related to showing the brand."
+                },
+                "parentOrganization": {
+                    "type": "string",
+                    "description": "The larger organization that this organization is a subOrganization of, if any."
+                }
+            },
+            "required": [
+                "legalName"
+            ]
+        },
+        "PaymentGateways": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "object",
+                    "$ref": "#/$defs/Languages",
+                    "description": "Descriptions of the payment gateway."
+                },
+                "type": {
+                    "type": "string",
+                    "enum": [
+                        "Stripe",
+                        "Axio",
+                        "Checkout",
+                        "Custom"
+                    ],
+                    "description": "Defines the payment system or protocol used. Use predefined values. Custom allows custom or internal solutions."
+                },
+                "version": {
+                    "type": "string",
+                    "examples": [
+                        "v1.0.0"
+                    ],
+                    "description": "Indicates the version of the payment gateway specification, SDK, or integration logic."
+                },
+                "reference": {
+                    "type": "string",
+                    "format": "uri",
+                    "description": "Points to documentation or developer reference for the payment gateway system."
+                },
+                "spec": {
+                    "type": [
+                        "object",
+                        "string"
+                    ],
+                    "description": "Contains the executable or declarative logic for the payment gateway integration. Can be inline YAML, stringified logic, or link to external file."
+                }
+            }
+        },
+        "KPI": {
+            "type": "object",
+            "description": "Single higher-level business KPI (from SMART objectives) that this product is accountable for.",
+            "properties": {
+                "id": {
+                    "type": "string",
+                    "description": "Identifier of the business KPI (use shared IDs for roll-ups)."
+                },
+                "name": {
+                    "type": "string",
+                    "description": "KPI name."
+                },
+                "description": {
+                    "type": "string",
+                    "description": "Human-readable description."
+                },
+                "unit": {
+                    "type": "string",
+                    "description": "Unit of measurement."
+                },
+                "target": {
+                    "type": [
+                        "number",
+                        "string"
+                    ],
+                    "description": "Target value for the KPI."
+                },
+                "direction": {
+                    "type": "string",
+                    "description": "Desired direction of movement.",
+                    "enum": [
+                        "increase",
+                        "decrease",
+                        "at_least",
+                        "at_most",
+                        "equals"
+                    ]
+                },
+                "timeframe": {
+                    "type": "string",
+                    "description": "When the target should be met."
+                },
+                "frequency": {
+                    "type": "string",
+                    "description": "Measurement cadence (e.g., hourly, daily, monthly)."
+                },
+                "owner": {
+                    "type": "string",
+                    "description": "Responsible role/team"
+                },
+                "calculation": {
+                    "type": "string",
+                    "description": "Human-readable formula"
+                }
+            },
+            "required": [
+                "id",
+                "name",
+                "unit",
+                "target"
+            ]
+        },
+        "Languages": {
+            "type": "object",
+            "patternProperties": {
+                "^[a-z]{2}$": {
+                    "type": "string",
+                    "description": "Localized string value keyed by ISO-639-1 two-letter language code (e.g., en, ar, fi)."
+                }
+            },
+            "minProperties": 1,
+            "additionalProperties": false,
+            "description": "Allows multilingual text fields where keys are ISO 639-1 language codes."
+        }
+    }
+}

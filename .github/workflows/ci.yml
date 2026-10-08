@@ -1,0 +1,49 @@
+name: Test and Package
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test-and-package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Install test and packaging dependencies
+        run: python -m pip install --upgrade pip ".[dev]"
+
+      - name: Run the test suite
+        run: pytest -q
+
+      - name: Build and inspect the distribution
+        run: |
+          python -m build --quiet
+          python -m twine check dist/*
+
+      - name: Smoke test the installed wheel
+        env:
+          WORKSPACE: ${{ github.workspace }}
+        run: |
+          python -m venv /tmp/open-data-products-wheel
+          /tmp/open-data-products-wheel/bin/pip install dist/*.whl
+          cd /tmp
+          /tmp/open-data-products-wheel/bin/python - <<'PY'
+          import os
+          from pathlib import Path
+
+          from open_data_products.agent import validate_document
+          from open_data_products.resources import get_resource
+
+          fixture = Path(os.environ["WORKSPACE"]) / "tests/fixtures/odps_v42_profiles.yaml"
+          assert validate_document(fixture).valid
+          assert Path(get_resource("odps.v4.2.schema.yaml").path).is_file()
+          PY

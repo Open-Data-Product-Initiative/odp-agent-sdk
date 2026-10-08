@@ -56,7 +56,9 @@ DEFAULT_OLLAMA_GENERATE_TIMEOUT = 300
 DEFAULT_OPENAI_GENERATE_TIMEOUT = 300
 DEFAULT_OPENAI_USER_AGENT = "open-data-products-python/0.2"
 DEFAULT_GENERATION_CONFIG = Path(__file__).resolve().parent / "generation.config.yaml"
-ODPS_SCHEMA_PATH = Path(__file__).resolve().parent.parent / "odps/data/schema/odps.json"
+ODPS_SCHEMA_PATH = (
+    Path(__file__).resolve().parent.parent / "odps/data/schema/odps-v4.2.json"
+)
 ODPS_PRODUCT_TYPES = {
     "raw data",
     "derived data",

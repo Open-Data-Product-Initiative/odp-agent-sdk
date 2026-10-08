@@ -26,6 +26,7 @@ if TYPE_CHECKING:
 
 from ._validators import ODPSValidator
 from .enums import ProductStatus, ProductVisibility, DataContractType
+from .models import DataContract
 
 
 class ValidationRule(ABC):
@@ -82,7 +83,7 @@ class EnumFieldsValidator(ValidationRule):
             errors.append(f"Invalid status. Must be one of: {ProductStatus.values()}")
 
         # Validate data contract type
-        if odp.data_contract and odp.data_contract.type:
+        if isinstance(odp.data_contract, DataContract) and odp.data_contract.type:
             if odp.data_contract.type not in DataContractType.values():
                 errors.append(
                     f"Data contract type must be one of: {DataContractType.values()}"
@@ -97,12 +98,15 @@ class DataAccessValidator(ValidationRule):
     def validate(self, odp: "OpenDataProduct") -> List[str]:
         errors: List[str] = []
 
-        if odp.data_access:
+        if odp.data_access and odp.data_access.dollar_ref is None:
             if not odp.data_access.default:
                 errors.append("dataAccess requires a 'default' method")
             else:
                 # Validate default method has minimum required fields
-                if not odp.data_access.default.output_port_type:
+                if (
+                    odp.data_access.default.dollar_ref is None
+                    and not odp.data_access.default.output_port_type
+                ):
                     errors.append("dataAccess.default requires 'outputPorttype' field")
 
         return errors
@@ -128,7 +132,7 @@ class LanguageCodesValidator(ValidationRule):
         errors.extend(lang_errors)
 
         # Validate multilingual fields in dataAccess
-        if odp.data_access:
+        if odp.data_access and odp.data_access.default:
             if odp.data_access.default.name:
                 name_errors = ODPSValidator.validate_multilingual_dict(
                     odp.data_access.default.name, "dataAccess.default.name"
@@ -245,12 +249,12 @@ class URLValidator(ValidationRule):
                 )
 
         # Component URLs
-        if odp.data_contract and odp.data_contract.contract_url:
+        if isinstance(odp.data_contract, DataContract) and odp.data_contract.contract_url:
             if not ODPSValidator.validate_url(odp.data_contract.contract_url):
                 errors.append("Data contract contractURL must be a valid RFC 3986 URI")
 
         # DataAccess URLs
-        if odp.data_access:
+        if odp.data_access and odp.data_access.default:
             if odp.data_access.default.access_url and not ODPSValidator.validate_url(
                 odp.data_access.default.access_url
             ):

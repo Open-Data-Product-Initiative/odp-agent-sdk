@@ -16,6 +16,6 @@ productReference:
     team: Airline Partnership Data Team
   productModel:
     standard: ODPS
-    version: '4.1'
+    version: '4.2'
     format: yaml
     $ref: products/flight-connection-reliability.yaml

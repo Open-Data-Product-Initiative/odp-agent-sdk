@@ -59,6 +59,7 @@ from pathlib import Path
 from .models import (
     ProductDetails,
     ProductStrategy,
+    ContractProfiles,
     DataContract,
     SLA,
     DataQuality,
@@ -73,6 +74,7 @@ from .models import (
 from .codecs import (
     parse_data_access,
     parse_data_contract,
+    parse_contract_profiles,
     parse_data_holder,
     parse_data_quality,
     parse_extensions,
@@ -84,6 +86,12 @@ from .codecs import (
     parse_sla,
 )
 from ._document import build_document
+from .versions import (
+    ODPS_V41,
+    ODPS_V42,
+    ODPS_V42_SCHEMA_URI,
+    detect_version,
+)
 from .validation import ODPSValidationFramework
 from ._state import (
     clear_caches,
@@ -219,20 +227,22 @@ class OpenDataProduct:
         clear_caches(self._validation_cache, self._serialization_cache)
         self._hash_cache = None
 
-    def __init__(self, product_details: ProductDetails):
+    def __init__(self, product_details: ProductDetails, version: str = ODPS_V41):
         """
         Initialize with mandatory product details
 
         Args:
             product_details: ProductDetails instance with core product info
         """
-        self.schema = self.REQUIRED_SCHEMA
-        self.version = self.REQUIRED_VERSION
+        if version not in {ODPS_V41, ODPS_V42}:
+            raise ValueError("Unsupported ODPS version: {0}".format(version))
+        self.schema = ODPS_V42_SCHEMA_URI if version == ODPS_V42 else self.REQUIRED_SCHEMA
+        self.version = version
         self.product_details = product_details
 
         # Optional components
         self.product_strategy: Optional[ProductStrategy] = None  # New in v4.1
-        self.data_contract: Optional[DataContract] = None
+        self.data_contract: Optional[Union[DataContract, ContractProfiles]] = None
         self.sla: Optional[SLA] = None
         self.data_quality: Optional[DataQuality] = None
         self.pricing_plans: Optional[PricingPlans] = None
@@ -268,9 +278,10 @@ class OpenDataProduct:
 
         product_details = parse_product_details(product_data)
 
+        detected_version = detect_version(data)
         instance = cls(product_details)
         instance.schema = schema or cls.REQUIRED_SCHEMA
-        instance.version = version or cls.REQUIRED_VERSION
+        instance.version = detected_version or version or cls.REQUIRED_VERSION
 
         # Load product strategy (v4.1)
         if "productStrategy" in product_data:
@@ -287,7 +298,11 @@ class OpenDataProduct:
             instance.pricing_plans = parse_pricing_plans(product_data["pricingPlans"])
 
         # Load optional components
-        if "dataContract" in product_data:
+        if detected_version == ODPS_V42 and "contract" in product_data:
+            instance.data_contract = parse_contract_profiles(product_data["contract"])
+        elif "contract" in product_data:
+            instance.data_contract = parse_data_contract(product_data["contract"])
+        elif "dataContract" in product_data:
             instance.data_contract = parse_data_contract(product_data["dataContract"])
 
         if "SLA" in product_data:
@@ -298,7 +313,9 @@ class OpenDataProduct:
 
         if "dataAccess" in product_data:
             da_data = product_data["dataAccess"]
-            instance.data_access = parse_data_access(da_data)
+            instance.data_access = parse_data_access(
+                da_data, ODPS_V42 if detected_version == ODPS_V42 else ODPS_V41
+            )
 
         if "license" in product_data:
             instance.license = parse_license(product_data["license"])
@@ -383,6 +400,25 @@ class OpenDataProduct:
         # Then run standard validation
         validator = ODPSValidationFramework()
         errors = validator.validate(self)
+
+        if self.version == ODPS_V42:
+            from jsonschema import Draft202012Validator, FormatChecker
+
+            from .versions import load_schema
+
+            schema_validator = Draft202012Validator(
+                load_schema(ODPS_V42), format_checker=FormatChecker()
+            )
+            for schema_error in sorted(
+                schema_validator.iter_errors(self.to_dict()),
+                key=lambda error: list(error.path),
+            ):
+                path = "/".join(str(item) for item in schema_error.absolute_path)
+                errors.append(
+                    "/{0}: {1}".format(path, schema_error.message)
+                    if path
+                    else "/: {0}".format(schema_error.message)
+                )
 
         if errors:
             error_msg = f"Validation errors: {'; '.join(errors)}"
@@ -570,8 +606,8 @@ class OpenDataProduct:
         contract_version: Optional[str] = None,
         ref: Optional[str] = None,
     ) -> None:
-        """Add or update data contract"""
-        self.data_contract = DataContract(
+        """Add or update the default Contract for this ODPS version."""
+        contract = DataContract(
             id=id,
             type=type,
             contract_version=contract_version,
@@ -579,6 +615,32 @@ class OpenDataProduct:
             spec=spec,
             ref=ref,
         )
+        self.data_contract = (
+            ContractProfiles(default=contract)
+            if self.version == ODPS_V42
+            else contract
+        )
+        self._invalidate_cache()
+
+    def add_contract_profile(self, name: str, contract: DataContract) -> None:
+        """Add or update a named ODPS v4.2 Contract profile."""
+        if self.version != ODPS_V42:
+            raise ValueError("Contract profiles require ODPS v4.2")
+        if not name or name == "$ref":
+            raise ValueError("Contract profile name must be a non-empty profile id")
+        if not isinstance(self.data_contract, ContractProfiles):
+            self.data_contract = ContractProfiles()
+        if name == "default":
+            self.data_contract.default = contract
+        else:
+            self.data_contract.additional_profiles[name] = contract
+        self._invalidate_cache()
+
+    def set_contract_profile_package_reference(self, reference: str) -> None:
+        """Set the ODPS v4.2 external Contract profile package reference."""
+        if self.version != ODPS_V42:
+            raise ValueError("Contract profile packages require ODPS v4.2")
+        self.data_contract = ContractProfiles(dollar_ref=reference)
         self._invalidate_cache()
 
     def add_sla(self, profiles: Optional[Dict[str, Any]] = None) -> None:
@@ -600,6 +662,27 @@ class OpenDataProduct:
         self.data_access = DataAccess(
             default=default_method, additional_methods=additional_methods
         )
+        self._invalidate_cache()
+
+    def add_data_access_profile(self, name: str, method: DataAccessMethod) -> None:
+        """Add or update a named ODPS v4.2 Data Access profile."""
+        if self.version != ODPS_V42:
+            raise ValueError("Data Access profiles require ODPS v4.2")
+        if not name or name == "$ref":
+            raise ValueError("Data Access profile name must be a non-empty profile id")
+        if self.data_access is None or self.data_access.dollar_ref is not None:
+            self.data_access = DataAccess()
+        if name == "default":
+            self.data_access.default = method
+        else:
+            self.data_access.additional_methods[name] = method
+        self._invalidate_cache()
+
+    def set_data_access_profile_package_reference(self, reference: str) -> None:
+        """Set the ODPS v4.2 external Data Access profile package reference."""
+        if self.version != ODPS_V42:
+            raise ValueError("Data Access profile packages require ODPS v4.2")
+        self.data_access = DataAccess(dollar_ref=reference)
         self._invalidate_cache()
 
     def __str__(self) -> str:

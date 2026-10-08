@@ -14,6 +14,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 ODPS_PRODUCT = (
     REPO_ROOT / "examples" / "apps" / "pricing_402_builder" / "priced_product.yaml"
 )
+ODPS_V42_PRODUCT = REPO_ROOT / "tests" / "fixtures" / "odps_v42_profiles.yaml"
 ODPG_GRAPH = REPO_ROOT / "open_data_products" / "odpg" / "data" / "graph" / "graph.yaml"
 RECIPE_CONFIG = REPO_ROOT / "examples" / "recipes" / "config" / "recipes.config.yaml"
 
@@ -77,6 +78,7 @@ def test_mcp_initialize_and_list_tools() -> None:
         "list_starter_recipes",
         "check_starter_catalog",
         "init_starter_recipe",
+        "build_portfolio",
         "explain_recipe",
         "validate_recipe",
         "plan_recipe_run",
@@ -95,10 +97,11 @@ def test_mcp_manifest_is_json_serializable_and_preserves_tool_contracts() -> Non
     assert [tool["name"] for tool in manifest_tools] == [tool["name"] for tool in TOOLS]
     classes = {tool["name"]: tool["class"] for tool in manifest_tools}
     assert classes["init_starter_recipe"] == "state-changing"
+    assert classes["build_portfolio"] == "state-changing"
     assert all(
         tool_class == "safe"
         for tool_name, tool_class in classes.items()
-        if tool_name != "init_starter_recipe"
+        if tool_name not in {"init_starter_recipe", "build_portfolio"}
     )
     assert all("handler" not in tool for tool in manifest_tools)
     assert all(tool["inputSchema"]["type"] == "object" for tool in manifest_tools)
@@ -157,6 +160,100 @@ def test_mcp_tool_calls_work_functionally(
     tool_name: str, arguments: Dict[str, Any]
 ) -> None:
     _call_tool(tool_name, arguments)
+
+
+def test_mcp_supports_odps_v42_validation_references_and_resources() -> None:
+    validation = json.loads(
+        _call_tool("validate_document", {"path": str(ODPS_V42_PRODUCT)})["content"][0][
+            "text"
+        ]
+    )
+    assert validation["valid"] is True
+    assert validation["version"] == "4.2"
+
+    explanation = _call_tool("explain_document", {"path": str(ODPS_V42_PRODUCT)})[
+        "content"
+    ][0]["text"]
+    assert "ODPS version: 4.2" in explanation
+
+    references = json.loads(
+        _call_tool("resolve_references", {"path": str(ODPS_V42_PRODUCT), "limit": 20})[
+            "content"
+        ][0]["text"]
+    )
+    assert {reference["ref_type"] for reference in references["refs"]} >= {
+        "contract-profile",
+        "contract-binding",
+    }
+
+    resource = json.loads(
+        _call_tool("get_resource", {"id": "odps.v4.2.schema.yaml"})["content"][0][
+            "text"
+        ]
+    )
+    assert resource["id"] == "odps.v4.2.schema.yaml"
+
+
+def test_mcp_build_portfolio_requires_approval() -> None:
+    response = handle(
+        {
+            "jsonrpc": "2.0",
+            "id": "build-portfolio-unapproved",
+            "method": "tools/call",
+            "params": {
+                "name": "build_portfolio",
+                "arguments": {"workspace": "generated/portfolio", "approved": False},
+            },
+        }
+    )
+
+    assert response is not None
+    assert response["result"]["isError"] is True
+    payload = json.loads(response["result"]["content"][0]["text"])
+    assert "approved" in payload["message"]
+
+
+def test_mcp_build_portfolio_invokes_pipeline(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from open_data_products import generation, portfolio
+
+    observed: Dict[str, Any] = {}
+
+    def fake_build_portfolio(workspace: str, **kwargs: Any) -> Dict[str, Any]:
+        observed["workspace"] = workspace
+        observed.update(kwargs)
+        return {"kind": "PortfolioBuild", "workspace": workspace, "valid": True}
+
+    monkeypatch.setattr(generation, "create_generation_client", lambda settings: "client")
+    monkeypatch.setattr(portfolio, "build_portfolio", fake_build_portfolio)
+
+    workspace = tmp_path / "portfolio"
+    result = _call_tool(
+        "build_portfolio",
+        {
+            "workspace": str(workspace),
+            "objectives": "sources/objectives",
+            "use_cases": "sources/use-cases",
+            "signals": "sources/signals",
+            "products": "sources/products",
+            "title": "MCP Portfolio",
+            "model": "test-model",
+            "context_format": "gcf",
+            "approved": True,
+        },
+    )
+
+    payload = json.loads(result["content"][0]["text"])
+    assert payload["kind"] == "PortfolioBuild"
+    assert payload["workspace_id"] == "portfolio"
+    assert payload["valid"] is True
+    assert str(workspace) not in result["content"][0]["text"]
+    assert observed["workspace"] == str(workspace)
+    assert observed["client"] == "client"
+    assert observed["model"] == "test-model"
+    assert observed["context_format"] == "gcf"
+    assert observed["title"] == "MCP Portfolio"
 
 
 def test_mcp_load_summary_exposes_context_sidecar_references(tmp_path: Path) -> None:

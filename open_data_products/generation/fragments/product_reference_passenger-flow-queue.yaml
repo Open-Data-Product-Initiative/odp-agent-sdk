@@ -16,6 +16,6 @@ productReference:
     team: Terminal Planning Analytics Team
   productModel:
     standard: ODPS
-    version: '4.1'
+    version: '4.2'
     format: yaml
     $ref: products/passenger-flow-queue.yaml

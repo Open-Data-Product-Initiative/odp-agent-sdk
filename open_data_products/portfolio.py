@@ -22,6 +22,7 @@ from typing import (
     List,
     Mapping,
     Optional,
+    Sequence,
     Set,
     Tuple,
     Union,
@@ -51,13 +52,11 @@ from . import portfolio_privacy as _portfolio_privacy
 from .portfolio_sources import (
     SOURCE_WARNING_KEY,
     changed_source_lanes as _changed_source_lanes,
-    collect_source_files as _collect_source_files,
     collect_source_lanes as _collect_source_lanes,
     resolve_source_lane_paths as _resolve_source_lane_paths,
     source_change_warnings as _source_change_warnings,
     source_changes as _source_changes,
     source_extraction_warnings as _source_extraction_warnings,
-    source_hashes as _source_hashes,
     source_hashes_by_lane as _source_hashes_by_lane,
 )
 
@@ -990,7 +989,7 @@ def render_portfolio_build_prompt(lanes: Dict[str, List[Dict[str, str]]]) -> str
         "  - productReference:",
         "      id: PR-STABLE-ID",
         "      productID: stable-product-id",
-        '      productVersion: "4.1"',
+        '      productVersion: "4.2"',
         "      name:",
         "        en: Product name",
         "      description:",
@@ -999,8 +998,8 @@ def render_portfolio_build_prompt(lanes: Dict[str, List[Dict[str, str]]]) -> str
         "      visibility: internal",
         "      type: dataset",
         "    odpsProduct:",
-        "      schema: https://opendataproducts.org/v4.1/schema/odps.json",
-        '      version: "4.1"',
+        "      schema: https://opendataproducts.org/v4.2/schema/odps.json",
+        '      version: "4.2"',
         "      product:",
         "        details:",
         "          en:",
@@ -1032,7 +1031,7 @@ def render_portfolio_build_prompt(lanes: Dict[str, List[Dict[str, str]]]) -> str
         "          email: data-products@example.com",
         "          businessDomain: Revenue Operations",
         "        dataAccess:",
-        "          API:",
+        "          default:",
         "            name:",
         "              en: API",
         "            description:",
@@ -1056,7 +1055,7 @@ def render_portfolio_build_prompt(lanes: Dict[str, List[Dict[str, str]]]) -> str
         "                SLA:",
         '                  $ref: "#/product/SLA/declarative/default"',
         "                access:",
-        '                  $ref: "#/product/dataAccess/API"',
+        '                  $ref: "#/product/dataAccess/default"',
         "              - name: Premium",
         "                description: Higher support and quality package",
         "                priceCurrency: XXX",
@@ -1070,7 +1069,7 @@ def render_portfolio_build_prompt(lanes: Dict[str, List[Dict[str, str]]]) -> str
         "                SLA:",
         '                  $ref: "#/product/SLA/declarative/premium"',
         "                access:",
-        '                  $ref: "#/product/dataAccess/API"',
+        '                  $ref: "#/product/dataAccess/default"',
         "        SLA:",
         "          declarative:",
         "            default:",
@@ -1181,15 +1180,15 @@ def render_portfolio_build_prompt(lanes: Dict[str, List[Dict[str, str]]]) -> str
         "- Keep all values schema-shaped YAML mappings, not narrative paragraphs at the root.",
         "- Use only facts supported by the source lanes. Draft minimal viable ODPS details when product evidence is sparse.",
         "",
-        "ODPS v4.1 product component rules:",
-        "- dataAccess must be a named mapping of access method objects, such as dataAccess.API. Use outputPortType with this exact casing.",
+        "ODPS v4.2 product component rules:",
+        "- dataAccess must be a named mapping of access profiles. Inline collections require dataAccess.default, and every inline profile requires outputPortType with this exact casing.",
         "- pricingPlans.declarative.en must be a list of pricing plan objects with name, priceCurrency, price, billingDuration, and unit.",
         "- SLA must be an object, never a list. Use SLA.declarative as a named mapping such as default and premium.",
         "- Each SLA declarative profile must contain dimensions with dimension, objective, and unit.",
         "- dataQuality must be an object, never a list. Use dataQuality.declarative as a named mapping such as default and premium.",
         "- Allowed dataQuality dimension names are accuracy, completeness, conformity, consistency, coverage, timeliness, validity, and uniqueness.",
         "- Map reconciliation checks to consistency. Keep the reconciliation detail in displayTitle or description, not as dimension: reconciliation.",
-        "- Pricing plan references must use named paths such as #/product/SLA/declarative/default, #/product/dataQuality/declarative/default, and #/product/dataAccess/API.",
+        "- Pricing plan references must use named paths such as #/product/SLA/declarative/default, #/product/dataQuality/declarative/default, and #/product/dataAccess/default.",
         "- paymentGateway refs must use named paths such as #/product/paymentGateways/default.",
         "- Never use array-index reference paths such as #/product/SLA/0 or #/product/dataQuality/declarative/0.",
         "- license uses scope, termination, and governance. Do not emit legacy license fields.",
@@ -1656,7 +1655,7 @@ def _write_portfolio_artifacts(
         reference = dict(reference)
         reference["productModel"] = {
             "standard": "ODPS",
-            "version": str(odps_product.get("version") or "4.1"),
+            "version": str(odps_product.get("version") or "4.2"),
             "format": "yaml",
             "$ref": f"../{product_path.as_posix()}",
         }
@@ -1777,6 +1776,7 @@ def _generate_portfolio_lane_fragments(
                         f"{Path(str(source_path)).name}: {_compact_warning(str(exc))}"
                     )
                     continue
+                _normalize_generated_odps_artifacts(odps_artifacts)
                 _align_generated_odps_products_to_reference(
                     odps_artifacts, reference_artifacts
                 )
@@ -1789,6 +1789,20 @@ def _generate_portfolio_lane_fragments(
                     ]
                 )
     return phases, warnings
+
+
+def _normalize_generated_odps_artifacts(artifacts: List[Any]) -> None:
+    """Write newly generated ODPS artifacts as normalized v4.2 documents."""
+    for artifact in artifacts:
+        output_path = getattr(artifact, "output_path", None)
+        if not isinstance(output_path, Path):
+            continue
+        try:
+            document = load_mapping(output_path, root_name="ODPS product")
+        except ValueError:
+            continue
+        _normalize_generated_odps_product(document)
+        _write_yaml(output_path, document)
 
 
 def _write_fallback_product_artifacts(
@@ -1809,7 +1823,7 @@ def _write_fallback_product_artifacts(
         "tags": ["fallback-generated", "needs-review"],
         "productModel": {
             "standard": "ODPS",
-            "version": "4.1",
+            "version": "4.2",
             "format": "yaml",
             "$ref": f"../odps/products/{product_id}.yaml",
         },
@@ -1820,8 +1834,8 @@ def _write_fallback_product_artifacts(
         },
     }
     product = {
-        "schema": "https://opendataproducts.org/v4.1/schema/odps.json",
-        "version": "4.1",
+        "schema": "https://opendataproducts.org/v4.2/schema/odps.json",
+        "version": "4.2",
         "product": {
             "details": {
                 "en": {
@@ -1835,12 +1849,6 @@ def _write_fallback_product_artifacts(
                 }
             }
         },
-        "reviewNotes": [
-            "Fallback product draft generated because LLM product-reference generation failed."
-        ],
-        "evidenceGaps": [
-            "Review and complete ownership, SLA, data quality, licensing, and access terms."
-        ],
     }
     _write_yaml(
         root / "odpc" / "fragments" / f"product_reference_{product_id}.yaml",
@@ -2361,7 +2369,7 @@ def _normalize_portfolio_plan(plan: Dict[str, Any]) -> Dict[str, Any]:
             reference["status"] = _normalize_enum(
                 reference.get("status"), ODPC_STATUSES, ODPC_STATUS_ALIASES, "draft"
             )
-        _normalize_odps_product(product.get("odpsProduct"))
+        _normalize_generated_odps_product(product.get("odpsProduct"))
 
     for edge in _list(normalized, "graphEdges"):
         source = _text(edge.get("source") or edge.get("from"))
@@ -2388,7 +2396,7 @@ def _normalize_odps_product(value: Any) -> None:
     if isinstance(product, dict):
         _normalize_odps_generated_sections(product)
         _normalize_odps_pricing_plans(product)
-        _normalize_odps_data_access(product)
+        _normalize_odps_data_access(product, _is_odps_v42(value))
         _normalize_odps_license(product.get("license"))
     details = _odps_details_mapping(value)
     if details is None:
@@ -2402,6 +2410,15 @@ def _normalize_odps_product(value: Any) -> None:
         ODPS_VISIBILITY_ALIASES,
         "private",
     )
+
+
+def _normalize_generated_odps_product(value: Any) -> None:
+    """Normalize generated portfolio products to the supported ODPS version."""
+    if not isinstance(value, dict):
+        return
+    value["schema"] = "https://opendataproducts.org/v4.2/schema/odps.json"
+    value["version"] = "4.2"
+    _normalize_odps_product(value)
 
 
 def _odps_details_mapping(value: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -2970,7 +2987,14 @@ def _normalize_odps_pricing_plans(product: Dict[str, Any]) -> None:
                 ]
 
 
-def _normalize_odps_data_access(product: Dict[str, Any]) -> None:
+def _is_odps_v42(document: Dict[str, Any]) -> bool:
+    """Return whether a portfolio product explicitly targets ODPS v4.2."""
+    schema = _text(document.get("schema")).lower()
+    version = _text(document.get("version")).lower()
+    return version in {"4.2", "v4.2"} or "/v4.2/" in schema
+
+
+def _normalize_odps_data_access(product: Dict[str, Any], v42: bool) -> None:
     data_access = product.get("dataAccess")
     if isinstance(data_access, list):
         named_items = [
@@ -2982,29 +3006,72 @@ def _normalize_odps_data_access(product: Dict[str, Any]) -> None:
             if isinstance(item, dict)
         ]
         if named_items:
-            product["dataAccess"] = _unique_named_items(named_items)
+            product["dataAccess"] = _named_data_access_items(
+                named_items, v42, product
+            )
         return
 
     if not isinstance(data_access, dict):
         return
 
     if _looks_like_data_access_method(data_access):
-        product["dataAccess"] = {
-            _data_access_key(data_access, None): _normalize_odps_data_access_item(
-                data_access
-            )
-        }
+        product["dataAccess"] = _named_data_access_items(
+            [
+                (
+                    _data_access_key(data_access, None),
+                    _normalize_odps_data_access_item(data_access),
+                )
+            ],
+            v42,
+            product,
+        )
         return
 
     items = []
     for key, value in list(data_access.items()):
         if key == "$ref" or not isinstance(value, dict):
             continue
+        if v42 and set(value) == {"$ref"}:
+            items.append((key, value))
+            continue
         method = _normalize_odps_data_access_item(value, method_name=key)
         items.append((_data_access_key(method, key), method))
 
     if items:
-        product["dataAccess"] = _unique_named_items(items)
+        product["dataAccess"] = _named_data_access_items(items, v42, product)
+
+
+def _named_data_access_items(
+    items: List[Tuple[str, Dict[str, Any]]], v42: bool, product: Dict[str, Any]
+) -> Dict[str, Dict[str, Any]]:
+    """Return named access profiles, adding v4.2's required default profile."""
+    named = _unique_named_items(items)
+    if not v42 or "default" in named or not named:
+        return named
+    first_name = next(iter(named))
+    primary = named[first_name]
+    named = {"default": primary, **{
+        key: value for key, value in named.items() if key != first_name
+    }}
+    _rewrite_data_access_references(product, first_name, "default")
+    return named
+
+
+def _rewrite_data_access_references(
+    value: Any, old_name: str, new_name: str
+) -> None:
+    """Update internal profile pointers after normalizing the primary profile."""
+    old_ref = "#/product/dataAccess/{0}".format(old_name)
+    new_ref = "#/product/dataAccess/{0}".format(new_name)
+    if isinstance(value, dict):
+        for key, item in value.items():
+            if isinstance(item, str) and item == old_ref:
+                value[key] = new_ref
+            else:
+                _rewrite_data_access_references(item, old_name, new_name)
+    elif isinstance(value, list):
+        for item in value:
+            _rewrite_data_access_references(item, old_name, new_name)
 
 
 def _unique_named_items(
@@ -3204,7 +3271,13 @@ def _sync_product_references_from_odps(
         if not isinstance(document, dict):
             continue
         details = _product_details(document)
-        if _merge_product_reference_details(reference, details):
+        product_path = product_info.get("path")
+        if _merge_product_reference_details(
+            reference,
+            details,
+            document=document,
+            product_path=product_path if isinstance(product_path, Path) else None,
+        ):
             writes.append(
                 _write_yaml(
                     root
@@ -3220,6 +3293,9 @@ def _sync_product_references_from_odps(
 def _merge_product_reference_details(
     reference: Dict[str, Any],
     details: Dict[str, Any],
+    *,
+    document: Dict[str, Any],
+    product_path: Optional[Path],
 ) -> bool:
     changed = False
     for source_key, target_key in (
@@ -3240,6 +3316,16 @@ def _merge_product_reference_details(
     if visibility and reference.get("visibility") != visibility:
         reference["visibility"] = visibility
         changed = True
+    if product_path is not None:
+        expected_model = {
+            "standard": "ODPS",
+            "version": _text(document.get("version"), "4.2"),
+            "format": "yaml",
+            "$ref": "../odps/products/{0}".format(product_path.name),
+        }
+        if reference.get("productModel") != expected_model:
+            reference["productModel"] = expected_model
+            changed = True
     return changed
 
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any, Dict, cast
 
 from .codecs import (
+    serialize_contract_profiles,
     serialize_data_access,
     serialize_data_contract,
     serialize_data_holder,
@@ -20,10 +21,16 @@ from .codecs import (
 
 def build_document(product: Any) -> Dict[str, Any]:
     """Build the canonical dictionary representation for an ODPS product."""
+    details = serialize_product_details(product.product_details)
+    product_value: Dict[str, Any] = (
+        {"details": {"en": details}}
+        if product.version == "4.2"
+        else details
+    )
     result: Dict[str, Any] = {
         "schema": product.schema,
         "version": product.version,
-        "product": serialize_product_details(product.product_details),
+        "product": product_value,
     }
 
     product_data = cast(Dict[str, Any], result["product"])
@@ -33,13 +40,18 @@ def build_document(product: Any) -> Dict[str, Any]:
             product.product_strategy
         )
     if product.data_contract:
-        product_data["dataContract"] = serialize_data_contract(product.data_contract)
+        if product.version == "4.2":
+            product_data["contract"] = serialize_contract_profiles(product.data_contract)
+        else:
+            product_data["contract"] = serialize_data_contract(product.data_contract)
     if product.sla:
         product_data["SLA"] = serialize_sla(product.sla)
     if product.data_quality:
         product_data["dataQuality"] = serialize_data_quality(product.data_quality)
     if product.data_access:
-        product_data["dataAccess"] = serialize_data_access(product.data_access)
+        product_data["dataAccess"] = serialize_data_access(
+            product.data_access, product.version
+        )
     if product.license:
         product_data["license"] = serialize_license(product.license)
     if product.data_holder:

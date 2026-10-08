@@ -136,7 +136,7 @@ def _reference_from_value(pointer: str, value: object) -> List[ContractReference
             ContractReference(
                 href=str(href),
                 pointer=pointer,
-                format=_optional_str(value.get("format") or value.get("type")),
+                format=_contract_reference_format(pointer, value),
             )
         )
     spec = value.get("spec")
@@ -150,6 +150,15 @@ def _reference_from_value(pointer: str, value: object) -> List[ContractReference
             )
         )
     return references
+
+
+def _contract_reference_format(pointer: str, value: Dict[str, object]) -> Optional[str]:
+    """Classify ODPS v4.2 profile references without resolving external data."""
+    if pointer.endswith("/product/contract") and set(value) == {"$ref"}:
+        return "ContractProfileCollection"
+    if "/product/contract/" in pointer and "$ref" in value:
+        return "Contract"
+    return _optional_str(value.get("format") or value.get("type"))
 
 
 def _dedupe_references(references: List[ContractReference]) -> List[ContractReference]:

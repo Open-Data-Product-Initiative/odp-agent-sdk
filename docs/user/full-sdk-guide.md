@@ -159,7 +159,7 @@ Use `open_data_products.<spec>` namespaces for every standard:
 | LLM generation | Draft ODPC fragments, ODPG graphs, and ODPS product YAML from source notes with Ollama, embedded llama.cpp, OpenAI-compatible providers, or Claude |
 | Compact context | Generate and consume TOON/GCF sidecars for ODPC catalogs and ODPG graphs while keeping YAML as the source of truth |
 | OKF context bundles | Validate Open Knowledge Format Markdown/frontmatter bundles, import them as generation source docs, and export ODPC catalog or portfolio artifacts as OKF context |
-| ODPS | Create, load, validate, serialize, and inspect ODPS v4.1 data product documents with v4.0 compatibility |
+| ODPS | Create, load, validate, serialize, and inspect ODPS v4.1 and v4.2 data product documents with v4.0 compatibility |
 | ODPC | Build catalogs from fragments and ODPS products, render HTML, create TOON/GCF context, search object guidance, and check derived artifacts |
 | ODPG | Build and validate graphs, infer relationships from catalog fragments, render graph explorers, traverse paths, analyze governance signals, and extract agent context |
 | ODPV | Search vocabulary terms, resolve aliases, explain canonical packets, check relationship compatibility, and produce agent-ready term context |
@@ -169,8 +169,9 @@ Use `open_data_products.<spec>` namespaces for every standard:
 | Bundled resources and docs | Discover schemas, prompts, examples, vocabularies, object guidance, graph records, and organized user/developer documentation |
 
 ODPS support is scoped to the 4.x generation of the specification. The SDK
-primarily targets ODPS v4.1 and keeps backward-compatible support for ODPS v4.0
-documents.
+supports ODPS v4.1 and v4.2, and keeps backward-compatible support for ODPS v4.0
+documents. ODPS v4.2 uses named `contract` and `dataAccess` profiles; inline
+collections must include `default`.
 
 ODPS field validation includes ISO language, country, currency, date/time,
 phone, email, and URI formats where those standards apply.
@@ -501,7 +502,7 @@ Live LLM generation requires Ollama or a configured provider API key; see
   OpenAI-compatible runtimes such as NVIDIA NIM, and hosted providers such as
   OpenAI, Together AI, Cerebras, SambaNova, Mistral, Gemini, xAI, Z.ai, and
   Sakana Fugu.
-- `open_data_products.odps`: ODPS v4.1 models, standards-aware validation, YAML/JSON I/O, compliance helpers, and `pricing_to_402`.
+- `open_data_products.odps`: ODPS v4.1/v4.2 models, standards-aware validation, YAML/JSON I/O, compliance helpers, and `pricing_to_402`.
 - `open_data_products.odpc`: ODPC catalog building, loading, validation, explanation, and object guidance search.
 - `open_data_products.odpg`: ODPG graph validation, summary, traversal, analysis, agent context, object search, external graph conversion, and graph explorer generation.
 - `open_data_products.odpv`: ODPV vocabulary loading, validation, search, and generated vocabulary artifacts.

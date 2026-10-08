@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from jsonschema import Draft202012Validator
+from jsonschema import Draft202012Validator, FormatChecker
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 
@@ -11,13 +11,11 @@ from .odpc import explain_catalog, load_catalog, validate_catalog
 from .odpg import explain_graph, load_graph, validate_graph
 from .odps import OpenDataProduct
 from .odps.exceptions import ODPSValidationError
+from .odps.versions import ODPS_V41, detect_version, load_schema
 from .odpv import load_vocabulary, validate_vocabulary
 from .results import Reference, ValidationResult
 
 Document = Union[OpenDataProduct, Dict[str, Any]]
-_ODPS_SCHEMA_PATH = (
-    Path(__file__).resolve().parent / "odps" / "data" / "schema" / "odps.json"
-)
 
 
 def load_document(path: Union[str, Path]) -> Document:
@@ -279,21 +277,44 @@ def _validate_raw_odps_document(
     raw = _raw_mapping(document)
     if raw is None:
         return []
-    if not _is_odps_v41(raw):
+    version = detect_version(raw)
+    if version is None:
+        markers = " ".join(
+            (str(raw.get("schema", "")).lower(), str(raw.get("version", "")).lower())
+        )
+        if "v4.1" in markers or "v4.2" in markers or markers.strip() in {
+            "4.1",
+            "4.2",
+        }:
+            return [
+                "/: conflicting ODPS version and schema marker; expected matching "
+                "v4.1 or v4.2 values"
+            ]
+        # Existing v4.0 and marker-free documents retain their historical SDK path.
         return []
 
-    schema = load_mapping(_ODPS_SCHEMA_PATH)
-    validator = Draft202012Validator(schema)
+    schema = load_schema(version)
+    validator = Draft202012Validator(schema, format_checker=FormatChecker())
     errors = sorted(validator.iter_errors(raw), key=lambda error: list(error.path))
-    return _validate_odps_v41_shape(raw) + [
+    schema_uri = str(raw.get("schema", ""))
+    expected_uri = "https://opendataproducts.org/v{0}/schema/odps".format(version)
+    marker_errors = []
+    if schema_uri not in {expected_uri + ".json", expected_uri + ".yaml"}:
+        marker_errors.append(
+            "/schema: expected the official ODPS v{0} schema URI".format(version)
+        )
+    shape_errors = (
+        _validate_odps_v41_shape(raw)
+        if version == ODPS_V41
+        else _validate_odps_v42_semantics(raw)
+    )
+    return marker_errors + shape_errors + [
         _format_schema_error(error) for error in errors
     ]
 
 
 def _is_odps_v41(document: Dict[str, Any]) -> bool:
-    schema = str(document.get("schema", "")).lower()
-    version = str(document.get("version", ""))
-    return "v4.1" in schema or version in {"4.1", "v4.1"}
+    return detect_version(document) == ODPS_V41
 
 
 def _validate_odps_v41_shape(document: Dict[str, Any]) -> List[str]:
@@ -327,6 +348,53 @@ def _validate_odps_v41_shape(document: Dict[str, Any]) -> List[str]:
     if "dataContract" in product:
         errors.append("/product/dataContract: ODPS v4.1 uses /product/contract")
 
+    return errors
+
+
+def _validate_odps_v42_semantics(document: Dict[str, Any]) -> List[str]:
+    """Validate v4.2 internal Contract binding targets after schema validation."""
+    product = document.get("product")
+    if not isinstance(product, dict):
+        return []
+    contract_profiles = product.get("contract")
+    data_access = product.get("dataAccess")
+    if not isinstance(contract_profiles, dict) or "$ref" in contract_profiles:
+        return []
+    if not isinstance(data_access, dict) or "$ref" in data_access:
+        return []
+
+    errors: List[str] = []
+    for access_name, access in data_access.items():
+        if not isinstance(access, dict):
+            continue
+        if "$ref" in access and set(access) != {"$ref"}:
+            errors.append(
+                "/product/dataAccess/{0}: invalid-reference-wrapper; "
+                "an external profile reference must contain only $ref".format(
+                    access_name
+                )
+            )
+        binding = access.get("contract")
+        if not isinstance(binding, dict) or set(binding) != {"$ref"}:
+            continue
+        reference = binding["$ref"]
+        if not isinstance(reference, str) or not reference.startswith("#/"):
+            continue
+        expected = "#/product/contract/"
+        if not reference.startswith(expected):
+            errors.append(
+                "/product/dataAccess/{0}/contract: invalid-contract-target; "
+                "internal references must target one named Contract profile".format(
+                    access_name
+                )
+            )
+            continue
+        profile_name = reference[len(expected) :]
+        if not profile_name or "/" in profile_name or profile_name not in contract_profiles:
+            errors.append(
+                "/product/dataAccess/{0}/contract: invalid-contract-target; "
+                "profile '{1}' does not exist".format(access_name, profile_name)
+            )
     return errors
 
 
@@ -364,6 +432,16 @@ def _walk_references(value: Any, pointer: str = "") -> Iterable[Tuple[str, str, 
 def _reference_type(pointer: str, key: str) -> str:
     if key == "schema":
         return "schema"
+    if pointer.endswith("/product/contract/$ref"):
+        return "contract-profile-package"
+    if "/product/contract/" in pointer and pointer.endswith("/$ref"):
+        return "contract-profile"
+    if pointer.endswith("/product/dataAccess/$ref"):
+        return "data-access-profile-package"
+    if "/product/dataAccess/" in pointer and pointer.endswith("/contract/$ref"):
+        return "contract-binding"
+    if "/product/dataAccess/" in pointer and pointer.endswith("/$ref"):
+        return "data-access-profile"
     if "/nodes/" in pointer:
         return "node"
     if "/edges/" in pointer:

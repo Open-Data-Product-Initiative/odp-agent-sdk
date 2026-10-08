@@ -78,7 +78,7 @@ For detailed documentation, see: https://github.com/Open-Data-Product-Initiative
 For ODPS specification: https://opendataproducts.org/v4.1/
 """
 
-__version__ = "0.3.6"
+__version__ = "0.4.0"
 SPEC_ID = "odps"
 SPEC_NAME = "Open Data Product Specification"
 

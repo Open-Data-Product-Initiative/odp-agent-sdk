@@ -1,0 +1,29 @@
+schema: https://opendataproducts.org/v4.2/schema/odps.yaml
+version: "4.2"
+product:
+  details:
+    en:
+      productID: airport-operations
+      name: Airport Operations
+      visibility: public
+      status: draft
+      type: dataset
+  contract:
+    default:
+      id: CONTRACT-001
+      type: ODCS
+      contractVersion: 2.2.2
+      contractURL: https://example.org/contracts/default
+    restricted:
+      $ref: contracts/restricted.yaml
+  dataAccess:
+    default:
+      outputPortType: API
+      format: JSON
+      accessURL: https://example.org/api
+      contract:
+        $ref: "#/product/contract/default"
+    agent:
+      outputPortType: AI
+      specification: MCP
+      format: MCP

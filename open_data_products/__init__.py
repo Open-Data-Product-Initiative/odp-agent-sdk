@@ -11,7 +11,7 @@ family. Each standard lives in its own namespace:
 
 # flake8: noqa: E402
 
-__version__ = "0.3.6"
+__version__ = "0.4.0"
 version = __version__
 
 from . import odpc

@@ -101,6 +101,7 @@ EXPECTED_TOOLS = {
     "list_starter_recipes",
     "check_starter_catalog",
     "init_starter_recipe",
+    "build_portfolio",
     "explain_recipe",
     "validate_recipe",
     "plan_recipe_run",
@@ -377,6 +378,7 @@ class TestAgentManifest:
             "validate_recipe",
             "plan_recipe_run",
         ]
+        assert workflows["build-portfolio"]["mcp_tools"] == ["build_portfolio"]
         assert manifest["interfaces"]["cli"]["command"] == "open-data-products"
         assert manifest["interfaces"]["mcp"]["command"] == "open-data-products serve"
         assert manifest["interfaces"]["manifest"]["command"] == (
@@ -402,6 +404,7 @@ class TestAgentManifest:
             "render",
             "explain",
         ]
+        assert portfolio["interfaces"] == ["cli", "mcp"]
         assert workflow_ids >= {
             "build-portfolio",
             "refresh-portfolio",
@@ -575,7 +578,10 @@ class TestAgentManifest:
 
         assert safety["mcp_tool_class"] == "mixed"
         assert safety["mcp_is_read_only"] is False
-        assert safety["mcp_state_changing_tools"] == ["init_starter_recipe"]
+        assert safety["mcp_state_changing_tools"] == [
+            "init_starter_recipe",
+            "build_portfolio",
+        ]
         assert "state-changing" in safety["cli_note"]
 
 

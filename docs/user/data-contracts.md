@@ -13,6 +13,38 @@ Install the optional adapter when you need external contract linting or export:
 pip install "open-data-products[contracts]"
 ```
 
+## ODPS v4.2 profiles
+
+ODPS v4.2 stores Contracts as named profiles under `product.contract`. An
+inline collection always includes `default`; additional profile names are
+publisher-defined. Data Access follows the same pattern under
+`product.dataAccess`, and every inline access profile has `outputPortType`.
+
+```yaml
+schema: https://opendataproducts.org/v4.2/schema/odps.yaml
+version: "4.2"
+product:
+  details:
+    en:
+      productID: orders
+      name: Orders
+      visibility: public
+      status: draft
+      type: dataset
+  contract:
+    default:
+      id: ORDERS-001
+      type: ODCS
+  dataAccess:
+    default:
+      outputPortType: API
+      contract:
+        $ref: "#/product/contract/default"
+```
+
+The SDK preserves root profile-package and individual-profile references. It
+does not fetch external references during ordinary validation.
+
 ## Commands
 
 ```bash

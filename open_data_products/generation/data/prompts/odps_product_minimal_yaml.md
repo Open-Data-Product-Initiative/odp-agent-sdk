@@ -21,8 +21,8 @@ Output rules:
 Required shape:
 
 ```yaml
-schema: https://opendataproducts.org/v4.1/schema/odps.json
-version: "4.1"
+schema: https://opendataproducts.org/v4.2/schema/odps.json
+version: "4.2"
 product:
   details:
     en:

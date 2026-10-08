@@ -178,6 +178,7 @@ packages = [
 ]
 "open_data_products.odps" = [
     "data/schema/*.json",
+    "data/schema/*.yaml",
 ]
 "open_data_products.odpv" = [
     "data/vocab/*.json",

@@ -73,7 +73,7 @@ Test the installed package:
 
 ```python
 import open_data_products
-print(open_data_products.__version__)  # Should print 0.2.0
+print(open_data_products.__version__)  # Should print 0.4.0
 
 from open_data_products.odps import OpenDataProduct, ODPSValidator
 from open_data_products.odps.models import ProductDetails

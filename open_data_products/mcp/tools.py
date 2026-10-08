@@ -436,6 +436,58 @@ def _h_search_recipe_guidance(args: Dict[str, Any]) -> Dict[str, Any]:
     )
 
 
+def _h_build_portfolio(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Build a portfolio after explicit approval of writes and LLM use."""
+    if args.get("approved") is not True:
+        raise ValueError(
+            "approved must be true before build_portfolio may write a workspace "
+            "or invoke an LLM"
+        )
+
+    from ..generation import create_generation_client, resolve_generation_settings
+    from ..portfolio import build_portfolio
+
+    settings = resolve_generation_settings(
+        config_path=args.get("config_path"),
+        provider=args.get("provider"),
+        model=args.get("model"),
+        ollama_url=args.get("ollama_url"),
+        prompt_dir=args.get("prompt_dir"),
+    )
+    result = build_portfolio(
+        args["workspace"],
+        objectives=args.get("objectives"),
+        use_cases=args.get("use_cases"),
+        signals=args.get("signals"),
+        products=args.get("products"),
+        title=args.get("title"),
+        client=create_generation_client(settings),
+        model=settings.model,
+        context_format=args.get("context_format", "markdown"),
+        source_budget=settings.portfolio_source_budget,
+        source_privacy=settings.portfolio_privacy,
+    )
+    return _json_envelope(_portfolio_build_summary(result, args["workspace"]))
+
+
+def _portfolio_build_summary(result: Dict[str, Any], workspace: str) -> Dict[str, Any]:
+    """Return an agent-safe portfolio build summary without filesystem paths."""
+    return {
+        "spec": "portfolio",
+        "kind": result.get("kind", "PortfolioBuild"),
+        "workspace_id": Path(workspace).name or "portfolio",
+        "valid": bool(result.get("valid", False)),
+        "artifact_counts": result.get("artifactCounts", {}),
+        "llm_call_count": result.get("llmCallCount", 0),
+        "llm_phases": result.get("llmPhases", []),
+        "write_counts": {
+            name: len(result.get(name, []))
+            for name in ("created", "updated", "unchanged", "removed")
+        },
+        "warnings": result.get("warnings", []),
+    }
+
+
 # --- registry ---------------------------------------------------------------
 
 _PATH_PROP = {
@@ -489,6 +541,18 @@ _PROVIDER_REF_PROP = {
 _MODEL_PROP = {
     "type": "string",
     "description": "Optional model override for recipe dry-runs.",
+}
+_PORTFOLIO_WORKSPACE_PROP = {
+    "type": "string",
+    "description": "Workspace directory to create or update.",
+}
+_PORTFOLIO_SOURCE_PROP = {
+    "type": "string",
+    "description": "Optional source file or directory for one portfolio lane.",
+}
+_PORTFOLIO_APPROVAL_PROP = {
+    "type": "boolean",
+    "description": "Must be true to permit workspace writes and configured LLM calls.",
 }
 
 TOOLS: List[Dict[str, Any]] = [
@@ -873,6 +937,53 @@ TOOLS: List[Dict[str, Any]] = [
             ["identifier"],
         ),
         "handler": _h_init_starter_recipe,
+    },
+    {
+        "name": "build_portfolio",
+        "description": "Build a portfolio workspace from source lanes after explicit approval.",
+        "class": "state-changing",
+        "inputSchema": _object_schema(
+            {
+                "workspace": _PORTFOLIO_WORKSPACE_PROP,
+                "objectives": _PORTFOLIO_SOURCE_PROP,
+                "use_cases": _PORTFOLIO_SOURCE_PROP,
+                "signals": _PORTFOLIO_SOURCE_PROP,
+                "products": _PORTFOLIO_SOURCE_PROP,
+                "title": {
+                    "type": "string",
+                    "description": "Optional human-controlled workspace title.",
+                },
+                "config_path": {
+                    "type": "string",
+                    "description": "Optional generation configuration YAML path.",
+                },
+                "provider": {
+                    "type": "string",
+                    "description": "Optional configured LLM provider override.",
+                },
+                "model": {
+                    "type": "string",
+                    "description": "Optional configured LLM model override.",
+                },
+                "ollama_url": {
+                    "type": "string",
+                    "description": "Optional Ollama endpoint override.",
+                },
+                "prompt_dir": {
+                    "type": "string",
+                    "description": "Optional generation prompt-directory override.",
+                },
+                "context_format": {
+                    "type": "string",
+                    "enum": ["markdown", "gcf", "toon"],
+                    "default": "markdown",
+                    "description": "Prompt context representation for source lanes.",
+                },
+                "approved": _PORTFOLIO_APPROVAL_PROP,
+            },
+            ["workspace", "approved"],
+        ),
+        "handler": _h_build_portfolio,
     },
     {
         "name": "explain_recipe",

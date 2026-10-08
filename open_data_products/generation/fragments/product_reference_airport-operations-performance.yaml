@@ -16,6 +16,6 @@ productReference:
     team: Airport Data Platform Team
   productModel:
     standard: ODPS
-    version: '4.1'
+    version: '4.2'
     format: yaml
     $ref: products/airport-operations-performance.yaml

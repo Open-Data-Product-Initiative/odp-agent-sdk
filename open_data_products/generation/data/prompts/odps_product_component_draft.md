@@ -18,7 +18,7 @@ Output rules:
   the request.
 - Put uncertainty in `reviewNotes` and `evidenceGaps`, not as YAML comments.
 - Do not return a full OpenDataProduct document from this step.
-- For `license`, use ODPS v4.1 `scope`, `termination`, and `governance`.
+- For `license`, use ODPS v4.2 `scope`, `termination`, and `governance`.
   Do not emit legacy license fields.
 - For `productStrategy`, include schema-shaped objectives, KPIs, and status
   only when the source evidence supports them.
@@ -86,7 +86,7 @@ Contrast examples:
 # Supported component: source names API access and API-key authentication.
 components:
   dataAccess:
-    API:
+    default:
       name:
         en: API
       outputPortType: API
@@ -131,7 +131,7 @@ components:
     email: data-products@example.com
     businessDomain: Revenue Operations
   dataAccess:
-    API:
+    default:
       name:
         en: API
       description:
@@ -230,7 +230,7 @@ components:
           SLA:
             $ref: "#/product/SLA/declarative/default"
           access:
-            $ref: "#/product/dataAccess/API"
+            $ref: "#/product/dataAccess/default"
 ```
 
 Complete-draft example for the default component set:

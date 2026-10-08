@@ -28,8 +28,22 @@ _RESOURCE_DEFINITIONS: Tuple[ResourceDefinition, ...] = (
         "odps.schema.json",
         "odps",
         "schema",
-        "odps/data/schema/odps.json",
+        "odps/data/schema/odps-v4.2.json",
+        "Bundled canonical ODPS v4.2 data product schema in JSON format.",
+    ),
+    (
+        "odps.v4.1.schema.json",
+        "odps",
+        "schema",
+        "odps/data/schema/odps-v4.1.json",
         "Bundled ODPS v4.1 data product schema in JSON format.",
+    ),
+    (
+        "odps.v4.2.schema.yaml",
+        "odps",
+        "schema",
+        "odps/data/schema/odps-v4.2.yaml",
+        "Bundled canonical ODPS v4.2 data product schema in YAML format.",
     ),
     (
         "odpr.schema.yaml",

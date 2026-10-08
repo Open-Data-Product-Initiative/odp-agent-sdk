@@ -133,8 +133,8 @@ def test_generation_prompts_are_listed_and_loadable():
     assert "product_reference_<id>.yaml" in load_generation_prompt("odpg_graph_yaml.md")
 
 
-def test_odps_generation_prompts_include_named_v41_component_example():
-    """Test ODPS prompts show the named v4.1 component and pricing ref shape."""
+def test_odps_generation_prompts_include_named_v42_component_example():
+    """Test ODPS prompts show the named v4.2 component and pricing ref shape."""
     component_prompt = load_generation_prompt("odps_product_component_draft.md")
     assemble_prompt = load_generation_prompt("odps_product_assemble_yaml.md")
     prompts = "\n".join([component_prompt, assemble_prompt])
@@ -147,7 +147,7 @@ def test_odps_generation_prompts_include_named_v41_component_example():
     assert "#/product/paymentGateways/default" in prompts
     assert "#/product/dataQuality/declarative/default" in prompts
     assert "#/product/SLA/declarative/default" in prompts
-    assert "#/product/dataAccess/API" in prompts
+    assert "#/product/dataAccess/default" in prompts
     assert "scopeOfUse" not in prompts
     assert "#/product/SLA/declarative/0" not in prompts
     assert "#/product/dataQuality/declarative/0" not in prompts
