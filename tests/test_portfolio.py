@@ -4575,7 +4575,7 @@ def test_sync_portfolio_propagates_linked_odps_product_details(
 
     assert result["kind"] == "PortfolioSync"
     fragment_text = (
-        workspace / "odpc" / "fragments" / "product_reference_PR-CUSTOMER.yaml"
+        workspace / "odpc" / "fragments" / "product_reference_pr-customer.yaml"
     ).read_text(encoding="utf-8")
     catalog_text = (workspace / "odpc" / "catalog.yaml").read_text(encoding="utf-8")
     html = (workspace / "index.html").read_text(encoding="utf-8")
