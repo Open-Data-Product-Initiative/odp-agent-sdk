@@ -3280,14 +3280,27 @@ def _sync_product_references_from_odps(
         ):
             writes.append(
                 _write_yaml(
-                    root
-                    / "odpc"
-                    / "fragments"
-                    / f"product_reference_{_file_id(reference)}.yaml",
+                    _product_reference_fragment_path(root, reference),
                     {"productReference": reference},
                 )
             )
     return writes
+
+
+def _product_reference_fragment_path(root: Path, reference: Dict[str, Any]) -> Path:
+    """Return the existing fragment path for one logical product reference."""
+    fragments_dir = root / "odpc" / "fragments"
+    reference_id = _fragment_identity(reference)
+    if reference_id:
+        for path in _fragment_paths(fragments_dir):
+            document = load_mapping(path, root_name="ODPC fragment")
+            candidate = document.get("productReference")
+            if (
+                isinstance(candidate, dict)
+                and _fragment_identity(candidate) == reference_id
+            ):
+                return path
+    return fragments_dir / f"product_reference_{_file_id(reference)}.yaml"
 
 
 def _merge_product_reference_details(
@@ -3393,19 +3406,47 @@ def _fragment_collections(fragments_dir: Path) -> Dict[str, List[Dict[str, Any]]
         "signal": "signals",
         "productReference": "productReferences",
     }
-    for path in sorted(
+    selected: Dict[str, Dict[str, Tuple[int, str, Dict[str, Any]]]] = {
+        key: {} for key in collections
+    }
+    anonymous: Dict[str, List[Dict[str, Any]]] = {key: [] for key in collections}
+    for path in _fragment_paths(fragments_dir):
+        document = load_mapping(path, root_name="ODPC fragment")
+        for source_key, target_key in keys.items():
+            value = document.get(source_key)
+            if isinstance(value, dict):
+                identity = _fragment_identity(value)
+                if not identity:
+                    anonymous[target_key].append(value)
+                    continue
+                candidate = (path.stat().st_mtime_ns, str(path), value)
+                existing = selected[target_key].get(identity)
+                if existing is None or candidate[:2] > existing[:2]:
+                    selected[target_key][identity] = candidate
+    for target_key in collections:
+        collections[target_key] = [
+            candidate[2]
+            for candidate in sorted(
+                selected[target_key].values(), key=lambda candidate: candidate[1]
+            )
+        ] + anonymous[target_key]
+    return collections
+
+
+def _fragment_paths(fragments_dir: Path) -> List[Path]:
+    """Return supported fragment paths in stable order."""
+    return sorted(
         [
             *fragments_dir.glob("*.yaml"),
             *fragments_dir.glob("*.yml"),
             *fragments_dir.glob("*.json"),
         ]
-    ):
-        document = load_mapping(path, root_name="ODPC fragment")
-        for source_key, target_key in keys.items():
-            value = document.get(source_key)
-            if isinstance(value, dict):
-                collections[target_key].append(value)
-    return collections
+    )
+
+
+def _fragment_identity(value: Dict[str, Any]) -> str:
+    """Return a logical identity shared by equivalent fragment files."""
+    return _text(value.get("id") or value.get("productID"))
 
 
 def _plan_from_catalog(catalog: Dict[str, Any]) -> Dict[str, Any]:
