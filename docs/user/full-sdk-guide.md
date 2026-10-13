@@ -139,7 +139,9 @@ and bundled skills.
 
 ## Package Structure
 
-Use `open_data_products.<spec>` namespaces for every standard:
+Use `open_data_products.<spec>` namespaces for every standard. Use the separate
+`profiles` namespace for interoperability operations that apply a profile rather
+than manage a standard's vocabulary:
 
 | Namespace | Standard | Status |
 |-----------|----------|--------|
@@ -148,6 +150,7 @@ Use `open_data_products.<spec>` namespaces for every standard:
 | `open_data_products.odpg` | Open Data Product Graph | Graph helpers implemented |
 | `open_data_products.odpv` | Open Data Product Vocabulary | Vocabulary tools implemented |
 | `open_data_products.odpr` | Open Data Product Recipes | Recipe workflow helpers implemented |
+| `open_data_products.profiles` | Interoperability profiles | Draft-profile validation, mapping, and bounded transformations implemented |
 
 ## Capabilities at a Glance
 
@@ -506,6 +509,9 @@ Live LLM generation requires Ollama or a configured provider API key; see
 - `open_data_products.odpc`: ODPC catalog building, loading, validation, explanation, and object guidance search.
 - `open_data_products.odpg`: ODPG graph validation, summary, traversal, analysis, agent context, object search, external graph conversion, and graph explorer generation.
 - `open_data_products.odpv`: ODPV vocabulary loading, validation, search, and generated vocabulary artifacts.
+- `open_data_products.profiles`: version-pinned profile validation, mapping
+  resolution, provenance reports, and bounded transformations. ODPV continues
+  to own the bundled source assets for ODPV 1.1 profiles.
 - `open_data_products.okf`: Open Knowledge Format validation, summary, import, and export helpers for external Markdown/frontmatter context bundles.
 
 ## Development

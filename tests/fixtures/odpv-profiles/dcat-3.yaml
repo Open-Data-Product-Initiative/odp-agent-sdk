@@ -1,0 +1,12 @@
+objects:
+  - id: dataset-1
+    type: Dataset
+    properties:
+      identifier: sales
+      license: https://example.test/license
+  - id: service-1
+    type: DataService
+relationships:
+  - source: dataset-1
+    type: exposes
+    target: service-1

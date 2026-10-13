@@ -41,9 +41,29 @@ jobs:
           from pathlib import Path
 
           from open_data_products.agent import validate_document
+          from open_data_products.profiles import (
+              profile_ref,
+              transform_profile,
+              validate_profile,
+              validate_vocabulary_release,
+          )
           from open_data_products.resources import get_resource
 
           fixture = Path(os.environ["WORKSPACE"]) / "tests/fixtures/odps_v42_profiles.yaml"
           assert validate_document(fixture).valid
           assert Path(get_resource("odps.v4.2.schema.yaml").path).is_file()
+          assert Path(get_resource("odpv.v1_1.vocabulary").path).is_file()
+          assert Path(get_resource("odpv.v1_1.profile-schema").path).is_file()
+          assert validate_vocabulary_release("1.1.0")["valid"]
+          assert validate_profile(profile_ref("ODPV-DCAT-3", "0.1.0")).valid
+          dcat = transform_profile(
+              profile_ref("ODPV-DCAT-3", "0.1.0"),
+              "odpvToExternal",
+              {
+                  "objects": [{"id": "dataset", "type": "Dataset"}],
+                  "relationships": [],
+              },
+              allow_draft=True,
+          )
+          assert dcat["status"] == "executed"
           PY

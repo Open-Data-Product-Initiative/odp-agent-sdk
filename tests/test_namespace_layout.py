@@ -7,14 +7,15 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_public_spec_namespaces_are_importable():
-    from open_data_products import odpc, odpg, odpr, odps, odpv
+def test_public_spec_and_profile_namespaces_are_importable():
+    from open_data_products import odpc, odpg, odpr, odps, odpv, profiles
 
     assert odps.SPEC_ID == "odps"
     assert odpc.SPEC_ID == "odpc"
     assert odpg.SPEC_ID == "odpg"
     assert odpr.SPEC_ID == "odpr"
     assert odpv.SPEC_ID == "odpv"
+    assert profiles.profile_ref("ODPV-DCAT-3", "0.1.0").id == "ODPV-DCAT-3"
 
 
 def test_top_level_package_exposes_version_alias():
@@ -45,6 +46,7 @@ def test_top_level_package_exposes_stable_workflow_facades():
     from open_data_products.odpc import catalog as odpc_catalog
     from open_data_products.odpg import graph as odpg_graph
     from open_data_products.odpv import vocabulary as odpv_vocabulary
+    from open_data_products.profiles import catalog as profiles_catalog
 
     assert "validate_document" in open_data_products.__all__
     assert open_data_products.validate_document is agent.validate_document
@@ -53,6 +55,7 @@ def test_top_level_package_exposes_stable_workflow_facades():
     assert open_data_products.resolve_vocabulary_term is (
         odpv_vocabulary.resolve_vocabulary_term
     )
+    assert open_data_products.transform_profile is profiles_catalog.transform_profile
     assert open_data_products.generate_local_artifacts_for_kind is (
         generation.generate_local_artifacts_for_kind
     )
@@ -61,6 +64,13 @@ def test_top_level_package_exposes_stable_workflow_facades():
     assert open_data_products.generate_product_contract_report is (
         contracts_product.generate_product_contract_report
     )
+
+
+def test_odpv_namespace_does_not_own_profile_operations():
+    import open_data_products.odpv as odpv
+
+    assert not hasattr(odpv, "profile_ref")
+    assert not hasattr(odpv, "transform_profile")
 
 
 def test_odps_namespace_exports_existing_api():

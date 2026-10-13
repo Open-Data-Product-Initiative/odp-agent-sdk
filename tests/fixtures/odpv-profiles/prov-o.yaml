@@ -1,0 +1,9 @@
+objects:
+  - id: workflow-1
+    type: Workflow
+  - id: dataset-1
+    type: Dataset
+relationships:
+  - source: workflow-1
+    type: produces
+    target: dataset-1

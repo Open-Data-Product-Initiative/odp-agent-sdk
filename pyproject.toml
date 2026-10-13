@@ -134,6 +134,7 @@ packages = [
     "open_data_products.odpv",
     "open_data_products.odpv.data",
     "open_data_products.odpv.data.vocab",
+    "open_data_products.profiles",
 ]
 
 [tool.setuptools.package-data]
@@ -184,6 +185,9 @@ packages = [
     "data/vocab/*.json",
     "data/vocab/*.jsonl",
     "data/vocab/*.yaml",
+    "data/v1_1/vocab/*.yaml",
+    "data/v1_1/schema/*.json",
+    "data/v1_1/profiles/*.yaml",
 ]
 
 [tool.setuptools.dynamic]

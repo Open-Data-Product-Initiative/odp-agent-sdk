@@ -1,0 +1,9 @@
+objects:
+  - id: product-1
+    type: DataProduct
+    properties:
+      identifier: sales-contract
+      schema:
+        type: object
+      retention: P30D
+      support: support@example.test

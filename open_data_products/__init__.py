@@ -7,6 +7,7 @@ family. Each standard lives in its own namespace:
 - :mod:`open_data_products.odpc`
 - :mod:`open_data_products.odpg`
 - :mod:`open_data_products.odpv`
+- :mod:`open_data_products.profiles`
 """
 
 # flake8: noqa: E402
@@ -19,6 +20,7 @@ from . import odpg
 from . import odpr
 from . import odps
 from . import odpv
+from . import profiles
 from .agent import (
     detect_document,
     explain_document,
@@ -115,7 +117,27 @@ from .odpv import (
     agent_vocabulary_context,
     check_vocabulary_relationship,
     explain_vocabulary_term,
+    load_vocabulary,
     resolve_vocabulary_term,
+)
+from .profiles import (
+    MappingResult,
+    Profile,
+    ProfileRef,
+    ProfileValidationResult,
+    VocabularyRef,
+    conformance_report,
+    explain_mapping,
+    list_vocabulary_releases,
+    load_profile,
+    load_vocabulary_release,
+    profile_ref,
+    resolve_mapping,
+    transform,
+    transform_profile,
+    validate_profile,
+    validate_vocabulary_release,
+    vocabulary_ref,
 )
 from .pricing import pricing_to_402
 from .privacy import obfuscate_personal_data
@@ -180,6 +202,11 @@ __all__ = [
     "RecipeDocument",
     "ValidationResult",
     "AlignmentFinding",
+    "VocabularyRef",
+    "ProfileRef",
+    "Profile",
+    "MappingResult",
+    "ProfileValidationResult",
     "agent_vocabulary_context",
     "build_catalog",
     "build_catalog_artifacts",
@@ -188,6 +215,7 @@ __all__ = [
     "build_recipe_catalog",
     "check_starter_catalog",
     "check_vocabulary_relationship",
+    "conformance_report",
     "convert_file",
     "convert_graph",
     "ContractToolAvailability",
@@ -215,6 +243,7 @@ __all__ = [
     "explain_product",
     "explain_portfolio",
     "explain_vocabulary_term",
+    "explain_mapping",
     "explain_vocabulary",
     "execute_recipe_run",
     "get_resource",
@@ -250,9 +279,12 @@ __all__ = [
     "inspect_portfolio_intake",
     "load_generation_config",
     "list_ollama_models",
+    "list_vocabulary_releases",
     "list_recipes",
     "list_starter_recipes",
     "load_recipe_catalog",
+    "load_profile",
+    "load_vocabulary_release",
     "openai_chat_generate",
     "openai_generate",
     "obfuscate_personal_data",
@@ -280,12 +312,19 @@ __all__ = [
     "render_graph_toon",
     "resolve_references",
     "resolve_vocabulary_term",
+    "resolve_mapping",
     "resolve_product_contracts",
     "summarize_contract",
     "summarize_contract_document",
     "summarize_okf_bundle",
     "validate_contract",
     "validate_document",
+    "validate_profile",
+    "validate_vocabulary_release",
+    "transform",
+    "transform_profile",
+    "profile_ref",
+    "vocabulary_ref",
     "validate_okf_bundle",
     "write_catalog",
     "write_catalog_gcf",

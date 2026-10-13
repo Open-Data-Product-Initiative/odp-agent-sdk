@@ -1,0 +1,111 @@
+profileFormat: ODPV-Profile-1.0
+id: ODPV-ODRL-2
+title: ODPV to ODRL 2 profile
+version: 0.1.0
+status: draft
+vocabulary:
+  id: ODPV
+  version: 1.1.0
+  baseUri: https://opendataproducts.org/odpv-v1.1/
+externalStandard:
+  name: ODRL Information Model
+  version: '2.2'
+  specification: https://www.w3.org/TR/odrl-model/
+  namespace: http://www.w3.org/ns/odrl/2/
+purpose: Bind ODPV governance concepts to machine-readable permissions, prohibitions, duties, and constraints where an implementation needs policy expression.
+scope:
+  includes:
+    - Policy, agreement, permission, and access-condition mappings
+    - Rights-policy expression
+  excludes:
+    - Legal interpretation or enforcement
+    - Identity, authentication, or authorization implementation
+    - License-text conversion
+mappings:
+  - id: data-product-asset
+    kind: fieldBinding
+    odpvTerm: DataProduct
+    externalReference: odrl:Asset
+    rationale: A data product can be the target asset of an ODRL policy, but an ODRL Asset does not carry the broader ODPV product-management semantics.
+    evidence: https://www.w3.org/TR/odrl-model/#asset
+    status: reviewed
+  - id: dataset-asset
+    kind: fieldBinding
+    odpvTerm: Dataset
+    externalReference: odrl:Asset
+    rationale: A dataset can be a policy target asset, while ODRL Asset is a generic policy target rather than a dataset concept.
+    evidence: https://www.w3.org/TR/odrl-model/#asset
+    status: reviewed
+  - id: provider-assigner
+    kind: fieldBinding
+    odpvTerm: Provider
+    externalReference: odrl:assigner
+    rationale: A provider may act as the party assigning policy permissions, but provider and assigner roles must remain distinct when the evidence says otherwise.
+    evidence: https://www.w3.org/TR/odrl-model/#party
+    status: reviewed
+  - id: consumer-assignee
+    kind: fieldBinding
+    odpvTerm: Consumer
+    externalReference: odrl:assignee
+    rationale: A consumer may be the party receiving a permission, but a consumer does not automatically receive every permission described by a policy.
+    evidence: https://www.w3.org/TR/odrl-model/#party
+    status: reviewed
+  - id: policy
+    kind: semanticMapping
+    odpvTerm: Policy
+    externalReference: odrl:Policy
+    relation: closeMatch
+    direction: bidirectional
+    rationale: ODRL Policy supplies a formal rights-expression model; ODPV Policy remains broader governance vocabulary.
+    evidence: https://www.w3.org/TR/odrl-model/#policy
+    status: reviewed
+  - id: agreement
+    kind: semanticMapping
+    odpvTerm: Agreement
+    externalReference: odrl:Agreement
+    relation: closeMatch
+    direction: bidirectional
+    rationale: Both identify a policy expressed between parties, while a general ODPV Agreement may include non-rights commitments.
+    evidence: https://www.w3.org/TR/odrl-model/#policy-classes
+    status: reviewed
+  - id: data-agreement
+    kind: semanticMapping
+    odpvTerm: DataAgreement
+    externalReference: odrl:Agreement
+    relation: narrowMatch
+    direction: bidirectional
+    rationale: An ODPV DataAgreement is specifically about data supply and use, whereas ODRL Agreement can govern any policy asset.
+    evidence: https://www.w3.org/TR/odrl-model/#policy-classes
+    status: reviewed
+  - id: usage-rights
+    kind: semanticMapping
+    odpvTerm: UsageRights
+    externalReference: odrl:Permission
+    relation: closeMatch
+    direction: bidirectional
+    rationale: ODRL Permission expresses allowed actions under constraints and duties; ODPV UsageRights can also be described outside an ODRL policy.
+    evidence: https://www.w3.org/TR/odrl-model/#permission
+    status: reviewed
+  - id: access-condition
+    kind: fieldBinding
+    odpvTerm: AccessCondition
+    externalReference: odrl:constraint
+    rationale: ODRL constraints qualify permissions, prohibitions, and duties, while ODPV AccessCondition may be expressed in non-ODRL systems.
+    evidence: https://www.w3.org/TR/odrl-model/#constraint
+    status: reviewed
+  - id: data-access
+    kind: fieldBinding
+    odpvTerm: DataAccess
+    externalReference: odrl:permission and odrl:prohibition
+    rationale: ODRL rules can express whether and under which conditions access actions are allowed or disallowed; they do not implement the underlying access mechanism.
+    evidence: https://www.w3.org/TR/odrl-model/#rule
+    status: reviewed
+  - id: governed-by
+    kind: transformation
+    odpvTerm: governedBy
+    externalReference: ODRL policy target and rule
+    direction: odpvToExternal
+    rationale: An ODPV governance edge must be expanded into a policy with its target, parties, action, and optional constraints before it can be evaluated as ODRL.
+    evidence: https://www.w3.org/TR/odrl-model/#policy
+    status: reviewed
+    implementationNotes: The SDK must reject a bare governedBy edge as an executable ODRL policy and require the policy rule information ODRL needs.

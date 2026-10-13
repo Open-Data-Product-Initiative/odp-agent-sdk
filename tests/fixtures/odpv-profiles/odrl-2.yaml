@@ -1,0 +1,12 @@
+objects:
+  - id: dataset-1
+    type: Dataset
+  - id: policy-1
+    type: Policy
+    properties:
+      rules:
+        - action: use
+relationships:
+  - source: dataset-1
+    type: governedBy
+    target: policy-1

@@ -1,0 +1,160 @@
+profileFormat: ODPV-Profile-1.0
+id: ODPV-DCAT-3
+title: ODPV to Data Catalog Vocabulary 3 profile
+version: 0.1.0
+status: draft
+vocabulary:
+  id: ODPV
+  version: 1.1.0
+  baseUri: https://opendataproducts.org/odpv-v1.1/
+externalStandard:
+  name: Data Catalog Vocabulary
+  version: '3'
+  specification: https://www.w3.org/TR/vocab-dcat-3/
+  namespace: http://www.w3.org/ns/dcat#
+purpose: Describe ODPV concepts in catalog metadata so data products, datasets, distributions, and data services can be discovered across catalog implementations.
+scope:
+  includes:
+    - Catalog discovery metadata
+    - Dataset, distribution, and data-service descriptions
+    - Version and access metadata bindings
+  excludes:
+    - A replacement data product model
+    - Contract enforcement
+    - Runtime lineage or policy evaluation
+mappings:
+  - id: catalog
+    kind: semanticMapping
+    odpvTerm: DataProductCatalog
+    externalReference: dcat:Catalog
+    relation: closeMatch
+    direction: bidirectional
+    rationale: Both describe curated metadata collections, while an ODPV catalog also carries portfolio objects beyond DCAT's core catalog scope.
+    evidence: https://www.w3.org/TR/vocab-dcat-3/#Class:Catalog
+    status: reviewed
+  - id: dataset
+    kind: semanticMapping
+    odpvTerm: Dataset
+    externalReference: dcat:Dataset
+    relation: exactMatch
+    direction: bidirectional
+    rationale: Both describe a conceptual collection of data independent of a particular accessible representation.
+    evidence: https://www.w3.org/TR/vocab-dcat-3/#Class:Dataset
+    status: reviewed
+  - id: distribution
+    kind: semanticMapping
+    odpvTerm: Distribution
+    externalReference: dcat:Distribution
+    relation: exactMatch
+    direction: bidirectional
+    rationale: Both describe an accessible representation of a dataset.
+    evidence: https://www.w3.org/TR/vocab-dcat-3/#Class:Distribution
+    status: reviewed
+  - id: data-service
+    kind: semanticMapping
+    odpvTerm: DataService
+    externalReference: dcat:DataService
+    relation: exactMatch
+    direction: bidirectional
+    rationale: Both describe an interface offering operations that provide access to data or data processing.
+    evidence: https://www.w3.org/TR/vocab-dcat-3/#Class:Data_Service
+    status: reviewed
+  - id: data-product-resource
+    kind: semanticMapping
+    odpvTerm: DataProduct
+    externalReference: dcat:Resource
+    relation: relatedMatch
+    direction: bidirectional
+    rationale: A managed data product can be cataloged as a resource, but its ownership, value, and governance commitments exceed DCAT Resource semantics.
+    evidence: https://www.w3.org/TR/vocab-dcat-3/#Class:Resource
+    status: reviewed
+  - id: identifier
+    kind: fieldBinding
+    odpvTerm: Identifier
+    externalReference: dcterms:identifier
+    rationale: DCAT resources carry identifiers through Dublin Core Terms; ODPV Identifier remains usable outside catalog records.
+    evidence: https://www.w3.org/TR/vocab-dcat-3/#Property:resource_identifier
+    status: reviewed
+  - id: provider
+    kind: fieldBinding
+    odpvTerm: Provider
+    externalReference: dcterms:publisher
+    rationale: DCAT records the agent that makes a resource available as its publisher, while ODPV Provider covers the broader data-product provider role.
+    evidence: https://www.w3.org/TR/vocab-dcat-3/#Property:resource_publisher
+    status: reviewed
+  - id: data-holder
+    kind: fieldBinding
+    odpvTerm: DataHolder
+    externalReference: dcterms:rightsHolder
+    rationale: A rights holder can identify the accountable legal entity for a catalog resource, but does not by itself express all ODPV DataHolder responsibilities.
+    evidence: https://www.w3.org/TR/vocab-dcat-3/#Class:Resource
+    status: reviewed
+  - id: domain
+    kind: fieldBinding
+    odpvTerm: Domain
+    externalReference: dcat:theme
+    rationale: A DCAT theme can classify a resource for discovery; an ODPV Domain may have wider organizational and capability meaning.
+    evidence: https://www.w3.org/TR/vocab-dcat-3/#Property:resource_theme
+    status: reviewed
+  - id: data-quality
+    kind: fieldBinding
+    odpvTerm: DataQuality
+    externalReference: dcat:qualityMeasurement
+    rationale: DCAT quality measurements provide catalog-visible quality evidence but do not exhaust the ODPV DataQuality governance concept.
+    evidence: https://www.w3.org/TR/vocab-dcat-3/#Property:resource_quality_measurement
+    status: reviewed
+  - id: license
+    kind: fieldBinding
+    odpvTerm: License
+    externalReference: dcterms:license
+    rationale: DCAT resource descriptions carry a license through the Dublin Core Terms license property.
+    evidence: https://www.w3.org/TR/vocab-dcat-3/#Property:resource_license
+    status: reviewed
+  - id: access-rights
+    kind: fieldBinding
+    odpvTerm: DataAccess
+    externalReference: dcterms:accessRights
+    rationale: DCAT records access rights on a resource, while ODPV DataAccess can contain broader delivery and access context.
+    evidence: https://www.w3.org/TR/vocab-dcat-3/#Property:resource_access_rights
+    status: reviewed
+  - id: policy
+    kind: fieldBinding
+    odpvTerm: Policy
+    externalReference: odrl:hasPolicy
+    rationale: DCAT resource descriptions can reference a policy, while ODPV Policy also covers governance rules that are not encoded as ODRL.
+    evidence: https://www.w3.org/TR/vocab-dcat-3/#Property:resource_has_policy
+    status: reviewed
+  - id: access-method
+    kind: fieldBinding
+    odpvTerm: AccessMethod
+    externalReference: dcat:accessService, dcat:accessURL, and dcat:downloadURL
+    rationale: DCAT access properties identify delivery endpoints and downloadable representations; an ODPV AccessMethod can also describe the access pattern and conditions.
+    evidence: https://www.w3.org/TR/vocab-dcat-3/#Class:Distribution
+    status: reviewed
+  - id: exposes
+    kind: transformation
+    odpvTerm: exposes
+    externalReference: dcat:accessService
+    direction: odpvToExternal
+    rationale: An ODPV object exposing a data service is represented in DCAT by attaching the service to the dataset or distribution it makes accessible.
+    evidence: https://www.w3.org/TR/vocab-dcat-3/#Property:distribution_access_service
+    status: reviewed
+    implementationNotes: The SDK must preserve the exposed service identity and attach it only to the catalog resource whose data it accesses.
+  - id: replaces
+    kind: transformation
+    odpvTerm: replaces
+    externalReference: dcterms:replaces
+    direction: odpvToExternal
+    rationale: Both express successor replacement, but the profile keeps this as a transformation because ODPV permits product-level and service-level edges while DCAT records resource metadata.
+    evidence: https://www.w3.org/TR/vocab-dcat-3/#Class:Resource
+    status: reviewed
+    implementationNotes: The SDK must emit dcterms:replaces only between cataloged resources and retain the original ODPV edge if either endpoint is not cataloged.
+  - id: version-of
+    kind: transformation
+    odpvTerm: versionOf
+    externalReference: dcat:hasVersion and dcat:previousVersion
+    direction: odpvToExternal
+    rationale: ODPV expresses a direct relationship from a version to its source; DCAT represents version relations with direction-specific properties.
+    evidence: https://www.w3.org/TR/vocab-dcat-3/#Property:resource_has_version
+    status: reviewed
+    implementationNotes: The SDK must reverse the subject and object when serializing an ODPV versionOf edge as dcat:hasVersion.

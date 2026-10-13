@@ -1,0 +1,102 @@
+profileFormat: ODPV-Profile-1.0
+id: ODPV-OPENLINEAGE-1
+title: ODPV to OpenLineage 1 profile
+version: 0.1.0
+status: draft
+vocabulary:
+  id: ODPV
+  version: 1.1.0
+  baseUri: https://opendataproducts.org/odpv-v1.1/
+externalStandard:
+  name: OpenLineage
+  version: '1.x'
+  specification: https://openlineage.io/docs/spec/object-model/
+purpose: Connect declared ODPV product semantics with observed OpenLineage dataset, job, and run metadata without treating runtime observations as business or contract proof.
+scope:
+  includes:
+    - Dataset and workflow bindings
+    - Declared and observed lineage distinctions
+    - Dataset quality assertion bindings
+  excludes:
+    - A replacement OpenLineage event schema
+    - Proof of contract compliance or business value
+    - Policy evaluation
+mappings:
+  - id: dataset
+    kind: fieldBinding
+    odpvTerm: Dataset
+    externalReference: OpenLineage Dataset
+    rationale: Both identify a discrete collection of data, but an OpenLineage Dataset is an operational identity within a namespace and name.
+    evidence: https://openlineage.io/docs/spec/object-model/
+    status: reviewed
+  - id: workflow-job
+    kind: fieldBinding
+    odpvTerm: Workflow
+    externalReference: OpenLineage Job
+    rationale: An OpenLineage Job can implement a workflow step, but an ODPV Workflow may be broader than one executable job.
+    evidence: https://openlineage.io/docs/spec/object-model/
+    status: reviewed
+  - id: owner
+    kind: fieldBinding
+    odpvTerm: Owner
+    externalReference: OpenLineage Ownership Dataset and Job facets
+    rationale: OpenLineage can record technical ownership for datasets and jobs; the facet does not establish all accountability captured by an ODPV Owner.
+    evidence: https://openlineage.io/docs/1.50.0/spec/facets/job-facets/ownership/
+    status: reviewed
+  - id: uses
+    kind: transformation
+    odpvTerm: uses
+    externalReference: OpenLineage input Dataset
+    direction: odpvToExternal
+    rationale: An ODPV use edge becomes an input dataset only when the source is represented by a concrete executing job and the target is an operational dataset.
+    evidence: https://openlineage.io/docs/spec/object-model/
+    status: reviewed
+    implementationNotes: The SDK must reject a direct conversion when the ODPV source is not bound to an OpenLineage Job or the target is not bound to a Dataset.
+  - id: consumes
+    kind: transformation
+    odpvTerm: consumes
+    externalReference: OpenLineage input Dataset
+    direction: odpvToExternal
+    rationale: Consumption maps to a job input at an observed or declared execution boundary, not to every conceptual dependency in an ODPV graph.
+    evidence: https://openlineage.io/docs/spec/object-model/
+    status: reviewed
+    implementationNotes: The SDK must retain whether the source came from declared graph metadata or an observed event.
+  - id: declared-lineage
+    kind: transformation
+    odpvTerm: derivedFrom
+    externalReference: OpenLineage JobEvent lineage facet
+    direction: odpvToExternal
+    rationale: Design-time lineage can express declared derivation, while run events express an observation during a particular execution.
+    evidence: https://openlineage.io/docs/spec/facets/job-facets/lineage/
+    status: reviewed
+    implementationNotes: The SDK must label derived lineage as declared when emitting a JobEvent and must retain event type when importing observed lineage.
+  - id: production-boundary
+    kind: transformation
+    odpvTerm: produces
+    externalReference: OpenLineage output Dataset
+    direction: odpvToExternal
+    rationale: A job output represents an operational production boundary; it does not by itself establish the broader product relationship or business outcome.
+    evidence: https://openlineage.io/docs/spec/object-model/
+    status: reviewed
+    implementationNotes: Emit outputs as observed only for RunEvent data and retain the job identity that owns the output.
+  - id: quality-assertions
+    kind: fieldBinding
+    odpvTerm: DataQuality
+    externalReference: OpenLineage DataQualityAssertionsDatasetFacet
+    rationale: Assertion results are evidence about tests on an observed dataset, not a complete definition of the ODPV DataQuality concept.
+    evidence: https://openlineage.io/docs/spec/facets/dataset-facets/data_quality_assertions/
+    status: reviewed
+  - id: quality-metrics
+    kind: fieldBinding
+    odpvTerm: DataQuality
+    externalReference: OpenLineage DataQualityMetricsDatasetFacet
+    rationale: Dataset and column metrics are operational quality evidence, not a complete ODPV DataQuality definition or guarantee.
+    evidence: https://openlineage.io/docs/spec/facets/dataset-facets/data_quality_metrics/
+    status: reviewed
+  - id: dataset-version
+    kind: fieldBinding
+    odpvTerm: versionOf
+    externalReference: OpenLineage DatasetVersionDatasetFacet
+    rationale: A dataset-store version can support a version relationship, but not every ODPV version is a physical dataset snapshot.
+    evidence: https://openlineage.io/docs/spec/object-model/
+    status: reviewed

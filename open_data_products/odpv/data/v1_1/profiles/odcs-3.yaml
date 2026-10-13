@@ -1,0 +1,128 @@
+profileFormat: ODPV-Profile-1.0
+id: ODPV-ODCS-3
+title: ODPV to Open Data Contract Standard 3 profile
+version: 0.1.0
+status: draft
+vocabulary:
+  id: ODPV
+  version: 1.1.0
+  baseUri: https://opendataproducts.org/odpv-v1.1/
+externalStandard:
+  name: Open Data Contract Standard
+  version: '3.2.0'
+  specification: https://bitol-io.github.io/open-data-contract-standard/
+purpose: Bind ODPV's stable product and governance concepts to data-contract sections without replacing ODCS as the contract format or enforcement authority.
+scope:
+  includes:
+    - Contract, schema, quality, service-level, team, and terms bindings
+    - Stable semantic annotations for contract implementation
+  excludes:
+    - An ODCS schema replacement
+    - Executable validation rules
+    - Legal agreement interpretation
+mappings:
+  - id: product-details
+    kind: fieldBinding
+    odpvTerm: ProductDetails
+    externalReference: ODCS fundamentals and info section
+    rationale: ODCS fundamentals describe the contract identity and descriptive context; ODPV ProductDetails remains the cross-standard term for product metadata.
+    evidence: https://github.com/bitol-io/open-data-contract-standard
+    status: reviewed
+  - id: contract-document
+    kind: fieldBinding
+    odpvTerm: DataContract
+    externalReference: ODCS contract document
+    rationale: An ODCS document is a portable expression of a data contract; ODPV provides the stable shared concept used across the standards family.
+    evidence: https://github.com/bitol-io/open-data-contract-standard
+    status: reviewed
+  - id: identifier
+    kind: fieldBinding
+    odpvTerm: Identifier
+    externalReference: ODCS id field
+    rationale: An ODCS id identifies the contract document; implementations must not assume it is automatically the same identifier as every ODPV product or dataset it describes.
+    evidence: https://github.com/bitol-io/open-data-contract-standard
+    status: reviewed
+  - id: schema
+    kind: fieldBinding
+    odpvTerm: Dataset
+    externalReference: ODCS schema section
+    rationale: ODCS schema entries define provided data structures; an ODPV Dataset identifies the conceptual data collection described by that structure.
+    evidence: https://docs.datacontract.com/schema
+    status: reviewed
+  - id: quality
+    kind: fieldBinding
+    odpvTerm: DataQuality
+    externalReference: ODCS quality attribute
+    rationale: ODCS quality rules make selected quality expectations executable, while ODPV DataQuality remains the shared governance concept.
+    evidence: https://docs.datacontract.com/quality-rules
+    status: reviewed
+  - id: retention
+    kind: fieldBinding
+    odpvTerm: Retention
+    externalReference: ODCS slaProperties retention
+    rationale: ODCS can make a retention commitment explicit; ODPV Retention also applies where no contract test is available.
+    evidence: https://docs.datacontract.com/service-levels
+    status: reviewed
+  - id: service-level
+    kind: fieldBinding
+    odpvTerm: SLA
+    externalReference: ODCS slaProperties attribute
+    rationale: ODCS expresses service-level commitments such as freshness and retention; ODPV SLA names the shared concept.
+    evidence: https://docs.datacontract.com/service-levels
+    status: reviewed
+  - id: ownership-and-stewardship
+    kind: fieldBinding
+    odpvTerm: Owner
+    externalReference: ODCS team and roles sections
+    rationale: ODCS assigns responsibility through its team and roles sections; implementers must preserve the role rather than infer every listed person is an owner.
+    evidence: https://github.com/bitol-io/open-data-contract-standard
+    status: reviewed
+  - id: data-access
+    kind: fieldBinding
+    odpvTerm: DataAccess
+    externalReference: ODCS servers and infrastructure sections
+    rationale: ODCS describes the locations and infrastructure through which contracted data is delivered, while ODPV DataAccess remains broader delivery and access context.
+    evidence: https://github.com/bitol-io/open-data-contract-standard
+    status: reviewed
+  - id: data-service
+    kind: fieldBinding
+    odpvTerm: DataService
+    externalReference: ODCS server endpoint or location
+    rationale: A contract server can identify a service endpoint, but not every ODCS server describes an ODPV DataService.
+    evidence: https://github.com/bitol-io/open-data-contract-standard
+    status: reviewed
+  - id: support
+    kind: fieldBinding
+    odpvTerm: Support
+    externalReference: ODCS support and communication channels section
+    rationale: ODCS can document support channels; ODPV Support names the reusable product-management concept.
+    evidence: https://github.com/bitol-io/open-data-contract-standard
+    status: reviewed
+  - id: pricing-plan
+    kind: fieldBinding
+    odpvTerm: PricingPlan
+    externalReference: ODCS pricing section
+    rationale: ODCS can document pricing information, while ODPV PricingPlan applies across catalog, product, and agreement contexts.
+    evidence: https://github.com/bitol-io/open-data-contract-standard
+    status: reviewed
+  - id: license
+    kind: fieldBinding
+    odpvTerm: License
+    externalReference: ODCS terms section
+    rationale: Contract terms may reference a license, but license interpretation and machine-readable rights evaluation remain outside the ODCS binding.
+    evidence: https://github.com/bitol-io/open-data-contract-standard
+    status: reviewed
+  - id: terms
+    kind: fieldBinding
+    odpvTerm: UsageRights
+    externalReference: ODCS terms section
+    rationale: Contract terms can state usage conditions, but an ODCS terms section is not automatically equivalent to a machine-evaluable rights policy.
+    evidence: https://github.com/bitol-io/open-data-contract-standard
+    status: reviewed
+  - id: data-agreement
+    kind: fieldBinding
+    odpvTerm: DataAgreement
+    externalReference: ODCS terms and parties
+    rationale: An ODCS contract may support a data agreement between provider and consumer, but the agreement lifecycle remains a distinct ODPV governance concern.
+    evidence: https://github.com/bitol-io/open-data-contract-standard
+    status: reviewed

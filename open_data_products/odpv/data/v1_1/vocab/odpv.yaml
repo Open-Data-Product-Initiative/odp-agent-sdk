@@ -1,0 +1,2422 @@
+schema: https://opendataproducts.org/odpv-v1.1/schema/odpv.schema.json
+version: 1.1.0
+id: ODPV
+name:
+  en: Open Data Product Vocabulary
+description:
+  en: Shared vocabulary for the OpenDataProducts.org standards family.
+
+license:
+  name: Apache 2.0
+  url: https://www.apache.org/licenses/LICENSE-2.0
+
+publisher:
+  name: Open Data Product Initiative
+  umbrella: Linux Foundation
+  url: https://opendataproducts.org
+
+sections:
+  - id: core
+    name:
+      en: ODPV Core
+    description:
+      en: Foundational terms used across the Open Data Products specification family.
+    terms:
+      - id: DataProduct
+        uri: https://opendataproducts.org/odpv-v1.1/terms/DataProduct
+        type: object
+        status: stable
+        introducedIn: 1.0.0
+        preferredLabel:
+          en: Data Product
+        definition:
+          en: A managed data offering designed for reuse, with defined ownership, access, quality, usage terms, and value context.
+        alsoKnownAs:
+          en:
+            - data product
+            - data offering
+            - reusable data asset
+            - data product asset
+        relatedTerms:
+          - Dataset
+          - DataService
+          - Distribution
+        usedIn:
+          - ODPS
+          - ODPC
+          - ODPG
+        examples:
+          en:
+            - Customer Churn Risk Scores is a DataProduct used by retention teams.
+            - Use DataProduct for a managed reusable data offering with ownership, access, quality, and usage context.
+
+      - id: ProductDetails
+        uri: https://opendataproducts.org/odpv-v1.1/terms/ProductDetails
+        type: object
+        status: stable
+        introducedIn: 1.0.0
+        preferredLabel:
+          en: Product Details
+        definition:
+          en: The descriptive metadata block for a data product, including name, product identifier, description, value proposition, visibility, status, and version.
+        alsoKnownAs:
+          en:
+            - details
+            - product details
+            - product metadata
+            - descriptive metadata
+        relatedTerms:
+          - DataProduct
+          - ValueProposition
+          - GovernanceProfile
+          - PortfolioPriority
+        usedIn:
+          - ODPS
+        examples:
+          en:
+            - The Details section of an ODPS product contains its name, identifier, value proposition, visibility, status, and version.
+            - Use ProductDetails for the descriptive metadata block of a data product.
+
+      - id: DataProductCatalog
+        uri: https://opendataproducts.org/odpv-v1.1/terms/DataProductCatalog
+        type: object
+        status: stable
+        introducedIn: 1.0.0
+        preferredLabel:
+          en: Data Product Catalog
+        definition:
+          en: A managed collection of data products and related portfolio objects, such as use cases, objectives, KPIs, signals, and references.
+        alsoKnownAs:
+          en:
+            - data catalog
+            - Catalog
+            - ODPC Catalog
+            - product catalog
+            - data product portfolio
+            - portfolio catalog
+        relatedTerms:
+          - DataProduct
+          - DataProductGraph
+          - Reference
+        mappings:
+          closeMatch:
+            - dcat:Catalog
+            - schema:DataCatalog
+        usedIn:
+          - ODPC
+          - ODPG
+        examples:
+          en:
+            - The enterprise data marketplace is a DataProductCatalog containing reusable data products and related portfolio objects.
+            - In ODPC, the root Catalog object maps to the ODPV DataProductCatalog term.
+            - Use DataProductCatalog when describing a managed collection of products, use cases, objectives, KPIs, and signals.
+
+      - id: DataProductGraph
+        uri: https://opendataproducts.org/odpv-v1.1/terms/DataProductGraph
+        type: object
+        status: stable
+        introducedIn: 1.0.0
+        preferredLabel:
+          en: Data Product Graph
+        definition:
+          en: A graph representation that connects data products, catalogs, use cases, objectives, KPIs, signals, and governance objects through defined relationships.
+        alsoKnownAs:
+          en:
+            - data product graph
+            - portfolio graph
+            - knowledge graph
+            - product relationship graph
+        relatedTerms:
+          - DataProductCatalog
+          - Reference
+          - Relationship
+        usedIn:
+          - ODPG
+        examples:
+          en:
+            - A DataProductGraph connects customer analytics products to use cases, KPIs, owners, and policies.
+            - Use DataProductGraph when data product portfolio objects need to be represented as connected nodes and relationships.
+
+      - id: Dataset
+        uri: https://opendataproducts.org/odpv-v1.1/terms/Dataset
+        type: object
+        status: stable
+        introducedIn: 1.0.0
+        preferredLabel:
+          en: Dataset
+        definition:
+          en: A structured collection of data that may be part of, or exposed through, a data product. Aligns with DCAT where applicable.
+        alsoKnownAs:
+          en:
+            - data set
+            - data collection
+            - source dataset
+            - data resource
+        relatedTerms:
+          - DataProduct
+          - Distribution
+          - DataService
+        mappings:
+          exactMatch:
+            - dcat:Dataset
+            - schema:Dataset
+        usedIn:
+          - ODPS
+          - ODPC
+        examples:
+          en:
+            - The monthly customer transactions table is a Dataset used by a Customer Analytics DataProduct.
+            - Use Dataset for a structured collection of data, not for the managed product wrapper around it.
+
+      - id: Distribution
+        uri: https://opendataproducts.org/odpv-v1.1/terms/Distribution
+        type: object
+        status: stable
+        introducedIn: 1.0.0
+        preferredLabel:
+          en: Distribution
+        definition:
+          en: A specific accessible form of a dataset, such as a file, API response, export, or downloadable representation. Aligns with DCAT where applicable.
+        alsoKnownAs:
+          en:
+            - data file
+            - data download
+            - export
+            - data representation
+        relatedTerms:
+          - Dataset
+          - DataService
+          - DataAccess
+        mappings:
+          exactMatch:
+            - dcat:Distribution
+          closeMatch:
+            - schema:DataDownload
+        usedIn:
+          - ODPS
+        examples:
+          en:
+            - A downloadable CSV export is a Distribution of a Dataset.
+            - Use Distribution for a specific accessible representation such as a file, API response, or export.
+
+      - id: DataService
+        uri: https://opendataproducts.org/odpv-v1.1/terms/DataService
+        type: object
+        status: stable
+        introducedIn: 1.0.0
+        preferredLabel:
+          en: Data Service
+        definition:
+          en: A service that provides access to data or data operations, such as an API, query endpoint, or data delivery service. Aligns with DCAT where applicable.
+        alsoKnownAs:
+          en:
+            - data API
+            - API
+            - data endpoint
+            - query service
+            - delivery service
+        relatedTerms:
+          - Dataset
+          - Distribution
+          - DataAccess
+          - API
+        mappings:
+          exactMatch:
+            - dcat:DataService
+        usedIn:
+          - ODPS
+          - ODPG
+        examples:
+          en:
+            - A REST API that returns fraud risk scores is a DataService.
+            - In ODPG graphs, an API node maps to the ODPV DataService term.
+            - Use DataService for an API, query endpoint, or delivery service that provides access to data.
+
+      - id: Agent
+        uri: https://opendataproducts.org/odpv-v1.1/terms/Agent
+        type: role
+        status: stable
+        introducedIn: 1.0.0
+        preferredLabel:
+          en: Agent
+        definition:
+          en: An AI agent, automation actor, or software system that can use data products, services, workflows, or graph context to perform a task.
+        alsoKnownAs:
+          en:
+            - AI agent
+            - automation actor
+            - autonomous agent
+            - software agent
+        relatedTerms:
+          - Consumer
+          - Workflow
+          - DataService
+        mappings:
+          closeMatch:
+            - prov:Agent
+        usedIn:
+          - ODPG
+        examples:
+          en:
+            - A maintenance recommendation agent uses an aviation risk score API to support operational decisions.
+            - Use Agent for an AI or automation actor represented in a graph or workflow.
+
+      - id: Workflow
+        uri: https://opendataproducts.org/odpv-v1.1/terms/Workflow
+        type: object
+        status: stable
+        introducedIn: 1.0.0
+        preferredLabel:
+          en: Workflow
+        definition:
+          en: A business, operational, analytical, or technical process that coordinates activities, systems, agents, data products, or services.
+        alsoKnownAs:
+          en:
+            - process
+            - business workflow
+            - technical workflow
+            - orchestration flow
+        relatedTerms:
+          - UseCase
+          - Agent
+          - Capability
+        mappings:
+          closeMatch:
+            - prov:Activity
+        usedIn:
+          - ODPG
+        examples:
+          en:
+            - A fraud investigation workflow uses transaction event data and risk scoring services.
+            - Use Workflow for a process or orchestration flow represented as a graph node.
+
+      - id: Capability
+        uri: https://opendataproducts.org/odpv-v1.1/terms/Capability
+        type: object
+        status: stable
+        introducedIn: 1.0.0
+        preferredLabel:
+          en: Capability
+        definition:
+          en: A reusable business, organizational, analytical, operational, or technical ability that can be supported by data products, workflows, agents, or services.
+        alsoKnownAs:
+          en:
+            - business capability
+            - technical capability
+            - organizational capability
+            - reusable capability
+        relatedTerms:
+          - Domain
+          - Workflow
+          - StrategicOpportunity
+        usedIn:
+          - ODPG
+        examples:
+          en:
+            - Predictive maintenance is a Capability supported by aircraft telemetry data products and monitoring workflows.
+            - Use Capability for a reusable business or technical ability that can be connected to products, workflows, and objectives.
+
+      - id: Provider
+        uri: https://opendataproducts.org/odpv-v1.1/terms/Provider
+        type: role
+        status: stable
+        introducedIn: 1.0.0
+        preferredLabel:
+          en: Provider
+        definition:
+          en: A person, team, organization, or system that provides or publishes a data product, dataset, distribution, or data service.
+        alsoKnownAs:
+          en:
+            - publisher
+            - supplier
+            - source provider
+            - data provider
+        relatedTerms:
+          - Owner
+          - Steward
+          - Consumer
+        usedIn:
+          - ODPS
+          - ODPC
+          - ODPG
+        examples:
+          en:
+            - The Payments Data Platform team is the Provider of the Transaction Events DataProduct.
+            - Use Provider for the team, organization, system, or person that publishes or supplies a data asset.
+
+      - id: DataHolder
+        uri: https://opendataproducts.org/odpv-v1.1/terms/DataHolder
+        type: role
+        status: stable
+        introducedIn: 1.0.0
+        preferredLabel:
+          en: Data Holder
+        definition:
+          en: A legal entity or accountable organization that holds, controls, or is responsible for a data product or the data it contains.
+        alsoKnownAs:
+          en:
+            - dataHolder
+            - data holder
+            - holding organization
+            - accountable legal entity
+        relatedTerms:
+          - Provider
+          - Owner
+          - Steward
+          - DataAgreement
+        usedIn:
+          - ODPS
+        examples:
+          en:
+            - Acme Bank Ltd is the DataHolder for a regulated payments data product.
+            - Use DataHolder for the legal entity or accountable organization that holds or controls the data.
+
+      - id: Consumer
+        uri: https://opendataproducts.org/odpv-v1.1/terms/Consumer
+        type: role
+        status: stable
+        introducedIn: 1.0.0
+        preferredLabel:
+          en: Consumer
+        definition:
+          en: A person, team, organization, system, or agent that uses or consumes a data product, dataset, distribution, or data service.
+        alsoKnownAs:
+          en:
+            - user
+            - data user
+            - customer
+            - recipient
+            - consuming agent
+        relatedTerms:
+          - Provider
+          - DataProduct
+          - DataAccess
+        usedIn:
+          - ODPS
+          - ODPC
+          - ODPG
+        examples:
+          en:
+            - The Retention Analytics team is a Consumer of the Customer Churn DataProduct.
+            - Use Consumer for a person, team, system, or agent that uses or receives data.
+
+      - id: Owner
+        uri: https://opendataproducts.org/odpv-v1.1/terms/Owner
+        type: role
+        status: stable
+        introducedIn: 1.0.0
+        preferredLabel:
+          en: Owner
+        definition:
+          en: A person, team, or organization accountable for a data product, catalog, dataset, service, or related object.
+        alsoKnownAs:
+          en:
+            - accountable owner
+            - product owner
+            - business owner
+            - asset owner
+        relatedTerms:
+          - Provider
+          - Steward
+          - Governance
+        usedIn:
+          - ODPS
+          - ODPC
+        examples:
+          en:
+            - The Head of Customer Analytics is the Owner accountable for the Churn Scores DataProduct.
+            - Use Owner for accountability, not day-to-day operational stewardship.
+
+      - id: Steward
+        uri: https://opendataproducts.org/odpv-v1.1/terms/Steward
+        type: role
+        status: stable
+        introducedIn: 1.0.0
+        preferredLabel:
+          en: Steward
+        definition:
+          en: A person, team, or organization responsible for the operational management, quality, metadata, and lifecycle of a data product or related object.
+        alsoKnownAs:
+          en:
+            - data steward
+            - product steward
+            - metadata steward
+            - quality steward
+        relatedTerms:
+          - Owner
+          - Provider
+          - DataQuality
+        usedIn:
+          - ODPS
+          - ODPC
+        examples:
+          en:
+            - A data steward maintains metadata and quality checks for the Customer Profile DataProduct.
+            - Use Steward for operational responsibility over metadata, quality, lifecycle, or product health.
+
+      - id: Domain
+        uri: https://opendataproducts.org/odpv-v1.1/terms/Domain
+        type: classification
+        status: stable
+        introducedIn: 1.0.0
+        preferredLabel:
+          en: Domain
+        definition:
+          en: A business, organizational, subject, or functional area used to group data products and related objects.
+        alsoKnownAs:
+          en:
+            - business domain
+            - data domain
+            - subject area
+            - functional area
+        relatedTerms:
+          - DataProductCatalog
+          - Category
+          - Theme
+        usedIn:
+          - ODPS
+          - ODPC
+          - ODPG
+        examples:
+          en:
+            - Mobility is a Domain used to group traffic, routing, and transit data products.
+            - Use Domain for a business, organizational, subject, or functional grouping.
+
+      - id: Identifier
+        uri: https://opendataproducts.org/odpv-v1.1/terms/Identifier
+        type: reference
+        status: stable
+        introducedIn: 1.0.0
+        preferredLabel:
+          en: Identifier
+        definition:
+          en: A stable value used to uniquely identify a vocabulary term, specification object, product, catalog item, or graph node.
+        alsoKnownAs:
+          en:
+            - id
+            - unique id
+            - persistent id
+            - node id
+        relatedTerms:
+          - Reference
+          - URI
+          - DataProduct
+        usedIn:
+          - ODPS
+          - ODPC
+          - ODPG
+        examples:
+          en:
+            - customer-churn-risk-score is an Identifier for a catalog item.
+            - Use Identifier for stable ids used by terms, products, catalog items, or graph nodes.
+
+      - id: Reference
+        uri: https://opendataproducts.org/odpv-v1.1/terms/Reference
+        type: reference
+        status: stable
+        introducedIn: 1.0.0
+        preferredLabel:
+          en: Reference
+        definition:
+          en: A link or pointer to another object, specification file, external vocabulary term, system record, or graph node.
+        alsoKnownAs:
+          en:
+            - link
+            - pointer
+            - external reference
+            - object reference
+            - GraphReference
+            - ProductReference
+            - ProductModel
+            - graph reference
+            - product reference
+            - product model reference
+        relatedTerms:
+          - Identifier
+          - $ref
+          - URI
+          - DataProduct
+          - DataProductGraph
+        usedIn:
+          - ODPS
+          - ODPC
+          - ODPG
+        examples:
+          en:
+            - A catalog entry may include a Reference to an external schema registry record.
+            - In ODPC, GraphReference, ProductReference, and ProductModel objects map to the ODPV Reference term.
+            - Use Reference for a link or pointer to another object, file, vocabulary term, or system record.
+
+  - id: value
+    name:
+      en: ODPV Value
+    description:
+      en: Terms used to describe why data products matter, where they create value, and how that value connects to business outcomes.
+    terms:
+      - id: UseCase
+        uri: https://opendataproducts.org/odpv-v1.1/terms/UseCase
+        type: object
+        status: stable
+        introducedIn: 1.0.0
+        preferredLabel:
+          en: Use Case
+        definition:
+          en: A practical business, operational, analytical, or technical scenario where one or more data products are used to create value.
+        alsoKnownAs:
+          en:
+            - use case
+            - scenario
+            - business scenario
+            - application case
+        relatedTerms:
+          - DataProduct
+          - BusinessObjective
+          - DataNeed
+          - Outcome
+        usedIn:
+          - ODPC
+          - ODPG
+        examples:
+          en:
+            - Fraud detection is a UseCase supported by transaction monitoring data products.
+            - Use UseCase for the practical scenario where data is used to create business, operational, analytical, or technical value.
+
+      - id: BusinessObjective
+        uri: https://opendataproducts.org/odpv-v1.1/terms/BusinessObjective
+        type: object
+        status: stable
+        introducedIn: 1.0.0
+        preferredLabel:
+          en: Business Objective
+        definition:
+          en: A business goal or intended outcome that data products, use cases, or portfolio actions support.
+        alsoKnownAs:
+          en:
+            - objective
+            - business goal
+            - strategic goal
+            - target outcome
+        relatedTerms:
+          - Outcome
+          - KPI
+          - Impact
+          - UseCase
+        usedIn:
+          - ODPC
+          - ODPG
+        examples:
+          en:
+            - Reduce customer churn by 10 percent is a BusinessObjective supported by retention analytics products.
+            - Use BusinessObjective for the goal or target outcome that data products and use cases help advance.
+
+      - id: KPI
+        uri: https://opendataproducts.org/odpv-v1.1/terms/KPI
+        type: object
+        status: stable
+        introducedIn: 1.0.0
+        preferredLabel:
+          en: KPI
+        definition:
+          en: A measurable indicator used to track progress toward a business objective, outcome, or portfolio goal.
+        alsoKnownAs:
+          en:
+            - key performance indicator
+            - metric
+            - performance measure
+            - success measure
+        relatedTerms:
+          - BusinessObjective
+          - Outcome
+          - Impact
+        usedIn:
+          - ODPC
+          - ODPG
+        examples:
+          en:
+            - Monthly churn rate is a KPI used to measure progress toward a retention objective.
+            - Use KPI for a measurable indicator connected to an objective, outcome, or impact.
+
+      - id: Impact
+        uri: https://opendataproducts.org/odpv-v1.1/terms/Impact
+        type: object
+        status: stable
+        introducedIn: 1.0.0
+        preferredLabel:
+          en: Impact
+        definition:
+          en: The expected or observed effect created by a data product, use case, signal, or portfolio decision.
+        alsoKnownAs:
+          en:
+            - effect
+            - value impact
+            - business impact
+            - observed effect
+        relatedTerms:
+          - Outcome
+          - Benefit
+          - KPI
+          - ValueProposition
+        usedIn:
+          - ODPC
+          - ODPG
+        examples:
+          en:
+            - Reduced manual reconciliation effort is an Impact of the Finance DataProduct.
+            - Use Impact for the expected or observed effect of a data product, signal, use case, or portfolio decision.
+
+      - id: Signal
+        uri: https://opendataproducts.org/odpv-v1.1/terms/Signal
+        type: object
+        status: stable
+        introducedIn: 1.0.0
+        preferredLabel:
+          en: Signal
+        definition:
+          en: An observed demand, trend, risk, gap, usage pattern, policy change, market change, or operational event that may require action.
+        alsoKnownAs:
+          en:
+            - market signal
+            - demand signal
+            - trigger
+            - observation
+        relatedTerms:
+          - Demand
+          - Risk
+          - Gap
+          - Opportunity
+        usedIn:
+          - ODPC
+          - ODPG
+        examples:
+          en:
+            - A sudden rise in failed deliveries is a Signal that may indicate an operational data gap.
+            - Use Signal for observed demand, trend, risk, usage pattern, market change, policy change, or event requiring attention.
+
+      - id: Gap
+        uri: https://opendataproducts.org/odpv-v1.1/terms/Gap
+        type: object
+        status: stable
+        introducedIn: 1.0.0
+        preferredLabel:
+          en: Gap
+        definition:
+          en: A missing data product, dataset, capability, quality level, access method, relationship, or portfolio coverage area.
+        alsoKnownAs:
+          en:
+            - missing capability
+            - coverage gap
+            - data gap
+            - portfolio gap
+        relatedTerms:
+          - DataNeed
+          - Opportunity
+          - Signal
+          - Priority
+        usedIn:
+          - ODPC
+          - ODPG
+        examples:
+          en:
+            - Missing product-level carbon emissions data is a Gap for sustainability reporting use cases.
+            - Use Gap for missing data, capability, quality, access, relationship, or portfolio coverage.
+
+      - id: Priority
+        uri: https://opendataproducts.org/odpv-v1.1/terms/Priority
+        type: classification
+        status: stable
+        introducedIn: 1.0.0
+        preferredLabel:
+          en: Priority
+        definition:
+          en: A ranking or importance level used to guide portfolio planning, product development, investment, or remediation.
+        alsoKnownAs:
+          en:
+            - importance level
+            - ranking
+            - urgency
+            - priority level
+        relatedTerms:
+          - PortfolioPriority
+          - Signal
+          - Gap
+          - Risk
+        usedIn:
+          - ODPC
+          - ODPG
+        examples:
+          en:
+            - Critical is a Priority assigned to a gap blocking regulatory reporting.
+            - Use Priority for ranking importance or urgency in planning, remediation, or investment decisions.
+
+      - id: Outcome
+        uri: https://opendataproducts.org/odpv-v1.1/terms/Outcome
+        type: object
+        status: stable
+        introducedIn: 1.0.0
+        preferredLabel:
+          en: Outcome
+        definition:
+          en: A desired or achieved result connected to a business objective, use case, KPI, or impact statement.
+        alsoKnownAs:
+          en:
+            - result
+            - target result
+            - achieved result
+            - intended outcome
+        relatedTerms:
+          - BusinessObjective
+          - KPI
+          - Impact
+          - Benefit
+        usedIn:
+          - ODPC
+          - ODPG
+        examples:
+          en:
+            - Faster fraud investigation is an Outcome of improved transaction event data.
+            - Use Outcome for a desired or achieved result connected to objectives, use cases, KPIs, or impact.
+
+      - id: DataNeed
+        uri: https://opendataproducts.org/odpv-v1.1/terms/DataNeed
+        type: object
+        status: stable
+        introducedIn: 1.0.0
+        preferredLabel:
+          en: Data Need
+        definition:
+          en: A required data input, data product, dataset, attribute, capability, or access pattern needed to support a use case or objective.
+        alsoKnownAs:
+          en:
+            - data requirement
+            - data demand
+            - required data
+            - information need
+        relatedTerms:
+          - UseCase
+          - Gap
+          - Demand
+          - DataProduct
+        usedIn:
+          - ODPC
+          - ODPG
+        examples:
+          en:
+            - Daily merchant risk scores are a DataNeed for the fraud monitoring use case.
+            - Use DataNeed for required data inputs, products, attributes, capabilities, or access patterns.
+
+      - id: Benefit
+        uri: https://opendataproducts.org/odpv-v1.1/terms/Benefit
+        type: object
+        status: stable
+        introducedIn: 1.0.0
+        preferredLabel:
+          en: Benefit
+        definition:
+          en: A positive business, operational, financial, social, or technical value expected from a data product, use case, or portfolio action.
+        alsoKnownAs:
+          en:
+            - value
+            - expected benefit
+            - positive impact
+            - business benefit
+        relatedTerms:
+          - Impact
+          - Outcome
+          - ValueProposition
+        usedIn:
+          - ODPC
+        examples:
+          en:
+            - Reduced reporting effort is a Benefit expected from a governed finance metrics product.
+            - Use Benefit for a positive business, operational, financial, social, or technical value.
+
+      - id: Demand
+        uri: https://opendataproducts.org/odpv-v1.1/terms/Demand
+        type: object
+        status: stable
+        introducedIn: 1.0.0
+        preferredLabel:
+          en: Demand
+        definition:
+          en: Evidence of need or interest from consumers, stakeholders, systems, markets, policies, or operational processes.
+        alsoKnownAs:
+          en:
+            - need
+            - interest
+            - request
+            - demand signal
+        relatedTerms:
+          - Signal
+          - DataNeed
+          - Opportunity
+          - UseCase
+        usedIn:
+          - ODPC
+          - ODPG
+        examples:
+          en:
+            - Repeated requests for near-real-time inventory data are Demand for a new data product.
+            - Use Demand for evidence of need or interest from consumers, stakeholders, systems, markets, or operations.
+
+      - id: Opportunity
+        uri: https://opendataproducts.org/odpv-v1.1/terms/Opportunity
+        type: object
+        status: stable
+        introducedIn: 1.0.0
+        preferredLabel:
+          en: Opportunity
+        definition:
+          en: A possible area for value creation, reuse, innovation, service improvement, monetization, or better decision-making.
+        alsoKnownAs:
+          en:
+            - value opportunity
+            - improvement area
+            - innovation opportunity
+            - reuse opportunity
+        relatedTerms:
+          - Signal
+          - Gap
+          - Benefit
+          - Impact
+        usedIn:
+          - ODPC
+          - ODPG
+        examples:
+          en:
+            - Combining mobility and weather data is an Opportunity for better route optimization.
+            - Use Opportunity for a possible area of reuse, innovation, service improvement, monetization, or better decisions.
+
+      - id: StrategicOpportunity
+        uri: https://opendataproducts.org/odpv-v1.1/terms/StrategicOpportunity
+        type: object
+        status: stable
+        introducedIn: 1.0.0
+        preferredLabel:
+          en: Strategic Opportunity
+        definition:
+          en: An inferred or declared opportunity with strategic relevance, such as a portfolio improvement, optimization, unmet need, or emerging value area.
+        alsoKnownAs:
+          en:
+            - strategic opportunity
+            - portfolio opportunity
+            - strategic value opportunity
+            - emerging opportunity
+        relatedTerms:
+          - Opportunity
+          - BusinessObjective
+          - Capability
+          - Gap
+        usedIn:
+          - ODPG
+        examples:
+          en:
+            - Reducing unscheduled aircraft maintenance is a StrategicOpportunity identified from reliability signals and operational gaps.
+            - Use StrategicOpportunity when an opportunity has portfolio, strategic, or business-objective relevance.
+
+      - id: ProductStrategy
+        uri: https://opendataproducts.org/odpv-v1.1/terms/ProductStrategy
+        type: object
+        status: stable
+        introducedIn: 1.0.0
+        preferredLabel:
+          en: Product Strategy
+        definition:
+          en: The strategic plan or context for a data product, including objectives, alignment, dates, status, and KPIs used to describe intended value.
+        alsoKnownAs:
+          en:
+            - productStrategy
+            - product strategy
+            - product strategic plan
+            - strategic product context
+        relatedTerms:
+          - BusinessObjective
+          - KPI
+          - StrategicOpportunity
+          - PortfolioPriority
+        usedIn:
+          - ODPS
+        examples:
+          en:
+            - A ProductStrategy links a customer intelligence data product to growth objectives and retention KPIs.
+            - Use ProductStrategy for product-level objectives, alignment, timing, status, and strategic KPIs.
+
+      - id: Risk
+        uri: https://opendataproducts.org/odpv-v1.1/terms/Risk
+        type: object
+        status: stable
+        introducedIn: 1.0.0
+        preferredLabel:
+          en: Risk
+        definition:
+          en: A possible negative event, weakness, exposure, or uncertainty that may affect data product value, trust, access, compliance, or operation.
+        alsoKnownAs:
+          en:
+            - issue
+            - exposure
+            - threat
+            - concern
+        relatedTerms:
+          - Signal
+          - Priority
+          - Gap
+          - Governance
+        usedIn:
+          - ODPC
+          - ODPG
+        examples:
+          en:
+            - Unclear licensing for customer demographic data is a Risk for external sharing.
+            - Use Risk for a possible negative event, exposure, weakness, or uncertainty affecting value, trust, access, compliance, or operation.
+
+      - id: ValueProposition
+        uri: https://opendataproducts.org/odpv-v1.1/terms/ValueProposition
+        type: object
+        status: stable
+        introducedIn: 1.0.0
+        preferredLabel:
+          en: Value Proposition
+        definition:
+          en: A short explanation of why a data product, use case, or portfolio item matters and what value it is expected to create.
+        alsoKnownAs:
+          en:
+            - value statement
+            - value case
+            - product value
+            - business value statement
+        relatedTerms:
+          - Benefit
+          - Impact
+          - Outcome
+          - UseCase
+        usedIn:
+          - ODPS
+          - ODPC
+        examples:
+          en:
+            - This product reduces onboarding time for analysts by providing governed customer features is a ValueProposition.
+            - Use ValueProposition for a short explanation of why a product, use case, or portfolio item matters.
+
+      - id: PortfolioPriority
+        uri: https://opendataproducts.org/odpv-v1.1/terms/PortfolioPriority
+        type: classification
+        status: stable
+        introducedIn: 1.0.0
+        preferredLabel:
+          en: Portfolio Priority
+        definition:
+          en: A portfolio-level priority assigned to a data product, use case, signal, gap, or objective.
+        alsoKnownAs:
+          en:
+            - portfolio ranking
+            - portfolio importance
+            - investment priority
+            - planning priority
+        relatedTerms:
+          - Priority
+          - Gap
+          - Signal
+          - BusinessObjective
+        usedIn:
+          - ODPC
+          - ODPG
+        examples:
+          en:
+            - High reuse potential is a PortfolioPriority for a shared customer identity data product.
+            - Use PortfolioPriority for a portfolio-level ranking assigned to products, use cases, signals, gaps, or objectives.
+
+  - id: governance
+    name:
+      en: ODPV Governance
+    description:
+      en: Terms used to describe how data products are controlled, protected, accessed, licensed, and operated.
+    terms:
+      - id: DataQuality
+        uri: https://opendataproducts.org/odpv-v1.1/terms/DataQuality
+        type: object
+        status: stable
+        introducedIn: 1.0.0
+        preferredLabel:
+          en: Data Quality
+        definition:
+          en: The expected, measured, or reported quality of a data product, dataset, distribution, or data service.
+        alsoKnownAs:
+          en:
+            - quality
+            - data quality score
+            - quality assessment
+            - quality metrics
+        relatedTerms:
+          - SLA
+          - DataContract
+          - Stewardship
+          - ComplianceRule
+        usedIn:
+          - ODPS
+          - ODPC
+          - ODPG
+        examples:
+          en:
+            - Completeness above 98 percent is a DataQuality expectation for the Customer Profile DataProduct.
+            - Use DataQuality for expected, measured, or reported quality of a product, dataset, distribution, or service.
+
+      - id: SLA
+        uri: https://opendataproducts.org/odpv-v1.1/terms/SLA
+        type: object
+        status: stable
+        introducedIn: 1.0.0
+        preferredLabel:
+          en: SLA
+        definition:
+          en: A service-level agreement or expectation that defines operational commitments for a data product, distribution, or data service.
+        alsoKnownAs:
+          en:
+            - service level agreement
+            - service commitment
+            - operational commitment
+            - service expectation
+        relatedTerms:
+          - DataQuality
+          - Agreement
+          - AccessMethod
+          - DataContract
+        usedIn:
+          - ODPS
+          - ODPG
+        examples:
+          en:
+            - The product refreshes by 08:00 UTC every business day is an SLA.
+            - Use SLA for service-level expectations or operational commitments.
+
+      - id: License
+        uri: https://opendataproducts.org/odpv-v1.1/terms/License
+        type: object
+        status: stable
+        introducedIn: 1.0.0
+        preferredLabel:
+          en: License
+        definition:
+          en: The legal terms that define how a data product, dataset, distribution, or data service may be used, shared, or redistributed.
+        alsoKnownAs:
+          en:
+            - license
+            - data license
+            - usage license
+            - legal license
+            - redistribution terms
+        relatedTerms:
+          - UsageRights
+          - Agreement
+          - DataAgreement
+          - Policy
+        mappings:
+          closeMatch:
+            - dcterms:LicenseDocument
+        usedIn:
+          - ODPS
+          - ODPC
+          - ODPG
+        examples:
+          en:
+            - Apache 2.0 is a License for a publicly shared dataset.
+            - Use License for legal terms that define how data may be used, shared, or redistributed.
+
+      - id: DataAccess
+        uri: https://opendataproducts.org/odpv-v1.1/terms/DataAccess
+        type: object
+        status: stable
+        introducedIn: 1.0.0
+        preferredLabel:
+          en: Data Access
+        definition:
+          en: The access configuration or access description for a data product, dataset, distribution, or data service.
+        alsoKnownAs:
+          en:
+            - dataAccess
+            - data access
+            - access configuration
+            - access description
+        relatedTerms:
+          - AccessMethod
+          - AccessCondition
+          - DataService
+          - Distribution
+        usedIn:
+          - ODPS
+          - ODPC
+          - ODPG
+        examples:
+          en:
+            - An ODPS dataAccess block describes the output ports or access channels for a data product.
+            - Use DataAccess for product-level access configuration or description.
+
+      - id: AccessMethod
+        uri: https://opendataproducts.org/odpv-v1.1/terms/AccessMethod
+        type: object
+        status: stable
+        introducedIn: 1.0.0
+        preferredLabel:
+          en: Access Method
+        definition:
+          en: The method used to access a data product, dataset, distribution, or data service, such as API, file download, query endpoint, or platform access.
+        alsoKnownAs:
+          en:
+            - access channel
+            - delivery method
+            - access interface
+            - data access method
+        relatedTerms:
+          - AccessCondition
+          - DataService
+          - Distribution
+          - SLA
+        usedIn:
+          - ODPS
+          - ODPC
+          - ODPG
+        examples:
+          en:
+            - A Snowflake share is an AccessMethod for the Customer Features DataProduct.
+            - Use AccessMethod for the channel or interface used to access data, such as API, file download, query endpoint, or platform access.
+
+      - id: PricingPlan
+        uri: https://opendataproducts.org/odpv-v1.1/terms/PricingPlan
+        type: object
+        status: stable
+        introducedIn: 1.0.0
+        preferredLabel:
+          en: Pricing Plan
+        definition:
+          en: A pricing, cost, subscription, or commercial plan that describes how a data product or data service may be paid for, charged, or monetized.
+        alsoKnownAs:
+          en:
+            - pricingPlans
+            - pricing plan
+            - commercial plan
+            - subscription plan
+        relatedTerms:
+          - Agreement
+          - License
+          - UsageRights
+          - PaymentGateway
+        usedIn:
+          - ODPS
+        examples:
+          en:
+            - A monthly subscription tier for a market data product is a PricingPlan.
+            - Use PricingPlan for pricing, cost, subscription, or monetization plans.
+
+      - id: PaymentGateway
+        uri: https://opendataproducts.org/odpv-v1.1/terms/PaymentGateway
+        type: object
+        status: stable
+        introducedIn: 1.0.0
+        preferredLabel:
+          en: Payment Gateway
+        definition:
+          en: A payment integration, payment service, or gateway used to process commercial access to a data product or data service.
+        alsoKnownAs:
+          en:
+            - paymentGateways
+            - payment gateway
+            - payment integration
+            - payment service
+        relatedTerms:
+          - PricingPlan
+          - Agreement
+          - DataAccess
+          - DataService
+        usedIn:
+          - ODPS
+        examples:
+          en:
+            - A Stripe integration configured for paid API access is a PaymentGateway.
+            - Use PaymentGateway for payment services or integrations used with commercial data product access.
+
+      - id: Support
+        uri: https://opendataproducts.org/odpv-v1.1/terms/Support
+        type: object
+        status: stable
+        introducedIn: 1.0.0
+        preferredLabel:
+          en: Support
+        definition:
+          en: The support model or contact channel for help, issue handling, or operational assistance related to a data product or data service.
+        alsoKnownAs:
+          en:
+            - support
+            - product support
+            - support contact
+            - help channel
+        relatedTerms:
+          - SLA
+          - Stewardship
+          - Owner
+          - DataService
+        usedIn:
+          - ODPS
+        examples:
+          en:
+            - A support email and phone number for product incidents is Support metadata.
+            - Use Support for help, issue handling, or operational assistance channels.
+
+      - id: Agreement
+        uri: https://opendataproducts.org/odpv-v1.1/terms/Agreement
+        type: object
+        status: stable
+        introducedIn: 1.0.0
+        preferredLabel:
+          en: Agreement
+        definition:
+          en: A formal or informal agreement that defines usage, commercial, legal, operational, or governance terms for a data product or data exchange.
+        alsoKnownAs:
+          en:
+            - data agreement
+            - usage agreement
+            - service agreement
+            - commercial agreement
+        relatedTerms:
+          - DataAgreement
+          - License
+          - UsageRights
+          - SLA
+        usedIn:
+          - ODPS
+          - ODPC
+          - ODPG
+        examples:
+          en:
+            - A commercial data sharing contract is an Agreement for an external data exchange.
+            - Use Agreement for usage, commercial, legal, operational, or governance terms between parties.
+
+      - id: Policy
+        uri: https://opendataproducts.org/odpv-v1.1/terms/Policy
+        type: object
+        status: stable
+        introducedIn: 1.0.0
+        preferredLabel:
+          en: Policy
+        definition:
+          en: A rule, guideline, or governance statement that applies to a data product, catalog, graph, use case, access method, or related object.
+        alsoKnownAs:
+          en:
+            - governance policy
+            - rule
+            - guideline
+            - control policy
+        relatedTerms:
+          - ComplianceRule
+          - GovernanceProfile
+          - AccessCondition
+          - Sensitivity
+        mappings:
+          closeMatch:
+            - odrl:Policy
+        usedIn:
+          - ODPS
+          - ODPC
+          - ODPG
+        examples:
+          en:
+            - Customer data must not be exported outside approved regions is a Policy.
+            - Use Policy for a rule, guideline, or governance statement that applies to products, catalogs, graphs, use cases, or access.
+
+      - id: ComplianceRule
+        uri: https://opendataproducts.org/odpv-v1.1/terms/ComplianceRule
+        type: object
+        status: stable
+        introducedIn: 1.0.0
+        preferredLabel:
+          en: Compliance Rule
+        definition:
+          en: A specific rule or requirement used to assess, enforce, or document compliance.
+        alsoKnownAs:
+          en:
+            - compliance requirement
+            - control rule
+            - regulatory rule
+            - validation rule
+        relatedTerms:
+          - Policy
+          - GovernanceProfile
+          - DataQuality
+          - Risk
+        usedIn:
+          - ODPS
+          - ODPC
+          - ODPG
+        examples:
+          en:
+            - PII fields must be masked before non-production use is a ComplianceRule.
+            - Use ComplianceRule for a specific requirement used to assess, enforce, or document compliance.
+
+      - id: Sensitivity
+        uri: https://opendataproducts.org/odpv-v1.1/terms/Sensitivity
+        type: classification
+        status: stable
+        introducedIn: 1.0.0
+        preferredLabel:
+          en: Sensitivity
+        definition:
+          en: A classification that indicates how sensitive a data product, dataset, attribute, distribution, or service is from a privacy, security, commercial, or operational perspective.
+        alsoKnownAs:
+          en:
+            - sensitivity level
+            - data sensitivity
+            - security classification
+            - privacy classification
+        relatedTerms:
+          - Policy
+          - AccessCondition
+          - UsageRights
+          - GovernanceProfile
+        usedIn:
+          - ODPS
+          - ODPC
+        examples:
+          en:
+            - Confidential is a Sensitivity classification for customer identity data.
+            - Use Sensitivity to indicate privacy, security, commercial, or operational sensitivity.
+
+      - id: UsageRights
+        uri: https://opendataproducts.org/odpv-v1.1/terms/UsageRights
+        type: object
+        status: stable
+        introducedIn: 1.0.0
+        preferredLabel:
+          en: Usage Rights
+        definition:
+          en: The rights granted to consumers for using, sharing, modifying, deriving, or redistributing a data product or dataset.
+        alsoKnownAs:
+          en:
+            - use rights
+            - permitted use
+            - usage permissions
+            - allowed use
+        relatedTerms:
+          - License
+          - Agreement
+          - DataAgreement
+          - AccessCondition
+        mappings:
+          closeMatch:
+            - odrl:Permission
+        usedIn:
+          - ODPS
+          - ODPC
+        examples:
+          en:
+            - Internal analytics only is a UsageRights statement for a licensed dataset.
+            - Use UsageRights for what consumers may do with data, including use, sharing, modification, derivation, or redistribution.
+
+      - id: Retention
+        uri: https://opendataproducts.org/odpv-v1.1/terms/Retention
+        type: object
+        status: stable
+        introducedIn: 1.0.0
+        preferredLabel:
+          en: Retention
+        definition:
+          en: The rules or expectations for how long data, metadata, logs, agreements, or related records should be retained.
+        alsoKnownAs:
+          en:
+            - retention rule
+            - retention period
+            - record retention
+            - data retention
+        relatedTerms:
+          - Policy
+          - ComplianceRule
+          - DataAgreement
+          - Stewardship
+        usedIn:
+          - ODPS
+          - ODPC
+        examples:
+          en:
+            - Transaction logs retained for seven years is a Retention rule.
+            - Use Retention for how long data, metadata, logs, agreements, or records should be kept.
+
+      - id: AccessCondition
+        uri: https://opendataproducts.org/odpv-v1.1/terms/AccessCondition
+        type: object
+        status: stable
+        introducedIn: 1.0.0
+        preferredLabel:
+          en: Access Condition
+        definition:
+          en: A condition that must be met before a consumer can access a data product, dataset, distribution, or data service.
+        alsoKnownAs:
+          en:
+            - access rule
+            - access requirement
+            - eligibility condition
+            - access constraint
+        relatedTerms:
+          - AccessMethod
+          - UsageRights
+          - Policy
+          - Sensitivity
+        usedIn:
+          - ODPS
+          - ODPC
+          - ODPG
+        examples:
+          en:
+            - Manager approval required before access is granted is an AccessCondition.
+            - Use AccessCondition for a requirement that must be met before a consumer can access data.
+
+      - id: GovernanceProfile
+        uri: https://opendataproducts.org/odpv-v1.1/terms/GovernanceProfile
+        type: classification
+        status: stable
+        introducedIn: 1.0.0
+        preferredLabel:
+          en: Governance Profile
+        definition:
+          en: A reusable governance classification that describes the expected level of control, assurance, review, or operational maturity for a data product or catalog item.
+        alsoKnownAs:
+          en:
+            - governance level
+            - assurance profile
+            - control profile
+            - maturity profile
+        relatedTerms:
+          - Policy
+          - ComplianceRule
+          - Sensitivity
+          - Stewardship
+        usedIn:
+          - ODPS
+          - ODPC
+        examples:
+          en:
+            - High assurance is a GovernanceProfile for regulated finance data products.
+            - Use GovernanceProfile for a reusable classification of control, assurance, review, or maturity expectations.
+
+      - id: DataAgreement
+        uri: https://opendataproducts.org/odpv-v1.1/terms/DataAgreement
+        type: object
+        status: stable
+        introducedIn: 1.0.0
+        preferredLabel:
+          en: Data Agreement
+        definition:
+          en: A structured agreement that defines the allowed use, responsibilities, obligations, and constraints for a data product or data exchange.
+        alsoKnownAs:
+          en:
+            - data sharing agreement
+            - data usage agreement
+            - data exchange agreement
+            - product agreement
+        relatedTerms:
+          - Agreement
+          - License
+          - UsageRights
+          - AccessCondition
+        usedIn:
+          - ODPS
+          - ODPC
+        examples:
+          en:
+            - A partner data exchange contract with allowed uses and obligations is a DataAgreement.
+            - Use DataAgreement for structured allowed use, responsibilities, obligations, and constraints for data sharing.
+
+      - id: DataContract
+        uri: https://opendataproducts.org/odpv-v1.1/terms/DataContract
+        type: object
+        status: stable
+        introducedIn: 1.0.0
+        preferredLabel:
+          en: Data Contract
+        definition:
+          en: A technical or operational contract that defines expectations for schema, quality, delivery, compatibility, and change management.
+        alsoKnownAs:
+          en:
+            - schema contract
+            - delivery contract
+            - operational contract
+            - technical contract
+        relatedTerms:
+          - DataQuality
+          - SLA
+          - AccessMethod
+          - Stewardship
+        usedIn:
+          - ODPS
+        examples:
+          en:
+            - A schema compatibility and freshness contract for an events API is a DataContract.
+            - Use DataContract for technical or operational expectations around schema, quality, delivery, compatibility, and change management.
+
+      - id: Stewardship
+        uri: https://opendataproducts.org/odpv-v1.1/terms/Stewardship
+        type: object
+        status: stable
+        introducedIn: 1.0.0
+        preferredLabel:
+          en: Stewardship
+        definition:
+          en: The assigned responsibility model for managing data product metadata, quality, lifecycle, and operational health.
+        alsoKnownAs:
+          en:
+            - data stewardship
+            - product stewardship
+            - metadata stewardship
+            - lifecycle responsibility
+        relatedTerms:
+          - Steward
+          - Owner
+          - DataQuality
+          - GovernanceProfile
+        usedIn:
+          - ODPS
+          - ODPC
+        examples:
+          en:
+            - The analytics platform team handles Stewardship for metadata quality and lifecycle reviews.
+            - Use Stewardship for the assigned responsibility model for metadata, quality, lifecycle, and operational health.
+
+  - id: relationships
+    name:
+      en: ODPV Relationships
+    description:
+      en: Terms used to connect data products, catalogs, use cases, objectives, KPIs, signals, governance objects, and related portfolio items.
+    terms:
+      - id: supports
+        uri: https://opendataproducts.org/odpv-v1.1/terms/supports
+        type: relationship
+        status: stable
+        introducedIn: 1.0.0
+        preferredLabel:
+          en: supports
+        definition:
+          en: Indicates that one object helps enable, serve, or make another object possible, such as a data product supporting a use case.
+        alsoKnownAs:
+          en:
+            - enables
+            - serves
+            - helps
+            - provides support for
+        relatedTerms:
+          - contributesTo
+          - requires
+          - relatedTo
+        domain:
+          - DataProduct
+          - DataProductCatalog
+          - UseCase
+        range:
+          - UseCase
+          - BusinessObjective
+          - Outcome
+        usedIn:
+          - ODPG
+        examples:
+          en:
+            - Customer Churn Risk Scores supports the Retention Campaign Optimization use case.
+            - Use supports when one object helps enable, serve, or make another object possible.
+
+      - id: requires
+        uri: https://opendataproducts.org/odpv-v1.1/terms/requires
+        type: relationship
+        status: stable
+        introducedIn: 1.0.0
+        preferredLabel:
+          en: requires
+        definition:
+          en: Indicates that one object needs another object to be complete, useful, or executable, such as a use case requiring a data product.
+        alsoKnownAs:
+          en:
+            - needs
+            - depends on
+            - must have
+            - requires input from
+        relatedTerms:
+          - dependsOn
+          - supports
+          - DataNeed
+        domain:
+          - UseCase
+          - DataProduct
+          - BusinessObjective
+        range:
+          - DataProduct
+          - Dataset
+          - DataNeed
+        usedIn:
+          - ODPG
+        examples:
+          en:
+            - The Fraud Detection use case requires the Transaction Events DataProduct.
+            - Use requires when one object needs another object to be complete, useful, or executable.
+
+      - id: uses
+        uri: https://opendataproducts.org/odpv-v1.1/terms/uses
+        type: relationship
+        status: stable
+        introducedIn: 1.0.0
+        preferredLabel:
+          en: uses
+        definition:
+          en: Indicates that one object uses another object as part of execution, operation, analysis, automation, or decision-making.
+        alsoKnownAs:
+          en:
+            - uses
+            - uses as input
+            - makes use of
+            - operates with
+        relatedTerms:
+          - requires
+          - dependsOn
+          - consumes
+        mappings:
+          closeMatch:
+            - prov:used
+        domain:
+          - UseCase
+          - Agent
+          - Workflow
+          - DataProduct
+        range:
+          - DataProduct
+          - DataService
+          - Dataset
+          - Workflow
+        usedIn:
+          - ODPG
+        examples:
+          en:
+            - A maintenance recommendation agent uses an aviation risk score data service.
+            - Use uses when one object actively uses another object during execution or operation.
+
+      - id: contributesTo
+        uri: https://opendataproducts.org/odpv-v1.1/terms/contributesTo
+        type: relationship
+        status: stable
+        introducedIn: 1.0.0
+        preferredLabel:
+          en: contributes to
+        definition:
+          en: Indicates that one object helps advance another object, such as a use case contributing to a business objective.
+        alsoKnownAs:
+          en:
+            - advances
+            - helps achieve
+            - adds value to
+            - supports progress toward
+        relatedTerms:
+          - supports
+          - measures
+          - BusinessObjective
+        domain:
+          - DataProduct
+          - UseCase
+          - KPI
+        range:
+          - BusinessObjective
+          - Outcome
+          - Impact
+        usedIn:
+          - ODPG
+        examples:
+          en:
+            - The Retention Campaign Optimization use case contributesTo the Reduce Churn business objective.
+            - Use contributesTo when one object helps advance an objective, outcome, or impact.
+
+      - id: measures
+        uri: https://opendataproducts.org/odpv-v1.1/terms/measures
+        type: relationship
+        status: stable
+        introducedIn: 1.0.0
+        preferredLabel:
+          en: measures
+        definition:
+          en: Indicates that one object measures another object, such as a KPI measuring a business objective or outcome.
+        alsoKnownAs:
+          en:
+            - tracks
+            - monitors
+            - evaluates
+            - assesses
+        relatedTerms:
+          - KPI
+          - Outcome
+          - BusinessObjective
+        domain:
+          - KPI
+          - Signal
+        range:
+          - BusinessObjective
+          - Outcome
+          - Impact
+        usedIn:
+          - ODPG
+        examples:
+          en:
+            - Monthly churn rate measures the Reduce Churn business objective.
+            - Use measures when a KPI, signal, or metric tracks an objective, outcome, or impact.
+
+      - id: belongsTo
+        uri: https://opendataproducts.org/odpv-v1.1/terms/belongsTo
+        type: relationship
+        status: stable
+        introducedIn: 1.0.0
+        preferredLabel:
+          en: belongs to
+        definition:
+          en: Indicates that one object is assigned to, grouped under, or included in another object, such as a data product belonging to a catalog.
+        alsoKnownAs:
+          en:
+            - assigned to
+            - grouped under
+            - included in
+            - cataloged under
+        relatedTerms:
+          - partOf
+          - hasPart
+          - DataProductCatalog
+        domain:
+          - DataProduct
+          - UseCase
+          - BusinessObjective
+        range:
+          - DataProductCatalog
+          - Domain
+        usedIn:
+          - ODPG
+        examples:
+          en:
+            - The Customer Churn Risk Scores DataProduct belongsTo the Customer Analytics catalog.
+            - Use belongsTo when one object is assigned to, grouped under, or included in another object.
+
+      - id: dependsOn
+        uri: https://opendataproducts.org/odpv-v1.1/terms/dependsOn
+        type: relationship
+        status: stable
+        introducedIn: 1.0.0
+        preferredLabel:
+          en: depends on
+        definition:
+          en: Indicates that one object has a dependency on another object, such as a data product depending on another product, service, or dataset.
+        alsoKnownAs:
+          en:
+            - relies on
+            - has dependency on
+            - uses dependency
+            - is dependent on
+        relatedTerms:
+          - requires
+          - relatedTo
+          - derivedFrom
+        domain:
+          - DataProduct
+          - DataService
+          - UseCase
+        range:
+          - DataProduct
+          - Dataset
+          - DataService
+        usedIn:
+          - ODPG
+        examples:
+          en:
+            - The Churn Scores DataProduct dependsOn the Customer Profile Dataset.
+            - Use dependsOn for operational, technical, or data dependencies between products, services, datasets, or use cases.
+
+      - id: governedBy
+        uri: https://opendataproducts.org/odpv-v1.1/terms/governedBy
+        type: relationship
+        status: stable
+        introducedIn: 1.0.0
+        preferredLabel:
+          en: governed by
+        definition:
+          en: Indicates that one object is governed by another object, such as a data product governed by a license, policy, agreement, or compliance rule.
+        alsoKnownAs:
+          en:
+            - controlled by
+            - regulated by
+            - subject to
+            - under governance of
+        relatedTerms:
+          - Policy
+          - License
+          - Agreement
+          - ComplianceRule
+        domain:
+          - DataProduct
+          - Dataset
+          - AccessMethod
+        range:
+          - Policy
+          - License
+          - Agreement
+          - ComplianceRule
+        usedIn:
+          - ODPG
+        examples:
+          en:
+            - The Customer Profile DataProduct is governedBy the Customer Data Access Policy.
+            - Use governedBy when a product, dataset, service, or access method is subject to a policy, license, agreement, or compliance rule.
+
+      - id: providedBy
+        uri: https://opendataproducts.org/odpv-v1.1/terms/providedBy
+        type: relationship
+        status: stable
+        introducedIn: 1.0.0
+        preferredLabel:
+          en: provided by
+        definition:
+          en: Indicates that one object is provided, published, or made available by a provider.
+        alsoKnownAs:
+          en:
+            - published by
+            - supplied by
+            - made available by
+            - offered by
+        relatedTerms:
+          - Provider
+          - Owner
+          - Steward
+        domain:
+          - DataProduct
+          - Dataset
+          - DataService
+        range:
+          - Provider
+          - Owner
+        usedIn:
+          - ODPG
+        examples:
+          en:
+            - The Transaction Events DataProduct is providedBy the Payments Data Platform team.
+            - Use providedBy when an object is published, supplied, or made available by a provider or owner.
+
+      - id: consumedBy
+        uri: https://opendataproducts.org/odpv-v1.1/terms/consumedBy
+        type: relationship
+        status: stable
+        introducedIn: 1.0.0
+        preferredLabel:
+          en: consumed by
+        definition:
+          en: Indicates that one object is used, accessed, or consumed by a consumer.
+        alsoKnownAs:
+          en:
+            - used by
+            - accessed by
+            - received by
+            - consumed by
+        relatedTerms:
+          - Consumer
+          - AccessMethod
+          - UsageRights
+        domain:
+          - DataProduct
+          - Dataset
+          - DataService
+        range:
+          - Consumer
+        usedIn:
+          - ODPG
+        examples:
+          en:
+            - The Customer Features DataProduct is consumedBy the Personalization Model Training system.
+            - Use consumedBy when an object is used, accessed, or received by a consumer.
+
+      - id: produces
+        uri: https://opendataproducts.org/odpv-v1.1/terms/produces
+        type: relationship
+        status: stable
+        introducedIn: 1.0.0
+        preferredLabel:
+          en: produces
+        definition:
+          en: Indicates that one object creates, generates, outputs, or makes available another object, such as a workflow producing a dataset or data service.
+        alsoKnownAs:
+          en:
+            - creates
+            - generates
+            - outputs
+            - produces output
+        relatedTerms:
+          - derivedFrom
+          - exposes
+          - DataProduct
+        domain:
+          - Workflow
+          - DataProduct
+          - Agent
+          - DataService
+        range:
+          - Dataset
+          - DataService
+          - DataProduct
+          - Distribution
+        usedIn:
+          - ODPG
+        examples:
+          en:
+            - A scoring workflow produces a daily maintenance risk dataset.
+            - Use produces when one object creates, generates, outputs, or makes another object available.
+
+      - id: consumes
+        uri: https://opendataproducts.org/odpv-v1.1/terms/consumes
+        type: relationship
+        status: stable
+        introducedIn: 1.0.0
+        preferredLabel:
+          en: consumes
+        definition:
+          en: Indicates that one object consumes data, services, outputs, or interfaces from another object.
+        alsoKnownAs:
+          en:
+            - consumes
+            - reads from
+            - receives input from
+            - takes as input
+        relatedTerms:
+          - consumedBy
+          - uses
+          - Consumer
+        domain:
+          - DataProduct
+          - Agent
+          - Workflow
+          - DataService
+        range:
+          - Dataset
+          - DataService
+          - DataProduct
+          - Distribution
+        usedIn:
+          - ODPG
+        examples:
+          en:
+            - A recommendation agent consumes telemetry datasets and a risk score data service.
+            - Use consumes for active consumption of data, services, outputs, or interfaces.
+
+      - id: indicates
+        uri: https://opendataproducts.org/odpv-v1.1/terms/indicates
+        type: relationship
+        status: stable
+        introducedIn: 1.0.0
+        preferredLabel:
+          en: indicates
+        definition:
+          en: Indicates that one object points to, reveals, or suggests another object, such as a signal indicating a gap, demand, risk, or opportunity.
+        alsoKnownAs:
+          en:
+            - points to
+            - suggests
+            - reveals
+            - signals
+        relatedTerms:
+          - Signal
+          - Gap
+          - Demand
+          - Risk
+          - Opportunity
+        domain:
+          - Signal
+          - KPI
+        range:
+          - Gap
+          - Demand
+          - Risk
+          - Opportunity
+        usedIn:
+          - ODPG
+        examples:
+          en:
+            - A rising support ticket trend indicates a Gap in product usage data.
+            - Use indicates when a signal, KPI, or observation points to a gap, demand, risk, or opportunity.
+
+      - id: identifies
+        uri: https://opendataproducts.org/odpv-v1.1/terms/identifies
+        type: relationship
+        status: stable
+        introducedIn: 1.0.0
+        preferredLabel:
+          en: identifies
+        definition:
+          en: Indicates that one object identifies, detects, discovers, or names another object, such as an agent identifying a strategic opportunity.
+        alsoKnownAs:
+          en:
+            - detects
+            - discovers
+            - finds
+            - recognizes
+        relatedTerms:
+          - indicates
+          - StrategicOpportunity
+          - Signal
+        domain:
+          - UseCase
+          - Agent
+          - KPI
+          - Signal
+        range:
+          - StrategicOpportunity
+          - Opportunity
+          - Gap
+          - Risk
+        usedIn:
+          - ODPG
+        examples:
+          en:
+            - A maintenance analytics agent identifies a StrategicOpportunity to reduce unscheduled maintenance.
+            - Use identifies when one object discovers or names an opportunity, condition, gap, or risk.
+
+      - id: relatedTo
+        uri: https://opendataproducts.org/odpv-v1.1/terms/relatedTo
+        type: relationship
+        status: stable
+        introducedIn: 1.0.0
+        preferredLabel:
+          en: related to
+        definition:
+          en: Indicates a general relationship between two objects when a more specific relationship type is not available.
+        alsoKnownAs:
+          en:
+            - associated with
+            - connected to
+            - linked to
+            - relevant to
+        relatedTerms:
+          - supports
+          - dependsOn
+          - partOf
+        domain:
+          - DataProduct
+          - UseCase
+          - BusinessObjective
+          - GovernanceProfile
+        range:
+          - DataProduct
+          - UseCase
+          - BusinessObjective
+          - GovernanceProfile
+        usedIn:
+          - ODPG
+        examples:
+          en:
+            - The Customer Profile DataProduct is relatedTo the Customer Segmentation UseCase.
+            - Use relatedTo only when a more specific relationship type is not available.
+
+      - id: ownedBy
+        uri: https://opendataproducts.org/odpv-v1.1/terms/ownedBy
+        type: relationship
+        status: stable
+        introducedIn: 1.0.0
+        preferredLabel:
+          en: owned by
+        definition:
+          en: Indicates that one object is owned or accountable to a person, team, organization, domain, or capability.
+        alsoKnownAs:
+          en:
+            - accountable to
+            - has owner
+            - owned by
+            - ownership assigned to
+        relatedTerms:
+          - Owner
+          - Stewardship
+          - providedBy
+        domain:
+          - DataProduct
+          - DataService
+          - Dataset
+          - Workflow
+          - Agent
+        range:
+          - Owner
+          - Domain
+          - Capability
+          - Provider
+        usedIn:
+          - ODPG
+        examples:
+          en:
+            - The maintenance risk score data service is ownedBy the aviation analytics domain.
+            - Use ownedBy when a graph object has an accountable owner, domain, team, or capability.
+
+      - id: alignsWith
+        uri: https://opendataproducts.org/odpv-v1.1/terms/alignsWith
+        type: relationship
+        status: stable
+        introducedIn: 1.0.0
+        preferredLabel:
+          en: aligns with
+        definition:
+          en: Indicates that one object has strategic, semantic, organizational, or capability alignment with another object.
+        alsoKnownAs:
+          en:
+            - aligned with
+            - maps to
+            - corresponds to
+            - strategically aligns with
+        relatedTerms:
+          - contributesTo
+          - supports
+          - relatedTo
+        domain:
+          - StrategicOpportunity
+          - Capability
+          - UseCase
+          - DataProduct
+        range:
+          - BusinessObjective
+          - Domain
+          - Capability
+          - StrategicOpportunity
+        usedIn:
+          - ODPG
+        examples:
+          en:
+            - A predictive maintenance capability alignsWith the reduce unscheduled maintenance business objective.
+            - Use alignsWith for strategic, semantic, organizational, or capability alignment.
+
+      - id: partOf
+        uri: https://opendataproducts.org/odpv-v1.1/terms/partOf
+        type: relationship
+        status: stable
+        introducedIn: 1.0.0
+        preferredLabel:
+          en: part of
+        definition:
+          en: Indicates that one object is part of a larger object, such as a catalog item being part of a catalog.
+        alsoKnownAs:
+          en:
+            - component of
+            - included in
+            - member of
+            - belongs within
+        relatedTerms:
+          - hasPart
+          - belongsTo
+          - DataProductCatalog
+        domain:
+          - DataProduct
+          - Dataset
+          - Distribution
+        range:
+          - DataProductCatalog
+          - DataProduct
+          - Dataset
+        usedIn:
+          - ODPG
+        examples:
+          en:
+            - A customer address Dataset is partOf the Customer Profile DataProduct.
+            - Use partOf when one object is a component or member of a larger object.
+
+      - id: hasPart
+        uri: https://opendataproducts.org/odpv-v1.1/terms/hasPart
+        type: relationship
+        status: stable
+        introducedIn: 1.0.0
+        preferredLabel:
+          en: has part
+        definition:
+          en: Indicates that one object contains or includes another object.
+        alsoKnownAs:
+          en:
+            - contains
+            - includes
+            - has component
+            - consists of
+        relatedTerms:
+          - partOf
+          - belongsTo
+          - Dataset
+        domain:
+          - DataProductCatalog
+          - DataProduct
+          - Dataset
+        range:
+          - DataProduct
+          - Dataset
+          - Distribution
+        usedIn:
+          - ODPG
+        examples:
+          en:
+            - The Customer Profile DataProduct hasPart the Customer Address Dataset.
+            - Use hasPart when one object contains or includes another object.
+
+      - id: derivedFrom
+        uri: https://opendataproducts.org/odpv-v1.1/terms/derivedFrom
+        type: relationship
+        status: stable
+        introducedIn: 1.0.0
+        preferredLabel:
+          en: derived from
+        definition:
+          en: Indicates that one object is derived from another object, such as an insight, product, dataset, or signal derived from a source.
+        alsoKnownAs:
+          en:
+            - based on
+            - sourced from
+            - generated from
+            - created from
+        relatedTerms:
+          - dependsOn
+          - Reference
+          - Dataset
+        mappings:
+          closeMatch:
+            - prov:wasDerivedFrom
+        domain:
+          - DataProduct
+          - Dataset
+          - Signal
+        range:
+          - Dataset
+          - DataProduct
+          - Reference
+        usedIn:
+          - ODPG
+        examples:
+          en:
+            - The Churn Score Dataset is derivedFrom customer events and subscription history datasets.
+            - Use derivedFrom when an object is based on, sourced from, generated from, or created from another object.
+
+      - id: impacts
+        uri: https://opendataproducts.org/odpv-v1.1/terms/impacts
+        type: relationship
+        status: stable
+        introducedIn: 1.0.0
+        preferredLabel:
+          en: impacts
+        definition:
+          en: Indicates that one object affects, changes, influences, or has an impact on another object.
+        alsoKnownAs:
+          en:
+            - affects
+            - influences
+            - changes
+            - has impact on
+        relatedTerms:
+          - Impact
+          - contributesTo
+          - supports
+        domain:
+          - Policy
+          - DataProduct
+          - Workflow
+          - StrategicOpportunity
+        range:
+          - UseCase
+          - KPI
+          - BusinessObjective
+          - Outcome
+        usedIn:
+          - ODPG
+        examples:
+          en:
+            - A delayed data refresh policy impacts a fraud detection use case.
+            - Use impacts when one object affects or influences a use case, metric, objective, or outcome.
+
+      - id: exposes
+        uri: https://opendataproducts.org/odpv-v1.1/terms/exposes
+        type: relationship
+        status: stable
+        introducedIn: 1.0.0
+        preferredLabel:
+          en: exposes
+        definition:
+          en: Indicates that one object exposes a data service, interface, endpoint, distribution, or access method.
+        alsoKnownAs:
+          en:
+            - exposes interface
+            - makes available through
+            - provides endpoint
+            - publishes interface
+        relatedTerms:
+          - DataService
+          - AccessMethod
+          - Distribution
+        domain:
+          - DataProduct
+          - Workflow
+          - Dataset
+          - Agent
+        range:
+          - DataService
+          - AccessMethod
+          - Distribution
+        usedIn:
+          - ODPG
+        examples:
+          en:
+            - The maintenance risk data product exposes a REST API represented as a DataService.
+            - Use exposes when one object makes an interface, endpoint, access method, or data service available.
+
+      - id: replaces
+        uri: https://opendataproducts.org/odpv-v1.1/terms/replaces
+        type: relationship
+        status: stable
+        introducedIn: 1.0.0
+        preferredLabel:
+          en: replaces
+        definition:
+          en: Indicates that one object replaces another object, such as a newer data product replacing an older version.
+        alsoKnownAs:
+          en:
+            - supersedes
+            - succeeds
+            - takes over from
+            - replaces version
+        relatedTerms:
+          - versionOf
+          - derivedFrom
+          - relatedTo
+        domain:
+          - DataProduct
+          - Dataset
+          - DataService
+        range:
+          - DataProduct
+          - Dataset
+          - DataService
+        usedIn:
+          - ODPG
+        examples:
+          en:
+            - Customer Churn Scores v2 replaces the legacy churn scoring product.
+            - Use replaces when a newer product, dataset, service, or version supersedes an older one.
+
+      - id: versionOf
+        uri: https://opendataproducts.org/odpv-v1.1/terms/versionOf
+        type: relationship
+        status: stable
+        introducedIn: 1.0.0
+        preferredLabel:
+          en: version of
+        definition:
+          en: Indicates that one object is a version of another object.
+        alsoKnownAs:
+          en:
+            - variant of
+            - release of
+            - revision of
+            - versioned form of
+        relatedTerms:
+          - replaces
+          - derivedFrom
+          - Identifier
+        domain:
+          - DataProduct
+          - Dataset
+          - DataService
+        range:
+          - DataProduct
+          - Dataset
+          - DataService
+        usedIn:
+          - ODPG
+        examples:
+          en:
+            - Customer Churn Scores v2 is a versionOf Customer Churn Scores.
+            - Use versionOf when one object is a version, variant, release, or revision of another object.

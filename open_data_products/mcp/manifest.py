@@ -272,6 +272,25 @@ def _capabilities() -> List[Dict[str, Any]]:
             ),
         },
         {
+            "id": "interoperability-profiles",
+            "title": "Draft interoperability profiles for ODPV",
+            "standards": ["odpv"],
+            "interfaces": ["python", "cli", "mcp"],
+            "lifecycle": [
+                "explicit-vocabulary-selection",
+                "profile-validation",
+                "mapping-resolution",
+                "mapping-explanation",
+                "bounded-transformation",
+                "conformance-reporting",
+            ],
+            "summary": (
+                "Validate and resolve version-pinned ODPV 1.1 draft profiles "
+                "from the dedicated profiles namespace with lifecycle, evidence, "
+                "direction, and content-digest provenance."
+            ),
+        },
+        {
             "id": "product-contracts",
             "title": "Product and Data Contract alignment",
             "standards": ["odps"],

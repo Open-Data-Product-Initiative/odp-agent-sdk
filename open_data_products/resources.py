@@ -144,6 +144,20 @@ _RESOURCE_DEFINITIONS: Tuple[ResourceDefinition, ...] = (
         "Bundled ODPV term records for retrieval and search.",
     ),
     (
+        "odpv.v1_1.vocabulary",
+        "odpv",
+        "vocabulary",
+        "odpv/data/v1_1/vocab/odpv.yaml",
+        "Bundled draft ODPV 1.1 vocabulary; callers must select it explicitly.",
+    ),
+    (
+        "odpv.v1_1.profile-schema",
+        "odpv",
+        "schema",
+        "odpv/data/v1_1/schema/odpv.profile.schema.json",
+        "Bundled draft ODPV 1.1 interoperability-profile validation schema.",
+    ),
+    (
         "okf.spec",
         "okf",
         "reference",

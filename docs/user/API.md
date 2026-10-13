@@ -187,6 +187,39 @@ registry exposes safe read-only tools; the ARWS manifest keeps that tool
 contract and adds SDK capability, workflow, resource, interface, and safety
 metadata for agent discovery.
 
+### ODPV 1.1 draft interoperability profiles
+
+Profile operations live in `open_data_products.profiles`; ODPV continues to own
+the bundled vocabulary and profile source assets. Operations are explicit and
+draft-gated. They do not change the ODPV 1.0 default:
+
+```python
+from open_data_products.profiles import profile_ref, transform_profile
+
+result = transform_profile(
+    profile_ref("ODPV-DCAT-3", "0.1.0"),
+    "odpvToExternal",
+    {
+        "objects": [
+            {"id": "dataset-1", "type": "Dataset"},
+            {"id": "service-1", "type": "DataService"},
+        ],
+        "relationships": [
+            {"source": "dataset-1", "type": "exposes", "target": "service-1"}
+        ],
+    },
+    allow_draft=True,
+)
+```
+
+Outbound input is an `ODPV-Interchange-1.0` object: an `objects` array with
+`id`, `type`, and optional `properties`; optional `relationships` with
+`source`, `type`, and `target`; and standard-specific `bindings` where a
+profile requires runtime identities. Each result distinguishes executed,
+skipped, and refused mappings and includes profile lifecycle, evidence, digest,
+declared state, and observed state. It does not assert legal permission,
+contract compliance, business value, or production execution.
+
 ## Package Namespace
 
 The SDK uses one namespace per Open Data Products standard:
@@ -195,6 +228,8 @@ The SDK uses one namespace per Open Data Products standard:
 - `open_data_products.odpc` for Open Data Product Catalog
 - `open_data_products.odpg` for Open Data Product Graph
 - `open_data_products.odpv` for Open Data Product Vocabulary
+- `open_data_products.profiles` for versioned interoperability profile
+  validation, mapping resolution, and bounded transformations
 - `open_data_products.odpr` for Open Data Product Recipes
 - `open_data_products.generation` for LLM generation prompts and provider config
 
@@ -235,6 +270,7 @@ from open_data_products.odpv import (
     validate_vocabulary,
     write_artifacts,
 )
+from open_data_products.profiles import profile_ref, transform_profile
 from open_data_products.generation import (
     list_generation_prompts,
     load_generation_prompt,
@@ -254,6 +290,9 @@ from open_data_products.odpr import (
   context, object search, and standalone graph explorer generation.
 - `open_data_products.odpv`: vocabulary loading, validation, search, generated
   JSON/JSONL/YAML artifacts, and artifact drift checks.
+- `open_data_products.profiles`: explicit draft ODPV 1.1 profile validation,
+  mapping resolution, provenance reports, and bounded adapters. Profile source
+  assets remain bundled with the ODPV vocabulary release they extend.
 - `open_data_products.odpr`: recipe loading, config inspection, recipe catalog
   listing, validation, dry-run planning, guarded deterministic execution, run
   manifests, and bundled recipe guidance.

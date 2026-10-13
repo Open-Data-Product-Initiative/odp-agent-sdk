@@ -1,0 +1,23 @@
+objects:
+  - id: workflow-1
+    type: Workflow
+  - id: dataset-1
+    type: Dataset
+relationships:
+  - source: workflow-1
+    type: uses
+    target: dataset-1
+  - source: workflow-1
+    type: produces
+    target: dataset-1
+    state: observed
+bindings:
+  openlineage:
+    jobs:
+      workflow-1:
+        namespace: acme
+        name: load
+    datasets:
+      dataset-1:
+        namespace: acme
+        name: sales

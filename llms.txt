@@ -127,6 +127,9 @@ Use these commands for machine-readable workflows:
 - `open-data-products odpv-explain DataProduct --json`
 - `open-data-products odpv-relationship DataProduct supports UseCase --json`
 - `open-data-products odpv-context DataProduct --json`
+- `open-data-products odpv-profile-validate ODPV-DCAT-3 0.1.0 --json`
+- `open-data-products odpv-profile-resolve ODPV-DCAT-3 0.1.0 --odpv-term Dataset --allow-draft --json`
+- `open-data-products odpv-profile-transform ODPV-DCAT-3 0.1.0 input.yaml --direction odpvToExternal --allow-draft --json`
 - `open-data-products product resolve-contracts <product.yaml> --json`
 - `open-data-products product check-contract <product.yaml> <contract.yaml> --json`
 - `open-data-products product contract-report <product.yaml> [contract.yaml] --json`
@@ -211,6 +214,8 @@ Agents can discover bundled resources with `list_resources()` or the
 - `odpg.objects`
 - `odpv.vocabulary`
 - `odpv.terms`
+- `odpv.v1_1.vocabulary` (draft; explicit selection required)
+- `odpv.v1_1.profile-schema` (draft profile validation schema)
 - `okf.spec`
 - `generation.prompt.system`
 - `generation.prompt.odps_data_product_fragment`
@@ -316,6 +321,9 @@ standards-ready YAML fragments:
   context, external graph conversion, and explorer generation
 - `open_data_products.odpv`: ODPV vocabulary loading, validation, search,
   artifacts, term resolution, relationship compatibility, and term context
+- `open_data_products.profiles`: version-pinned interoperability-profile
+  validation, mapping resolution, provenance reporting, and bounded
+  transformations; ODPV owns the bundled profile source assets
 - `open_data_products.okf`: OKF bundle validation, concept summaries, import
   into generation source docs, and export from ODPC catalog or portfolio artifacts
 - `open_data_products.generation`: editable LLM prompt templates for generating

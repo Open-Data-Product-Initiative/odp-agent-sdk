@@ -73,6 +73,15 @@ from ..odpv import (
     resolve_vocabulary_term as _resolve_vocabulary_term,
     search_vocabulary,
 )
+from ..profiles import (
+    ProfileRef,
+    explain_mapping as _explain_mapping,
+    list_vocabulary_releases as _list_vocabulary_releases,
+    profile_ref as _profile_ref,
+    resolve_mapping as _resolve_mapping,
+    transform_profile as _transform_profile,
+    validate_profile as _validate_profile,
+)
 from ..resources import get_resource, list_resources
 from ..summary import load_summary
 
@@ -223,6 +232,48 @@ def _h_check_vocabulary_relationship(args: Dict[str, Any]) -> Dict[str, Any]:
 
 def _h_vocabulary_term_context(args: Dict[str, Any]) -> Dict[str, Any]:
     return _json_envelope(_agent_vocabulary_context(args["term"]))
+
+
+def _profile_reference(args: Dict[str, Any]) -> ProfileRef:
+    return _profile_ref(args["profile_id"], args["profile_version"])
+
+
+def _h_list_vocabulary_releases(args: Dict[str, Any]) -> Dict[str, Any]:
+    return _json_envelope(_list_vocabulary_releases())
+
+
+def _h_validate_profile(args: Dict[str, Any]) -> Dict[str, Any]:
+    return _json_envelope(_validate_profile(_profile_reference(args)).to_dict())
+
+
+def _h_resolve_profile_mapping(args: Dict[str, Any]) -> Dict[str, Any]:
+    mappings = _resolve_mapping(
+        _profile_reference(args),
+        odpv_term=args.get("odpv_term"),
+        external_reference=args.get("external_reference"),
+        allow_draft=bool(args.get("allow_draft", False)),
+    )
+    return _json_envelope([mapping.to_dict() for mapping in mappings])
+
+
+def _h_explain_profile_mapping(args: Dict[str, Any]) -> Dict[str, Any]:
+    mapping = _explain_mapping(
+        _profile_reference(args),
+        args["mapping_id"],
+        allow_draft=bool(args.get("allow_draft", False)),
+    )
+    return _json_envelope(mapping.to_dict())
+
+
+def _h_transform_profile(args: Dict[str, Any]) -> Dict[str, Any]:
+    return _json_envelope(
+        _transform_profile(
+            _profile_reference(args),
+            args["direction"],
+            args["source_document"],
+            allow_draft=bool(args.get("allow_draft", False)),
+        )
+    )
 
 
 def _h_search_objects(args: Dict[str, Any]) -> Dict[str, Any]:
@@ -727,6 +778,110 @@ TOOLS: List[Dict[str, Any]] = [
         "class": "safe",
         "inputSchema": _object_schema({"term": _TERM_PROP}, ["term"]),
         "handler": _h_vocabulary_term_context,
+    },
+    {
+        "name": "list_odpv_vocabulary_releases",
+        "description": "List bundled stable and draft ODPV vocabulary releases.",
+        "class": "safe",
+        "inputSchema": _object_schema({}),
+        "handler": _h_list_vocabulary_releases,
+    },
+    {
+        "name": "validate_odpv_profile",
+        "description": "Validate one exact bundled ODPV interoperability profile.",
+        "class": "safe",
+        "inputSchema": _object_schema(
+            {
+                "profile_id": {"type": "string", "description": "Profile id."},
+                "profile_version": {
+                    "type": "string",
+                    "description": "Exact profile version.",
+                },
+            },
+            ["profile_id", "profile_version"],
+        ),
+        "handler": _h_validate_profile,
+    },
+    {
+        "name": "resolve_odpv_profile_mapping",
+        "description": "Resolve mappings in one exact ODPV profile after draft opt-in.",
+        "class": "safe",
+        "inputSchema": _object_schema(
+            {
+                "profile_id": {"type": "string", "description": "Profile id."},
+                "profile_version": {
+                    "type": "string",
+                    "description": "Exact profile version.",
+                },
+                "odpv_term": {
+                    "type": "string",
+                    "description": "Optional exact ODPV term id.",
+                },
+                "external_reference": {
+                    "type": "string",
+                    "description": "Optional exact external reference.",
+                },
+                "allow_draft": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": "Explicitly allow draft profile operations.",
+                },
+            },
+            ["profile_id", "profile_version"],
+        ),
+        "handler": _h_resolve_profile_mapping,
+    },
+    {
+        "name": "explain_odpv_profile_mapping",
+        "description": "Explain one exact ODPV profile mapping with lifecycle provenance.",
+        "class": "safe",
+        "inputSchema": _object_schema(
+            {
+                "profile_id": {"type": "string", "description": "Profile id."},
+                "profile_version": {
+                    "type": "string",
+                    "description": "Exact profile version.",
+                },
+                "mapping_id": {"type": "string", "description": "Mapping id."},
+                "allow_draft": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": "Explicitly allow draft profile operations.",
+                },
+            },
+            ["profile_id", "profile_version", "mapping_id"],
+        ),
+        "handler": _h_explain_profile_mapping,
+    },
+    {
+        "name": "transform_odpv_profile",
+        "description": "Transform a bounded document through an exact ODPV profile after draft opt-in.",
+        "class": "safe",
+        "inputSchema": _object_schema(
+            {
+                "profile_id": {"type": "string", "description": "Profile id."},
+                "profile_version": {
+                    "type": "string",
+                    "description": "Exact profile version.",
+                },
+                "direction": {
+                    "type": "string",
+                    "enum": ["odpvToExternal", "externalToOdpv"],
+                    "description": "Requested adapter direction.",
+                },
+                "source_document": {
+                    "type": "object",
+                    "description": "Bounded ODPV interchange or external document.",
+                },
+                "allow_draft": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": "Explicitly allow draft profile operations.",
+                },
+            },
+            ["profile_id", "profile_version", "direction", "source_document"],
+        ),
+        "handler": _h_transform_profile,
     },
     {
         "name": "search_objects",

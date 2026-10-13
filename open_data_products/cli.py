@@ -102,6 +102,9 @@ ODPV vocabulary commands:
   odpv-context         Return an agent-ready term context packet
   resources --id odpv.terms     Return vocabulary term records
   MCP search_terms              Search ODPV terms from agents
+  odpv-profile-validate         Validate an exact draft ODPV 1.1 profile
+  odpv-profile-resolve          Resolve a mapping after explicit draft opt-in
+  odpv-profile-transform        Transform a bounded document through a profile
 
 ODPR recipe commands:
   recipe list           List workflow recipe metadata
@@ -1082,6 +1085,64 @@ def main(argv: Optional[List[str]] = None) -> int:
     odpv_context_parser.add_argument("term", help="ODPV term id")
     odpv_context_parser.add_argument("--json", action="store_true", help="Emit JSON")
 
+    odpv_profile_validate_parser = subparsers.add_parser(
+        "odpv-profile-validate", help="Validate an exact ODPV 1.1 profile"
+    )
+    odpv_profile_validate_parser.add_argument("profile_id", help="Profile id")
+    odpv_profile_validate_parser.add_argument(
+        "profile_version", help="Exact profile version"
+    )
+    odpv_profile_validate_parser.add_argument(
+        "--json", action="store_true", help="Emit JSON"
+    )
+
+    odpv_profile_resolve_parser = subparsers.add_parser(
+        "odpv-profile-resolve",
+        help="Resolve mappings in an exact ODPV 1.1 profile",
+    )
+    odpv_profile_resolve_parser.add_argument("profile_id", help="Profile id")
+    odpv_profile_resolve_parser.add_argument(
+        "profile_version", help="Exact profile version"
+    )
+    odpv_profile_resolve_parser.add_argument("--odpv-term", help="Exact ODPV term id")
+    odpv_profile_resolve_parser.add_argument(
+        "--external-reference", help="Exact external reference"
+    )
+    odpv_profile_resolve_parser.add_argument(
+        "--allow-draft",
+        action="store_true",
+        help="Explicitly allow a draft-profile operation",
+    )
+    odpv_profile_resolve_parser.add_argument(
+        "--json", action="store_true", help="Emit JSON"
+    )
+
+    odpv_profile_transform_parser = subparsers.add_parser(
+        "odpv-profile-transform",
+        help="Transform a bounded document through an exact ODPV 1.1 profile",
+    )
+    odpv_profile_transform_parser.add_argument("profile_id", help="Profile id")
+    odpv_profile_transform_parser.add_argument(
+        "profile_version", help="Exact profile version"
+    )
+    odpv_profile_transform_parser.add_argument(
+        "source", help="YAML or JSON ODPV interchange or external document"
+    )
+    odpv_profile_transform_parser.add_argument(
+        "--direction",
+        choices=("odpvToExternal", "externalToOdpv"),
+        required=True,
+        help="Requested adapter direction",
+    )
+    odpv_profile_transform_parser.add_argument(
+        "--allow-draft",
+        action="store_true",
+        help="Explicitly allow a draft-profile operation",
+    )
+    odpv_profile_transform_parser.add_argument(
+        "--json", action="store_true", help="Emit JSON"
+    )
+
     odpg_summary_parser = subparsers.add_parser(
         "odpg-summary", help="Summarize an ODPG graph"
     )
@@ -1391,7 +1452,9 @@ def main(argv: Optional[List[str]] = None) -> int:
         "--config",
         help="Generation config YAML file with portfolio source budget settings.",
     )
-    portfolio_intake_parser.add_argument("--json", action="store_true", help="Emit JSON")
+    portfolio_intake_parser.add_argument(
+        "--json", action="store_true", help="Emit JSON"
+    )
     portfolio_sync_parser = portfolio_subparsers.add_parser(
         "sync",
         help="Sync edited YAML artifacts without calling an LLM",
@@ -2351,6 +2414,79 @@ def main(argv: Optional[List[str]] = None) -> int:
                 term = payload["term"]
                 print(f"{term['id']}: {term['definition'].get('en', '')}")
             return _finalize_activity(args, activity_context, activity_start_time, 0)
+
+        if args.command == "odpv-profile-validate":
+            from .profiles import profile_ref, validate_profile
+
+            result = validate_profile(
+                profile_ref(args.profile_id, args.profile_version)
+            ).to_dict()
+            if args.json:
+                print(json.dumps(result, indent=2))
+            else:
+                state = "valid" if result["valid"] else "invalid"
+                print("ODPV profile %s" % state)
+                for warning in result["warnings"]:
+                    print("- WARNING: %s" % warning)
+                for error in result["errors"]:
+                    print("- ERROR: %s" % error)
+            return _finalize_activity(
+                args, activity_context, activity_start_time, 0 if result["valid"] else 1
+            )
+
+        if args.command == "odpv-profile-resolve":
+            from .profiles import profile_ref, resolve_mapping
+
+            if not args.odpv_term and not args.external_reference:
+                raise ValueError("Specify --odpv-term or --external-reference")
+            mappings = resolve_mapping(
+                profile_ref(args.profile_id, args.profile_version),
+                odpv_term=args.odpv_term,
+                external_reference=args.external_reference,
+                allow_draft=args.allow_draft,
+            )
+            payload = [mapping.to_dict() for mapping in mappings]
+            if args.json:
+                print(json.dumps(payload, indent=2))
+            else:
+                for mapping in payload:
+                    print(
+                        "%s: %s -> %s"
+                        % (
+                            mapping["mappingId"],
+                            mapping["odpvTerm"],
+                            mapping["externalReference"],
+                        )
+                    )
+            return _finalize_activity(
+                args, activity_context, activity_start_time, 0 if mappings else 1
+            )
+
+        if args.command == "odpv-profile-transform":
+            from ._io import load_mapping
+            from .profiles import profile_ref, transform_profile
+
+            source = load_mapping(args.source, root_name="ODPV profile source")
+            result = transform_profile(
+                profile_ref(args.profile_id, args.profile_version),
+                args.direction,
+                source,
+                allow_draft=args.allow_draft,
+            )
+            if args.json:
+                print(json.dumps(result, indent=2))
+            else:
+                print("ODPV profile transformation %s" % result["status"])
+                for item in result["transformations"]["refused"]:
+                    print("- REFUSED: %s" % item["reason"])
+                for item in result["transformations"]["skipped"]:
+                    print("- SKIPPED: %s" % item["reason"])
+            return _finalize_activity(
+                args,
+                activity_context,
+                activity_start_time,
+                0 if result["status"] == "executed" else 1,
+            )
 
         if args.command == "odpg-summary":
             from .odpg import load_graph, summarize_graph

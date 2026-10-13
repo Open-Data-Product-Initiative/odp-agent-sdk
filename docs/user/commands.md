@@ -288,6 +288,20 @@ open-data-products odpv-context DataProduct
 
 Returns an agent-ready context packet for one vocabulary term.
 
+### ODPV 1.1 draft profile adapters
+
+```bash
+open-data-products odpv-profile-validate ODPV-DCAT-3 0.1.0 --json
+open-data-products odpv-profile-resolve ODPV-DCAT-3 0.1.0 --odpv-term Dataset --allow-draft --json
+open-data-products odpv-profile-transform ODPV-DCAT-3 0.1.0 input.yaml --direction odpvToExternal --allow-draft --json
+```
+
+The profile id and version are exact, and every operation needs explicit draft
+opt-in. Adapter input is a bounded `ODPV-Interchange-1.0` object with
+`objects`, optional `relationships`, and optional standard bindings. Results
+record executed, skipped, and refused transformations; they do not establish
+business, legal, or runtime compliance.
+
 ## ODPG Graph Reasoning
 
 ```bash

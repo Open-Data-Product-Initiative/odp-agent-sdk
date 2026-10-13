@@ -1,0 +1,422 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://opendataproducts.org/odpv-v1.1/schema/odpv.schema.json",
+  "title": "Open Data Product Vocabulary Schema",
+  "description": "JSON Schema for validating the Open Data Product Vocabulary, ODPV.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "version",
+    "id",
+    "name",
+    "description",
+    "license",
+    "publisher",
+    "sections"
+  ],
+  "properties": {
+    "schema": {
+      "type": "string",
+      "format": "uri",
+      "description": "URI of this JSON Schema."
+    },
+    "version": {
+      "$ref": "#/$defs/semanticVersion"
+    },
+    "id": {
+      "type": "string",
+      "const": "ODPV",
+      "description": "Vocabulary identifier."
+    },
+    "name": {
+      "$ref": "#/$defs/languageMap"
+    },
+    "description": {
+      "$ref": "#/$defs/languageMap"
+    },
+    "license": {
+      "$ref": "#/$defs/license"
+    },
+    "publisher": {
+      "$ref": "#/$defs/publisher"
+    },
+    "sections": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/section"
+      }
+    }
+  },
+  "$defs": {
+    "semanticVersion": {
+      "type": "string",
+      "description": "Semantic version number, with optional prerelease suffix.",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(-[A-Za-z0-9.-]+)?$",
+      "examples": [
+        "1.0.0",
+        "1.0.0-dev",
+        "1.0.0-rc.1"
+      ]
+    },
+    "languageTag": {
+      "type": "string",
+      "description": "Simple BCP 47-style language tag.",
+      "pattern": "^[a-z]{2}(-[A-Z]{2})?$",
+      "examples": [
+        "en",
+        "fi",
+        "ar",
+        "en-US"
+      ]
+    },
+    "languageMap": {
+      "type": "object",
+      "description": "Language-tagged text values.",
+      "minProperties": 1,
+      "additionalProperties": false,
+      "patternProperties": {
+        "^[a-z]{2}(-[A-Z]{2})?$": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "examples": [
+        {
+          "en": "Open Data Product Vocabulary"
+        }
+      ]
+    },
+    "languageArrayMap": {
+      "type": "object",
+      "description": "Language-tagged arrays of text values.",
+      "minProperties": 1,
+      "additionalProperties": false,
+      "patternProperties": {
+        "^[a-z]{2}(-[A-Z]{2})?$": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        }
+      },
+      "examples": [
+        {
+          "en": [
+            "data offering",
+            "reusable data asset"
+          ]
+        }
+      ]
+    },
+    "identifier": {
+      "type": "string",
+      "description": "Stable ODPV term identifier.",
+      "pattern": "^[A-Za-z][A-Za-z0-9]*$",
+      "examples": [
+        "DataProduct",
+        "BusinessObjective",
+        "governedBy"
+      ]
+    },
+    "uri": {
+      "type": "string",
+      "format": "uri"
+    },
+    "license": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "url"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "examples": [
+            "Apache 2.0"
+          ]
+        },
+        "url": {
+          "$ref": "#/$defs/uri"
+        }
+      }
+    },
+    "publisher": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "examples": [
+            "Open Data Product Initiative"
+          ]
+        },
+        "umbrella": {
+          "type": "string",
+          "minLength": 1,
+          "examples": [
+            "Linux Foundation"
+          ]
+        },
+        "url": {
+          "$ref": "#/$defs/uri"
+        }
+      }
+    },
+    "sectionId": {
+      "type": "string",
+      "enum": [
+        "core",
+        "value",
+        "governance",
+        "relationships"
+      ]
+    },
+    "section": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name",
+        "description",
+        "terms"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/sectionId"
+        },
+        "name": {
+          "$ref": "#/$defs/languageMap"
+        },
+        "description": {
+          "$ref": "#/$defs/languageMap"
+        },
+        "terms": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/term"
+          }
+        }
+      }
+    },
+    "termType": {
+      "type": "string",
+      "enum": [
+        "object",
+        "role",
+        "classification",
+        "reference",
+        "relationship"
+      ]
+    },
+    "termStatus": {
+      "type": "string",
+      "enum": [
+        "draft",
+        "stable",
+        "deprecated",
+        "retired"
+      ]
+    },
+    "specName": {
+      "type": "string",
+      "enum": [
+        "ODPS",
+        "ODPC",
+        "ODPG",
+        "ODPV"
+      ]
+    },
+    "termReferenceArray": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "usedInArray": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/specName"
+      },
+      "uniqueItems": true
+    },
+    "externalMappings": {
+      "type": "object",
+      "description": "External vocabulary mappings. Keys may represent vocabularies such as dcat, schemaOrg, skos, dublinCore, prov, or custom namespaces.",
+      "additionalProperties": {
+        "type": "array",
+        "minItems": 1,
+        "items": {
+          "type": "string",
+          "minLength": 1
+        },
+        "uniqueItems": true
+      },
+      "examples": [
+        {
+          "dcat": [
+            "dcat:Dataset"
+          ],
+          "schemaOrg": [
+            "schema:Dataset"
+          ]
+        }
+      ]
+    },
+    "term": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "uri",
+        "type",
+        "status",
+        "preferredLabel",
+        "definition",
+        "alsoKnownAs",
+        "relatedTerms",
+        "usedIn"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "uri": {
+          "$ref": "#/$defs/uri"
+        },
+        "type": {
+          "$ref": "#/$defs/termType"
+        },
+        "status": {
+          "$ref": "#/$defs/termStatus"
+        },
+        "preferredLabel": {
+          "$ref": "#/$defs/languageMap"
+        },
+        "definition": {
+          "$ref": "#/$defs/languageMap"
+        },
+        "alsoKnownAs": {
+          "$ref": "#/$defs/languageArrayMap"
+        },
+        "relatedTerms": {
+          "$ref": "#/$defs/termReferenceArray"
+        },
+        "usedIn": {
+          "$ref": "#/$defs/usedInArray"
+        },
+        "introducedIn": {
+          "$ref": "#/$defs/semanticVersion"
+        },
+        "deprecatedIn": {
+          "$ref": "#/$defs/semanticVersion"
+        },
+        "retiredIn": {
+          "$ref": "#/$defs/semanticVersion"
+        },
+        "replacedBy": {
+          "type": "string",
+          "minLength": 1
+        },
+        "domain": {
+          "description": "Recommended source object types for relationship terms.",
+          "$ref": "#/$defs/termReferenceArray"
+        },
+        "range": {
+          "description": "Recommended target object types for relationship terms.",
+          "$ref": "#/$defs/termReferenceArray"
+        },
+        "mappings": {
+          "$ref": "#/$defs/externalMappings"
+        },
+        "examples": {
+          "$ref": "#/$defs/languageArrayMap"
+        },
+        "notes": {
+          "$ref": "#/$defs/languageMap"
+        },
+        "seeAlso": {
+          "type": "array",
+          "description": "External documentation links.",
+          "items": {
+            "$ref": "#/$defs/uri"
+          },
+          "uniqueItems": true
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "relationship"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "properties": {
+              "domain": {
+                "$ref": "#/$defs/termReferenceArray"
+              },
+              "range": {
+                "$ref": "#/$defs/termReferenceArray"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "deprecated"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "required": [
+              "deprecatedIn"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "retired"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "required": [
+              "retiredIn"
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

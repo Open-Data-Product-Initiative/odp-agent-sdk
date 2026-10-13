@@ -83,6 +83,11 @@ EXPECTED_TOOLS = {
     "explain_vocabulary_term",
     "check_vocabulary_relationship",
     "vocabulary_term_context",
+    "list_odpv_vocabulary_releases",
+    "validate_odpv_profile",
+    "resolve_odpv_profile_mapping",
+    "explain_odpv_profile_mapping",
+    "transform_odpv_profile",
     "search_objects",
     "search_graph_objects",
     "summarize_graph",
@@ -214,6 +219,22 @@ class TestCodexProjectConfig:
         assert server["startup_timeout_sec"] == 10
         assert server["tool_timeout_sec"] == 60
         assert "/" not in server["command"]
+
+
+class TestContinuousIntegration:
+    def test_installed_wheel_smoke_covers_odpv_v1_1_resources_and_adapter(self):
+        workflow = (REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text(
+            encoding="utf-8"
+        )
+
+        for expected in (
+            'get_resource("odpv.v1_1.vocabulary")',
+            'get_resource("odpv.v1_1.profile-schema")',
+            'validate_vocabulary_release("1.1.0")',
+            'validate_profile(profile_ref("ODPV-DCAT-3", "0.1.0"))',
+            "transform_profile(",
+        ):
+            assert expected in workflow
 
 
 class TestClaudeCodeProjectConfig:
