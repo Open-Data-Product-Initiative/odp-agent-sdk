@@ -2,6 +2,8 @@
 
 from pathlib import Path
 
+import yaml
+
 from open_data_products.odpc import (
     DEFAULT_CATALOG_HTML_TEMPLATE,
     build_catalog,
@@ -20,7 +22,8 @@ from open_data_products.odpc import (
     write_catalog_toon,
     write_catalog_artifacts,
 )
-from open_data_products.odpc.ai_product import validate_ai_product
+from open_data_products.agent import detect_document, validate_document
+from open_data_products.odpc import load_ai_product, validate_ai_product
 
 VALID_CATALOG = {
     "schema": "https://opendataproducts.org/odpc-v1.0/schema/odpc.yaml",
@@ -80,6 +83,20 @@ def test_validate_odpc_v1_1_ai_product_and_report_missing_governance_path():
 
     assert not invalid.valid
     assert any("aiProduct.governance" in error for error in invalid.errors)
+
+
+def test_agent_api_detects_and_validates_an_odpc_v1_1_ai_product(tmp_path):
+    path = tmp_path / "ai-product.yaml"
+    path.write_text(yaml.safe_dump(VALID_AI_PRODUCT, sort_keys=False), encoding="utf-8")
+
+    loaded = load_ai_product(path)
+    result = validate_document(loaded)
+
+    assert detect_document(loaded) == ("odpc", "AIProduct")
+    assert result.valid
+    assert result.spec == "odpc"
+    assert result.kind == "AIProduct"
+    assert result.version == "1.1"
 
 
 def test_search_objects_returns_product_reference_by_id():
