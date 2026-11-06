@@ -42,6 +42,7 @@ class CatalogValidationResult:
 
 
 SCHEMA_URI = "https://opendataproducts.org/odpc-v1.0/schema/odpc.yaml"
+V11_SCHEMA_URI = "https://opendataproducts.org/odpc-v1.1/schema/odpc.yaml"
 OBJECT_COLLECTIONS = {
     "productReference": "productReferences",
     "useCase": "useCases",
@@ -829,7 +830,10 @@ def validate_catalog(
             "ODPC validation dependencies."
         ) from exc
 
-    schema_data = schema or load_schema()
+    is_v11 = document.get("schema") == V11_SCHEMA_URI and document.get("version") == "1.1"
+    schema_data = schema or load_schema(
+        _data_file("schema", "v1.1", "odpc.yaml") if is_v11 else None
+    )
     jsonschema.Draft202012Validator.check_schema(schema_data)
     validator = jsonschema.Draft202012Validator(schema_data)
     errors = sorted(validator.iter_errors(document), key=lambda error: list(error.path))

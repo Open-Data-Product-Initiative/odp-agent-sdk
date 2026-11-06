@@ -23,7 +23,11 @@ from open_data_products.odpc import (
     write_catalog_artifacts,
 )
 from open_data_products.agent import detect_document, validate_document
-from open_data_products.odpc import load_ai_product, validate_ai_product
+from open_data_products.odpc import (
+    load_ai_product,
+    validate_ai_product,
+    validate_ai_product_bundle,
+)
 
 VALID_CATALOG = {
     "schema": "https://opendataproducts.org/odpc-v1.0/schema/odpc.yaml",
@@ -97,6 +101,38 @@ def test_agent_api_detects_and_validates_an_odpc_v1_1_ai_product(tmp_path):
     assert result.spec == "odpc"
     assert result.kind == "AIProduct"
     assert result.version == "1.1"
+
+
+def test_odpc_v1_1_catalog_and_bundle_require_matching_ai_product_identity():
+    product = VALID_AI_PRODUCT["aiProduct"]
+    catalog = {
+        "schema": "https://opendataproducts.org/odpc-v1.1/schema/odpc.yaml",
+        "version": "1.1",
+        "kind": "Catalog",
+        "catalog": {
+            "metadata": {"id": "CAT-AI-001", "name": {"en": "AI Products"}, "description": {"en": "AI product portfolio."}},
+            "nodes": [
+                {"node": {"kind": "aiProduct", "id": "AI-001", **product}},
+                {"node": {"kind": "productReference", "id": "AI-PR-001", "productID": product["productID"], "productVersion": product["productVersion"], "name": product["name"], "description": product["description"], "productCategory": "ai_product", "productModel": {"standard": "ODPC", "version": "1.1", "profile": "AIProduct", "format": "yaml", "schema": "https://opendataproducts.org/odpc-v1.1/schema/ai-product.yaml", "$ref": "ai-products/policy-knowledge-assistant.odpc.yaml"}}},
+            ],
+        },
+    }
+    graph = {
+        "schema": "https://opendataproducts.org/odpg-v1.0/schema/odpg.yaml",
+        "version": "1.0",
+        "kind": "Graph",
+        "graph": {"metadata": {"id": "graph-ai", "name": {"en": "AI graph"}, "description": {"en": "AI product graph."}}, "nodes": [{"id": "AI-001", "type": "AIProduct", "$ref": "ai-products/policy-knowledge-assistant.odpc.yaml"}], "edges": []},
+    }
+
+    assert validate_catalog(catalog).valid
+    assert validate_ai_product_bundle(VALID_AI_PRODUCT, catalog, graph).valid
+
+    catalog["catalog"]["nodes"][1]["node"]["productID"] = "wrong-id"
+
+    invalid = validate_ai_product_bundle(VALID_AI_PRODUCT, catalog, graph)
+
+    assert not invalid.valid
+    assert any("productID" in error for error in invalid.errors)
 
 
 def test_search_objects_returns_product_reference_by_id():
