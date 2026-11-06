@@ -27,6 +27,12 @@ def test_top_level_package_exposes_version_alias():
     assert open_data_products.odps.__version__ == open_data_products.__version__
 
 
+def test_current_release_version_is_0_5_0():
+    import open_data_products
+
+    assert open_data_products.__version__ == "0.5.0"
+
+
 def test_release_summary_matches_package_version():
     import open_data_products
 
