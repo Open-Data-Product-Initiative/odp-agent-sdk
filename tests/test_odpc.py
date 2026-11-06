@@ -20,6 +20,7 @@ from open_data_products.odpc import (
     write_catalog_toon,
     write_catalog_artifacts,
 )
+from open_data_products.odpc.ai_product import validate_ai_product
 
 VALID_CATALOG = {
     "schema": "https://opendataproducts.org/odpc-v1.0/schema/odpc.yaml",
@@ -33,6 +34,52 @@ VALID_CATALOG = {
         }
     },
 }
+
+
+VALID_AI_PRODUCT = {
+    "schema": "https://opendataproducts.org/odpc-v1.1/schema/ai-product.yaml",
+    "version": "1.1",
+    "kind": "AIProduct",
+    "aiProduct": {
+        "productID": "policy-knowledge-assistant",
+        "productVersion": "1.0.0",
+        "name": {"en": "Policy Knowledge Assistant"},
+        "description": {"en": "Answers policy questions from approved material."},
+        "purpose": {"en": "Improve access to policy guidance with human escalation."},
+        "owner": {"team": "Knowledge Management"},
+        "productType": "rag",
+        "governance": {
+            "autonomyLevel": "assistive",
+            "humanOversight": {"required": True, "requirements": [{"en": "Review source changes."}]},
+            "consequentialActionApproval": {"required": False, "requirements": [{"en": "The assistant takes no consequential action."}]},
+            "riskClassification": "limited",
+            "knownLimitations": [{"en": "Sources can be out of date."}],
+        },
+        "evaluation": [{
+            "id": "GROUNDEDNESS",
+            "name": {"en": "Grounded answer review"},
+            "measurementMethod": {"en": "Expert review of sampled answers."},
+            "targetValue": "Pass",
+            "unit": "review outcome",
+            "status": "planned",
+        }],
+    },
+}
+
+
+def test_validate_odpc_v1_1_ai_product_and_report_missing_governance_path():
+    valid = validate_ai_product(VALID_AI_PRODUCT)
+
+    assert valid.valid
+    assert valid.errors == []
+
+    incomplete = {**VALID_AI_PRODUCT, "aiProduct": {**VALID_AI_PRODUCT["aiProduct"]}}
+    del incomplete["aiProduct"]["governance"]
+
+    invalid = validate_ai_product(incomplete)
+
+    assert not invalid.valid
+    assert any("aiProduct.governance" in error for error in invalid.errors)
 
 
 def test_search_objects_returns_product_reference_by_id():
