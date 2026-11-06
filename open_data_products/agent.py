@@ -7,7 +7,14 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 
 from ._io import load_mapping
-from .odpc import explain_catalog, load_catalog, validate_catalog
+from .odpc import (
+    AI_PRODUCT_SCHEMA_URL,
+    explain_catalog,
+    load_ai_product,
+    load_catalog,
+    validate_ai_product,
+    validate_catalog,
+)
 from .odpg import explain_graph, load_graph, validate_graph
 from .odps import OpenDataProduct
 from .odps.exceptions import ODPSValidationError
@@ -25,6 +32,8 @@ def load_document(path: Union[str, Path]) -> Document:
     spec, _kind = detect_document(data)
     if spec == "odps":
         return OpenDataProduct.from_file(document_path)
+    if spec == "odpc" and _kind == "AIProduct":
+        return load_ai_product(document_path)
     if spec == "odpc":
         return load_catalog(document_path)
     if spec == "odpg":
@@ -43,6 +52,8 @@ def detect_document(document: Document) -> Tuple[str, str]:
 
     schema = str(document.get("schema", "")).lower()
     kind = str(document.get("kind", "") or "")
+    if schema == AI_PRODUCT_SCHEMA_URL or kind == "AIProduct":
+        return "odpc", "AIProduct"
     if "odpc" in schema or kind == "Catalog" or "catalog" in document:
         return "odpc", kind or "Catalog"
     if "odpg" in schema or kind in {"Graph", "DataProductGraph"}:
@@ -92,6 +103,18 @@ def validate_document(
                 path=source_path,
                 version=version,
             )
+
+    if spec == "odpc" and kind == "AIProduct":
+        assert isinstance(loaded, dict)
+        profile_result = validate_ai_product(loaded)
+        return ValidationResult(
+            valid=profile_result.valid,
+            spec=spec,
+            kind=kind,
+            errors=profile_result.errors,
+            path=source_path,
+            version=version,
+        )
 
     if spec == "odpc":
         assert isinstance(loaded, dict)
