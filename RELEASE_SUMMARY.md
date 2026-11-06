@@ -1,47 +1,31 @@
-# Open Data Products Python SDK 0.4.0 Release Notes
+# Open Data Products Python SDK 0.5.0 Release Notes
 
-## ODPS v4.2 is ready to use
+## ODPC v1.1 AI products are ready to validate
 
-Version 0.4.0 adds full support for ODPS v4.2 while keeping existing ODPS v4.1
-documents working. You can validate, inspect, generate, and package v4.2 data
-products without downloading schemas at runtime.
-
-The SDK now understands v4.2 profile-based Contracts and Data Access. A data
-product can declare a default Contract profile, additional named profiles,
-external profile packages, and explicit links from an access profile to its
-Contract. Invalid profile structures, missing required defaults, missing output
-port types, invalid references, and malformed URLs are reported during
-validation.
+Version 0.5.0 adds offline validation for the official ODPC v1.1 AI Product
+profile and its catalog representation. The package bundles the canonical
+schemas, so validation does not fetch remote schemas at runtime.
 
 ## What changes for users
 
-- New product generation and portfolio builds produce ODPS v4.2 artifacts.
-  Generated Data Access uses the required `default` profile, and the linked
-  Product Reference records ODPS version 4.2 as well.
-- The Python SDK offers helpers for creating Contract and Data Access profiles.
-  Use `OpenDataProduct(details, version="4.2")` when creating a v4.2 product
-  directly in Python.
-- The CLI and MCP interfaces automatically recognize v4.1 and v4.2 documents
-  from their schema URI or `version` value. Their validation, explanation, and
-  reference commands expose the matching version and v4.2 profile references.
-- MCP can now build a portfolio workspace. This is a state-changing tool: the
-  caller must send `approved: true` because the operation writes files and can
-  call the configured LLM provider.
+- `validate_ai_product` validates a standalone `AIProduct` profile, including
+  its purpose, structured ownership, governance, and evaluation requirements.
+- `validate_ai_product_bundle` checks that a standalone profile, an ODPC v1.1
+  catalog entry, and an ODPG `AIProduct` node have consistent identities and
+  profile references.
+- The unified Python agent API and `open-data-products validate` command
+  automatically detect an ODPC v1.1 `AIProduct` from its canonical schema URI
+  and report `odpc`, `AIProduct`, and version `1.1`.
 
 ## Compatibility
 
-ODPS v4.1 remains supported for parsing and validation, and the Python
-`OpenDataProduct` constructor continues to default to v4.1 for compatibility.
-Use `version="4.2"` for newly created v4.2 products. A v4.1 singleton Contract
-is not silently reinterpreted as a v4.2 Contract profile.
+Existing ODPC v1.0 catalog validation remains unchanged. An AI product is a
+separate ODPC v1.1 profile; no existing data-product profile or agent node is
+reinterpreted.
 
 ## Release confidence
 
-The test suite covers v4.1 and v4.2 schema routing, profile round trips, CLI
-and MCP commands, portfolio generation and fallback artifacts, plus the MCP
-portfolio-build approval gate. CI runs the full suite, builds and checks the
-distribution, then validates a v4.2 fixture from an installed wheel.
-
-The local environment cannot build a distribution because its Python build
-backend is unavailable and it cannot download dependencies. The CI workflow is
-the final distribution-build check.
+The test suite covers standalone profile validation, missing governance paths,
+agent API and CLI detection, catalog validation, bundle identity mismatches, and
+top-level public API exposure. The distribution build includes the v1.1 profile
+and catalog schemas.
