@@ -4,6 +4,7 @@ from .ai_product import (
     AI_PRODUCT_SCHEMA_URL,
     load_ai_product,
     load_ai_product_schema,
+    validate_ai_product_bundle,
     validate_ai_product,
 )
 
@@ -59,6 +60,7 @@ __all__ = [
     "search_objects",
     "validate_catalog",
     "validate_ai_product",
+    "validate_ai_product_bundle",
     "write_catalog",
     "write_catalog_gcf",
     "write_catalog_html",
