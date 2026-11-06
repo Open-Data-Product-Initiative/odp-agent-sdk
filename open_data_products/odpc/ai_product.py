@@ -3,14 +3,13 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Dict, Union
+from typing import Any, Dict, List, Union
 
 from jsonschema import Draft202012Validator, FormatChecker
 
 from open_data_products._io import load_mapping
 
 from .catalog import CatalogValidationResult, NoDatesSafeLoader, validate_catalog
-
 
 AI_PRODUCT_SCHEMA_URL = "https://opendataproducts.org/odpc-v1.1/schema/ai-product.yaml"
 
@@ -47,7 +46,11 @@ def validate_ai_product(document: Dict[str, Any]) -> CatalogValidationResult:
         location = "$." + ".".join(map(str, error.path)) if error.path else "$"
         if error.validator == "required" and isinstance(error.instance, dict):
             missing = next(
-                (field for field in error.validator_value if field not in error.instance),
+                (
+                    field
+                    for field in error.validator_value
+                    if field not in error.instance
+                ),
                 None,
             )
             if missing:
@@ -85,7 +88,11 @@ def validate_ai_product_bundle(
         None,
     )
     reference = next(
-        (entry["node"] for entry in nodes if entry["node"].get("kind") == "productReference"),
+        (
+            entry["node"]
+            for entry in nodes
+            if entry["node"].get("kind") == "productReference"
+        ),
         None,
     )
     graph_node = next(
@@ -104,11 +111,18 @@ def validate_ai_product_bundle(
     for field in ("productID", "productVersion"):
         values = (product[field], inline[field], reference[field])
         if len(set(values)) != 1:
-            errors.append(f"bundle.{field}: profile, inline node, and product reference must match")
+            errors.append(
+                f"bundle.{field}: profile, inline node, and product reference must match"
+            )
     model = reference["productModel"]
-    if (model["standard"], model["version"], model["profile"]) != ("ODPC", "1.1", "AIProduct"):
+    if (model["standard"], model["version"], model["profile"]) != (
+        "ODPC",
+        "1.1",
+        "AIProduct",
+    ):
         errors.append("bundle.productModel: reference must declare ODPC 1.1 AIProduct")
     if graph_node["$ref"] != model["$ref"]:
-        errors.append("bundle.$ref: graph and product reference must target the same profile")
+        errors.append(
+            "bundle.$ref: graph and product reference must target the same profile"
+        )
     return CatalogValidationResult(valid=not errors, errors=errors)
-
