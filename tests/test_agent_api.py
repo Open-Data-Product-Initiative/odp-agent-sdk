@@ -189,6 +189,65 @@ def test_top_level_cli_json_validate_and_explain(tmp_path, capsys):
     assert "summary" not in explain_payload
 
 
+def test_top_level_cli_validates_odpc_v1_1_ai_product(tmp_path, capsys):
+    path = tmp_path / "ai-product.yaml"
+    path.write_text(
+        yaml.safe_dump(
+            {
+                "schema": (
+                    "https://opendataproducts.org/odpc-v1.1/schema/ai-product.yaml"
+                ),
+                "version": "1.1",
+                "kind": "AIProduct",
+                "aiProduct": {
+                    "productID": "knowledge-assistant",
+                    "productVersion": "1.0.0",
+                    "name": {"en": "Knowledge Assistant"},
+                    "description": {"en": "Answers approved knowledge questions."},
+                    "purpose": {"en": "Make approved knowledge easier to access."},
+                    "owner": {"team": "Knowledge Management"},
+                    "productType": "rag",
+                    "governance": {
+                        "autonomyLevel": "assistive",
+                        "humanOversight": {
+                            "required": True,
+                            "requirements": [{"en": "Review source updates."}],
+                        },
+                        "consequentialActionApproval": {
+                            "required": False,
+                            "requirements": [
+                                {"en": "The product takes no consequential action."}
+                            ],
+                        },
+                        "riskClassification": "limited",
+                        "knownLimitations": [{"en": "Sources can become outdated."}],
+                    },
+                    "evaluation": [
+                        {
+                            "id": "GROUNDEDNESS",
+                            "name": {"en": "Grounded answer review"},
+                            "measurementMethod": {"en": "Expert sample review."},
+                            "targetValue": "Pass",
+                            "unit": "review outcome",
+                            "status": "planned",
+                        }
+                    ],
+                },
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+
+    assert main(["validate", str(path), "--json"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+
+    assert payload["valid"] is True
+    assert payload["spec"] == "odpc"
+    assert payload["kind"] == "AIProduct"
+    assert payload["version"] == "1.1"
+
+
 def test_top_level_cli_json_explain_odpg_returns_structured_payload(tmp_path, capsys):
     path = tmp_path / "graph.yaml"
     path.write_text(
