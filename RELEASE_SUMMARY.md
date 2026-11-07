@@ -1,8 +1,15 @@
-# Open Data Products Python SDK 0.6.1 Release Notes
+# Open Data Products Python SDK 0.6.2 Release Notes
 
 ## Unreleased package contents
 
-This patch release exposes ODCS-to-ODPS product drafting through MCP.
+This patch release makes the ODCS wrapper input explicit in the CLI.
+
+## Explicit ODCS wrapper input
+
+- Use `open-data-products product wrap-contract --input contract.yaml` in all
+  documented wrapper workflows.
+- The former positional contract input remains a compatibility alias, but it
+  cannot be combined with `--input`.
 
 ## MCP product drafting
 

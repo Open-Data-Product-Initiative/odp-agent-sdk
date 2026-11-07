@@ -27,7 +27,7 @@ Examples:
   open-data-products product resolve-contracts product.yaml --json
   open-data-products product contract-report product.yaml contract.yaml --json
   open-data-products product audit product.yaml --contract contract.yaml --json
-  open-data-products product wrap-contract contracts/orders.yaml --output products/orders.yaml
+  open-data-products product wrap-contract --input contracts/orders.yaml --output products/orders.yaml
 """
 
 
@@ -127,7 +127,14 @@ def add_product_subparser(subparsers: argparse._SubParsersAction) -> None:
         help="Generate an ODPS 4.2 draft from an ODCS contract",
     )
     wrap_contract_parser.add_argument(
-        "contract", help="Path or URI of the ODCS contract to wrap"
+        "contract",
+        nargs="?",
+        help="Deprecated positional ODCS contract path or URI; prefer --input",
+    )
+    wrap_contract_parser.add_argument(
+        "--input",
+        dest="input_contract",
+        help="ODCS contract path or URI to wrap",
     )
     wrap_contract_parser.add_argument(
         "--output", "-o", required=True, help="Output ODPS YAML path"
@@ -177,8 +184,16 @@ def handle_product_command(args: argparse.Namespace) -> int:
     if args.product_command == "wrap-contract":
         from .contracts import wrap_contract
 
+        if args.input_contract and args.contract:
+            raise ValueError(
+                "Pass either --input or the positional contract argument, not both"
+            )
+        contract = args.input_contract or args.contract
+        if not contract:
+            raise ValueError("wrap-contract requires --input")
+
         result = wrap_contract(
-            args.contract,
+            contract,
             args.output,
             inline_contract=args.inline_contract,
             use_ai=args.enrich,

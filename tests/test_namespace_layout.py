@@ -31,7 +31,7 @@ def test_top_level_package_exposes_version_alias():
 def test_current_release_version_is_0_6_1():
     import open_data_products
 
-    assert open_data_products.__version__ == "0.6.1"
+    assert open_data_products.__version__ == "0.6.2"
 
 
 def test_release_summary_matches_package_version():

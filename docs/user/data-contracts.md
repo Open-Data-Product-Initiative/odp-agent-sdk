@@ -66,7 +66,7 @@ the technical authority and the product is deliberately marked `draft` and
 service commitments, access rights, or production readiness.
 
 ```bash
-open-data-products product wrap-contract contracts/orders.yaml \
+open-data-products product wrap-contract --input contracts/orders.yaml \
   --output products/orders.yaml
 ```
 
@@ -82,7 +82,7 @@ the generated product should refer to the published location rather than the
 loaded local copy:
 
 ```bash
-open-data-products product wrap-contract ./contracts/orders.yaml \
+open-data-products product wrap-contract --input ./contracts/orders.yaml \
   --contract-url https://example.org/contracts/orders.yaml \
   --output products/orders.yaml
 ```
@@ -93,7 +93,7 @@ the ODCS specification version separately from the contract instance version.
 `product.contract.default.spec`; it does not translate ODCS-only structures.
 
 ```bash
-open-data-products product wrap-contract contracts/orders.yaml \
+open-data-products product wrap-contract --input contracts/orders.yaml \
   --inline-contract --output products/orders.yaml
 ```
 
@@ -110,7 +110,7 @@ writing; existing outputs require `--overwrite`.
 `--enrich` is opt-in and uses the normal generation-provider configuration:
 
 ```bash
-open-data-products product wrap-contract contracts/orders.yaml \
+open-data-products product wrap-contract --input contracts/orders.yaml \
   --output products/orders.yaml --enrich --config generation.config.yaml --json
 ```
 
@@ -128,7 +128,7 @@ Add `--full-draft` with `--enrich` when the intended output is a fuller draft ra
 than a minimal ODPS wrapper:
 
 ```bash
-open-data-products product wrap-contract contracts/orders.yaml \
+open-data-products product wrap-contract --input contracts/orders.yaml \
   --output products/orders.yaml --enrich --full-draft --config generation.config.yaml
 ```
 

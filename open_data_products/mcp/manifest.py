@@ -592,7 +592,7 @@ def _workflows() -> List[Dict[str, Any]]:
             "id": "wrap-odcs-contract",
             "title": "Wrap an ODCS contract as an ODPS draft",
             "commands": [
-                "open-data-products product wrap-contract contracts/orders.yaml --output products/orders.yaml --json"
+                "open-data-products product wrap-contract --input contracts/orders.yaml --output products/orders.yaml --json"
             ],
             "mcp_tools": [],
         },

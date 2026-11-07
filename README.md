@@ -82,7 +82,7 @@ open-data-products explain examples/product.yaml --json
 Wrap an ODCS contract without changing its source:
 
 ```bash
-open-data-products product wrap-contract contracts/orders.yaml \
+open-data-products product wrap-contract --input contracts/orders.yaml \
   --output products/orders.yaml --json
 ```
 
@@ -94,13 +94,13 @@ Choose the draft depth with optional enrichment:
 
 ```bash
 # Minimal technical wrapper
-open-data-products product wrap-contract contracts/orders.yaml --output products/orders.yaml
+open-data-products product wrap-contract --input contracts/orders.yaml --output products/orders.yaml
 
 # Business description and discovery tags
-open-data-products product wrap-contract contracts/orders.yaml --output products/orders.yaml --enrich
+open-data-products product wrap-contract --input contracts/orders.yaml --output products/orders.yaml --enrich
 
 # Rich ODPS draft
-open-data-products product wrap-contract contracts/orders.yaml --output products/orders.yaml --enrich --full-draft
+open-data-products product wrap-contract --input contracts/orders.yaml --output products/orders.yaml --enrich --full-draft
 ```
 
 See [Data Contract workflows](docs/user/data-contracts.md) for the generated

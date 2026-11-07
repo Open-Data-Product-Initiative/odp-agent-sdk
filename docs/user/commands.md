@@ -529,7 +529,7 @@ See [Data Contract workflows](../user/data-contracts.md) for optional validation
 alignment, reports, and export commands that use `datacontract-cli`.
 
 ```bash
-open-data-products product wrap-contract contracts/orders.yaml \
+open-data-products product wrap-contract --input contracts/orders.yaml \
   --output products/orders.yaml --json
 ```
 

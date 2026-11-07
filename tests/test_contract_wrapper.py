@@ -126,6 +126,30 @@ version: 1.0.0
     assert '"target_odps_version": "4.2"' in report
 
 
+def test_wrap_contract_cli_accepts_named_input(tmp_path: Path) -> None:
+    """Prefer an explicit input path for the wrapper source contract."""
+    contract = tmp_path / "orders.yaml"
+    output = tmp_path / "orders-product.yaml"
+    contract.write_text(
+        "apiVersion: v3.2.0\nkind: DataContract\nid: ORDERS\ndataProduct: Orders\n",
+        encoding="utf-8",
+    )
+
+    exit_code = main(
+        [
+            "product",
+            "wrap-contract",
+            "--input",
+            str(contract),
+            "--output",
+            str(output),
+        ]
+    )
+
+    assert exit_code == 0
+    assert output.is_file()
+
+
 def test_wrap_contract_inline_preserves_complete_contract_and_access_profile(
     tmp_path: Path,
 ) -> None:
@@ -397,6 +421,7 @@ dataProduct: Seller Metrics
 
     assert exc_info.value.code == 0
     help_output = capsys.readouterr().out
+    assert "--input" in help_output
     assert "--enrich" in help_output
     assert "--full-draft" in help_output
     assert "--ai" not in help_output
