@@ -169,6 +169,9 @@ class ContractInventoryRecord:
     lifecycle_status: Optional[str] = None
     purpose: Optional[str] = None
     tags: List[str] = field(default_factory=list)
+    technical_interfaces: List[str] = field(default_factory=list)
+    technical_resources: List[str] = field(default_factory=list)
+    server_count: int = 0
     model_count: int = 0
     field_count: int = 0
     fingerprint: Optional[str] = None
@@ -208,7 +211,10 @@ class IntelligenceFinding:
     kind: str
     evidence_class: str
     source_contract_ids: List[str]
+    evidence: List[str]
     rationale: str
+    why_it_matters: str
+    suggested_action: str
     score: float = 1.0
 
     def to_dict(self) -> Dict[str, object]:

@@ -206,7 +206,7 @@ The command recursively reads YAML and JSON files and writes:
 - `contract-inventory.json` with normalized source references and contract
   metadata.
 - `contract-intelligence.json` with evidence-linked similarities, reuse
-  findings, and information gaps.
+  findings, actionable investigation guidance, and information gaps.
 - `product-candidates.json` with review-only proposed product groups.
 - `discovery-report.html`, a self-contained offline Data Contract Intelligence
   report with an overview, searchable contract explorer, relationship evidence,
@@ -218,6 +218,11 @@ safe product-boundary proposal. Relationships are inferred unless source
 contracts declare them. Every candidate remains proposed; technical similarity
 does not establish a business objective, consumer demand, ownership, or
 approved product boundary.
+
+The intelligence artifact records source contracts, evidence, why each finding
+matters, and a suggested human investigation. It normalizes safe technical
+interface identifiers such as declared server types and resource names, but it
+does not expose server locations or credentials.
 
 Future API sources are configured under portfolio.contractSources in
 generation.config.yaml. Credentials use credentialsRef with an env:NAME
