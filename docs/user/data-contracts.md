@@ -207,17 +207,21 @@ The command recursively reads YAML and JSON files and writes:
   metadata.
 - `contract-intelligence.json` with evidence-linked similarities, reuse
   findings, actionable investigation guidance, and information gaps.
-- `product-candidates.json` with review-only proposed product groups.
+- `product-candidates.json` with review-only standalone product candidates,
+  boundary proposals, rationalisation opportunities, and source references for
+  contracts with no current opportunity signal.
 - `discovery-report.html`, a self-contained offline Data Contract Intelligence
   report with an overview, searchable contract explorer, relationship evidence,
   and product opportunities.
 
-The report remains useful when no product groups are proposed: ungrouped
-contracts are evidence that the available source metadata is insufficient for a
-safe product-boundary proposal. Relationships are inferred unless source
-contracts declare them. Every candidate remains proposed; technical similarity
-does not establish a business objective, consumer demand, ownership, or
-approved product boundary.
+The report separates three different portfolio decisions: a standalone product
+candidate requires a declared name, domain, and purpose; a boundary proposal
+requires repeatable shared-domain capability evidence; and a rationalisation
+opportunity requires exact-duplicate evidence. Contracts that meet none of
+these conservative rules remain visible as having no current opportunity
+signal. Relationships are inferred unless source contracts declare them. Every
+candidate remains proposed; technical similarity does not establish a business
+objective, consumer demand, ownership, or approved product boundary.
 
 The intelligence artifact records source contracts, evidence, why each finding
 matters, and a suggested human investigation. It normalizes safe technical
