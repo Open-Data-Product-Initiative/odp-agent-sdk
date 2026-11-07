@@ -2,6 +2,8 @@
 
 from pathlib import Path
 
+import yaml
+
 from open_data_products.odpc import (
     DEFAULT_CATALOG_HTML_TEMPLATE,
     build_catalog,
@@ -20,6 +22,12 @@ from open_data_products.odpc import (
     write_catalog_toon,
     write_catalog_artifacts,
 )
+from open_data_products.agent import detect_document, validate_document
+from open_data_products.odpc import (
+    load_ai_product,
+    validate_ai_product,
+    validate_ai_product_bundle,
+)
 
 VALID_CATALOG = {
     "schema": "https://opendataproducts.org/odpc-v1.0/schema/odpc.yaml",
@@ -33,6 +41,98 @@ VALID_CATALOG = {
         }
     },
 }
+
+
+VALID_AI_PRODUCT = {
+    "schema": "https://opendataproducts.org/odpc-v1.1/schema/ai-product.yaml",
+    "version": "1.1",
+    "kind": "AIProduct",
+    "aiProduct": {
+        "productID": "policy-knowledge-assistant",
+        "productVersion": "1.0.0",
+        "name": {"en": "Policy Knowledge Assistant"},
+        "description": {"en": "Answers policy questions from approved material."},
+        "purpose": {"en": "Improve access to policy guidance with human escalation."},
+        "owner": {"team": "Knowledge Management"},
+        "productType": "rag",
+        "governance": {
+            "autonomyLevel": "assistive",
+            "humanOversight": {"required": True, "requirements": [{"en": "Review source changes."}]},
+            "consequentialActionApproval": {"required": False, "requirements": [{"en": "The assistant takes no consequential action."}]},
+            "riskClassification": "limited",
+            "knownLimitations": [{"en": "Sources can be out of date."}],
+        },
+        "evaluation": [{
+            "id": "GROUNDEDNESS",
+            "name": {"en": "Grounded answer review"},
+            "measurementMethod": {"en": "Expert review of sampled answers."},
+            "targetValue": "Pass",
+            "unit": "review outcome",
+            "status": "planned",
+        }],
+    },
+}
+
+
+def test_validate_odpc_v1_1_ai_product_and_report_missing_governance_path():
+    valid = validate_ai_product(VALID_AI_PRODUCT)
+
+    assert valid.valid
+    assert valid.errors == []
+
+    incomplete = {**VALID_AI_PRODUCT, "aiProduct": {**VALID_AI_PRODUCT["aiProduct"]}}
+    del incomplete["aiProduct"]["governance"]
+
+    invalid = validate_ai_product(incomplete)
+
+    assert not invalid.valid
+    assert any("aiProduct.governance" in error for error in invalid.errors)
+
+
+def test_agent_api_detects_and_validates_an_odpc_v1_1_ai_product(tmp_path):
+    path = tmp_path / "ai-product.yaml"
+    path.write_text(yaml.safe_dump(VALID_AI_PRODUCT, sort_keys=False), encoding="utf-8")
+
+    loaded = load_ai_product(path)
+    result = validate_document(loaded)
+
+    assert detect_document(loaded) == ("odpc", "AIProduct")
+    assert result.valid
+    assert result.spec == "odpc"
+    assert result.kind == "AIProduct"
+    assert result.version == "1.1"
+
+
+def test_odpc_v1_1_catalog_and_bundle_require_matching_ai_product_identity():
+    product = VALID_AI_PRODUCT["aiProduct"]
+    catalog = {
+        "schema": "https://opendataproducts.org/odpc-v1.1/schema/odpc.yaml",
+        "version": "1.1",
+        "kind": "Catalog",
+        "catalog": {
+            "metadata": {"id": "CAT-AI-001", "name": {"en": "AI Products"}, "description": {"en": "AI product portfolio."}},
+            "nodes": [
+                {"node": {"kind": "aiProduct", "id": "AI-001", **product}},
+                {"node": {"kind": "productReference", "id": "AI-PR-001", "productID": product["productID"], "productVersion": product["productVersion"], "name": product["name"], "description": product["description"], "productCategory": "ai_product", "productModel": {"standard": "ODPC", "version": "1.1", "profile": "AIProduct", "format": "yaml", "schema": "https://opendataproducts.org/odpc-v1.1/schema/ai-product.yaml", "$ref": "ai-products/policy-knowledge-assistant.odpc.yaml"}}},
+            ],
+        },
+    }
+    graph = {
+        "schema": "https://opendataproducts.org/odpg-v1.0/schema/odpg.yaml",
+        "version": "1.0",
+        "kind": "Graph",
+        "graph": {"metadata": {"id": "graph-ai", "name": {"en": "AI graph"}, "description": {"en": "AI product graph."}}, "nodes": [{"id": "AI-001", "type": "AIProduct", "$ref": "ai-products/policy-knowledge-assistant.odpc.yaml"}], "edges": []},
+    }
+
+    assert validate_catalog(catalog).valid
+    assert validate_ai_product_bundle(VALID_AI_PRODUCT, catalog, graph).valid
+
+    catalog["catalog"]["nodes"][1]["node"]["productID"] = "wrong-id"
+
+    invalid = validate_ai_product_bundle(VALID_AI_PRODUCT, catalog, graph)
+
+    assert not invalid.valid
+    assert any("productID" in error for error in invalid.errors)
 
 
 def test_search_objects_returns_product_reference_by_id():

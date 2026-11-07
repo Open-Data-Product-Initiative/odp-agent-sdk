@@ -1,0 +1,123 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: https://opendataproducts.org/odpc-v1.1/schema/ai-product.yaml
+title: ODPC 1.1 AI Product Profile
+description: Normative ODPC profile for an AI product business definition. Technical components remain external references.
+type: object
+additionalProperties: false
+required: [schema, version, kind, aiProduct]
+properties:
+  schema: {const: https://opendataproducts.org/odpc-v1.1/schema/ai-product.yaml}
+  version: {const: "1.1"}
+  kind: {const: AIProduct}
+  aiProduct: {$ref: "#/$defs/AIProduct"}
+$defs:
+  LanguageString:
+    type: object
+    minProperties: 1
+    required: [en]
+    properties: {en: {type: string, minLength: 1}}
+    patternProperties: {"^[a-z]{2,3}(-[A-Za-z0-9]+)*$": {type: string, minLength: 1}}
+    additionalProperties: false
+  Owner:
+    type: object
+    additionalProperties: false
+    properties:
+      organization: {type: string, minLength: 1}
+      team: {type: string, minLength: 1}
+      role: {type: string, minLength: 1}
+    minProperties: 1
+    patternProperties: {"^x-": {}}
+  Reference: {type: string, minLength: 1}
+  Capability:
+    type: object
+    additionalProperties: false
+    required: [id, name, description]
+    properties:
+      id: {type: string, minLength: 1}
+      name: {$ref: "#/$defs/LanguageString"}
+      description: {$ref: "#/$defs/LanguageString"}
+      intendedUsers: {type: array, items: {type: string, minLength: 1}}
+      expectedInputs: {type: array, items: {type: string, minLength: 1}}
+      expectedOutputs: {type: array, items: {type: string, minLength: 1}}
+      operationalLimitations: {type: array, items: {$ref: "#/$defs/LanguageString"}}
+    patternProperties: {"^x-": {}}
+  Governance:
+    type: object
+    additionalProperties: false
+    required: [autonomyLevel, humanOversight, consequentialActionApproval, riskClassification, knownLimitations]
+    properties:
+      autonomyLevel: {enum: [assistive, supervised, autonomous]}
+      humanOversight:
+        type: object
+        additionalProperties: false
+        required: [required, requirements]
+        properties:
+          required: {type: boolean}
+          requirements: {type: array, minItems: 1, items: {$ref: "#/$defs/LanguageString"}}
+      consequentialActionApproval:
+        type: object
+        additionalProperties: false
+        required: [required, requirements]
+        properties:
+          required: {type: boolean}
+          requirements: {type: array, minItems: 1, items: {$ref: "#/$defs/LanguageString"}}
+      riskClassification: {enum: [minimal, limited, high, critical, other]}
+      policyComplianceReferences: {type: array, items: {$ref: "#/$defs/Reference"}}
+      knownLimitations: {type: array, minItems: 1, items: {$ref: "#/$defs/LanguageString"}}
+    patternProperties: {"^x-": {}}
+  EvaluationMetric:
+    type: object
+    additionalProperties: false
+    required: [id, name, measurementMethod, targetValue, unit, status]
+    properties:
+      id: {type: string, minLength: 1}
+      name: {$ref: "#/$defs/LanguageString"}
+      measurementMethod: {$ref: "#/$defs/LanguageString"}
+      methodType: {enum: [quantitative, qualitative, mixed]}
+      targetValue: {oneOf: [{type: number}, {type: string, minLength: 1}]}
+      unit: {type: string, minLength: 1}
+      status: {enum: [planned, active, achieved, not_met, retired]}
+      evidenceReference: {$ref: "#/$defs/Reference"}
+    patternProperties: {"^x-": {}}
+  Operations:
+    type: object
+    additionalProperties: false
+    properties:
+      lifecycleStatus: {enum: [planned, pilot, active, suspended, retired]}
+      availabilityExpectations: {$ref: "#/$defs/LanguageString"}
+      monitoringRequirements: {type: array, items: {$ref: "#/$defs/LanguageString"}}
+      operationalOwner: {$ref: "#/$defs/Owner"}
+      supportAndIncidentHandling: {$ref: "#/$defs/LanguageString"}
+      costOrResourceExpectations: {$ref: "#/$defs/LanguageString"}
+    patternProperties: {"^x-": {}}
+  ImplementationReference:
+    type: object
+    additionalProperties: false
+    required: [role, standard, version, format, "$ref"]
+    properties:
+      role: {enum: [model, agent, agent_card, workflow, tool, service, evaluation, other]}
+      standard: {type: string, minLength: 1}
+      version: {type: string, minLength: 1}
+      format: {enum: [yaml, json, html, markdown, api, other]}
+      schema: {$ref: "#/$defs/Reference"}
+      "$ref": {$ref: "#/$defs/Reference"}
+    patternProperties: {"^x-": {}}
+  AIProduct:
+    type: object
+    additionalProperties: false
+    required: [productID, productVersion, name, description, purpose, owner, productType, governance, evaluation]
+    properties:
+      productID: {type: string, minLength: 1}
+      productVersion: {type: string, minLength: 1}
+      name: {$ref: "#/$defs/LanguageString"}
+      description: {$ref: "#/$defs/LanguageString"}
+      purpose: {$ref: "#/$defs/LanguageString"}
+      valueProposition: {$ref: "#/$defs/LanguageString"}
+      owner: {$ref: "#/$defs/Owner"}
+      productType: {enum: [predictive, generative, rag, agentic, hybrid, other]}
+      capabilities: {type: array, items: {$ref: "#/$defs/Capability"}}
+      governance: {$ref: "#/$defs/Governance"}
+      evaluation: {type: array, minItems: 1, items: {$ref: "#/$defs/EvaluationMetric"}}
+      operations: {$ref: "#/$defs/Operations"}
+      implementationReferences: {type: array, items: {$ref: "#/$defs/ImplementationReference"}}
+    patternProperties: {"^x-": {}}

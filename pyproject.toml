@@ -169,6 +169,7 @@ packages = [
     "data/catalog/*.jsonl",
     "data/schema/*.json",
     "data/schema/*.yaml",
+    "data/schema/**/*.yaml",
     "data/templates/*.html",
 ]
 "open_data_products.odpg" = [

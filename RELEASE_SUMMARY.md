@@ -2,9 +2,16 @@
 
 ## Unreleased package contents
 
-This is the next unreleased PyPI package after the 0.5.0 release. It combines
-ODPS 4.2 work, draft ODPV 1.1 interoperability capabilities, and ODCS-to-ODPS
-product drafting.
+This is the next unreleased PyPI package after the 0.5.0 release. It adds
+ODCS-to-ODPS product drafting alongside the released ODPC v1.1 AI Product
+validation and draft ODPV 1.1 interoperability capabilities.
+
+## ODCS-to-ODPS product drafting
+
+- Wrap ODCS 3.0, 3.1, and 3.2 contracts as validated ODPS 4.2 drafts with
+  `open-data-products product wrap-contract`.
+- Use `--enrich` for a business-language description and discovery tags, or
+  `--enrich --full-draft` for wider AI-generated ODPS product details.
 
 ## ODPS v4.2 support
 
@@ -22,12 +29,18 @@ profile remain draft. Existing ODPV 1.0 behaviour remains the default.
 The executable profile API is `open_data_products.profiles`; ODPV retains the
 versioned vocabulary and source-profile assets.
 
-## What changes for users
+## ODPC v1.1 AI products
 
-- Wrap ODCS 3.0, 3.1, and 3.2 contracts as validated ODPS 4.2 drafts with
-  `open-data-products product wrap-contract`. Use `--enrich` for a business
-  description and discovery tags, or `--enrich --full-draft` for wider
-  AI-generated ODPS product details.
+- `validate_ai_product` validates a standalone `AIProduct` profile, including
+  its purpose, structured ownership, governance, and evaluation requirements.
+- `validate_ai_product_bundle` checks that a standalone profile, an ODPC v1.1
+  catalog entry, and an ODPG `AIProduct` node have consistent identities and
+  profile references.
+- The unified Python agent API and `open-data-products validate` command
+  automatically detect an ODPC v1.1 `AIProduct` from its canonical schema URI.
+
+## Other user-facing capabilities
+
 - Select ODPV 1.1 explicitly with `load_vocabulary_release("1.1.0")`; no
   existing call is upgraded silently.
 - Use `open_data_products.profiles` for profile validation, mapping resolution,
@@ -44,11 +57,11 @@ versioned vocabulary and source-profile assets.
   profile-permitted mappings. They preserve declared-versus-observed state and
   report missing bindings, missing policy rules, unsupported directions, and
   out-of-scope concepts as reviewable refusals or skips.
-
 ## Compatibility and release confidence
 
 ODPV 1.0 remains the default vocabulary and retains its existing URI and helper
 behaviour. The test suite validates every bundled profile against the supplied
 Draft 2020-12 schema, checks all five pinned mapping counts, and exercises
 adapter direction, prerequisite, and provenance boundaries. CI remains the
-final distribution-build check.
+final distribution-build check. Existing ODPC v1.0 catalog validation remains
+unchanged; an AI product is a separate ODPC v1.1 profile.

@@ -1,5 +1,13 @@
 """Open Data Product Catalog (ODPC) namespace."""
 
+from .ai_product import (
+    AI_PRODUCT_SCHEMA_URL,
+    load_ai_product,
+    load_ai_product_schema,
+    validate_ai_product_bundle,
+    validate_ai_product,
+)
+
 from .catalog import (
     CatalogValidationResult,
     DEFAULT_CATALOG_HTML_TEMPLATE,
@@ -31,6 +39,7 @@ SPEC_NAME = "Open Data Product Catalog"
 __all__ = [
     "SPEC_ID",
     "SPEC_NAME",
+    "AI_PRODUCT_SCHEMA_URL",
     "CatalogValidationResult",
     "DEFAULT_CATALOG_HTML_TEMPLATE",
     "build_catalog",
@@ -39,6 +48,8 @@ __all__ = [
     "count_items",
     "explain_catalog",
     "load_catalog",
+    "load_ai_product",
+    "load_ai_product_schema",
     "load_object_records",
     "load_schema",
     "render_catalog_gcf",
@@ -48,6 +59,8 @@ __all__ = [
     "render_object_records",
     "search_objects",
     "validate_catalog",
+    "validate_ai_product",
+    "validate_ai_product_bundle",
     "write_catalog",
     "write_catalog_gcf",
     "write_catalog_html",

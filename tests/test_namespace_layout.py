@@ -28,6 +28,12 @@ def test_top_level_package_exposes_version_alias():
     assert open_data_products.odps.__version__ == open_data_products.__version__
 
 
+def test_current_release_version_is_0_6_0():
+    import open_data_products
+
+    assert open_data_products.__version__ == "0.6.0"
+
+
 def test_release_summary_matches_package_version():
     import open_data_products
 
@@ -43,6 +49,7 @@ def test_top_level_package_exposes_stable_workflow_facades():
     import open_data_products
     from open_data_products import agent, generation, odpr, portfolio
     from open_data_products.contracts import product as contracts_product
+    from open_data_products.odpc import ai_product as odpc_ai_product
     from open_data_products.odpc import catalog as odpc_catalog
     from open_data_products.odpg import graph as odpg_graph
     from open_data_products.odpv import vocabulary as odpv_vocabulary
@@ -61,6 +68,11 @@ def test_top_level_package_exposes_stable_workflow_facades():
     )
     assert open_data_products.build_portfolio is portfolio.build_portfolio
     assert open_data_products.validate_recipe is odpr.validate_recipe
+    assert open_data_products.validate_ai_product is odpc_ai_product.validate_ai_product
+    assert (
+        open_data_products.validate_ai_product_bundle
+        is odpc_ai_product.validate_ai_product_bundle
+    )
     assert open_data_products.generate_product_contract_report is (
         contracts_product.generate_product_contract_report
     )
