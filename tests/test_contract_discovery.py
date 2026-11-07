@@ -132,6 +132,39 @@ def test_discovery_exposes_source_linked_gaps_and_reuse_findings(
         not set(item.supporting_contract_ids).issubset(duplicate_contract_ids)
         for item in result.candidates
     )
+    reuse = next(
+        item for item in result.intelligence_findings if item.kind == "exact_duplicate"
+    )
+    assert reuse.evidence
+    assert "diverge" in reuse.why_it_matters.lower()
+    assert reuse.suggested_action.startswith("Review")
+
+
+def test_discovery_extracts_declared_technical_interfaces_and_shared_resources(
+    tmp_path: Path,
+) -> None:
+    from open_data_products import discover_contract_portfolio
+
+    result = discover_contract_portfolio(directory=REAL_CORPUS, output=tmp_path / "out")
+    records = {item.source_reference: item for item in result.inventory}
+    weather = records["tests/fixtures/api/weather-service.odcs.yaml"]
+    weather_array = records["tests/fixtures/api/weather-service-array.odcs.yaml"]
+
+    assert weather.owner == "Weather Data Team"
+    assert weather.technical_interfaces == ["api"]
+    assert weather.server_count == 1
+    assert any(
+        item.kind == "shared_technical_resource"
+        and item.evidence_class == "source_fact"
+        and {item.source_id, item.target_id}
+        == {weather.logical_id, weather_array.logical_id}
+        for item in result.relationships
+    )
+    assert all(
+        "production" not in item.rationale.lower()
+        for item in result.relationships
+        if item.kind == "shared_technical_resource"
+    )
 
 
 def test_discovery_writes_contract_intelligence_summary_artifact(
@@ -162,11 +195,15 @@ def test_intelligence_report_renders_explorer_and_evidence_links(
 
     assert "Data Contract Intelligence" in report
     assert "Contracts analyzed" in report
+    assert "Priority findings" in report
     assert "Contract Intelligence Explorer" in report
     assert "Product Opportunities" in report
     assert 'id="contract-search"' in report
     assert "data-relationship-id=" in report
     assert 'id="relationship-' in report
+    assert 'id="finding-' in report
+    assert "Why it matters" in report
+    assert "Suggested action" in report
     assert "#6D28D9" in report
 
 

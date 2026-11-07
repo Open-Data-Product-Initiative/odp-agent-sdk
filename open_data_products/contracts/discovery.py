@@ -156,6 +156,7 @@ def _inventory_record(path: Path, root: Path) -> ContractInventoryRecord:
     schema = extract_contract_schema_from_document(document, path=reference)
     description = document.get("description")
     description = description if isinstance(description, dict) else {}
+    servers = _mapping_list(document.get("servers"))
     return ContractInventoryRecord(
         logical_id=logical_id,
         source_reference=reference,
@@ -165,10 +166,13 @@ def _inventory_record(path: Path, root: Path) -> ContractInventoryRecord:
         version=summary.version,
         odcs_version=str(document.get("apiVersion")),
         domain=_text(document.get("domain")),
-        owner=_text(document.get("owner")),
+        owner=_owner_from_document(document),
         lifecycle_status=_text(document.get("status")),
         purpose=_text(description.get("purpose") or document.get("purpose")),
         tags=_text_list(document.get("tags")),
+        technical_interfaces=_server_values(servers, "type"),
+        technical_resources=_server_values(servers, "server"),
+        server_count=len(servers),
         model_count=schema.model_count,
         field_count=schema.field_count,
         fingerprint=_canonical_contract_hash(document),
@@ -220,6 +224,37 @@ def _text_list(value: object) -> List[str]:
     return [item.strip() for item in value if isinstance(item, str) and item.strip()]
 
 
+def _mapping_list(value: object) -> List[Mapping[str, object]]:
+    """Return mapping items from a list without preserving arbitrary values."""
+    if not isinstance(value, list):
+        return []
+    return [item for item in value if isinstance(item, dict)]
+
+
+def _server_values(servers: Sequence[Mapping[str, object]], key: str) -> List[str]:
+    """Return stable declared server identifiers without locations or credentials."""
+    return sorted(
+        {
+            value
+            for server in servers
+            for value in [_text(server.get(key))]
+            if value is not None
+        }
+    )
+
+
+def _owner_from_document(document: Mapping[str, object]) -> Optional[str]:
+    """Return a declared owner from root metadata or an ODCS owner team entry."""
+    direct = _text(document.get("owner"))
+    if direct is not None:
+        return direct
+    for member in _mapping_list(document.get("team")):
+        if _text(member.get("role")) != "owner":
+            continue
+        return _text(member.get("name")) or _text(member.get("username"))
+    return None
+
+
 def _analyze_inventory(
     inventory: Sequence[ContractInventoryRecord],
 ) -> Tuple[List[ContractRelationship], List[ProductCandidate]]:
@@ -239,6 +274,26 @@ def _analyze_inventory(
                     )
                 )
                 continue
+            shared_resources = sorted(
+                resource
+                for resource in (
+                    set(source.technical_resources) & set(target.technical_resources)
+                )
+                if _is_specific_technical_resource(resource)
+            )
+            if shared_resources:
+                relationships.append(
+                    ContractRelationship(
+                        source_id=source.logical_id,
+                        target_id=target.logical_id,
+                        kind="shared_technical_resource",
+                        evidence_class="source_fact",
+                        rationale="Both contracts declare technical resource names: {}.".format(
+                            ", ".join(shared_resources)
+                        ),
+                        score=1.0,
+                    )
+                )
             shared = sorted(set(source.schema_signature) & set(target.schema_signature))
             if shared:
                 relationships.append(
@@ -259,7 +314,6 @@ def _analyze_inventory(
                         ),
                     )
                 )
-                continue
             shared_tokens = _shared_capability_tokens(source, target)
             if shared_tokens:
                 relationships.append(
@@ -322,18 +376,31 @@ def _derive_intelligence_findings(
                         kind="missing_" + field_name,
                         evidence_class="source_fact",
                         source_contract_ids=[record.logical_id],
+                        evidence=[
+                            "{} is not declared in the contract metadata.".format(label)
+                        ],
                         rationale="Contract does not declare a {}.".format(label),
+                        why_it_matters=(
+                            "Missing {} limits reliable governance and product review."
+                        ).format(label),
+                        suggested_action=(
+                            "Add the accountable {} before making product or reuse decisions."
+                        ).format(label),
                     )
                 )
     for relationship in relationships:
         category = "reuse" if relationship.kind == "exact_duplicate" else "similarity"
+        why_it_matters, suggested_action = _relationship_action(relationship.kind)
         findings.append(
             _intelligence_finding(
                 category=category,
                 kind=relationship.kind,
                 evidence_class=relationship.evidence_class,
                 source_contract_ids=[relationship.source_id, relationship.target_id],
+                evidence=[relationship.rationale],
                 rationale=relationship.rationale,
+                why_it_matters=why_it_matters,
+                suggested_action=suggested_action,
                 score=relationship.score,
             )
         )
@@ -346,7 +413,10 @@ def _intelligence_finding(
     kind: str,
     evidence_class: str,
     source_contract_ids: List[str],
+    evidence: List[str],
     rationale: str,
+    why_it_matters: str,
+    suggested_action: str,
     score: float = 1.0,
 ) -> IntelligenceFinding:
     """Create one stable source-linked intelligence finding."""
@@ -357,8 +427,40 @@ def _intelligence_finding(
         kind=kind,
         evidence_class=evidence_class,
         source_contract_ids=list(source_contract_ids),
+        evidence=list(evidence),
         rationale=rationale,
+        why_it_matters=why_it_matters,
+        suggested_action=suggested_action,
         score=score,
+    )
+
+
+def _relationship_action(kind: str) -> Tuple[str, str]:
+    """Return conservative investigation guidance for one relationship kind."""
+    actions = {
+        "exact_duplicate": (
+            "Duplicate contracts can diverge and create avoidable maintenance or consumer confusion.",
+            "Review whether the contracts should consolidate or designate one canonical resource.",
+        ),
+        "schema_overlap": (
+            "Overlapping schema can indicate duplicated resources or complementary interfaces that need clearer boundaries.",
+            "Review whether the shared schema represents reuse, duplication, or a documented interface dependency.",
+        ),
+        "shared_technical_resource": (
+            "A shared declared technical resource can create common operational or governance dependencies.",
+            "Review whether the contracts should share ownership, access controls, or lifecycle coordination.",
+        ),
+        "shared_domain_capability": (
+            "A shared domain and capability signal can justify investigating a common product boundary.",
+            "Confirm consumer needs, accountable ownership, and intended product scope before grouping the contracts.",
+        ),
+    }
+    return actions.get(
+        kind,
+        (
+            "The relationship needs human interpretation before it can affect a portfolio decision.",
+            "Review the supporting contract evidence.",
+        ),
     )
 
 
@@ -392,6 +494,22 @@ def _shared_capability_tokens(
         return []
     shared = sorted(_capability_tokens(source.name) & _capability_tokens(target.name))
     return shared if len(shared) >= 2 else []
+
+
+def _is_specific_technical_resource(resource: str) -> bool:
+    """Exclude generic environment and platform labels from resource matches."""
+    generic = {
+        "api",
+        "athena",
+        "bigquery",
+        "databricks",
+        "development",
+        "local",
+        "postgres",
+        "production",
+        "staging",
+    }
+    return resource.strip().lower() not in generic
 
 
 def _capability_tokens(name: Optional[str]) -> set:
@@ -620,6 +738,11 @@ def _render_report(result: ContractDiscoveryResult) -> str:
             ),
         )
     )
+    priority_findings = "".join(
+        _priority_finding(finding)
+        for finding in result.intelligence_findings
+        if finding.category in {"reuse", "similarity"}
+    )
     rows = "".join(
         _contract_explorer_row(
             item,
@@ -633,6 +756,10 @@ def _render_report(result: ContractDiscoveryResult) -> str:
             _relationship_id(relationship), relationship, inventory_by_id
         )
         for relationship in result.relationships
+    )
+    finding_details = "".join(
+        _finding_detail(finding, inventory_by_id)
+        for finding in result.intelligence_findings
     )
     opportunity_cards = "".join(
         _opportunity_card(candidate, inventory_by_id)
@@ -657,22 +784,25 @@ main { max-width:1240px; margin:auto; padding:36px 24px 56px; } header { display
 .eyebrow { margin:0 0 5px; color:var(--purple); font-size:12px; font-weight:800; letter-spacing:.1em; } h1 { margin:0; font-size:32px; line-height:1.15; letter-spacing:-.03em; } h2 { margin:0; font-size:21px; letter-spacing:-.015em; } .subtitle, .meta { color:var(--muted); } .meta { font-size:13px; white-space:nowrap; }
 section { margin-top:30px; } .metrics { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; margin-top:14px; } .metric { background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:16px; } .metric strong { display:block; color:var(--purple); font-size:29px; line-height:1; } .metric span { display:block; font-weight:750; margin-top:9px; } .metric small { color:var(--muted); display:block; margin-top:3px; }
 .summary { max-width:780px; margin:14px 0 0; color:var(--muted); } .explorer { background:var(--surface); border:1px solid var(--line); border-radius:12px; overflow:hidden; } .toolbar { display:flex; justify-content:space-between; gap:16px; padding:16px; border-bottom:1px solid var(--line); } input { width:min(360px,100%); border:1px solid #CFC4D7; border-radius:7px; padding:9px 11px; font:inherit; } input:focus { outline:3px solid var(--purple-soft); border-color:var(--purple); }
+.priority-findings { display:grid; grid-template-columns:repeat(auto-fit,minmax(270px,1fr)); gap:10px; margin-top:16px; } .priority-finding { display:block; background:var(--surface); border:1px solid var(--line); border-left:3px solid var(--purple); border-radius:7px; padding:11px 12px; color:var(--ink); text-decoration:none; } .priority-finding:hover { border-color:var(--purple); } .priority-finding strong { display:block; font-size:14px; } .priority-finding span { color:var(--muted); display:block; font-size:13px; margin-top:3px; }
 .table-wrap { overflow:auto; } table { width:100%; border-collapse:collapse; min-width:810px; } th { color:var(--muted); font-size:12px; letter-spacing:.04em; text-align:left; text-transform:uppercase; background:#FCFBFD; } th, td { padding:12px 16px; border-bottom:1px solid var(--line); vertical-align:top; } tr:last-child td { border-bottom:0; } .contract-name { font-weight:750; } .source { color:var(--muted); font-size:12px; overflow-wrap:anywhere; } .badge { display:inline-block; padding:2px 7px; border-radius:999px; background:var(--purple-soft); color:#5B21B6; font-size:12px; font-weight:750; }
 .relationship-link { display:block; color:#5B21B6; font-size:13px; margin:2px 0; text-decoration:none; } .relationship-link:hover { text-decoration:underline; } .gap { color:var(--warning); font-size:13px; margin:2px 0; } .details { margin-top:14px; } details { background:var(--surface); border:1px solid var(--line); border-radius:8px; margin:8px 0; padding:12px 14px; } details:target { border-color:var(--purple); box-shadow:0 0 0 3px var(--purple-soft); } summary { cursor:pointer; font-weight:750; } .evidence { color:var(--muted); margin:8px 0 0; }
 .opportunities { display:grid; grid-template-columns:repeat(auto-fit,minmax(310px,1fr)); gap:14px; margin-top:14px; } .opportunity, .empty-state { background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:18px; } .opportunity { border-top:3px solid var(--purple); } .opportunity h3 { margin:0; font-size:18px; } .opportunity p { color:var(--muted); } .label { color:var(--purple); font-size:12px; font-weight:800; letter-spacing:.06em; } .contracts { margin:10px 0; padding-left:18px; color:var(--muted); font-size:13px; } .review-note { margin:12px 0 0; padding:10px; border-radius:7px; background:var(--warning-bg); color:#854D0E; font-size:13px; }
 .legend { display:flex; flex-wrap:wrap; gap:16px; color:var(--muted); font-size:13px; margin-top:16px; } .legend b { color:var(--ink); } @media (max-width:760px) { main { padding:24px 14px 40px; } header { align-items:start; flex-direction:column; } .metrics { grid-template-columns:repeat(2,minmax(0,1fr)); } .toolbar { flex-direction:column; } input { width:100%; } } @media (max-width:420px) { .metrics { grid-template-columns:1fr; } h1 { font-size:27px; } }
 </style></head><body><main>
 <header><div><p class="eyebrow">DATA CONTRACT INTELLIGENCE</p><h1>Portfolio discovery review</h1><p class="subtitle">Evidence-led contract intelligence. Product groups remain proposals until reviewed.</p></div><div class="meta">Source: __SOURCE__</div></header>
-<section aria-labelledby="overview"><p class="eyebrow">OVERVIEW</p><h2 id="overview">What the contracts reveal</h2><div class="metrics">__METRICS__</div><p class="summary">__SUMMARY__</p></section>
-<section aria-labelledby="explorer"><p class="eyebrow">EXPLORE THE EVIDENCE</p><h2 id="explorer">Contract Intelligence Explorer</h2><p class="summary">Contracts, relationships, and missing information.</p><div class="explorer"><div class="toolbar"><span class="meta">Select a relationship to inspect the supporting evidence below.</span><label><span class="meta">Search</span><input id="contract-search" type="search" placeholder="Contract, domain, finding, or source"></label></div><div class="table-wrap"><table><thead><tr><th>Contract</th><th>Domain / owner</th><th>Relationships</th><th>Missing information</th></tr></thead><tbody id="contract-rows">__ROWS__</tbody></table></div></div><div class="details" aria-label="Relationship evidence">__RELATIONSHIP_DETAILS__</div></section>
+<section aria-labelledby="overview"><p class="eyebrow">OVERVIEW</p><h2 id="overview">What the contracts reveal</h2><div class="metrics">__METRICS__</div><p class="summary">__SUMMARY__</p><h3>Priority findings</h3><div class="priority-findings">__PRIORITY_FINDINGS__</div></section>
+<section aria-labelledby="explorer"><p class="eyebrow">EXPLORE THE EVIDENCE</p><h2 id="explorer">Contract Intelligence Explorer</h2><p class="summary">Contracts, relationships, and missing information.</p><div class="explorer"><div class="toolbar"><span class="meta">Select a relationship or gap to inspect supporting evidence below.</span><label><span class="meta">Search</span><input id="contract-search" type="search" placeholder="Contract, domain, finding, or source"></label></div><div class="table-wrap"><table><thead><tr><th>Contract</th><th>Domain / owner</th><th>Interfaces</th><th>Relationships</th><th>Missing information</th></tr></thead><tbody id="contract-rows">__ROWS__</tbody></table></div></div><div class="details" aria-label="Relationship and finding evidence">__RELATIONSHIP_DETAILS____FINDING_DETAILS__</div></section>
 <section aria-labelledby="opportunities"><p class="eyebrow">REVIEW ONLY</p><h2 id="opportunities">Product Opportunities</h2><p class="summary">Proposed groups for human review.</p><div class="opportunities">__OPPORTUNITIES__</div><div class="legend"><span><b>Source fact</b> is declared in a contract.</span><span><b>Inference</b> is a repeatable analysis rule.</span><span><b>Proposal</b> needs a human decision.</span></div></section>
 </main><script>
 const search=document.getElementById('contract-search'); const rows=[...document.querySelectorAll('#contract-rows tr')]; search.addEventListener('input',()=>{const term=search.value.toLowerCase().trim(); rows.forEach(row=>{row.hidden=term!==''&&!row.textContent.toLowerCase().includes(term);});});
 </script></body></html>""".replace("__SOURCE__", _escape(result.source_id))
         .replace("__METRICS__", overview)
         .replace("__SUMMARY__", _escape(_report_summary(summary)))
+        .replace("__PRIORITY_FINDINGS__", priority_findings)
         .replace("__ROWS__", rows)
         .replace("__RELATIONSHIP_DETAILS__", relationship_details)
+        .replace("__FINDING_DETAILS__", finding_details)
         .replace("__OPPORTUNITIES__", opportunity_cards)
     )
 
@@ -681,6 +811,17 @@ def _metric_card(label: str, value: int, note: str) -> str:
     """Render one compact overview metric."""
     return '<div class="metric"><strong>{}</strong><span>{}</span><small>{}</small></div>'.format(
         value, _escape(label), _escape(note)
+    )
+
+
+def _priority_finding(finding: IntelligenceFinding) -> str:
+    """Render one compact actionable finding link for the overview."""
+    return (
+        '<a class="priority-finding" href="#finding-{}"><strong>{}</strong><span>{}</span></a>'
+    ).format(
+        _escape(finding.finding_id),
+        _escape(finding.kind.replace("_", " ")),
+        _escape(finding.suggested_action),
     )
 
 
@@ -709,8 +850,10 @@ def _contract_explorer_row(
     )
     gap_text = (
         "".join(
-            '<div class="gap">Missing {}</div>'.format(
-                _escape(finding.kind.replace("missing_", ""))
+            '<a class="relationship-link gap" data-finding-id="{}" href="#finding-{}">Missing {}</a>'.format(
+                _escape(finding.finding_id),
+                _escape(finding.finding_id),
+                _escape(finding.kind.replace("missing_", "")),
             )
             for finding in gaps
         )
@@ -719,14 +862,16 @@ def _contract_explorer_row(
     domain_owner = (
         " / ".join(value for value in (record.domain, record.owner) if value) or "—"
     )
+    interfaces = ", ".join(record.technical_interfaces) or "—"
     return (
         '<tr data-contract-row><td><div class="contract-name">{}</div><div class="source">{}</div><span class="badge">{}</span></td>'
-        "<td>{}</td><td>{}</td><td>{}</td></tr>"
+        "<td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>"
     ).format(
         _escape(record.name or record.contract_id or "Unnamed contract"),
         _escape(record.source_reference),
         _escape(record.status),
         _escape(domain_owner),
+        _escape(interfaces),
         relationship_links,
         gap_text,
     )
@@ -751,16 +896,50 @@ def _relationship_detail(
         for item in (source, target)
         if item is not None
     )
+    why_it_matters, suggested_action = _relationship_action(relationship.kind)
     return (
         '<details id="relationship-{}"><summary>{}: {}</summary>'
-        '<p class="evidence">{}</p><p class="evidence">Evidence class: {} · Score: {:.2f}</p></details>'
+        '<p class="evidence">{}</p><p class="evidence"><strong>Why it matters:</strong> {}</p>'
+        '<p class="evidence"><strong>Suggested action:</strong> {}</p>'
+        '<p class="evidence">Evidence class: {} · Score: {:.2f}</p></details>'
     ).format(
         _escape(identifier),
         _escape(relationship.kind.replace("_", " ")),
         names,
         _escape(relationship.rationale),
+        _escape(why_it_matters),
+        _escape(suggested_action),
         _escape(relationship.evidence_class),
         relationship.score,
+    )
+
+
+def _finding_detail(
+    finding: IntelligenceFinding,
+    inventory: Mapping[str, ContractInventoryRecord],
+) -> str:
+    """Render one expandable source-linked intelligence finding."""
+    sources = ", ".join(
+        _escape(
+            inventory.get(
+                identifier, ContractInventoryRecord("", identifier, "unknown")
+            ).name
+            or identifier
+        )
+        for identifier in finding.source_contract_ids
+    )
+    evidence = " ".join(_escape(item) for item in finding.evidence)
+    return (
+        '<details id="finding-{}"><summary>{}</summary><p class="evidence"><strong>Contracts:</strong> {}</p>'
+        '<p class="evidence"><strong>Evidence:</strong> {}</p><p class="evidence"><strong>Why it matters:</strong> {}</p>'
+        '<p class="evidence"><strong>Suggested action:</strong> {}</p></details>'
+    ).format(
+        _escape(finding.finding_id),
+        _escape(finding.kind.replace("_", " ")),
+        sources,
+        evidence,
+        _escape(finding.why_it_matters),
+        _escape(finding.suggested_action),
     )
 
 
