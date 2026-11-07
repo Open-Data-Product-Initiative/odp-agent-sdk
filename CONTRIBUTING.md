@@ -440,8 +440,8 @@ We follow [Semantic Versioning](https://semver.org/):
 2. **Update CHANGELOG.md** with new version
 3. **Create release tag**:
    ```bash
-   git tag -a v0.6.4 -m "Release version 0.6.4"
-   git push origin v0.6.4
+   git tag -a v0.6.5 -m "Release version 0.6.5"
+   git push origin v0.6.5
    ```
 4. **Build and publish** to PyPI (maintainers only)
 

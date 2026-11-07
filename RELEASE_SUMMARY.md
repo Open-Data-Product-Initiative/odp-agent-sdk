@@ -1,13 +1,20 @@
-# Open Data Products Python SDK 0.6.4 Release Notes
+# Open Data Products Python SDK 0.6.5 Release Notes
 
 ## Unreleased package contents
 
-This release supersedes 0.6.3 with the same Data Contract Intelligence
-capabilities and restores normal PyPI provenance attestations.
+This patch release keeps the Data Contract Intelligence capabilities and
+corrects the public PyPI version badge.
+
+## Dynamic PyPI version badge
+
+- The README now uses the Shields.io PyPI-version endpoint instead of the
+  stale Badge Fury endpoint.
+- The badge automatically follows the current PyPI release and links directly
+  to the project page.
 
 ## Release provenance
 
-- 0.6.4 is the preferred release for the Data Contract Intelligence update.
+- 0.6.5 is the preferred release for the Data Contract Intelligence update.
 - It is published through the normal trusted-publishing workflow with PyPI
   provenance attestations enabled.
 - Version 0.6.3 remains available for compatibility with pinned installs, but
