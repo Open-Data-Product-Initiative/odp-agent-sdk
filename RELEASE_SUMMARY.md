@@ -1,10 +1,15 @@
-# Open Data Products Python SDK 0.6.0 Release Notes
+# Open Data Products Python SDK 0.6.1 Release Notes
 
 ## Unreleased package contents
 
-This is the next unreleased PyPI package after the 0.5.0 release. It adds
-ODCS-to-ODPS product drafting alongside the released ODPC v1.1 AI Product
-validation and draft ODPV 1.1 interoperability capabilities.
+This patch release exposes ODCS-to-ODPS product drafting through MCP.
+
+## MCP product drafting
+
+- `wrap_odcs_contract` is a state-changing MCP tool for writing a validated
+  ODPS draft from an ODCS contract.
+- It accepts the same enrichment and full-draft options as the CLI and redacts
+  local filesystem paths from its response.
 
 ## ODCS-to-ODPS product drafting
 

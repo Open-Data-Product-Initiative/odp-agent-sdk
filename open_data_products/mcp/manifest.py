@@ -313,7 +313,7 @@ def _capabilities() -> List[Dict[str, Any]]:
             "id": "odcs-product-wrapping",
             "title": "ODCS to ODPS product drafting",
             "standards": ["odps"],
-            "interfaces": ["python", "cli"],
+            "interfaces": ["python", "cli", "mcp"],
             "lifecycle": ["wrap-contract"],
             "summary": (
                 "Create a conservative, validated ODPS 4.2 draft from an ODCS "
@@ -482,7 +482,7 @@ def _workflows() -> List[Dict[str, Any]]:
             "commands": [
                 "open-data-products portfolio localize portfolio/ --languages fi,sv"
             ],
-            "mcp_tools": [],
+            "mcp_tools": ["wrap_odcs_contract"],
         },
         {
             "id": "render-portfolio",

@@ -111,6 +111,7 @@ EXPECTED_TOOLS = {
     "validate_recipe",
     "plan_recipe_run",
     "search_recipe_guidance",
+    "wrap_odcs_contract",
 }
 
 
@@ -176,6 +177,24 @@ class TestMCPToolDefinitions:
         payload = json.loads(result["content"][0]["text"])
         assert payload["valid"] is True
         assert payload["spec"] == "odps"
+
+    def test_wrap_odcs_contract_is_state_changing_and_redacts_paths(self, tmp_path):
+        from open_data_products.mcp.tools import TOOLS
+
+        contract = tmp_path / "orders.yaml"
+        output = tmp_path / "draft.yaml"
+        contract.write_text(
+            "apiVersion: v3.2.0\nkind: DataContract\nid: orders\ndataProduct: Orders\n",
+            encoding="utf-8",
+        )
+        tool = next(tool for tool in TOOLS if tool["name"] == "wrap_odcs_contract")
+        result = tool["handler"]({"contract": str(contract), "output": str(output)})
+        payload = json.loads(result["content"][0]["text"])
+
+        assert tool["class"] == "state-changing"
+        assert payload["valid"] is True
+        assert payload["output"] == "draft.yaml"
+        assert str(tmp_path) not in result["content"][0]["text"]
 
     @pytest.mark.parametrize(
         ("tool_name", "query"),

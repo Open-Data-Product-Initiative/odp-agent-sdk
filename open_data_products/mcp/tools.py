@@ -35,6 +35,7 @@ from ..contracts import (
     resolve_product_contracts,
     summarize_contract,
     validate_contract,
+    wrap_contract,
 )
 from ..generation import get_config as get_generation_config
 from ..generation import validate_config as validate_generation_config
@@ -408,6 +409,53 @@ def _h_extract_data_contract_schema(args: Dict[str, Any]) -> Dict[str, Any]:
     return _json_envelope(extract_contract_schema(args["contract"]).to_dict())
 
 
+def _h_wrap_odcs_contract(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Write one ODPS draft from an ODCS contract with explicit MCP inputs."""
+    result = wrap_contract(
+        args["contract"],
+        args["output"],
+        inline_contract=bool(args.get("inline_contract", False)),
+        use_ai=bool(args.get("enrich", False)),
+        extend=bool(args.get("full_draft", False)),
+        contract_url=args.get("contract_url"),
+        product_name=args.get("product_name"),
+        product_id=args.get("product_id"),
+        product_type=args.get("product_type"),
+        language=args.get("language"),
+        config=args.get("config"),
+        dry_run=bool(args.get("dry_run", False)),
+        overwrite=bool(args.get("overwrite", False)),
+    )
+    return _json_envelope(
+        {
+            "valid": result.validation.valid,
+            "output": Path(args["output"]).name,
+            "dry_run": bool(args.get("dry_run", False)),
+            "document": _redact_local_paths(result.document),
+            "mapped_fields": _redact_local_paths(
+                [item.to_dict() for item in result.mapped_fields]
+            ),
+            "provisional_defaults": result.provisional_defaults,
+            "missing_business_information": result.missing_business_information,
+            "ai_proposals": [item.to_dict() for item in result.ai_proposals],
+            "warnings": result.warnings,
+            "errors": result.errors,
+            "validation": result.validation.to_dict(),
+        }
+    )
+
+
+def _redact_local_paths(value: Any) -> Any:
+    """Remove local filesystem locations from MCP responses."""
+    if isinstance(value, dict):
+        return {key: _redact_local_paths(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_redact_local_paths(item) for item in value]
+    if isinstance(value, str) and value.startswith("file://"):
+        return "file://<local-contract>"
+    return value
+
+
 def _h_list_recipes(args: Dict[str, Any]) -> Dict[str, Any]:
     return _json_envelope(
         _list_recipes(
@@ -565,6 +613,7 @@ _CONTRACT_PROP = {
     "type": "string",
     "description": "Filesystem path or URL to a Data Contract file.",
 }
+_OUTPUT_PROP = {"type": "string", "description": "Output ODPS YAML path."}
 _TERM_PROP = {"type": "string", "description": "ODPV term id."}
 _OKF_BUNDLE_PROP = {
     "type": "string",
@@ -1001,6 +1050,30 @@ TOOLS: List[Dict[str, Any]] = [
         "class": "safe",
         "inputSchema": _object_schema({"contract": _CONTRACT_PROP}, ["contract"]),
         "handler": _h_validate_data_contract,
+    },
+    {
+        "name": "wrap_odcs_contract",
+        "description": "Write a validated ODPS draft from an ODCS contract.",
+        "class": "state-changing",
+        "inputSchema": _object_schema(
+            {
+                "contract": _CONTRACT_PROP,
+                "output": _OUTPUT_PROP,
+                "inline_contract": {"type": "boolean", "default": False},
+                "enrich": {"type": "boolean", "default": False},
+                "full_draft": {"type": "boolean", "default": False},
+                "contract_url": {"type": "string"},
+                "product_name": {"type": "string"},
+                "product_id": {"type": "string"},
+                "product_type": {"type": "string"},
+                "language": {"type": "string"},
+                "config": {"type": "string"},
+                "dry_run": {"type": "boolean", "default": False},
+                "overwrite": {"type": "boolean", "default": False},
+            },
+            ["contract", "output"],
+        ),
+        "handler": _h_wrap_odcs_contract,
     },
     {
         "name": "summarize_data_contract",

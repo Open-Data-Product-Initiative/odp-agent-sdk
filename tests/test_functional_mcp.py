@@ -101,7 +101,8 @@ def test_mcp_manifest_is_json_serializable_and_preserves_tool_contracts() -> Non
     assert all(
         tool_class == "safe"
         for tool_name, tool_class in classes.items()
-        if tool_name not in {"init_starter_recipe", "build_portfolio"}
+        if tool_name
+        not in {"init_starter_recipe", "build_portfolio", "wrap_odcs_contract"}
     )
     assert all("handler" not in tool for tool in manifest_tools)
     assert all(tool["inputSchema"]["type"] == "object" for tool in manifest_tools)
@@ -225,7 +226,9 @@ def test_mcp_build_portfolio_invokes_pipeline(
         observed.update(kwargs)
         return {"kind": "PortfolioBuild", "workspace": workspace, "valid": True}
 
-    monkeypatch.setattr(generation, "create_generation_client", lambda settings: "client")
+    monkeypatch.setattr(
+        generation, "create_generation_client", lambda settings: "client"
+    )
     monkeypatch.setattr(portfolio, "build_portfolio", fake_build_portfolio)
 
     workspace = tmp_path / "portfolio"
