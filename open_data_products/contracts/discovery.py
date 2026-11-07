@@ -739,7 +739,7 @@ def _render_report(result: ContractDiscoveryResult) -> str:
         )
     )
     priority_findings = "".join(
-        _priority_finding(finding)
+        _priority_finding(finding, inventory_by_id)
         for finding in result.intelligence_findings
         if finding.category in {"reuse", "similarity"}
     )
@@ -784,7 +784,7 @@ main { max-width:1240px; margin:auto; padding:36px 24px 56px; } header { display
 .eyebrow { margin:0 0 5px; color:var(--purple); font-size:12px; font-weight:800; letter-spacing:.1em; } h1 { margin:0; font-size:32px; line-height:1.15; letter-spacing:-.03em; } h2 { margin:0; font-size:21px; letter-spacing:-.015em; } .subtitle, .meta { color:var(--muted); } .meta { font-size:13px; white-space:nowrap; }
 section { margin-top:30px; } .metrics { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; margin-top:14px; } .metric { background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:16px; } .metric strong { display:block; color:var(--purple); font-size:29px; line-height:1; } .metric span { display:block; font-weight:750; margin-top:9px; } .metric small { color:var(--muted); display:block; margin-top:3px; }
 .summary { max-width:780px; margin:14px 0 0; color:var(--muted); } .explorer { background:var(--surface); border:1px solid var(--line); border-radius:12px; overflow:hidden; } .toolbar { display:flex; justify-content:space-between; gap:16px; padding:16px; border-bottom:1px solid var(--line); } input { width:min(360px,100%); border:1px solid #CFC4D7; border-radius:7px; padding:9px 11px; font:inherit; } input:focus { outline:3px solid var(--purple-soft); border-color:var(--purple); }
-.priority-findings { display:grid; grid-template-columns:repeat(auto-fit,minmax(270px,1fr)); gap:10px; margin-top:16px; } .priority-finding { display:block; background:var(--surface); border:1px solid var(--line); border-left:3px solid var(--purple); border-radius:7px; padding:11px 12px; color:var(--ink); text-decoration:none; } .priority-finding:hover { border-color:var(--purple); } .priority-finding strong { display:block; font-size:14px; } .priority-finding span { color:var(--muted); display:block; font-size:13px; margin-top:3px; }
+.priority-findings { display:grid; grid-template-columns:repeat(auto-fit,minmax(310px,1fr)); gap:10px; margin-top:16px; } .priority-finding { background:var(--surface); border:1px solid var(--line); border-left:3px solid var(--purple); border-radius:7px; padding:13px; } .priority-finding h4 { margin:0; font-size:15px; } .priority-contracts { margin:8px 0; color:var(--ink); font-size:13px; } .priority-contracts span { color:var(--muted); display:block; font-size:12px; overflow-wrap:anywhere; } .priority-evidence, .priority-action { color:var(--muted); display:block; font-size:13px; margin-top:6px; }
 .table-wrap { overflow:auto; } table { width:100%; border-collapse:collapse; min-width:810px; } th { color:var(--muted); font-size:12px; letter-spacing:.04em; text-align:left; text-transform:uppercase; background:#FCFBFD; } th, td { padding:12px 16px; border-bottom:1px solid var(--line); vertical-align:top; } tr:last-child td { border-bottom:0; } .contract-name { font-weight:750; } .source { color:var(--muted); font-size:12px; overflow-wrap:anywhere; } .badge { display:inline-block; padding:2px 7px; border-radius:999px; background:var(--purple-soft); color:#5B21B6; font-size:12px; font-weight:750; }
 .relationship-link { display:block; color:#5B21B6; font-size:13px; margin:2px 0; text-decoration:none; } .relationship-link:hover { text-decoration:underline; } .gap { color:var(--warning); font-size:13px; margin:2px 0; } .details { margin-top:14px; } details { background:var(--surface); border:1px solid var(--line); border-radius:8px; margin:8px 0; padding:12px 14px; } details:target { border-color:var(--purple); box-shadow:0 0 0 3px var(--purple-soft); } summary { cursor:pointer; font-weight:750; } .evidence { color:var(--muted); margin:8px 0 0; }
 .opportunities { display:grid; grid-template-columns:repeat(auto-fit,minmax(310px,1fr)); gap:14px; margin-top:14px; } .opportunity, .empty-state { background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:18px; } .opportunity { border-top:3px solid var(--purple); } .opportunity h3 { margin:0; font-size:18px; } .opportunity p { color:var(--muted); } .label { color:var(--purple); font-size:12px; font-weight:800; letter-spacing:.06em; } .contracts { margin:10px 0; padding-left:18px; color:var(--muted); font-size:13px; } .review-note { margin:12px 0 0; padding:10px; border-radius:7px; background:var(--warning-bg); color:#854D0E; font-size:13px; }
@@ -814,13 +814,35 @@ def _metric_card(label: str, value: int, note: str) -> str:
     )
 
 
-def _priority_finding(finding: IntelligenceFinding) -> str:
-    """Render one compact actionable finding link for the overview."""
+def _priority_finding(
+    finding: IntelligenceFinding,
+    inventory: Mapping[str, ContractInventoryRecord],
+) -> str:
+    """Render one self-contained actionable finding in the overview."""
+    contracts = "".join(
+        "<div><strong>{}</strong><span>{}</span></div>".format(
+            _escape(
+                inventory.get(
+                    identifier, ContractInventoryRecord("", identifier, "unknown")
+                ).name
+                or identifier
+            ),
+            _escape(
+                inventory.get(
+                    identifier, ContractInventoryRecord("", identifier, "unknown")
+                ).source_reference
+            ),
+        )
+        for identifier in finding.source_contract_ids
+    )
     return (
-        '<a class="priority-finding" href="#finding-{}"><strong>{}</strong><span>{}</span></a>'
+        '<article class="priority-finding"><h4>{}</h4><div class="priority-contracts">{}</div>'
+        '<span class="priority-evidence"><strong>Evidence:</strong> {}</span>'
+        '<span class="priority-action"><strong>Next:</strong> {}</span></article>'
     ).format(
-        _escape(finding.finding_id),
         _escape(finding.kind.replace("_", " ")),
+        contracts,
+        _escape(" ".join(finding.evidence)),
         _escape(finding.suggested_action),
     )
 
