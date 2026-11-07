@@ -49,6 +49,22 @@ def test_pypi_workflow_uses_release_trusted_publishing_with_version_guard() -> N
     assert "repository-url: https://test.pypi.org/legacy/" not in content
 
 
+def test_manual_pypi_dispatch_keeps_attestations_enabled_by_default() -> None:
+    content = PYPI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert (
+        "attestations:\n"
+        '        description: "Generate PyPI provenance attestations"\n'
+        "        required: false\n"
+        "        type: boolean\n"
+        "        default: true"
+    ) in content
+    assert (
+        "attestations: ${{ github.event_name != 'workflow_dispatch' || "
+        "inputs.attestations }}"
+    ) in content
+
+
 def test_package_metadata_includes_mcp_package() -> None:
     content = PYPROJECT.read_text(encoding="utf-8")
 
