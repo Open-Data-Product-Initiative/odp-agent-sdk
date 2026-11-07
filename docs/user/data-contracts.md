@@ -228,6 +228,12 @@ counts, interface types and their contracts, priority findings, contract
 inventory, all three opportunity types, and every contract with no current
 opportunity signal. Add `--json` to receive the same data as structured output.
 
+The Python API returns the same metadata through
+`discover_contract_portfolio(...).to_dict()`. The state-changing MCP tool
+`discover_contract_portfolio` requires `approved: true` because it writes
+artifacts; its response then carries the same metadata-only intelligence result,
+without raw contract document bodies or absolute local paths.
+
 The intelligence artifact records source contracts, evidence, why each finding
 matters, and a suggested human investigation. It normalizes safe technical
 interface identifiers such as declared server types and resource names, but it

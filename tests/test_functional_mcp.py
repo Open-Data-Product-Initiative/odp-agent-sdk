@@ -17,6 +17,9 @@ ODPS_PRODUCT = (
 ODPS_V42_PRODUCT = REPO_ROOT / "tests" / "fixtures" / "odps_v42_profiles.yaml"
 ODPG_GRAPH = REPO_ROOT / "open_data_products" / "odpg" / "data" / "graph" / "graph.yaml"
 RECIPE_CONFIG = REPO_ROOT / "examples" / "recipes" / "config" / "recipes.config.yaml"
+DATA_CONTRACT_CORPUS = (
+    REPO_ROOT / "tests" / "fixtures" / "external_contract_sources" / "datacontract-cli"
+)
 
 
 def _call_tool(name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
@@ -111,6 +114,35 @@ def test_mcp_discover_contract_portfolio_requires_approval(tmp_path: Path) -> No
 
     assert response is not None
     assert response["result"]["isError"] is True
+
+
+def test_mcp_discover_contract_portfolio_returns_full_intelligence_metadata(
+    tmp_path: Path,
+) -> None:
+    result = _call_tool(
+        "discover_contract_portfolio",
+        {
+            "directory": str(DATA_CONTRACT_CORPUS),
+            "output": str(tmp_path / "out"),
+            "approved": True,
+        },
+    )
+    payload = json.loads(result["content"][0]["text"])
+
+    assert payload["intelligence_summary"]["contracts_analyzed"] == 146
+    assert payload["interface_analysis"]["interface_type_count"] == 28
+    assert payload["interface_analysis"]["contracts_with_one_interface"] == 99
+    assert payload["interface_analysis"]["contracts_with_multiple_interfaces"] == 3
+    assert len(payload["inventory"]) == 146
+    assert len(payload["intelligence_findings"]) == 379
+    assert {item["opportunity_type"] for item in payload["candidates"]} == {
+        "standalone_product_candidate",
+        "boundary_proposal",
+        "rationalisation_opportunity",
+    }
+    assert len(payload["unclassified_contracts"]) == 134
+    assert "document" not in result["content"][0]["text"]
+    assert str(DATA_CONTRACT_CORPUS) not in result["content"][0]["text"]
 
 
 def test_mcp_manifest_is_json_serializable_and_preserves_tool_contracts() -> None:

@@ -457,19 +457,7 @@ def _h_discover_contract_portfolio(args: Dict[str, Any]) -> Dict[str, Any]:
         source_id=args.get("source"),
         output=args["output"],
     )
-    payload = result.to_dict()
-    return _json_envelope(
-        {
-            "kind": payload["kind"],
-            "source_id": payload["source_id"],
-            "source_status": payload["source_status"],
-            "inventory_count": len(payload["inventory"]),
-            "relationship_count": len(payload["relationships"]),
-            "candidate_count": len(payload["candidates"]),
-            "artifacts": payload["artifacts"],
-            "warnings": payload["warnings"],
-        }
-    )
+    return _json_envelope(_redact_local_paths(result.to_dict()))
 
 
 def _redact_local_paths(value: Any) -> Any:
@@ -1112,7 +1100,7 @@ TOOLS: List[Dict[str, Any]] = [
     },
     {
         "name": "discover_contract_portfolio",
-        "description": "Write review-only portfolio discovery artifacts from ODCS contracts.",
+        "description": "Write review-only portfolio discovery artifacts and return evidence-backed intelligence metadata from ODCS contracts.",
         "class": "state-changing",
         "inputSchema": _object_schema(
             {
