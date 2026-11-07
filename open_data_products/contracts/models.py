@@ -267,6 +267,8 @@ class ContractDiscoveryResult:
     warnings: List[str] = field(default_factory=list)
     ai_enabled: bool = False
     ai_proposals: List[ProductCandidate] = field(default_factory=list)
+    interface_analysis: Dict[str, object] = field(default_factory=dict)
+    unclassified_contracts: List[Dict[str, str]] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, object]:
         """Return a JSON-serializable representation."""
@@ -285,6 +287,10 @@ class ContractDiscoveryResult:
             "warnings": list(self.warnings),
             "ai_enabled": self.ai_enabled,
             "ai_proposals": [item.to_dict() for item in self.ai_proposals],
+            "interface_analysis": dict(self.interface_analysis),
+            "unclassified_contracts": [
+                dict(item) for item in self.unclassified_contracts
+            ],
         }
 
 

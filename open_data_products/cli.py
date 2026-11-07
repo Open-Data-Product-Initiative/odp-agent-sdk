@@ -524,6 +524,212 @@ Examples:
 """
 
 
+def _print_contract_discovery_report(payload: Dict[str, object]) -> None:
+    """Print the complete human-readable contract intelligence report."""
+    inventory = _payload_mapping_list(payload.get("inventory"))
+    relationships = _payload_mapping_list(payload.get("relationships"))
+    findings = _payload_mapping_list(payload.get("intelligence_findings"))
+    candidates = _payload_mapping_list(payload.get("candidates"))
+    candidates.extend(_payload_mapping_list(payload.get("ai_proposals")))
+    summary = payload.get("intelligence_summary")
+    summary = summary if isinstance(summary, dict) else {}
+    interface_analysis = payload.get("interface_analysis")
+    interface_analysis = (
+        interface_analysis if isinstance(interface_analysis, dict) else {}
+    )
+    unclassified = _payload_mapping_list(payload.get("unclassified_contracts"))
+    inventory_by_id = {
+        str(item.get("logical_id")): item
+        for item in inventory
+        if isinstance(item.get("logical_id"), str)
+    }
+
+    print("Data Contract Intelligence")
+    print("Overview")
+    print("Contracts analyzed: {}".format(summary.get("contracts_analyzed", 0)))
+    print("Relationships detected: {}".format(summary.get("relationships_detected", 0)))
+    print("Reuse or duplication findings: {}".format(summary.get("reuse_findings", 0)))
+    print("Product opportunities: {}".format(summary.get("product_opportunities", 0)))
+
+    print("\nInterface analysis")
+    print(
+        "Declared interface types: {}".format(
+            interface_analysis.get("interface_type_count", 0)
+        )
+    )
+    print(
+        "Contracts with one interface: {}".format(
+            interface_analysis.get("contracts_with_one_interface", 0)
+        )
+    )
+    print(
+        "Contracts with multiple interfaces: {}".format(
+            interface_analysis.get("contracts_with_multiple_interfaces", 0)
+        )
+    )
+    print(
+        "Contracts without an interface: {}".format(
+            interface_analysis.get("contracts_without_declared_interface", 0)
+        )
+    )
+    for interface_type in _payload_mapping_list(interface_analysis.get("types")):
+        print(
+            "- {}: {} contracts".format(
+                _payload_text(interface_type.get("interface_type"), "unknown"),
+                interface_type.get("contract_count", 0),
+            )
+        )
+        for contract in _payload_mapping_list(interface_type.get("contracts")):
+            print(
+                "  - {} — {}".format(
+                    _contract_label(contract), _contract_source(contract)
+                )
+            )
+
+    print("\nPriority findings")
+    priority_findings = [
+        finding
+        for finding in findings
+        if finding.get("category") in {"reuse", "similarity"}
+    ]
+    if not priority_findings:
+        print("- None detected")
+    for finding in priority_findings:
+        print(
+            "- {}".format(
+                _payload_text(finding.get("kind"), "finding").replace("_", " ")
+            )
+        )
+        for identifier in _payload_string_list(finding.get("source_contract_ids")):
+            record = inventory_by_id.get(identifier, {})
+            print(
+                "  - {} — {}".format(_contract_label(record), _contract_source(record))
+            )
+        print(
+            "  Evidence: {}".format(
+                " ".join(_payload_string_list(finding.get("evidence")))
+            )
+        )
+        print(
+            "  Next: {}".format(
+                _payload_text(finding.get("suggested_action"), "Review the evidence.")
+            )
+        )
+
+    print("\nContract inventory")
+    for record in inventory:
+        identifier = _payload_text(record.get("logical_id"), "")
+        related = [
+            _payload_text(item.get("kind"), "relationship").replace("_", " ")
+            for item in relationships
+            if identifier
+            in {
+                _payload_text(item.get("source_id"), ""),
+                _payload_text(item.get("target_id"), ""),
+            }
+        ]
+        gaps = [
+            _payload_text(item.get("kind"), "gap").replace("missing_", "missing ")
+            for item in findings
+            if item.get("category") == "information_gap"
+            and identifier in _payload_string_list(item.get("source_contract_ids"))
+        ]
+        print("- {} — {}".format(_contract_label(record), _contract_source(record)))
+        print(
+            "  Domain / owner: {} / {}".format(
+                _payload_text(record.get("domain"), "—"),
+                _payload_text(record.get("owner"), "—"),
+            )
+        )
+        print(
+            "  Interfaces: {}".format(
+                ", ".join(_payload_string_list(record.get("technical_interfaces")))
+                or "—"
+            )
+        )
+        print("  Relationships: {}".format(", ".join(related) or "None detected"))
+        print("  Missing information: {}".format(", ".join(gaps) or "None recorded"))
+
+    print("\nProduct opportunities")
+    for opportunity_type, title in (
+        ("standalone_product_candidate", "Standalone product candidates"),
+        ("boundary_proposal", "Boundary proposals"),
+        ("rationalisation_opportunity", "Rationalisation opportunities"),
+    ):
+        typed_candidates = [
+            candidate
+            for candidate in candidates
+            if candidate.get("opportunity_type") == opportunity_type
+        ]
+        print("{} ({})".format(title, len(typed_candidates)))
+        for candidate in typed_candidates:
+            print(
+                "- {}".format(
+                    _payload_text(candidate.get("rationale"), "Evidence unavailable.")
+                )
+            )
+            for identifier in _payload_string_list(
+                candidate.get("supporting_contract_ids")
+            ):
+                record = inventory_by_id.get(identifier, {})
+                print(
+                    "  - {} — {}".format(
+                        _contract_label(record), _contract_source(record)
+                    )
+                )
+            questions = _payload_string_list(candidate.get("unresolved_questions"))
+            if questions:
+                print("  Human review: {}".format("; ".join(questions)))
+
+    print("No current opportunity signal ({})".format(len(unclassified)))
+    for record in unclassified:
+        print(
+            "- {} — {} — {}".format(
+                _contract_label(record),
+                _contract_source(record),
+                _payload_text(record.get("reason"), "No current evidence signal."),
+            )
+        )
+    print("\nArtifacts")
+    for artifact in _payload_mapping_list(payload.get("artifacts")):
+        print("- {}".format(_payload_text(artifact.get("kind"), "artifact")))
+
+
+def _payload_mapping_list(value: object) -> List[Dict[str, object]]:
+    """Return mapping items from a JSON-ready CLI payload."""
+    if not isinstance(value, list):
+        return []
+    return [item for item in value if isinstance(item, dict)]
+
+
+def _payload_string_list(value: object) -> List[str]:
+    """Return text items from a JSON-ready CLI payload."""
+    if not isinstance(value, list):
+        return []
+    return [item for item in value if isinstance(item, str)]
+
+
+def _payload_text(value: object, default: str) -> str:
+    """Return one displayable scalar from a JSON-ready CLI payload."""
+    return value if isinstance(value, str) and value else default
+
+
+def _contract_label(record: Dict[str, object]) -> str:
+    """Return one contract name for terminal output."""
+    return _payload_text(
+        record.get("name"),
+        _payload_text(
+            record.get("contract_id"),
+            _payload_text(record.get("logical_id"), "Unnamed contract"),
+        ),
+    )
+
+
+def _contract_source(record: Dict[str, object]) -> str:
+    """Return one contract source reference for terminal output."""
+    return _payload_text(record.get("source_reference"), "Unknown source")
+
+
 def main(argv: Optional[List[str]] = None) -> int:
     """Run the top-level Open Data Products CLI."""
     cli_argv = list(sys.argv[1:] if argv is None else argv)
@@ -2990,9 +3196,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                     print(f"Omitted chunks: {source_budget.get('omittedChunkCount')}")
                 print(f"Validation mode: {payload['validationMode']}")
             elif payload.get("kind") == "ContractDiscovery":
-                print("Contract portfolio discovery")
-                print(f"Contracts: {len(payload.get('inventory', []))}")
-                print(f"Candidates: {len(payload.get('candidates', []))}")
+                _print_contract_discovery_report(payload)
                 print(f"Validation mode: {payload['validationMode']}")
             else:
                 print(f"Workspace: {payload['workspace']}")
