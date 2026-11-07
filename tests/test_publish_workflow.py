@@ -11,6 +11,7 @@ PYPROJECT = REPO_ROOT / "pyproject.toml"
 MANIFEST = REPO_ROOT / "MANIFEST.in"
 DOCS_DIR = REPO_ROOT / "docs"
 DEVELOPMENT_DOC = DOCS_DIR / "development" / "README.md"
+README = REPO_ROOT / "README.md"
 
 
 def test_testpypi_workflow_uses_manual_trusted_publishing() -> None:
@@ -63,6 +64,16 @@ def test_manual_pypi_dispatch_keeps_attestations_enabled_by_default() -> None:
         "attestations: ${{ github.event_name != 'workflow_dispatch' || "
         "inputs.attestations }}"
     ) in content
+
+
+def test_readme_uses_the_dynamic_pypi_version_badge() -> None:
+    content = README.read_text(encoding="utf-8")
+
+    assert (
+        "[![PyPI version](https://img.shields.io/pypi/v/open-data-products.svg)]"
+        "(https://pypi.org/project/open-data-products/)"
+    ) in content
+    assert "badge.fury.io/py/open-data-products" not in content
 
 
 def test_package_metadata_includes_mcp_package() -> None:
