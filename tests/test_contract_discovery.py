@@ -194,6 +194,12 @@ def test_intelligence_report_renders_explorer_and_evidence_links(
     report = (output / "discovery-report.html").read_text(encoding="utf-8")
 
     assert "Data Contract Intelligence" in report
+    assert 'role="tablist"' in report
+    assert 'id="tab-overview"' in report
+    assert 'id="tab-priority-findings"' in report
+    assert 'id="tab-explorer"' in report
+    assert 'id="tab-opportunities"' in report
+    assert 'role="tabpanel"' in report
     assert "Contracts analyzed" in report
     assert "Priority findings" in report
     assert "Contract Intelligence Explorer" in report
@@ -205,8 +211,8 @@ def test_intelligence_report_renders_explorer_and_evidence_links(
     assert "Why it matters" in report
     assert "Suggested action" in report
     assert "#6D28D9" in report
-    priority = report.split("Priority findings", 1)[1].split(
-        "Contract Intelligence Explorer", 1
+    priority = report.split('id="panel-priority-findings"', 1)[1].split(
+        'id="panel-explorer"', 1
     )[0]
     assert "Top Artists by Year" in priority
     assert "examples/business-definitions/top-artists-by-year.odcs.yaml" in priority
