@@ -1,9 +1,18 @@
-# Open Data Products Python SDK 0.6.3 Release Notes
+# Open Data Products Python SDK 0.6.4 Release Notes
 
 ## Unreleased package contents
 
-This release adds Data Contract Intelligence while retaining the existing
-contract discovery, CLI, Python API, and MCP workflows.
+This release supersedes 0.6.3 with the same Data Contract Intelligence
+capabilities and restores normal PyPI provenance attestations.
+
+## Release provenance
+
+- 0.6.4 is the preferred release for the Data Contract Intelligence update.
+- It is published through the normal trusted-publishing workflow with PyPI
+  provenance attestations enabled.
+- Version 0.6.3 remains available for compatibility with pinned installs, but
+  has no PyPI provenance attestation because the external transparency log was
+  unavailable during its publication.
 
 ## Data Contract Intelligence
 
