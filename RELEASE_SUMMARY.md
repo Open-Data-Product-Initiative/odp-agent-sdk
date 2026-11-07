@@ -1,8 +1,25 @@
-# Open Data Products Python SDK 0.6.2 Release Notes
+# Open Data Products Python SDK 0.6.3 Release Notes
 
 ## Unreleased package contents
 
-This patch release makes the ODCS wrapper input explicit in the CLI.
+This release adds Data Contract Intelligence while retaining the existing
+contract discovery, CLI, Python API, and MCP workflows.
+
+## Data Contract Intelligence
+
+- Discover and inventory ODCS contracts from local folders or configured API
+  sources, with source references and declared metadata retained as evidence.
+- Identify exact duplicates, schema overlap, shared technical resources, and
+  shared domain/capability signals without treating inferred relationships as
+  source facts.
+- Report metadata gaps, interface coverage and types, and contracts that have
+  no current opportunity signal.
+- Classify review-only opportunities as standalone product candidates,
+  boundary proposals, or rationalisation opportunities. No data product is
+  created or approved automatically.
+- Produce the same evidence-backed intelligence through the Python API, CLI,
+  MCP response, structured JSON artifacts, and a self-contained offline HTML
+  report.
 
 ## Explicit ODCS wrapper input
 
