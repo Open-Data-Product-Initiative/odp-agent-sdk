@@ -113,11 +113,11 @@ declaring any contract to be an approved data product:
       --output portfolio-discovery/ --json
 
 The command writes a normalized contract inventory, a source-linked Data
-Contract Intelligence artifact, review-only candidate groupings, and a static
-HTML report. The report shows inventory, relationships, reuse evidence, and
-information gaps even when no product groups are proposed. Duplicate and
-schema-overlap findings are technical evidence, not approved product
-boundaries.
+Contract Intelligence artifact, review-only typed opportunities, and a static
+HTML report. The report separates standalone product candidates, multi-contract
+boundary proposals, and rationalisation opportunities; it also lists contracts
+without a current opportunity signal. Duplicate and schema-overlap findings are
+technical evidence, not approved product boundaries.
 
 Portfolio source intake can be inspected without calling an LLM:
 

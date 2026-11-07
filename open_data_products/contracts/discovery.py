@@ -31,6 +31,14 @@ _BUSINESS_QUESTIONS = [
     "Which consumer need justifies this product boundary?",
     "Who is accountable for approving ownership and scope?",
 ]
+_STANDALONE_QUESTIONS = [
+    "Which consumer need confirms this contract should be offered as a data product?",
+    "Who is accountable for approving ownership and product scope?",
+]
+_RATIONALISATION_QUESTIONS = [
+    "Which contract should be the canonical resource?",
+    "Who approves consolidation, deprecation, or retained parallel ownership?",
+]
 
 
 def discover_contract_portfolio(
@@ -336,7 +344,7 @@ def _analyze_inventory(
                         ),
                     )
                 )
-    candidates = [
+    boundary_candidates = [
         ProductCandidate(
             candidate_id="candidate-"
             + relationship.source_id[-6:]
@@ -348,11 +356,49 @@ def _analyze_inventory(
             rationale=relationship.rationale,
             unresolved_questions=list(_BUSINESS_QUESTIONS),
             score=relationship.score,
+            opportunity_type="boundary_proposal",
         )
         for relationship in relationships
         if relationship.kind == "shared_domain_capability"
     ]
-    return relationships, candidates
+    standalone_candidates = [
+        ProductCandidate(
+            candidate_id="candidate-standalone-" + record.logical_id[-12:],
+            status="proposed",
+            evidence_class="source_fact",
+            supporting_contract_ids=[record.logical_id],
+            rationale=(
+                "Contract declares name '{}', domain '{}', and purpose '{}'."
+            ).format(record.name, record.domain, record.purpose),
+            unresolved_questions=list(_STANDALONE_QUESTIONS),
+            opportunity_type="standalone_product_candidate",
+        )
+        for record in loaded
+        if record.name is not None
+        and record.domain is not None
+        and record.purpose is not None
+    ]
+    rationalisation_candidates = [
+        ProductCandidate(
+            candidate_id="candidate-rationalisation-"
+            + relationship.source_id[-6:]
+            + "-"
+            + relationship.target_id[-6:],
+            status="proposed",
+            evidence_class=relationship.evidence_class,
+            supporting_contract_ids=[relationship.source_id, relationship.target_id],
+            rationale=relationship.rationale,
+            unresolved_questions=list(_RATIONALISATION_QUESTIONS),
+            score=relationship.score,
+            opportunity_type="rationalisation_opportunity",
+        )
+        for relationship in relationships
+        if relationship.kind == "exact_duplicate"
+    ]
+    return (
+        relationships,
+        standalone_candidates + boundary_candidates + rationalisation_candidates,
+    )
 
 
 def _derive_intelligence_findings(
@@ -482,7 +528,28 @@ def _intelligence_summary(
         "information_gap_findings": len(
             [finding for finding in findings if finding.category == "information_gap"]
         ),
-        "proposed_product_groups": len(candidates),
+        "proposed_product_groups": len(
+            [
+                item
+                for item in candidates
+                if item.opportunity_type == "boundary_proposal"
+            ]
+        ),
+        "product_opportunities": len(candidates),
+        "standalone_product_candidates": len(
+            [
+                item
+                for item in candidates
+                if item.opportunity_type == "standalone_product_candidate"
+            ]
+        ),
+        "rationalisation_opportunities": len(
+            [
+                item
+                for item in candidates
+                if item.opportunity_type == "rationalisation_opportunity"
+            ]
+        ),
     }
 
 
@@ -623,6 +690,7 @@ def _propose_candidates_with_ai(
                 supporting_contract_ids=list(identifiers),
                 rationale=rationale,
                 unresolved_questions=list(_BUSINESS_QUESTIONS),
+                opportunity_type="boundary_proposal",
             )
         )
     return proposals, warnings
@@ -649,6 +717,23 @@ def _has_relationship_evidence(
         and relationship.target_id in identifiers_set
         for relationship in relationships
     )
+
+
+def _unclassified_contracts(
+    inventory: Sequence[ContractInventoryRecord],
+    candidates: Sequence[ProductCandidate],
+) -> List[ContractInventoryRecord]:
+    """Return loaded contracts without a current opportunity signal."""
+    classified_ids = {
+        identifier
+        for candidate in candidates
+        for identifier in candidate.supporting_contract_ids
+    }
+    return [
+        record
+        for record in inventory
+        if record.status == "loaded" and record.logical_id not in classified_ids
+    ]
 
 
 def _write_artifacts(
@@ -686,6 +771,17 @@ def _write_artifacts(
             "relationships": [item.to_dict() for item in result.relationships],
             "candidates": [item.to_dict() for item in result.candidates],
             "ai_proposals": [item.to_dict() for item in result.ai_proposals],
+            "unclassified_contracts": [
+                {
+                    "logical_id": record.logical_id,
+                    "name": record.name or record.contract_id,
+                    "source_reference": record.source_reference,
+                    "reason": "No current standalone, boundary, or rationalisation signal.",
+                }
+                for record in _unclassified_contracts(
+                    result.inventory, result.candidates
+                )
+            ],
         },
     )
     report_path.write_text(_render_report(result), encoding="utf-8")
@@ -786,8 +882,8 @@ def _render_report(result: ContractDiscoveryResult) -> str:
             ),
             ("Reuse or duplication", "reuse_findings", "Exact duplicate evidence"),
             (
-                "Proposed product groups",
-                "proposed_product_groups",
+                "Product opportunities",
+                "product_opportunities",
                 "Require human review",
             ),
         )
@@ -819,17 +915,41 @@ def _render_report(result: ContractDiscoveryResult) -> str:
         _finding_detail(finding, inventory_by_id)
         for finding in result.intelligence_findings
     )
-    opportunity_cards = "".join(
-        _opportunity_card(candidate, inventory_by_id)
-        for candidate in list(result.candidates) + list(result.ai_proposals)
-    )
-    if not opportunity_cards:
-        opportunity_cards = (
-            '<div class="empty-state"><strong>No proposed product groups</strong>'
-            "<p>This is not a failure. No relationship currently meets the "
-            "conservative grouping rule; review contract metadata and evidence "
-            "before proposing a product boundary.</p></div>"
+    opportunities = list(result.candidates) + list(result.ai_proposals)
+    opportunity_sections = "".join(
+        _opportunity_section(
+            opportunity_type,
+            title,
+            description,
+            [
+                candidate
+                for candidate in opportunities
+                if candidate.opportunity_type == opportunity_type
+            ],
+            inventory_by_id,
         )
+        for opportunity_type, title, description in (
+            (
+                "standalone_product_candidate",
+                "Standalone product candidates",
+                "One contract declares a name, domain, and purpose. Human review still decides whether it becomes a data product.",
+            ),
+            (
+                "boundary_proposal",
+                "Boundary proposals",
+                "Related contracts have repeatable shared-domain and capability evidence, but a shared product boundary needs human approval.",
+            ),
+            (
+                "rationalisation_opportunity",
+                "Rationalisation opportunities",
+                "Exact duplicate evidence suggests consolidation or a canonical contract decision, not a new data product.",
+            ),
+        )
+    )
+    unclassified_contracts = _unclassified_contracts(result.inventory, opportunities)
+    unclassified_rows = "".join(
+        _unclassified_contract_row(record) for record in unclassified_contracts
+    )
     return (
         """<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
@@ -846,7 +966,7 @@ def _render_report(result: ContractDiscoveryResult) -> str:
 .explorer { margin-top:32px; overflow:hidden; } .toolbar { display:flex; justify-content:space-between; align-items:end; gap:16px; padding:20px 24px; border-bottom:1px solid var(--line); } .meta { color:var(--muted); font-size:14px; } input { width:min(400px,100%); margin-top:4px; border:1px solid #CCC4D9; border-radius:10px; padding:10px 12px; color:var(--ink); font:inherit; } input:focus { outline:3px solid var(--purple-soft); border-color:var(--purple); } .table-wrap { overflow:auto; } table { width:100%; border-collapse:collapse; min-width:810px; } th { color:var(--muted); font-size:12px; letter-spacing:.06em; text-align:left; text-transform:uppercase; background:#FCFBFE; } th, td { padding:15px 20px; border-bottom:1px solid var(--line); vertical-align:top; } tr:last-child td { border-bottom:0; } .contract-name { color:var(--ink); font-weight:800; } .source { color:var(--muted); font-size:13px; overflow-wrap:anywhere; } .badge { display:inline-block; margin-top:5px; padding:2px 8px; border-radius:999px; background:var(--purple-soft); color:#5621B6; font-size:12px; font-weight:800; }
 .relationship-link { display:block; color:#5621B6; font-size:14px; margin:3px 0; text-decoration:none; } .relationship-link:hover { text-decoration:underline; } .gap { color:var(--warning); } .details { margin-top:24px; } details { background:var(--surface); border:1px solid var(--line); border-radius:14px; margin:10px 0; padding:15px 18px; } details:target { border-color:var(--purple); box-shadow:0 0 0 3px var(--purple-soft); } summary { cursor:pointer; color:var(--ink); font-weight:800; } .evidence { color:var(--muted); margin:10px 0 0; }
 .interface-summary { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:20px; margin-top:32px; } .interface-summary .metric { min-height:132px; } .interface-register { margin-top:28px; overflow:hidden; } .interface-table { min-width:980px; } .interface-type { color:var(--ink); font-weight:850; } .interface-count { color:var(--purple); font-size:21px; font-weight:850; letter-spacing:-.02em; white-space:nowrap; } .interface-contracts { display:grid; gap:12px; } .interface-contract strong { display:block; color:var(--ink); font-size:15px; } .interface-contract span { color:var(--muted); display:block; font-size:13px; overflow-wrap:anywhere; }
-.opportunity { position:relative; } .opportunity .label { margin-bottom:19px; } .label { color:var(--purple); font-size:13px; font-weight:850; letter-spacing:.07em; } .opportunity .finding-contracts { margin-top:22px; } .contract-group h4 { margin:0; color:var(--ink); font-size:15px; } .contract-record { padding-top:13px; } .contract-number { color:var(--purple)!important; font-size:12px!important; font-weight:850; letter-spacing:.07em; } .contract-record strong { display:block; color:var(--ink); font-size:17px; line-height:1.3; } .review-note { margin-top:22px; padding:14px 15px; border-radius:12px; background:var(--warning-bg); color:var(--warning); font-size:15px; line-height:1.5; } .legend { display:flex; flex-wrap:wrap; gap:18px; color:var(--muted); font-size:14px; margin-top:26px; } .legend b { color:var(--ink); }
+.opportunity-section { margin-top:52px; } .opportunity-section:first-child { margin-top:42px; } .opportunity-section h3, .unclassified-section h3 { margin:0; color:var(--ink); font-size:27px; letter-spacing:-.035em; } .opportunity-description { max-width:900px; margin:8px 0 0; color:var(--muted); } .opportunity-section .opportunities { margin-top:22px; } .opportunity { position:relative; } .opportunity .label { margin-bottom:19px; } .label { color:var(--purple); font-size:13px; font-weight:850; letter-spacing:.07em; } .opportunity .finding-contracts { margin-top:22px; } .contract-group h4 { margin:0; color:var(--ink); font-size:15px; } .contract-record { padding-top:13px; } .contract-number { color:var(--purple)!important; font-size:12px!important; font-weight:850; letter-spacing:.07em; } .contract-record strong { display:block; color:var(--ink); font-size:17px; line-height:1.3; } .review-note { margin-top:22px; padding:14px 15px; border-radius:12px; background:var(--warning-bg); color:var(--warning); font-size:15px; line-height:1.5; } .unclassified-section { margin-top:62px; } .unclassified-section .summary { margin-top:8px; } .unclassified-register { margin-top:24px; overflow:hidden; } .unclassified-register table { min-width:640px; } .unclassified-reason { color:var(--muted); font-size:14px; } .legend { display:flex; flex-wrap:wrap; gap:18px; color:var(--muted); font-size:14px; margin-top:26px; } .legend b { color:var(--ink); }
 @media (max-width:900px) { main { padding:26px 28px 56px; } .report-source { display:none; } .section-heading { font-size:39px; } .metrics, .interface-summary { grid-template-columns:repeat(2,minmax(0,1fr)); } } @media (max-width:620px) { main { padding:22px 18px 42px; } .brand-lockup { gap:16px; } .brand-name { font-size:16px; } .report-section { margin-top:46px; } .section-heading { font-size:34px; } .summary { font-size:18px; } .tabs { gap:19px; } .metrics, .interface-summary, .priority-findings, .opportunities { grid-template-columns:1fr; } .priority-findings, .opportunities { gap:16px; margin-top:34px; } .evidence-card, .empty-state { border-radius:16px; padding:23px 21px; } .finding-title { font-size:22px; } .toolbar { align-items:stretch; flex-direction:column; } input { width:100%; } }
 </style></head><body><main>
 <header class="report-header"><div class="brand-lockup"><div class="brand-mark" aria-label="ODPS">ODPS</div><span class="brand-divider" aria-hidden="true"></span><div class="brand-name">Data Contract Intelligence</div></div><div class="report-source">Source: __SOURCE__</div></header>
@@ -855,7 +975,7 @@ def _render_report(result: ContractDiscoveryResult) -> str:
 <section id="panel-priority-findings" class="report-section" role="tabpanel" aria-labelledby="tab-priority-findings" hidden><p class="eyebrow">ACTIONABLE EVIDENCE</p><h2 class="section-heading">Priority findings</h2><p class="summary">Each finding includes the contracts, source references, matching evidence, and next action.</p><div class="priority-findings">__PRIORITY_FINDINGS__</div></section>
 <section id="panel-explorer" class="report-section" role="tabpanel" aria-labelledby="tab-explorer" hidden><p class="eyebrow">EXPLORE THE EVIDENCE</p><h2 class="section-heading">Contract Intelligence Explorer</h2><p class="summary">Contracts, relationships, and missing information.</p><div class="surface-card explorer"><div class="toolbar"><span class="meta">Select a relationship or gap to inspect supporting evidence below.</span><label><span class="meta">Search</span><input id="contract-search" type="search" placeholder="Contract, domain, finding, or source"></label></div><div class="table-wrap"><table><thead><tr><th>Contract</th><th>Domain / owner</th><th>Interfaces</th><th>Relationships</th><th>Missing information</th></tr></thead><tbody id="contract-rows">__ROWS__</tbody></table></div></div><div class="details" aria-label="Relationship and finding evidence">__RELATIONSHIP_DETAILS____FINDING_DETAILS__</div></section>
 <section id="panel-interfaces" class="report-section" role="tabpanel" aria-labelledby="tab-interfaces" hidden><p class="eyebrow">DECLARED TECHNICAL INTERFACES</p><h2 class="section-heading">Interface Analysis</h2><p class="summary">__INTERFACE_TYPE_COUNT__ declared interface types. __INTERFACE_CONTRACT_COUNT__ contracts declare at least one interface: __SINGLE_INTERFACE_COUNT__ contracts declare one interface and __MULTIPLE_INTERFACE_COUNT__ contracts declare multiple interfaces. __INTERFACE_MISSING_COUNT__ contracts do not declare an interface. Counts show how many contracts declare each type; each source contract remains visible below.</p><div class="interface-summary"><div class="surface-card metric"><strong>__INTERFACE_TYPE_COUNT__</strong><span>Declared interface types</span><small>Distinct values in contract servers</small></div><div class="surface-card metric"><strong>__SINGLE_INTERFACE_COUNT__</strong><span>Contracts with one interface</span><small>One declared server type</small></div><div class="surface-card metric"><strong>__MULTIPLE_INTERFACE_COUNT__</strong><span>Contracts with multiple interfaces</span><small>More than one declared server type</small></div><div class="surface-card metric"><strong>__INTERFACE_MISSING_COUNT__</strong><span>Contracts without an interface</span><small>No declared server type</small></div></div><div class="surface-card interface-register"><div class="table-wrap"><table class="interface-table"><thead><tr><th>Interface type</th><th>Declared by</th><th>Contracts</th></tr></thead><tbody>__INTERFACE_ROWS__</tbody></table></div></div></section>
-<section id="panel-opportunities" class="report-section" role="tabpanel" aria-labelledby="tab-opportunities" hidden><p class="eyebrow">REVIEW ONLY</p><h2 class="section-heading">Product Opportunities</h2><p class="summary">Proposed groups for human review.</p><div class="opportunities">__OPPORTUNITIES__</div><div class="legend"><span><b>Source fact</b> is declared in a contract.</span><span><b>Inference</b> is a repeatable analysis rule.</span><span><b>Proposal</b> needs a human decision.</span></div></section>
+<section id="panel-opportunities" class="report-section" role="tabpanel" aria-labelledby="tab-opportunities" hidden><p class="eyebrow">REVIEW ONLY</p><h2 class="section-heading">Product Opportunities</h2><p class="summary">Three different decisions are shown separately: whether one contract may stand alone, whether related contracts need a shared boundary, and whether duplicates need rationalisation.</p><div class="opportunity-sections">__OPPORTUNITY_SECTIONS__</div><div class="unclassified-section"><h3>No current opportunity signal · __UNCLASSIFIED_COUNT__ contracts</h3><p class="summary">These contracts do not currently have enough declared evidence for a standalone candidate, boundary proposal, or rationalisation opportunity. This is not a failure.</p><div class="surface-card unclassified-register"><div class="table-wrap"><table><thead><tr><th>Contract</th><th>Source reference</th><th>Why it is unclassified</th></tr></thead><tbody>__UNCLASSIFIED_ROWS__</tbody></table></div></div></div><div class="legend"><span><b>Source fact</b> is declared in a contract.</span><span><b>Inference</b> is a repeatable analysis rule.</span><span><b>Proposal</b> needs a human decision.</span></div></section>
 </main><script>
 const tabs=[...document.querySelectorAll('[role="tab"]')]; const panels=[...document.querySelectorAll('[role="tabpanel"]')]; function activateTab(tab){tabs.forEach(item=>{const active=item===tab;item.setAttribute('aria-selected',String(active));document.getElementById(item.getAttribute('aria-controls')).hidden=!active;});} tabs.forEach(tab=>tab.addEventListener('click',()=>activateTab(tab))); const search=document.getElementById('contract-search'); const rows=[...document.querySelectorAll('#contract-rows tr')]; search.addEventListener('input',()=>{const term=search.value.toLowerCase().trim(); rows.forEach(row=>{row.hidden=term!==''&&!row.textContent.toLowerCase().includes(term);});});
 </script></body></html>""".replace("__SOURCE__", _escape(result.source_id))
@@ -886,7 +1006,9 @@ const tabs=[...document.querySelectorAll('[role="tab"]')]; const panels=[...docu
             str(interface_analysis["contracts_without_declared_interface"]),
         )
         .replace("__INTERFACE_ROWS__", interface_rows)
-        .replace("__OPPORTUNITIES__", opportunity_cards)
+        .replace("__OPPORTUNITY_SECTIONS__", opportunity_sections)
+        .replace("__UNCLASSIFIED_COUNT__", str(len(unclassified_contracts)))
+        .replace("__UNCLASSIFIED_ROWS__", unclassified_rows)
     )
 
 
@@ -1080,18 +1202,56 @@ def _opportunity_card(
     return (
         '<article class="evidence-card opportunity"><div class="label">{} · HUMAN REVIEW REQUIRED</div>'
         '<h3 class="finding-title"><span class="finding-accent" aria-hidden="true"></span>'
-        "Proposed grouping · {} contracts</h3>"
-        '<div class="finding-contracts contract-group"><h4>Contracts in this group ({})</h4>{}</div>'
+        "{}</h3>"
+        '<div class="finding-contracts contract-group"><h4>{} ({})</h4>{}</div>'
         '<div class="finding-divider"></div><p class="evidence-copy"><strong>Evidence:</strong> {}</p>'
         '<div class="review-note"><strong>Missing business context:</strong> {}</div></article>'
     ).format(
         _escape(candidate.evidence_class),
-        len(candidate.supporting_contract_ids),
+        _escape(_opportunity_title(candidate)),
+        _escape(_opportunity_contract_label(candidate)),
         len(candidate.supporting_contract_ids),
         contracts,
         _escape(candidate.rationale),
         _escape("; ".join(candidate.unresolved_questions)),
     )
+
+
+def _opportunity_section(
+    opportunity_type: str,
+    title: str,
+    description: str,
+    candidates: Sequence[ProductCandidate],
+    inventory: Mapping[str, ContractInventoryRecord],
+) -> str:
+    """Render one explicit opportunity decision type."""
+    cards = "".join(_opportunity_card(candidate, inventory) for candidate in candidates)
+    if not cards:
+        cards = (
+            '<div class="empty-state"><strong>No {} detected</strong>'
+            "<p>No contract currently meets this conservative evidence rule.</p></div>"
+        ).format(_escape(title.lower()))
+    return (
+        '<section class="opportunity-section" data-opportunity-type="{}"><h3>{}</h3>'
+        '<p class="opportunity-description">{}</p><div class="opportunities">{}</div></section>'
+    ).format(_escape(opportunity_type), _escape(title), _escape(description), cards)
+
+
+def _opportunity_title(candidate: ProductCandidate) -> str:
+    """Return a decision-focused title for one opportunity type."""
+    titles = {
+        "standalone_product_candidate": "Standalone product candidate",
+        "boundary_proposal": "Boundary proposal",
+        "rationalisation_opportunity": "Rationalisation opportunity",
+    }
+    return titles.get(candidate.opportunity_type, "Product opportunity")
+
+
+def _opportunity_contract_label(candidate: ProductCandidate) -> str:
+    """Return the correct supporting-contract label for an opportunity."""
+    if candidate.opportunity_type == "standalone_product_candidate":
+        return "Supporting contract"
+    return "Supporting contracts"
 
 
 def _opportunity_contract_record(
@@ -1109,6 +1269,17 @@ def _opportunity_contract_record(
     ).format(
         index,
         _escape(record.name or record.contract_id or identifier),
+        _escape(record.source_reference),
+    )
+
+
+def _unclassified_contract_row(record: ContractInventoryRecord) -> str:
+    """Render one contract with no current opportunity signal."""
+    return (
+        '<tr><td><strong>{}</strong></td><td class="source">{}</td>'
+        '<td class="unclassified-reason">No current standalone, boundary, or rationalisation signal.</td></tr>'
+    ).format(
+        _escape(record.name or record.contract_id or record.logical_id),
         _escape(record.source_reference),
     )
 

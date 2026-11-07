@@ -97,6 +97,7 @@ def test_discovery_groups_real_contracts_with_a_shared_domain_and_capability(
     assert any(
         set(item.supporting_contract_ids) == {source, target}
         and item.evidence_class == "inferred"
+        and item.opportunity_type == "boundary_proposal"
         for item in result.candidates
     )
 
@@ -131,6 +132,7 @@ def test_discovery_exposes_source_linked_gaps_and_reuse_findings(
     assert all(
         not set(item.supporting_contract_ids).issubset(duplicate_contract_ids)
         for item in result.candidates
+        if item.opportunity_type == "boundary_proposal"
     )
     reuse = next(
         item for item in result.intelligence_findings if item.kind == "exact_duplicate"
@@ -138,6 +140,37 @@ def test_discovery_exposes_source_linked_gaps_and_reuse_findings(
     assert reuse.evidence
     assert "diverge" in reuse.why_it_matters.lower()
     assert reuse.suggested_action.startswith("Review")
+
+
+def test_discovery_distinguishes_three_opportunity_types_and_unclassified_contracts(
+    tmp_path: Path,
+) -> None:
+    from open_data_products import discover_contract_portfolio
+
+    output = tmp_path / "out"
+    result = discover_contract_portfolio(directory=REAL_CORPUS, output=output)
+    counts = Counter(item.opportunity_type for item in result.candidates)
+    candidates = json.loads((output / "product-candidates.json").read_text())
+
+    assert counts == {
+        "standalone_product_candidate": 7,
+        "boundary_proposal": 2,
+        "rationalisation_opportunity": 2,
+    }
+    assert all(
+        item.evidence_class == "source_fact" and len(item.supporting_contract_ids) == 1
+        for item in result.candidates
+        if item.opportunity_type == "standalone_product_candidate"
+    )
+    assert all(
+        item.evidence_class == "inferred" and len(item.supporting_contract_ids) == 2
+        for item in result.candidates
+        if item.opportunity_type == "rationalisation_opportunity"
+    )
+    assert len(candidates["unclassified_contracts"]) == 134
+    assert all(
+        "source_reference" in item for item in candidates["unclassified_contracts"]
+    )
 
 
 def test_discovery_extracts_declared_technical_interfaces_and_shared_resources(
@@ -179,7 +212,8 @@ def test_discovery_writes_contract_intelligence_summary_artifact(
     assert payload["summary"] == result.intelligence_summary
     assert payload["summary"]["contracts_analyzed"] == 146
     assert payload["summary"]["reuse_findings"] == 2
-    assert payload["summary"]["proposed_product_groups"] == len(result.candidates)
+    assert payload["summary"]["proposed_product_groups"] == 2
+    assert payload["summary"]["product_opportunities"] == len(result.candidates)
     assert payload["interface_analysis"]["interface_type_count"] == 28
     assert payload["interface_analysis"]["contracts_with_declared_interface"] == 102
     assert payload["interface_analysis"]["contracts_with_one_interface"] == 99
@@ -236,7 +270,11 @@ def test_intelligence_report_renders_explorer_and_evidence_links(
     assert "18 contracts" in interfaces
     assert "tests/fixtures/api/weather-service.odcs.yaml" in interfaces
     opportunities = report.split('id="panel-opportunities"', 1)[1]
-    assert "Contracts in this group (2)" in opportunities
+    assert "Standalone product candidates" in opportunities
+    assert "Boundary proposals" in opportunities
+    assert "Rationalisation opportunities" in opportunities
+    assert "No current opportunity signal · 134 contracts" in opportunities
+    assert "Supporting contracts (2)" in opportunities
     assert "Contract 1" in opportunities
     assert "Contract 2" in opportunities
     assert (
@@ -277,7 +315,7 @@ def test_intelligence_report_explains_when_no_product_groups_exist(
     report = (output / "discovery-report.html").read_text(encoding="utf-8")
 
     assert result.candidates == []
-    assert "No proposed product groups" in report
+    assert "No boundary proposals detected" in report
     assert "not a failure" in report
 
 

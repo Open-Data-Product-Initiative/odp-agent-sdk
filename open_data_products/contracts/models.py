@@ -224,7 +224,7 @@ class IntelligenceFinding:
 
 @dataclass(frozen=True)
 class ProductCandidate:
-    """Review-only grouping candidate derived from technical evidence."""
+    """Review-only opportunity derived from contract evidence."""
 
     candidate_id: str
     status: str
@@ -233,6 +233,7 @@ class ProductCandidate:
     rationale: str
     unresolved_questions: List[str] = field(default_factory=list)
     score: float = 0.0
+    opportunity_type: str = "boundary_proposal"
 
     def to_dict(self) -> Dict[str, object]:
         """Return a JSON-serializable representation."""
