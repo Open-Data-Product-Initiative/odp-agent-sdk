@@ -3244,3 +3244,38 @@ def test_portfolio_discover_contracts_writes_review_artifacts(
     payload = json.loads(capsys.readouterr().out)
     assert payload["kind"] == "ContractDiscovery"
     assert (output / "contract-inventory.json").is_file()
+
+
+def test_portfolio_discover_contracts_uses_configured_ai_client(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from open_data_products import generation
+
+    contracts = tmp_path / "contracts"
+    contracts.mkdir()
+    (contracts / "orders.yaml").write_text(
+        "apiVersion: v3.2.0\nkind: DataContract\nid: orders\nmodels: {}\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        generation,
+        "create_generation_client",
+        lambda settings: lambda prompt, model: '{"suggestions":[]}',
+    )
+
+    assert (
+        main(
+            [
+                "portfolio",
+                "discover-contracts",
+                str(contracts),
+                "--output",
+                str(tmp_path / "discovery"),
+                "--ai",
+                "--json",
+            ]
+        )
+        == 0
+    )
+
+    assert json.loads(capsys.readouterr().out)["ai_enabled"] is True

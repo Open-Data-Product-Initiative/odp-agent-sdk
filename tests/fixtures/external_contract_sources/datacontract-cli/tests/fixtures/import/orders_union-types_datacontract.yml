@@ -1,0 +1,74 @@
+version: 1.0.0
+kind: DataContract
+apiVersion: v3.2.0
+id: my-data-contract
+name: OrderSchema
+status: draft
+schema:
+- name: OrderSchema
+  physicalType: object
+  description: Schema for order details
+  businessName: OrderSchema
+  logicalType: object
+  physicalName: OrderSchema
+  properties:
+  - name: order_id
+    physicalType: string
+    description: Unique identifier for the order
+    businessName: Order ID
+    logicalType: string
+    required: true
+  - name: order_timestamp
+    physicalType: string
+    description: Timestamp when the order was placed
+    businessName: Order Timestamp
+    logicalType: string
+    logicalTypeOptions:
+      format: date-time
+    required: true
+  - name: order_total
+    physicalType: integer
+    description: Total amount of the order
+    businessName: Order Total
+    logicalType: integer
+    required: true
+  - name: line_items
+    physicalType: array
+    businessName: Line Items
+    logicalType: array
+    items:
+      name: items
+      physicalType: integer
+      logicalType: integer
+  - name: vouchers
+    physicalType: array
+    businessName: List of used vouchers
+    logicalType: array
+    items:
+      name: items
+      physicalType: integer
+      logicalType: integer
+  - name: customer_id
+    physicalType: string
+    description: Unique identifier for the customer
+    businessName: Customer ID
+    logicalType: string
+    logicalTypeOptions:
+      minLength: 10
+      maxLength: 20
+  - name: customer_email_address
+    physicalType: string
+    description: Email address of the customer
+    businessName: Customer Email Address
+    logicalType: string
+    logicalTypeOptions:
+      format: email
+    required: true
+  - name: processed_timestamp
+    physicalType: string
+    description: Timestamp when the order was processed
+    businessName: Processed Timestamp
+    logicalType: string
+    logicalTypeOptions:
+      format: date-time
+    required: true

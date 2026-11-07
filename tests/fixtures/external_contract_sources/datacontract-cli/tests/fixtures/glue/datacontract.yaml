@@ -1,0 +1,114 @@
+version: 1.0.0
+kind: DataContract
+apiVersion: v3.2.0
+id: my-data-contract
+name: My Data Contract
+status: draft
+servers:
+- server: production
+  type: glue
+  account: '123456789012'
+  database: test_database
+  location: s3://test_bucket/testdb
+schema:
+- name: test_table
+  physicalType: table
+  logicalType: object
+  physicalName: test_table
+  properties:
+  - name: field_one
+    physicalType: string
+    description: Comment 1
+    logicalType: string
+  - name: field_two
+    physicalType: int
+    logicalType: integer
+  - name: field_three
+    physicalType: timestamp
+    logicalType: timestamp
+  - name: field_four
+    physicalType: decimal
+    customProperties:
+    - property: precision
+      value: 6
+    - property: scale
+      value: 2
+    logicalType: number
+  - name: field_five
+    physicalType: struct
+    logicalType: object
+    properties:
+    - name: sub_field_one
+      physicalType: string
+      logicalType: string
+    - name: sub_field_two
+      physicalType: boolean
+      logicalType: boolean
+  - name: field_six
+    physicalType: array
+    logicalType: array
+    items:
+      name: items
+      physicalType: string
+      logicalType: string
+  - name: field_seven
+    physicalType: array
+    logicalType: array
+    items:
+      name: items
+      physicalType: struct
+      logicalType: object
+      properties:
+      - name: sub_field_three
+        physicalType: string
+        logicalType: string
+      - name: sub_field_four
+        physicalType: int
+        logicalType: integer
+  - name: field_eight
+    physicalType: map
+    logicalType: map
+    map:
+      key:
+        name: key
+        physicalType: string
+        logicalType: string
+      value:
+        name: value
+        physicalType: int
+        logicalType: integer
+  - name: field_nine
+    physicalType: decimal
+    logicalType: number
+  - name: field_ten
+    physicalType: bigint
+    logicalType: integer
+  - name: field_eleven
+    physicalType: float
+    logicalType: number
+  - name: field_twelve
+    physicalType: double
+    logicalType: number
+  - name: field_thirteen
+    physicalType: timestamp
+    logicalType: timestamp
+  - name: field_fourteen
+    physicalType: date
+    logicalType: date
+  - name: field_fifteen
+    physicalType: varchar
+    logicalType: string
+  - name: field_sixteen
+    physicalType: varchar
+    logicalType: string
+    logicalTypeOptions:
+      maxLength: 255
+  - name: part_one
+    physicalType: string
+    description: Comment 2
+    logicalType: string
+    required: true
+  - name: part_two
+    physicalType: date
+    logicalType: date
+    required: true

@@ -1393,6 +1393,18 @@ def main(argv: Optional[List[str]] = None) -> int:
         "--config", help="Generation configuration containing contract sources"
     )
     portfolio_discover_parser.add_argument(
+        "--ai", action="store_true", help="Add review-only AI candidate proposals."
+    )
+    portfolio_discover_parser.add_argument(
+        "--provider", help="LLM provider override for --ai."
+    )
+    portfolio_discover_parser.add_argument(
+        "--model", help="LLM model override for --ai."
+    )
+    portfolio_discover_parser.add_argument(
+        "--ollama-url", help="Local Ollama URL override for --ai."
+    )
+    portfolio_discover_parser.add_argument(
         "--strict-validation",
         action="store_true",
         help="Return non-zero when external validation is unavailable or failed.",
@@ -2839,15 +2851,28 @@ def main(argv: Optional[List[str]] = None) -> int:
                     )
                 elif args.portfolio_command == "discover-contracts":
                     from .contracts import discover_contract_portfolio
-                    from .generation import resolve_generation_settings
+                    from .generation import (
+                        create_generation_client,
+                        resolve_generation_settings,
+                    )
 
                     if bool(args.contracts) == bool(args.source):
                         raise ValueError(
                             "Provide exactly one contract directory or --source."
                         )
                     settings = (
-                        resolve_generation_settings(config_path=args.config)
-                        if args.source
+                        resolve_generation_settings(
+                            config_path=args.config,
+                            provider=args.provider,
+                            model=args.model,
+                            ollama_url=args.ollama_url,
+                        )
+                        if args.source or args.ai
+                        else None
+                    )
+                    client = (
+                        create_generation_client(settings)
+                        if args.ai and settings is not None
                         else None
                     )
                     result = discover_contract_portfolio(
@@ -2856,6 +2881,13 @@ def main(argv: Optional[List[str]] = None) -> int:
                         output=args.output,
                         source_settings=(
                             settings.contract_sources if settings is not None else None
+                        ),
+                        use_ai=args.ai,
+                        client=client,
+                        model=(
+                            settings.model
+                            if settings is not None
+                            else "contract-discovery"
                         ),
                     )
                     payload = result.to_dict()

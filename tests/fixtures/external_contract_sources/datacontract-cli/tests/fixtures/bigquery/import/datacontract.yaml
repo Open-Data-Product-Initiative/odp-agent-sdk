@@ -1,0 +1,141 @@
+version: 1.0.0
+kind: DataContract
+apiVersion: v3.2.0
+id: my-data-contract
+name: My Data Contract
+status: draft
+servers:
+- server: bigquery
+  type: bigquery
+  dataset: test_dataset
+  project: bigquery-test-423213
+schema:
+- name: BQ_Example_Table
+  physicalType: table
+  description: This is a test table that contains all the possible field types for
+    testing
+  logicalType: object
+  physicalName: BQ_Example_Table
+  properties:
+  - name: String_field
+    physicalType: STRING
+    description: A simple String field
+    logicalType: string
+  - name: Nonnullable_String_field
+    physicalType: STRING
+    description: A required String field
+    logicalType: string
+    required: true
+  - name: Maxlength_string_field
+    physicalType: STRING
+    description: A required String field with a maximum length
+    logicalType: string
+    logicalTypeOptions:
+      maxLength: 42
+    required: true
+  - name: Bytes field
+    physicalType: BYTES
+    description: A_nullable_bytes_field
+    logicalType: array
+  - name: Bytes_field_with_maxlength
+    physicalType: BYTES
+    description: An bytes field with maxlength (which doesn't translate into datacontracts)
+    logicalType: array
+  - name: Int_field
+    physicalType: INTEGER
+    description: An Integer field
+    logicalType: integer
+  - name: Float_field
+    physicalType: FLOAT
+    description: A float field
+    logicalType: number
+  - name: Boolean_field
+    physicalType: BOOLEAN
+    description: A boolean field
+    logicalType: boolean
+  - name: Timestamp_field
+    physicalType: TIMESTAMP
+    description: A Timestamp field
+    logicalType: timestamp
+  - name: Date_field
+    physicalType: DATE
+    description: A Date field
+    logicalType: date
+  - name: Time_Field
+    physicalType: TIME
+    description: A time field
+    logicalType: time
+  - name: Datetime_Field
+    physicalType: DATETIME
+    description: A Datetime field
+    logicalType: timestamp
+  - name: Numeric_Field
+    physicalType: NUMERIC
+    description: A Numeric field with precision 5 and scale 3
+    customProperties:
+    - property: precision
+      value: 5
+    - property: scale
+      value: 3
+    logicalType: number
+  - name: Bignumeric_field
+    physicalType: BIGNUMERIC
+    description: A bignumeric field with precision 8 and sclae 4
+    customProperties:
+    - property: precision
+      value: 8
+    - property: scale
+      value: 4
+    logicalType: number
+  - name: Record_field
+    physicalType: RECORD
+    description: A record field with two subfields
+    logicalType: object
+    properties:
+    - name: subfield_1
+      physicalType: STRING
+      description: subfield 1 of type string
+      logicalType: string
+    - name: subfield_2
+      physicalType: INTEGER
+      description: Subfield 2 of type integer
+      logicalType: integer
+  - name: Range_field
+    physicalType: RANGE
+    description: a datetime range
+    logicalType: array
+    items:
+      name: items
+      physicalType: DATETIME
+      logicalType: timestamp
+  - name: Geography_Field
+    physicalType: GEOGRAPHY
+    description: a geography field
+    logicalType: object
+  - name: JSON_Field
+    physicalType: JSON
+    description: a json field
+    logicalType: object
+  - name: INTERVAL_Field
+    physicalType: INTERVAL
+    description: an interval field
+    logicalType: string
+  - name: String_List_Field
+    description: list of string (REPEATED string)
+    logicalType: array
+    items:
+      name: items
+      physicalType: STRING
+      logicalType: string
+  - name: Record_List_Field
+    description: list of records (REPEATED record)
+    logicalType: array
+    items:
+      name: items
+      physicalType: RECORD
+      logicalType: object
+      properties:
+        - name: subfield_1
+          physicalType: STRING
+          description: subfield 1 of type string
+          logicalType: string

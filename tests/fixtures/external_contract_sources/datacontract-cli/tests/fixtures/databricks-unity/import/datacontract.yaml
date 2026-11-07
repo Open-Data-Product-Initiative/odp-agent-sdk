@@ -1,0 +1,41 @@
+kind: DataContract
+apiVersion: v3.2.0
+id: my-data-contract
+name: My Data Contract
+version: 1.0.0
+status: draft
+servers:
+- server: databricks
+  type: databricks
+  catalog: mycatalog
+  schema: myschema
+schema:
+- name: test_table
+  businessName: test_table
+  physicalName: test_table
+  logicalType: object
+  physicalType: table
+  description: string
+  properties:
+  - name: id
+    physicalType: int
+    logicalType: integer
+    required: true
+  - name: name
+    physicalType: varchar(255)
+    logicalType: string
+  - name: age
+    physicalType: smallint
+    logicalType: integer
+  - name: salary
+    physicalType: decimal(10,2)
+    logicalType: number
+  - name: join_date
+    physicalType: date
+    logicalType: date
+  - name: updated_at
+    physicalType: timestamp
+    logicalType: timestamp
+  - name: is_active
+    physicalType: boolean
+    logicalType: boolean
