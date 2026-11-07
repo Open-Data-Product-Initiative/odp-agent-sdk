@@ -210,7 +210,11 @@ def test_intelligence_report_renders_explorer_and_evidence_links(
     assert 'id="finding-' in report
     assert "Why it matters" in report
     assert "Suggested action" in report
-    assert "#6D28D9" in report
+    assert "#7436EB" in report
+    assert '<header class="report-header">' in report
+    assert 'class="brand-mark"' in report
+    assert 'class="section-heading"' in report
+    assert 'class="surface-card metric"' in report
     opportunities = report.split('id="panel-opportunities"', 1)[1]
     assert "Contracts in this group (2)" in opportunities
     assert "Contract 1" in opportunities
@@ -229,6 +233,12 @@ def test_intelligence_report_renders_explorer_and_evidence_links(
     assert "examples/business-definitions/top-artists-by-year.odcs.yaml" in priority
     assert "Shared domain" in priority
     assert "media" in priority
+    assert 'class="evidence-card priority-finding"' in priority
+    assert 'class="finding-title"' in priority
+    assert 'class="finding-contracts"' in priority
+    assert 'class="finding-divider"' in priority
+    assert 'class="evidence-copy"' in priority
+    assert 'class="action-copy"' in priority
     assert '<a class="priority-finding"' not in priority
 
 
