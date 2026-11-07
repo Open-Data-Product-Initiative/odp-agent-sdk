@@ -6,6 +6,7 @@ from hashlib import sha256
 import html
 import json
 from pathlib import Path
+import re
 from typing import Callable, Dict, List, Mapping, Optional, Sequence, Tuple, Union
 
 from .loader import (
@@ -237,6 +238,29 @@ def _analyze_inventory(
                         ),
                     )
                 )
+                continue
+            shared_tokens = _shared_capability_tokens(source, target)
+            if shared_tokens:
+                relationships.append(
+                    ContractRelationship(
+                        source_id=source.logical_id,
+                        target_id=target.logical_id,
+                        kind="shared_domain_capability",
+                        evidence_class="inferred",
+                        rationale=(
+                            "Shared domain '{}' and capability terms: {}.".format(
+                                source.domain, ", ".join(shared_tokens)
+                            )
+                        ),
+                        score=len(shared_tokens)
+                        / float(
+                            max(
+                                len(_capability_tokens(source.name)),
+                                len(_capability_tokens(target.name)),
+                            )
+                        ),
+                    )
+                )
     candidates = [
         ProductCandidate(
             candidate_id="candidate-"
@@ -253,6 +277,28 @@ def _analyze_inventory(
         for relationship in relationships
     ]
     return relationships, candidates
+
+
+def _shared_capability_tokens(
+    source: ContractInventoryRecord, target: ContractInventoryRecord
+) -> List[str]:
+    """Return meaningful shared name terms when contracts declare one domain."""
+    if not source.domain or source.domain != target.domain:
+        return []
+    shared = sorted(_capability_tokens(source.name) & _capability_tokens(target.name))
+    return shared if len(shared) >= 2 else []
+
+
+def _capability_tokens(name: Optional[str]) -> set:
+    """Return stable name terms suitable for conservative similarity checks."""
+    if not name:
+        return set()
+    ignored = {"contract", "data", "test", "unit", "view", "v1", "v2", "v3"}
+    return {
+        token
+        for token in re.findall(r"[a-z0-9]+", name.lower())
+        if len(token) > 1 and token not in ignored
+    }
 
 
 def _propose_candidates_with_ai(

@@ -52,6 +52,32 @@ def test_discovery_runs_against_pinned_real_odcs_corpus(tmp_path: Path) -> None:
     assert any(item.kind == "exact_duplicate" for item in result.relationships)
 
 
+def test_discovery_groups_real_contracts_with_a_shared_domain_and_capability(
+    tmp_path: Path,
+) -> None:
+    from open_data_products import discover_contract_portfolio
+
+    result = discover_contract_portfolio(directory=REAL_CORPUS, output=tmp_path / "out")
+    records = {item.source_reference: item for item in result.inventory}
+    source = records[
+        "examples/business-definitions/top-artists-by-year.odcs.yaml"
+    ].logical_id
+    target = records[
+        "examples/business-definitions/top-artists-by-year-view.odcs.yaml"
+    ].logical_id
+
+    assert any(
+        item.kind == "shared_domain_capability"
+        and {item.source_id, item.target_id} == {source, target}
+        for item in result.relationships
+    )
+    assert any(
+        set(item.supporting_contract_ids) == {source, target}
+        and item.evidence_class == "inferred"
+        for item in result.candidates
+    )
+
+
 def test_discovery_uses_relative_source_references(tmp_path: Path) -> None:
     from open_data_products import discover_contract_portfolio
 
