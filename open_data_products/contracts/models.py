@@ -166,6 +166,9 @@ class ContractInventoryRecord:
     odcs_version: Optional[str] = None
     domain: Optional[str] = None
     owner: Optional[str] = None
+    lifecycle_status: Optional[str] = None
+    purpose: Optional[str] = None
+    tags: List[str] = field(default_factory=list)
     model_count: int = 0
     field_count: int = 0
     fingerprint: Optional[str] = None
@@ -188,6 +191,23 @@ class ContractRelationship:
     target_id: str
     kind: str
     evidence_class: str
+    rationale: str
+    score: float = 1.0
+
+    def to_dict(self) -> Dict[str, object]:
+        """Return a JSON-serializable representation."""
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class IntelligenceFinding:
+    """One source-linked finding from contract intelligence analysis."""
+
+    finding_id: str
+    category: str
+    kind: str
+    evidence_class: str
+    source_contract_ids: List[str]
     rationale: str
     score: float = 1.0
 
@@ -233,6 +253,8 @@ class ContractDiscoveryResult:
     inventory: List[ContractInventoryRecord]
     relationships: List[ContractRelationship]
     candidates: List[ProductCandidate]
+    intelligence_findings: List[IntelligenceFinding] = field(default_factory=list)
+    intelligence_summary: Dict[str, int] = field(default_factory=dict)
     source_status: str = "loaded"
     artifacts: List[DiscoveryArtifact] = field(default_factory=list)
     warnings: List[str] = field(default_factory=list)
@@ -247,6 +269,10 @@ class ContractDiscoveryResult:
             "source_status": self.source_status,
             "inventory": [item.to_dict() for item in self.inventory],
             "relationships": [item.to_dict() for item in self.relationships],
+            "intelligence_findings": [
+                item.to_dict() for item in self.intelligence_findings
+            ],
+            "intelligence_summary": dict(self.intelligence_summary),
             "candidates": [item.to_dict() for item in self.candidates],
             "artifacts": [item.to_dict() for item in self.artifacts],
             "warnings": list(self.warnings),

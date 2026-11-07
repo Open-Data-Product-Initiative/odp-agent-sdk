@@ -26,6 +26,29 @@ def test_discovery_result_serializes_metadata_not_document_bodies() -> None:
     assert "document" not in json.dumps(payload)
 
 
+def test_intelligence_additions_preserve_discovery_result_fields() -> None:
+    from open_data_products.contracts.discovery import ContractDiscoveryResult
+
+    payload = ContractDiscoveryResult(
+        source_id="contracts", inventory=[], relationships=[], candidates=[]
+    ).to_dict()
+
+    assert {
+        "kind",
+        "source_id",
+        "source_status",
+        "inventory",
+        "relationships",
+        "candidates",
+        "artifacts",
+        "warnings",
+        "ai_enabled",
+        "ai_proposals",
+    }.issubset(payload)
+    assert payload["intelligence_findings"] == []
+    assert payload["intelligence_summary"] == {}
+
+
 def test_discovery_api_is_explicitly_exported() -> None:
     from open_data_products import discover_contract_portfolio
 
@@ -76,6 +99,94 @@ def test_discovery_groups_real_contracts_with_a_shared_domain_and_capability(
         and item.evidence_class == "inferred"
         for item in result.candidates
     )
+
+
+def test_discovery_exposes_source_linked_gaps_and_reuse_findings(
+    tmp_path: Path,
+) -> None:
+    from open_data_products import discover_contract_portfolio
+
+    result = discover_contract_portfolio(directory=REAL_CORPUS, output=tmp_path / "out")
+    records = {item.source_reference: item for item in result.inventory}
+    orders = records["examples/orders/orders.odcs.yaml"]
+
+    assert any(
+        item.kind == "missing_domain"
+        and item.category == "information_gap"
+        and item.source_contract_ids == [orders.logical_id]
+        for item in result.intelligence_findings
+    )
+    assert any(
+        item.kind == "exact_duplicate"
+        and item.category == "reuse"
+        and len(item.source_contract_ids) == 2
+        for item in result.intelligence_findings
+    )
+    duplicate_contract_ids = {
+        identifier
+        for item in result.intelligence_findings
+        if item.kind == "exact_duplicate"
+        for identifier in item.source_contract_ids
+    }
+    assert all(
+        not set(item.supporting_contract_ids).issubset(duplicate_contract_ids)
+        for item in result.candidates
+    )
+
+
+def test_discovery_writes_contract_intelligence_summary_artifact(
+    tmp_path: Path,
+) -> None:
+    from open_data_products import discover_contract_portfolio
+
+    output = tmp_path / "out"
+    result = discover_contract_portfolio(directory=REAL_CORPUS, output=output)
+    payload = json.loads((output / "contract-intelligence.json").read_text())
+
+    assert payload["summary"] == result.intelligence_summary
+    assert payload["summary"]["contracts_analyzed"] == 146
+    assert payload["summary"]["reuse_findings"] == 2
+    assert payload["summary"]["proposed_product_groups"] == len(result.candidates)
+    assert all("source_contract_ids" in item for item in payload["findings"])
+    assert "document" not in json.dumps(payload)
+
+
+def test_intelligence_report_renders_explorer_and_evidence_links(
+    tmp_path: Path,
+) -> None:
+    from open_data_products import discover_contract_portfolio
+
+    output = tmp_path / "out"
+    discover_contract_portfolio(directory=REAL_CORPUS, output=output)
+    report = (output / "discovery-report.html").read_text(encoding="utf-8")
+
+    assert "Data Contract Intelligence" in report
+    assert "Contracts analyzed" in report
+    assert "Contract Intelligence Explorer" in report
+    assert "Product Opportunities" in report
+    assert 'id="contract-search"' in report
+    assert "data-relationship-id=" in report
+    assert 'id="relationship-' in report
+    assert "#6D28D9" in report
+
+
+def test_intelligence_report_explains_when_no_product_groups_exist(
+    tmp_path: Path,
+) -> None:
+    from open_data_products import discover_contract_portfolio
+
+    source = REAL_CORPUS / "examples" / "orders" / "orders.odcs.yaml"
+    contracts = tmp_path / "contracts"
+    contracts.mkdir()
+    (contracts / "orders.yaml").write_text(source.read_text(encoding="utf-8"))
+
+    output = tmp_path / "out"
+    result = discover_contract_portfolio(directory=contracts, output=output)
+    report = (output / "discovery-report.html").read_text(encoding="utf-8")
+
+    assert result.candidates == []
+    assert "No proposed product groups" in report
+    assert "not a failure" in report
 
 
 def test_discovery_uses_relative_source_references(tmp_path: Path) -> None:

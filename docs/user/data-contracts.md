@@ -201,11 +201,23 @@ become data products:
     open-data-products portfolio discover-contracts ./contracts \
       --output ./portfolio-discovery --json
 
-The command recursively reads YAML and JSON files and writes a contract
-inventory, review-only candidate groupings, and a static report. Relationships
-are inferred unless source contracts declare them. Every candidate remains
-proposed; technical similarity does not establish a business objective,
-consumer demand, ownership, or approved product boundary.
+The command recursively reads YAML and JSON files and writes:
+
+- `contract-inventory.json` with normalized source references and contract
+  metadata.
+- `contract-intelligence.json` with evidence-linked similarities, reuse
+  findings, and information gaps.
+- `product-candidates.json` with review-only proposed product groups.
+- `discovery-report.html`, a self-contained offline Data Contract Intelligence
+  report with an overview, searchable contract explorer, relationship evidence,
+  and product opportunities.
+
+The report remains useful when no product groups are proposed: ungrouped
+contracts are evidence that the available source metadata is insufficient for a
+safe product-boundary proposal. Relationships are inferred unless source
+contracts declare them. Every candidate remains proposed; technical similarity
+does not establish a business objective, consumer demand, ownership, or
+approved product boundary.
 
 Future API sources are configured under portfolio.contractSources in
 generation.config.yaml. Credentials use credentialsRef with an env:NAME
