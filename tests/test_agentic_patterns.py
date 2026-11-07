@@ -112,6 +112,7 @@ EXPECTED_TOOLS = {
     "plan_recipe_run",
     "search_recipe_guidance",
     "wrap_odcs_contract",
+    "discover_contract_portfolio",
 }
 
 
@@ -621,6 +622,7 @@ class TestAgentManifest:
         assert safety["mcp_state_changing_tools"] == [
             "init_starter_recipe",
             "build_portfolio",
+            "discover_contract_portfolio",
         ]
         assert "state-changing" in safety["cli_note"]
 

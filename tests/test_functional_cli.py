@@ -1395,10 +1395,7 @@ def test_recipe_cli_init_defaults_to_recipes_directory(
 ) -> None:
     monkeypatch.chdir(tmp_path)
 
-    assert (
-        main(["recipe", "init", "build-data-product-portfolio", "--json"])
-        == 0
-    )
+    assert main(["recipe", "init", "build-data-product-portfolio", "--json"]) == 0
 
     payload = _json_output(capsys)
     output = tmp_path / "recipes" / "build-data-product-portfolio"
@@ -1440,9 +1437,9 @@ def test_recipe_cli_init_parameterized_creates_values_files(
     assert (output / "recipe.values.yaml").is_file()
     assert (output / "values.schema.yaml").is_file()
     assert payload["created"]["values"] == (output / "recipe.values.yaml").as_posix()
-    assert payload["created"]["valuesSchema"] == (
-        output / "values.schema.yaml"
-    ).as_posix()
+    assert (
+        payload["created"]["valuesSchema"] == (output / "values.schema.yaml").as_posix()
+    )
 
 
 def test_recipe_cli_init_refuses_existing_output(
@@ -1494,8 +1491,7 @@ def test_recipe_cli_initialized_starter_execute_requires_llm_and_review(
     _json_output(capsys)
 
     assert (
-        main(["recipe", "run", str(output / "recipe.yaml"), "--execute", "--json"])
-        == 1
+        main(["recipe", "run", str(output / "recipe.yaml"), "--execute", "--json"]) == 1
     )
     payload = _json_output(capsys)
 
@@ -1558,10 +1554,7 @@ def test_recipe_cli_initialized_starter_review_does_not_allow_llm(
 def test_recipe_cli_explain_starter_uses_packaged_catalog(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    assert (
-        main(["recipe", "explain", "build-data-product-portfolio", "--json"])
-        == 0
-    )
+    assert main(["recipe", "explain", "build-data-product-portfolio", "--json"]) == 0
 
     payload = _json_output(capsys)
 
@@ -3221,3 +3214,33 @@ models:
     assert audit_payload["summary"].startswith(
         "Product valid; 1 Data Contract reference"
     )
+
+
+def test_portfolio_discover_contracts_writes_review_artifacts(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    contracts = tmp_path / "contracts"
+    contracts.mkdir()
+    (contracts / "orders.yaml").write_text(
+        "apiVersion: v3.2.0\nkind: DataContract\nid: orders\nmodels: {}\n",
+        encoding="utf-8",
+    )
+    output = tmp_path / "discovery"
+
+    assert (
+        main(
+            [
+                "portfolio",
+                "discover-contracts",
+                str(contracts),
+                "--output",
+                str(output),
+                "--json",
+            ]
+        )
+        == 0
+    )
+
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["kind"] == "ContractDiscovery"
+    assert (output / "contract-inventory.json").is_file()

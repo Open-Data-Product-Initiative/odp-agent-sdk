@@ -628,12 +628,14 @@ providers:
     report = validate_config("generation", config)
 
     assert report["valid"] is False
-    assert "portfolio.sourceBudget.maxSourceChars must be a positive integer" in report[
-        "errors"
-    ]
-    assert "portfolio.sourceBudget.maxPromptChars must be a positive integer" in report[
-        "errors"
-    ]
+    assert (
+        "portfolio.sourceBudget.maxSourceChars must be a positive integer"
+        in report["errors"]
+    )
+    assert (
+        "portfolio.sourceBudget.maxPromptChars must be a positive integer"
+        in report["errors"]
+    )
 
 
 def test_validate_generation_config_rejects_invalid_portfolio_privacy(tmp_path):
@@ -658,12 +660,12 @@ providers:
     report = validate_config("generation", config)
 
     assert report["valid"] is False
-    assert "portfolio.privacy.obfuscatePersonalData must be a boolean" in report[
-        "errors"
-    ]
-    assert "Unknown generation config key: portfolio.privacy.unknown" in report[
-        "errors"
-    ]
+    assert (
+        "portfolio.privacy.obfuscatePersonalData must be a boolean" in report["errors"]
+    )
+    assert (
+        "Unknown generation config key: portfolio.privacy.unknown" in report["errors"]
+    )
 
 
 def test_resolve_generation_settings_allows_overrides(tmp_path):
@@ -3238,3 +3240,57 @@ def test_generate_local_artifact_rejects_unknown_kind(tmp_path):
         assert "Unknown generation artifact kind" in str(exc)
     else:
         raise AssertionError("unknown artifact kind did not raise KeyError")
+
+
+def test_generation_config_resolves_safe_contract_source_settings(tmp_path):
+    config = tmp_path / "generation.config.yaml"
+    config.write_text(
+        """\
+provider: ollama
+model: qwen2.5
+portfolio:
+  contractSources:
+    registry:
+      type: api
+      endpoint: https://contracts.example.test/v1/contracts
+      credentialsRef: env:CONTRACT_REGISTRY_TOKEN
+      authentication:
+        type: bearer
+      documentsSelector: items
+      pagination:
+        type: cursor
+        nextSelector: nextCursor
+""",
+        encoding="utf-8",
+    )
+
+    report = validate_config(config_path=config)
+    settings = resolve_generation_settings(config_path=config)
+
+    assert report["valid"] is True
+    assert settings.contract_sources["registry"].credentials_ref == (
+        "env:CONTRACT_REGISTRY_TOKEN"
+    )
+
+
+@pytest.mark.parametrize("reference", ["token", "env:bad-name", "env:sk-secret"])
+def test_generation_config_rejects_invalid_contract_source_credentials(
+    tmp_path: Path, reference: str
+):
+    config = tmp_path / "generation.config.yaml"
+    config.write_text(
+        """\
+provider: ollama
+model: qwen2.5
+portfolio:
+  contractSources:
+    registry:
+      type: api
+      endpoint: https://contracts.example.test/v1/contracts
+      credentialsRef: """ + reference + "\n",
+        encoding="utf-8",
+    )
+
+    report = validate_config(config_path=config)
+
+    assert any("credentialsRef" in error for error in report["errors"])

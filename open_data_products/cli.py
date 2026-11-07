@@ -1376,6 +1376,30 @@ def main(argv: Optional[List[str]] = None) -> int:
         ),
     )
     portfolio_build_parser.add_argument("--json", action="store_true", help="Emit JSON")
+    portfolio_discover_parser = portfolio_subparsers.add_parser(
+        "discover-contracts",
+        help="Discover review-only candidates from ODCS contracts",
+    )
+    portfolio_discover_parser.add_argument(
+        "contracts", nargs="?", help="Directory containing ODCS YAML or JSON files"
+    )
+    portfolio_discover_parser.add_argument(
+        "--source", help="Configured contract source ID"
+    )
+    portfolio_discover_parser.add_argument(
+        "--output", "-o", required=True, help="Discovery artifact directory"
+    )
+    portfolio_discover_parser.add_argument(
+        "--config", help="Generation configuration containing contract sources"
+    )
+    portfolio_discover_parser.add_argument(
+        "--strict-validation",
+        action="store_true",
+        help="Return non-zero when external validation is unavailable or failed.",
+    )
+    portfolio_discover_parser.add_argument(
+        "--json", action="store_true", help="Emit JSON"
+    )
     portfolio_refresh_parser = portfolio_subparsers.add_parser(
         "refresh",
         help="Refresh a portfolio workspace from saved source lanes",
@@ -2813,6 +2837,28 @@ def main(argv: Optional[List[str]] = None) -> int:
                         source_budget=settings.portfolio_source_budget,
                         source_privacy=settings.portfolio_privacy,
                     )
+                elif args.portfolio_command == "discover-contracts":
+                    from .contracts import discover_contract_portfolio
+                    from .generation import resolve_generation_settings
+
+                    if bool(args.contracts) == bool(args.source):
+                        raise ValueError(
+                            "Provide exactly one contract directory or --source."
+                        )
+                    settings = (
+                        resolve_generation_settings(config_path=args.config)
+                        if args.source
+                        else None
+                    )
+                    result = discover_contract_portfolio(
+                        directory=args.contracts,
+                        source_id=args.source,
+                        output=args.output,
+                        source_settings=(
+                            settings.contract_sources if settings is not None else None
+                        ),
+                    )
+                    payload = result.to_dict()
                 elif args.portfolio_command == "refresh":
                     from .generation import (
                         create_generation_client,
@@ -2910,6 +2956,11 @@ def main(argv: Optional[List[str]] = None) -> int:
                 if isinstance(source_budget, dict):
                     print(f"Max prompt chars: {source_budget.get('maxPromptChars')}")
                     print(f"Omitted chunks: {source_budget.get('omittedChunkCount')}")
+                print(f"Validation mode: {payload['validationMode']}")
+            elif payload.get("kind") == "ContractDiscovery":
+                print("Contract portfolio discovery")
+                print(f"Contracts: {len(payload.get('inventory', []))}")
+                print(f"Candidates: {len(payload.get('candidates', []))}")
                 print(f"Validation mode: {payload['validationMode']}")
             else:
                 print(f"Workspace: {payload['workspace']}")

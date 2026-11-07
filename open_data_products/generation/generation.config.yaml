@@ -40,6 +40,19 @@ portfolio:
     # default. Set to false only for local-only or controlled environments where
     # raw extracted source content is acceptable.
     obfuscatePersonalData: true
+  # Future contract registries are configured here. API retrieval is not
+  # implemented yet; credentials are always environment references.
+  # contractSources:
+  #   contracts-api:
+  #     type: api
+  #     endpoint: https://contracts.example.org/api/contracts
+  #     credentialsRef: env:ODP_CONTRACTS_API_TOKEN
+  #     authentication:
+  #       type: bearer
+  #     documentsSelector: items
+  #     pagination:
+  #       type: cursor
+  #       nextSelector: nextCursor
 
 # To make Claude the default instead, set `provider: claude`. The selected
 # provider entry below supplies the Claude model and Anthropic API settings.

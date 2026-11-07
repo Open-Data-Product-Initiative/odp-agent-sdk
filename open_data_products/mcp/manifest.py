@@ -615,7 +615,11 @@ def _safety() -> Dict[str, Any]:
     return {
         "mcp_tool_class": "mixed",
         "mcp_is_read_only": False,
-        "mcp_state_changing_tools": ["init_starter_recipe", "build_portfolio"],
+        "mcp_state_changing_tools": [
+            "init_starter_recipe",
+            "build_portfolio",
+            "discover_contract_portfolio",
+        ],
         "mcp_note": (
             "MCP tools are safe/read-only except explicitly approved workspace "
             "initialization and portfolio build tools classified as state-changing."
