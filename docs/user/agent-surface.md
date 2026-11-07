@@ -51,6 +51,11 @@ resource discovery, summaries, ODPC object search, ODPV vocabulary work, ODPG
 graph reasoning, OKF context bundle metadata, and product-level Data Contract
 context.
 
+ODCS-to-ODPS wrapping is intentionally exposed through the Python API and the
+state-changing CLI command `product wrap-contract`, not as an MCP tool. It
+writes an explicitly requested local draft and reports proposed AI output
+separately from confirmed technical facts.
+
 Current tool names include:
 
 - `validate_document`

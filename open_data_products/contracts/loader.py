@@ -2,8 +2,17 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional
+import re
+import ssl
+from typing import Dict, Iterable, List, Optional, Tuple
+from urllib.error import HTTPError, URLError
+from urllib.parse import ParseResult, unquote, urlparse, urlunparse
+from urllib.request import urlopen
+
+import certifi
+import yaml
 
 from .._io import load_mapping
 from .models import (
@@ -15,18 +24,141 @@ from .models import (
     Finding,
 )
 
+_HTTP_TIMEOUT_SECONDS = 10.0
+_MAX_HTTP_DOCUMENT_BYTES = 1024 * 1024
+_CREDENTIAL_QUERY_FRAGMENTS = (
+    "authorization",
+    "credential",
+    "password",
+    "secret",
+    "sig",
+    "signature",
+    "token",
+    "jwt",
+)
+
 
 def load_contract(path_or_url: str) -> ContractDocument:
-    """Load a local Data Contract YAML or JSON document."""
-    path = Path(path_or_url)
-    if "://" in path_or_url:
-        raise ValueError("Remote Data Contract URLs are not loaded by the SDK yet")
-    document = load_mapping(path, root_name="Data Contract")
+    """Load a local or remote Data Contract YAML or JSON document."""
+    parsed = urlparse(path_or_url)
+    source_location = _safe_source_location(path_or_url)
+    if "://" not in path_or_url:
+        path = Path(path_or_url)
+        document = load_mapping(path, root_name="Data Contract")
+        resolved_uri = path.resolve().as_uri()
+    elif parsed.scheme == "file":
+        path = _file_uri_path(parsed)
+        document = load_mapping(path, root_name="Data Contract")
+        resolved_uri = path.resolve().as_uri()
+    elif parsed.scheme in {"http", "https"}:
+        document, resolved_uri = _load_remote_contract(path_or_url)
+    else:
+        raise ValueError(
+            "Unsupported Data Contract URI scheme: " f"{parsed.scheme or '(missing)'}"
+        )
     return ContractDocument(
-        path=str(path),
+        path=source_location,
         document=document,
         contract_format=_infer_contract_format(path_or_url),
+        source=source_location,
+        resolved_uri=resolved_uri,
     )
+
+
+def _file_uri_path(parsed: ParseResult) -> Path:
+    """Return a local path from a parsed file URI."""
+    netloc = parsed.netloc
+    if netloc not in {"", "localhost"}:
+        raise ValueError("Data Contract file URI must reference the local host")
+    decoded_path = unquote(parsed.path)
+    if not decoded_path:
+        raise ValueError("Data Contract file URI must include a path")
+    return Path(decoded_path)
+
+
+def _load_remote_contract(source: str) -> Tuple[Dict[str, object], str]:
+    """Load a bounded Data Contract mapping over HTTP(S)."""
+    try:
+        context = ssl.create_default_context(cafile=certifi.where())
+        with urlopen(
+            source, timeout=_HTTP_TIMEOUT_SECONDS, context=context
+        ) as response:
+            content = response.read(_MAX_HTTP_DOCUMENT_BYTES + 1)
+            resolved_uri = _safe_http_uri(str(response.geturl()))
+    except (HTTPError, URLError, OSError, ValueError):
+        raise ValueError("Could not load remote Data Contract") from None
+    if len(content) > _MAX_HTTP_DOCUMENT_BYTES:
+        raise ValueError("Remote Data Contract response exceeds the maximum size")
+    try:
+        text = content.decode("utf-8")
+    except UnicodeDecodeError:
+        raise ValueError("Remote Data Contract response is not UTF-8") from None
+    return _load_mapping_text(text, _infer_contract_format(source)), resolved_uri
+
+
+def _safe_source_location(source: str) -> str:
+    """Return a source location that cannot contain URL user credentials."""
+    parsed = urlparse(source)
+    if parsed.scheme in {"http", "https"}:
+        return _safe_http_uri(source)
+    if parsed.scheme == "file" and ("?" in source or "#" in source):
+        raise ValueError(
+            "Data Contract URL query parameters and fragments are not supported"
+        )
+    return source
+
+
+def _safe_http_uri(source: str) -> str:
+    """Return an HTTP(S) URI without user credentials or a fragment."""
+    parsed = urlparse(source)
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+        raise ValueError("Could not load remote Data Contract")
+    try:
+        port = parsed.port
+    except ValueError:
+        raise ValueError("Could not load remote Data Contract") from None
+    if "@" in parsed.netloc:
+        raise ValueError("Credential-bearing Data Contract URL is not supported")
+    if _has_credential_query(parsed.query):
+        raise ValueError("Credential-bearing Data Contract URL is not supported")
+    if "?" in source or "#" in source:
+        raise ValueError(
+            "Data Contract URL query parameters and fragments are not supported"
+        )
+    netloc = parsed.hostname if port is None else f"{parsed.hostname}:{port}"
+    return urlunparse(
+        (parsed.scheme, netloc, parsed.path, parsed.params, parsed.query, "")
+    )
+
+
+def _has_credential_query(query: str) -> bool:
+    """Return whether decoded query keys indicate credential material."""
+    for parameter in re.split(r"[&;]", query):
+        key = unquote(parameter.split("=", 1)[0])
+        normalized = re.sub(r"[^a-z0-9]", "", key.lower())
+        if normalized in {"apikey", "auth", "key"} or any(
+            fragment in normalized for fragment in _CREDENTIAL_QUERY_FRAGMENTS
+        ):
+            return True
+    return False
+
+
+def _load_mapping_text(
+    text: str,
+    contract_format: Optional[str],
+) -> Dict[str, object]:
+    """Load a YAML or JSON mapping from text."""
+    try:
+        parsed: object
+        if contract_format == "json":
+            parsed = json.loads(text)
+        else:
+            parsed = yaml.safe_load(text)
+    except (json.JSONDecodeError, yaml.YAMLError):
+        raise ValueError("Remote Data Contract is not valid YAML or JSON") from None
+    if not isinstance(parsed, dict):
+        raise ValueError("Data Contract must contain an object at the document root")
+    return {str(key): value for key, value in parsed.items()}
 
 
 def summarize_contract(path_or_url: str) -> ContractSummary:
@@ -61,8 +193,7 @@ def summarize_contract_document(
             or _mapping(document.get("info")).get("name")
         ),
         version=_optional_str(
-            document.get("version")
-            or _mapping(document.get("info")).get("version")
+            document.get("version") or _mapping(document.get("info")).get("version")
         ),
         model_count=len(models),
         field_count=sum(_field_count(model) for model in models),

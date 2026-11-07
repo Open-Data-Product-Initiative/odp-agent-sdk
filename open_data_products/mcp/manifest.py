@@ -310,6 +310,18 @@ def _capabilities() -> List[Dict[str, Any]]:
             ),
         },
         {
+            "id": "odcs-product-wrapping",
+            "title": "ODCS to ODPS product drafting",
+            "standards": ["odps"],
+            "interfaces": ["python", "cli"],
+            "lifecycle": ["wrap-contract"],
+            "summary": (
+                "Create a conservative, validated ODPS 4.2 draft from an ODCS "
+                "3.0, 3.1, or 3.2 contract while reporting defaults, missing business "
+                "evidence, and optional review-required AI proposals."
+            ),
+        },
+        {
             "id": "bundled-resources",
             "title": "Bundled schemas, prompts, and retrieval indexes",
             "standards": ["odps", "odpc", "odpg", "odpv"],
@@ -575,6 +587,14 @@ def _workflows() -> List[Dict[str, Any]]:
                 "summarize_data_contract",
                 "extract_data_contract_schema",
             ],
+        },
+        {
+            "id": "wrap-odcs-contract",
+            "title": "Wrap an ODCS contract as an ODPS draft",
+            "commands": [
+                "open-data-products product wrap-contract contracts/orders.yaml --output products/orders.yaml --json"
+            ],
+            "mcp_tools": [],
         },
     ]
 

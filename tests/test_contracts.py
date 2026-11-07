@@ -1,6 +1,9 @@
 """Tests for optional Data Contract integration."""
 
 from pathlib import Path
+from types import SimpleNamespace
+from typing import Dict
+from urllib.error import URLError
 
 import pytest
 
@@ -13,9 +16,255 @@ from open_data_products.contracts.models import (
     Finding,
 )
 
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
-ODPS_PRODUCT = REPO_ROOT / "examples" / "apps" / "pricing_402_builder" / "priced_product.yaml"
+ODPS_PRODUCT = (
+    REPO_ROOT / "examples" / "apps" / "pricing_402_builder" / "priced_product.yaml"
+)
+
+
+def test_load_contract_preserves_local_source_and_resolved_uri(tmp_path: Path) -> None:
+    from open_data_products.contracts import load_contract
+
+    contract_path = tmp_path / "orders contract.yaml"
+    contract_path.write_text("id: orders-contract\n", encoding="utf-8")
+
+    contract = load_contract(str(contract_path))
+
+    assert contract.source == str(contract_path)
+    assert contract.resolved_uri == contract_path.resolve().as_uri()
+
+
+def test_load_contract_reads_percent_encoded_file_uri(tmp_path: Path) -> None:
+    from open_data_products.contracts import load_contract
+
+    contract_path = tmp_path / "orders contract.yaml"
+    contract_path.write_text("id: orders-contract\n", encoding="utf-8")
+
+    contract = load_contract(contract_path.resolve().as_uri())
+
+    assert contract.document == {"id": "orders-contract"}
+    assert contract.source == contract_path.resolve().as_uri()
+    assert contract.resolved_uri == contract_path.resolve().as_uri()
+
+
+def test_load_contract_reads_http_mapping_with_bounded_timeout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from open_data_products.contracts import load_contract
+    from open_data_products.contracts import loader
+
+    class Response:
+        def __enter__(self) -> "Response":
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+        def read(self, size: int) -> bytes:
+            assert size > 0
+            return b'{"id": "orders-contract"}'
+
+        def geturl(self) -> str:
+            return "https://contracts.example.test/orders.json"
+
+    def fake_urlopen(url: str, timeout: float, context: object) -> Response:
+        assert url == "https://contracts.example.test/orders.json"
+        assert timeout > 0
+        assert timeout < 60
+        return Response()
+
+    monkeypatch.setattr(loader, "urlopen", fake_urlopen)
+
+    contract = load_contract("https://contracts.example.test/orders.json")
+
+    assert contract.document == {"id": "orders-contract"}
+    assert contract.source == "https://contracts.example.test/orders.json"
+    assert contract.resolved_uri == "https://contracts.example.test/orders.json"
+
+
+def test_load_contract_http_uses_certifi_trust_context(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Use the SDK CA bundle for HTTPS contract retrieval."""
+    from open_data_products.contracts import load_contract
+    from open_data_products.contracts import loader
+
+    context = object()
+    captured: Dict[str, object] = {}
+
+    class Response:
+        def __enter__(self) -> "Response":
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+        def read(self, size: int) -> bytes:
+            return b"id: orders-contract\n"
+
+        def geturl(self) -> str:
+            return "https://contracts.example.test/orders.yaml"
+
+    def fake_context(*, cafile: str) -> object:
+        captured["cafile"] = cafile
+        return context
+
+    def fake_urlopen(url: str, timeout: float, context: object = None) -> Response:
+        captured["context"] = context
+        return Response()
+
+    monkeypatch.setattr(
+        loader,
+        "certifi",
+        SimpleNamespace(where=lambda: "/tmp/certifi.pem"),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        loader,
+        "ssl",
+        SimpleNamespace(create_default_context=fake_context),
+        raising=False,
+    )
+    monkeypatch.setattr(loader, "urlopen", fake_urlopen)
+
+    load_contract("https://contracts.example.test/orders.yaml")
+
+    assert captured == {"cafile": "/tmp/certifi.pem", "context": context}
+
+
+def test_load_contract_does_not_expose_url_credentials_in_results(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from open_data_products.contracts import load_contract
+    from open_data_products.contracts import loader
+
+    class Response:
+        def __enter__(self) -> "Response":
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+        def read(self, size: int) -> bytes:
+            return b"id: orders-contract\n"
+
+        def geturl(self) -> str:
+            return "https://user:secret@contracts.example.test/orders.yaml"
+
+    monkeypatch.setattr(loader, "urlopen", lambda url, timeout, context: Response())
+
+    with pytest.raises(ValueError, match="Credential-bearing Data Contract URL"):
+        load_contract("https://user:secret@contracts.example.test/orders.yaml")
+
+
+def test_load_contract_rejects_non_http_redirect_target(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from open_data_products.contracts import load_contract
+    from open_data_products.contracts import loader
+
+    class Response:
+        def __enter__(self) -> "Response":
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+        def read(self, size: int) -> bytes:
+            return b"id: orders-contract\n"
+
+        def geturl(self) -> str:
+            return "ftp://contracts.example.test/orders.yaml"
+
+    monkeypatch.setattr(loader, "urlopen", lambda url, timeout, context: Response())
+
+    with pytest.raises(ValueError, match="Could not load remote Data Contract"):
+        load_contract("https://contracts.example.test/orders.yaml")
+
+
+def test_load_contract_rejects_credential_bearing_query_parameters() -> None:
+    from open_data_products.contracts import load_contract
+
+    for query in (
+        "access_token=secret",
+        "accessToken=secret",
+        "clientSecret=secret",
+        "Authorization=Bearer",
+        "foo=1;accessToken=secret",
+        "sig=secret",
+        "jwt=secret",
+    ):
+        with pytest.raises(ValueError, match="Credential-bearing Data Contract URL"):
+            load_contract(f"https://contracts.example.test/orders.yaml?{query}")
+
+
+def test_load_contract_rejects_empty_uri_query_or_fragment(tmp_path: Path) -> None:
+    """Opaque URI delimiters cannot enter contract location results."""
+    from open_data_products.contracts import load_contract
+    from open_data_products.contracts import loader
+
+    contract = tmp_path / "orders.yaml"
+    contract.write_text("id: orders\n", encoding="utf-8")
+
+    for suffix in ("?", "#"):
+        with pytest.raises(ValueError, match="query parameters and fragments"):
+            load_contract(contract.as_uri() + suffix)
+        with pytest.raises(ValueError, match="query parameters and fragments"):
+            loader._safe_http_uri("https://contracts.example.test/orders.yaml" + suffix)
+
+
+def test_load_contract_rejects_unsupported_uri_scheme() -> None:
+    from open_data_products.contracts import load_contract
+
+    with pytest.raises(ValueError, match="Unsupported Data Contract URI scheme: s3"):
+        load_contract("s3://contracts/orders.yaml")
+
+
+def test_load_contract_bounds_http_response_size(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from open_data_products.contracts import load_contract
+    from open_data_products.contracts import loader
+
+    class Response:
+        def __enter__(self) -> "Response":
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+        def read(self, size: int) -> bytes:
+            return b"x" * size
+
+        def geturl(self) -> str:
+            return "https://contracts.example.test/orders.yaml"
+
+    monkeypatch.setattr(
+        loader,
+        "urlopen",
+        lambda url, timeout, context: Response(),
+    )
+
+    with pytest.raises(ValueError, match="maximum size"):
+        load_contract("https://contracts.example.test/orders.yaml")
+
+
+def test_load_contract_does_not_expose_url_credentials_in_network_errors(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from open_data_products.contracts import load_contract
+    from open_data_products.contracts import loader
+
+    def fail(url: str, timeout: float) -> None:
+        raise URLError("network failure")
+
+    monkeypatch.setattr(loader, "urlopen", fail)
+
+    with pytest.raises(ValueError) as error:
+        load_contract("https://user:secret@contracts.example.test/orders.yaml")
+
+    assert "user" not in str(error.value)
+    assert "secret" not in str(error.value)
 
 
 def test_validate_contract_returns_install_hint_when_dependency_missing(

@@ -57,6 +57,103 @@ open-data-products product export-contract examples/contract.yaml --format jsons
 open-data-products product audit examples/product.yaml --json
 ```
 
+## Wrap an ODCS contract as an ODPS 4.2 draft
+
+`wrap-contract` creates a structurally valid ODPS 4.2 draft from an ODCS 3.0,
+3.1, or 3.2 contract. It is deterministic by default: the source contract remains
+the technical authority and the product is deliberately marked `draft` and
+`private`. A valid draft is not evidence of approved ownership, business value,
+service commitments, access rights, or production readiness.
+
+```bash
+open-data-products product wrap-contract contracts/orders.yaml \
+  --output products/orders.yaml
+```
+
+Local relative and absolute paths are resolved without network access and are
+recorded as schema-valid `file://` URIs in `product.contract.default.contractURL`.
+Those references are portable only to systems with access to the same path; use
+`--contract-url` to publish a portable reference when one becomes available.
+The same command accepts percent-encoded file URIs and HTTP(S) URLs. Remote
+loads use bounded requests; retrieval failures do not include credentials in
+the diagnostic. For safe generated references, query parameters and fragments
+are rejected; use a credential-free canonical URL. Use `--contract-url` when
+the generated product should refer to the published location rather than the
+loaded local copy:
+
+```bash
+open-data-products product wrap-contract ./contracts/orders.yaml \
+  --contract-url https://example.org/contracts/orders.yaml \
+  --output products/orders.yaml
+```
+
+The default profile is always named `default`, uses `type: ODCS`, and records
+the ODCS specification version separately from the contract instance version.
+`--inline-contract` instead preserves the complete parsed source document under
+`product.contract.default.spec`; it does not translate ODCS-only structures.
+
+```bash
+open-data-products product wrap-contract contracts/orders.yaml \
+  --inline-contract --output products/orders.yaml
+```
+
+When an ODCS server explicitly establishes a supported technical transport, the
+wrapper creates one named Data Access profile bound to
+`#/product/contract/default`. It otherwise omits Data Access rather than
+inventing endpoints, authentication, or availability commitments.
+
+Use `--json` to receive source and resolved location, mapped fields,
+provisional defaults, missing business information, warnings, optional AI
+proposals, and the final ODPS validation result. `--dry-run` validates without
+writing; existing outputs require `--overwrite`.
+
+`--enrich` is opt-in and uses the normal generation-provider configuration:
+
+```bash
+open-data-products product wrap-contract contracts/orders.yaml \
+  --output products/orders.yaml --enrich --config generation.config.yaml --json
+```
+
+AI output is returned as proposed, review-required business-layer fields. When
+the provider returns a `description`, the generated ODPS draft uses its
+business-language restatement of `description.purpose`. When it returns
+`suggestedTags`, the draft uses those concise discovery tags in
+`product.details.en.tags`. The structured result retains both as `proposed`;
+only the AI description emits a review warning. Value propositions, consumers,
+use cases, and suggested categories remain report-only proposals unless
+`--full-draft` is selected. AI never rewrites the ODCS source or asserts ownership,
+terms, access rights, service commitments, demand, or production approval.
+
+Add `--full-draft` with `--enrich` when the intended output is a fuller draft rather
+than a minimal ODPS wrapper:
+
+```bash
+open-data-products product wrap-contract contracts/orders.yaml \
+  --output products/orders.yaml --enrich --full-draft --config generation.config.yaml
+```
+
+Extended mode applies the generated value proposition, categories, use cases,
+product series, brand slogan, version notes, issue URL, and recommended product
+URLs to `product.details.en`. It also maps the source contract instance version
+to `productVersion`. `--full-draft` requires `--enrich` and retains all generated values
+in the structured proposal report.
+
+### Python API
+
+```python
+from open_data_products.contracts import wrap_contract
+
+result = wrap_contract(
+    "contracts/orders.yaml",
+    output="products/orders.yaml",
+    inline_contract=False,
+    use_ai=False,
+)
+
+assert result.validation.valid
+print(result.to_dict())
+```
+
 ## Supported Contract References
 
 Native ODPS `/product/contract` references can point to local files:

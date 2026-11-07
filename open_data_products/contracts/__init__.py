@@ -17,6 +17,7 @@ from .loader import (
 from .models import (
     ContractDocument,
     ContractExportResult,
+    ContractMappedField,
     ContractReference,
     ContractSchemaField,
     ContractSchemaModel,
@@ -24,17 +25,24 @@ from .models import (
     ContractSummary,
     ContractToolAvailability,
     ContractValidationResult,
+    ContractWrapProposal,
+    ContractWrapResult,
     Finding,
     AlignmentFinding,
     ProductContractReport,
     ProductContractAlignmentResult,
 )
-from .product import generate_product_contract_report, resolve_product_contracts
+from .product import (
+    generate_product_contract_report,
+    resolve_product_contracts,
+    wrap_contract,
+)
 
 __all__ = [
     "AlignmentFinding",
     "ContractDocument",
     "ContractExportResult",
+    "ContractMappedField",
     "ContractReference",
     "ContractSchemaField",
     "ContractSchemaModel",
@@ -42,6 +50,8 @@ __all__ = [
     "ContractSummary",
     "ContractToolAvailability",
     "ContractValidationResult",
+    "ContractWrapProposal",
+    "ContractWrapResult",
     "Finding",
     "ProductContractAlignmentResult",
     "ProductContractReport",
@@ -57,4 +67,5 @@ __all__ = [
     "summarize_contract",
     "summarize_contract_document",
     "validate_contract",
+    "wrap_contract",
 ]

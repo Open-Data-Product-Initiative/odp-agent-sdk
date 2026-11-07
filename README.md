@@ -46,7 +46,7 @@ Python 3.8 or newer is required.
 | Document intake | Read Markdown, text, YAML, JSON, EML, MSG with the `email` extra, DOCX, PPTX, PDF, CSV, and XLSX source files for portfolio workflows |
 | Agent surfaces | Run a safe-class stdio MCP server and generate an ARWS-compatible agent manifest |
 | LLM generation | Generate ODPC fragments, ODPG graphs, and ODPS product YAML from source notes using local or hosted providers |
-| Data Contracts | Resolve ODPS contract references, validate external contracts through optional `datacontract-cli`, extract schemas, check alignment, and generate reports |
+| Data Contracts | Wrap ODCS 3.0/3.1/3.2 contracts into conservative ODPS 4.2 drafts, resolve ODPS contract references, validate external contracts through optional `datacontract-cli`, extract schemas, check alignment, and generate reports |
 
 ## Quick CLI Examples
 
@@ -77,6 +77,33 @@ After installation, the console script provides the same commands:
 open-data-products validate examples/product.yaml
 open-data-products explain examples/product.yaml --json
 ```
+
+Wrap an ODCS contract without changing its source:
+
+```bash
+open-data-products product wrap-contract contracts/orders.yaml \
+  --output products/orders.yaml --json
+```
+
+The resulting ODPS document is a private draft with reported defaults and
+missing business evidence. It uses the original contract as an external
+reference unless `--inline-contract` is selected.
+
+Choose the draft depth with optional enrichment:
+
+```bash
+# Minimal technical wrapper
+open-data-products product wrap-contract contracts/orders.yaml --output products/orders.yaml
+
+# Business description and discovery tags
+open-data-products product wrap-contract contracts/orders.yaml --output products/orders.yaml --enrich
+
+# Rich ODPS draft
+open-data-products product wrap-contract contracts/orders.yaml --output products/orders.yaml --enrich --full-draft
+```
+
+See [Data Contract workflows](docs/user/data-contracts.md) for the generated
+fields and provider configuration.
 
 Portfolio source intake can be inspected without calling an LLM:
 

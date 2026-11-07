@@ -145,6 +145,7 @@ Product/Data Contract commands:
   product align-contract      Check static ODPS/Data Contract alignment
   product contract-schema     Summarize a Data Contract schema
   product export-contract     Export through datacontract-cli
+  product wrap-contract       Generate an ODPS 4.2 draft from an ODCS contract
 
 Portfolio workflow commands:
   portfolio build     Build a portfolio workspace from source lanes

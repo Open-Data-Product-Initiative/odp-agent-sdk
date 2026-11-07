@@ -696,3 +696,11 @@ The same prompt files are also listed through bundled resources:
 open-data-products resources --id generation.prompt.system --json
 open-data-products resources --json
 ```
+## ODCS wrapper enrichment
+
+The deterministic `product wrap-contract` workflow does not require an LLM.
+Pass `--enrich --config generation.config.yaml` when you want the existing
+generation provider to apply a review-required business-language description and
+discovery tags. Add `--full-draft` to fill the wider, schema-native ODPS product
+details in the validated draft. See [Data Contract workflows](data-contracts.md)
+for the source and output contract.

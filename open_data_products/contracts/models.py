@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 from typing import Dict, List, Optional
 
+from ..results import ValidationResult
+
 
 @dataclass(frozen=True)
 class Finding:
@@ -143,10 +145,90 @@ class ContractDocument:
     path: str
     document: Dict[str, object]
     contract_format: Optional[str] = None
+    source: Optional[str] = None
+    resolved_uri: Optional[str] = None
 
     def to_dict(self) -> Dict[str, object]:
         """Return a JSON-serializable representation."""
         return asdict(self)
+
+
+@dataclass(frozen=True)
+class ContractMappedField:
+    """One deterministic ODCS-to-ODPS field mapping."""
+
+    source: str
+    target: str
+    value: str
+
+    def to_dict(self) -> Dict[str, object]:
+        """Return a JSON-serializable representation."""
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class ContractWrapProposal:
+    """An unconfirmed business-layer proposal from optional enrichment."""
+
+    field: str
+    value: str
+    provenance: str = "ai"
+    review_status: str = "proposed"
+
+    def to_dict(self) -> Dict[str, object]:
+        """Return a JSON-serializable representation."""
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class ContractWrapResult:
+    """Structured result for an ODCS-to-ODPS product draft."""
+
+    source: str
+    resolved_uri: str
+    source_standard: str
+    source_specification_version: str
+    contract_id: Optional[str]
+    contract_instance_version: Optional[str]
+    target_odps_version: str
+    output: Optional[str]
+    inline_contract: bool
+    ai_enabled: bool
+    ai_enriched: bool
+    document: Dict[str, object]
+    mapped_fields: List[ContractMappedField] = field(default_factory=list)
+    provisional_defaults: List[str] = field(default_factory=list)
+    missing_business_information: List[str] = field(default_factory=list)
+    ai_proposals: List[ContractWrapProposal] = field(default_factory=list)
+    warnings: List[str] = field(default_factory=list)
+    errors: List[str] = field(default_factory=list)
+    validation: ValidationResult = field(
+        default_factory=lambda: ValidationResult(False, "odps", "OpenDataProduct")
+    )
+
+    def to_dict(self) -> Dict[str, object]:
+        """Return a JSON-serializable representation."""
+        return {
+            "source": self.source,
+            "resolved_uri": self.resolved_uri,
+            "source_standard": self.source_standard,
+            "source_specification_version": self.source_specification_version,
+            "contract_id": self.contract_id,
+            "contract_instance_version": self.contract_instance_version,
+            "target_odps_version": self.target_odps_version,
+            "output": self.output,
+            "inline_contract": self.inline_contract,
+            "ai_enabled": self.ai_enabled,
+            "ai_enriched": self.ai_enriched,
+            "document": self.document,
+            "mapped_fields": [item.to_dict() for item in self.mapped_fields],
+            "provisional_defaults": list(self.provisional_defaults),
+            "missing_business_information": list(self.missing_business_information),
+            "ai_proposals": [item.to_dict() for item in self.ai_proposals],
+            "warnings": list(self.warnings),
+            "errors": list(self.errors),
+            "validation": self.validation.to_dict(),
+        }
 
 
 @dataclass(frozen=True)
@@ -235,9 +317,7 @@ class ProductContractReport:
         """Return a JSON-serializable representation."""
         data = asdict(self)
         data["references"] = [reference.to_dict() for reference in self.references]
-        data["validations"] = [
-            validation.to_dict() for validation in self.validations
-        ]
+        data["validations"] = [validation.to_dict() for validation in self.validations]
         data["summaries"] = [summary.to_dict() for summary in self.summaries]
         data["alignments"] = [alignment.to_dict() for alignment in self.alignments]
         data["findings"] = [finding.to_dict() for finding in self.findings]

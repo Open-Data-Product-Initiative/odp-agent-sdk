@@ -12,7 +12,7 @@ family. Each standard lives in its own namespace:
 
 # flake8: noqa: E402
 
-__version__ = "0.4.0"
+__version__ = "0.6.0"
 version = __version__
 
 from . import odpc
@@ -34,6 +34,7 @@ from .contracts import (
     AlignmentFinding,
     ContractDocument,
     ContractExportResult,
+    ContractMappedField,
     ContractReference,
     ContractSchemaField,
     ContractSchemaModel,
@@ -41,6 +42,8 @@ from .contracts import (
     ContractSummary,
     ContractToolAvailability,
     ContractValidationResult,
+    ContractWrapProposal,
+    ContractWrapResult,
     Finding,
     ProductContractAlignmentResult,
     ProductContractReport,
@@ -56,6 +59,7 @@ from .contracts import (
     summarize_contract,
     summarize_contract_document,
     validate_contract,
+    wrap_contract,
 )
 from .generation import (
     anthropic_generate,
@@ -222,11 +226,14 @@ __all__ = [
     "ContractValidationResult",
     "ContractDocument",
     "ContractExportResult",
+    "ContractMappedField",
     "ContractReference",
     "ContractSchemaField",
     "ContractSchemaModel",
     "ContractSchemaSummary",
     "ContractSummary",
+    "ContractWrapProposal",
+    "ContractWrapResult",
     "Finding",
     "ProductContractAlignmentResult",
     "ProductContractReport",
@@ -318,6 +325,7 @@ __all__ = [
     "summarize_contract_document",
     "summarize_okf_bundle",
     "validate_contract",
+    "wrap_contract",
     "validate_document",
     "validate_profile",
     "validate_vocabulary_release",

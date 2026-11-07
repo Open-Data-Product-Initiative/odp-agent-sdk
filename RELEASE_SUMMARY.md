@@ -1,10 +1,10 @@
-# Open Data Products Python SDK 0.4.0 Release Notes
+# Open Data Products Python SDK 0.6.0 Release Notes
 
 ## Unreleased package contents
 
-This is the next unreleased PyPI package. It combines the earlier ODPS 4.2
-work with the new draft ODPV 1.1 interoperability capabilities below; neither
-area is a separately published 0.5.0 release.
+This is the next unreleased PyPI package after the 0.5.0 release. It combines
+ODPS 4.2 work, draft ODPV 1.1 interoperability capabilities, and ODCS-to-ODPS
+product drafting.
 
 ## ODPS v4.2 support
 
@@ -24,6 +24,10 @@ versioned vocabulary and source-profile assets.
 
 ## What changes for users
 
+- Wrap ODCS 3.0, 3.1, and 3.2 contracts as validated ODPS 4.2 drafts with
+  `open-data-products product wrap-contract`. Use `--enrich` for a business
+  description and discovery tags, or `--enrich --full-draft` for wider
+  AI-generated ODPS product details.
 - Select ODPV 1.1 explicitly with `load_vocabulary_release("1.1.0")`; no
   existing call is upgraded silently.
 - Use `open_data_products.profiles` for profile validation, mapping resolution,

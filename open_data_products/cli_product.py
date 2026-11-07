@@ -21,11 +21,13 @@ Data Contract workflow commands:
   align-contract      Check static ODPS-to-Data Contract alignment
   contract-schema     Extract models and fields from a Data Contract
   export-contract     Export a Data Contract through datacontract-cli
+  wrap-contract       Generate an ODPS 4.2 draft from an ODCS contract
 
 Examples:
   open-data-products product resolve-contracts product.yaml --json
   open-data-products product contract-report product.yaml contract.yaml --json
   open-data-products product audit product.yaml --contract contract.yaml --json
+  open-data-products product wrap-contract contracts/orders.yaml --output products/orders.yaml
 """
 
 
@@ -120,10 +122,90 @@ def add_product_subparser(subparsers: argparse._SubParsersAction) -> None:
         help="Reserved for future live Data Contract tests",
     )
     audit_parser.add_argument("--json", action="store_true", help="Emit JSON")
+    wrap_contract_parser = product_subparsers.add_parser(
+        "wrap-contract",
+        help="Generate an ODPS 4.2 draft from an ODCS contract",
+    )
+    wrap_contract_parser.add_argument(
+        "contract", help="Path or URI of the ODCS contract to wrap"
+    )
+    wrap_contract_parser.add_argument(
+        "--output", "-o", required=True, help="Output ODPS YAML path"
+    )
+    wrap_contract_parser.add_argument(
+        "--inline-contract",
+        action="store_true",
+        help="Embed the complete parsed ODCS document instead of contractURL",
+    )
+    wrap_contract_parser.add_argument(
+        "--enrich",
+        action="store_true",
+        help="Enrich the draft with a business description and discovery tags",
+    )
+    wrap_contract_parser.add_argument(
+        "--full-draft",
+        action="store_true",
+        help="Fill wider ODPS draft details; requires --enrich",
+    )
+    wrap_contract_parser.add_argument(
+        "--contract-url", help="Override the generated ODPS contractURL"
+    )
+    wrap_contract_parser.add_argument("--product-name", help="Override product name")
+    wrap_contract_parser.add_argument("--product-id", help="Override product ID")
+    wrap_contract_parser.add_argument("--product-type", help="Override product type")
+    wrap_contract_parser.add_argument(
+        "--language", help="Set the ODPS content language"
+    )
+    wrap_contract_parser.add_argument(
+        "--config", help="Generation config YAML used only with --enrich"
+    )
+    wrap_contract_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Generate and validate without writing output",
+    )
+    wrap_contract_parser.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="Allow replacement of an existing output",
+    )
+    wrap_contract_parser.add_argument("--json", action="store_true", help="Emit JSON")
 
 
 def handle_product_command(args: argparse.Namespace) -> int:
     """Run the selected product command."""
+    if args.product_command == "wrap-contract":
+        from .contracts import wrap_contract
+
+        result = wrap_contract(
+            args.contract,
+            args.output,
+            inline_contract=args.inline_contract,
+            use_ai=args.enrich,
+            extend=args.full_draft,
+            contract_url=args.contract_url,
+            product_name=args.product_name,
+            product_id=args.product_id,
+            product_type=args.product_type,
+            language=args.language,
+            config=args.config,
+            dry_run=args.dry_run,
+            overwrite=args.overwrite,
+        )
+        if args.json:
+            print(json.dumps(result.to_dict(), indent=2))
+        else:
+            destination = args.output if not args.dry_run else "(dry run)"
+            state = "valid" if result.validation.valid else "invalid"
+            print(f"ODPS 4.2 draft {state}: {destination}")
+            for warning in result.warnings:
+                print(f"- {warning}")
+            for error in result.errors:
+                print(f"- {error}")
+            for error in result.validation.errors:
+                print(f"- ODPS_VALIDATION: {error}")
+        return 0 if result.validation.valid else 1
+
     if args.product_command == "check-contract":
         from .contracts import validate_contract
 

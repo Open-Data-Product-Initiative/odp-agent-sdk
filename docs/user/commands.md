@@ -527,3 +527,20 @@ file. This command does not require the optional `datacontract-cli` adapter.
 
 See [Data Contract workflows](../user/data-contracts.md) for optional validation,
 alignment, reports, and export commands that use `datacontract-cli`.
+
+```bash
+open-data-products product wrap-contract contracts/orders.yaml \
+  --output products/orders.yaml --json
+```
+
+Creates a conservative ODPS 4.2 draft from an ODCS 3.0, 3.1, or 3.2 contract. The
+default output references the source with `contractURL`; use `--inline-contract`
+to preserve it under `spec`, and `--enrich --config generation.config.yaml` for
+review-required business proposals. An AI-proposed business-language description
+is applied with a structured review warning; AI-suggested discovery tags are
+applied without one. See [Data Contract workflows](data-contracts.md) for URI
+handling, draft defaults, and the Python API.
+
+Add `--full-draft` with `--enrich` to apply generated value proposition, categories,
+use cases, product series, brand slogan, version notes, issue URL, and
+recommended product URLs to the ODPS draft.
