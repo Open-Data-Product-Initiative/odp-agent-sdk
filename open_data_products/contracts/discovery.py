@@ -674,6 +674,7 @@ def _write_artifacts(
             "kind": "ContractIntelligence",
             "source_id": result.source_id,
             "summary": result.intelligence_summary,
+            "interface_analysis": _interface_analysis(result.inventory),
             "findings": [item.to_dict() for item in result.intelligence_findings],
         },
     )
@@ -703,9 +704,56 @@ def _write_json(path: Path, value: object) -> None:
     )
 
 
+def _interface_type_records(
+    inventory: Sequence[ContractInventoryRecord],
+) -> List[Tuple[str, List[ContractInventoryRecord]]]:
+    """Group loaded contracts by their declared interface type."""
+    records_by_type: Dict[str, List[ContractInventoryRecord]] = {}
+    for record in inventory:
+        if record.status != "loaded":
+            continue
+        for interface_type in record.technical_interfaces:
+            records_by_type.setdefault(interface_type, []).append(record)
+    return sorted(records_by_type.items(), key=lambda item: (-len(item[1]), item[0]))
+
+
+def _interface_analysis(
+    inventory: Sequence[ContractInventoryRecord],
+    interface_types: Optional[
+        Sequence[Tuple[str, List[ContractInventoryRecord]]]
+    ] = None,
+) -> Dict[str, object]:
+    """Return source-fact interface counts and their declaring contracts."""
+    loaded = [record for record in inventory if record.status == "loaded"]
+    grouped = list(interface_types or _interface_type_records(loaded))
+    declared_ids = {record.logical_id for _, records in grouped for record in records}
+    return {
+        "interface_type_count": len(grouped),
+        "contracts_with_declared_interface": len(declared_ids),
+        "contracts_without_declared_interface": len(loaded) - len(declared_ids),
+        "types": [
+            {
+                "interface_type": interface_type,
+                "contract_count": len(records),
+                "contracts": [
+                    {
+                        "logical_id": record.logical_id,
+                        "name": record.name or record.contract_id,
+                        "source_reference": record.source_reference,
+                    }
+                    for record in records
+                ],
+            }
+            for interface_type, records in grouped
+        ],
+    }
+
+
 def _render_report(result: ContractDiscoveryResult) -> str:
     """Render a self-contained evidence-led intelligence report."""
     inventory_by_id = {item.logical_id: item for item in result.inventory}
+    interface_types = _interface_type_records(result.inventory)
+    interface_analysis = _interface_analysis(result.inventory, interface_types)
     relationships_by_contract: Dict[str, List[Tuple[str, ContractRelationship]]] = {}
     for relationship in result.relationships:
         relationship_id = _relationship_id(relationship)
@@ -751,6 +799,10 @@ def _render_report(result: ContractDiscoveryResult) -> str:
         )
         for item in result.inventory
     )
+    interface_rows = "".join(
+        _interface_analysis_row(interface_type, records)
+        for interface_type, records in interface_types
+    )
     relationship_details = "".join(
         _relationship_detail(
             _relationship_id(relationship), relationship, inventory_by_id
@@ -787,14 +839,16 @@ def _render_report(result: ContractDiscoveryResult) -> str:
 .priority-findings, .opportunities { display:grid; grid-template-columns:repeat(auto-fit,minmax(350px,1fr)); gap:28px; margin-top:58px; } .evidence-card, .empty-state { background:var(--surface); border:1px solid var(--line); border-radius:20px; padding:28px 30px 30px; box-shadow:0 10px 26px rgba(35, 19, 73, .025); } .finding-title { display:flex; align-items:center; gap:17px; margin:0; color:var(--ink); font-size:25px; letter-spacing:-.035em; line-height:1.2; text-transform:capitalize; } .finding-accent { display:block; width:7px; height:38px; flex:none; border-radius:999px; background:var(--purple); box-shadow:0 0 0 3px var(--purple-soft); } .finding-contracts { display:grid; gap:18px; margin-top:27px; } .contract-entry strong { display:block; color:var(--ink); font-size:17px; line-height:1.3; } .contract-entry span, .contract-record span { color:var(--muted); display:block; font-size:14px; line-height:1.45; overflow-wrap:anywhere; } .finding-divider { height:1px; margin:26px 0 22px; background:var(--line); } .evidence-copy, .action-copy { margin:0; color:#302847; font-size:16px; line-height:1.55; } .action-copy { margin-top:15px; } .evidence-copy strong, .action-copy strong { color:var(--ink); }
 .explorer { margin-top:32px; overflow:hidden; } .toolbar { display:flex; justify-content:space-between; align-items:end; gap:16px; padding:20px 24px; border-bottom:1px solid var(--line); } .meta { color:var(--muted); font-size:14px; } input { width:min(400px,100%); margin-top:4px; border:1px solid #CCC4D9; border-radius:10px; padding:10px 12px; color:var(--ink); font:inherit; } input:focus { outline:3px solid var(--purple-soft); border-color:var(--purple); } .table-wrap { overflow:auto; } table { width:100%; border-collapse:collapse; min-width:810px; } th { color:var(--muted); font-size:12px; letter-spacing:.06em; text-align:left; text-transform:uppercase; background:#FCFBFE; } th, td { padding:15px 20px; border-bottom:1px solid var(--line); vertical-align:top; } tr:last-child td { border-bottom:0; } .contract-name { color:var(--ink); font-weight:800; } .source { color:var(--muted); font-size:13px; overflow-wrap:anywhere; } .badge { display:inline-block; margin-top:5px; padding:2px 8px; border-radius:999px; background:var(--purple-soft); color:#5621B6; font-size:12px; font-weight:800; }
 .relationship-link { display:block; color:#5621B6; font-size:14px; margin:3px 0; text-decoration:none; } .relationship-link:hover { text-decoration:underline; } .gap { color:var(--warning); } .details { margin-top:24px; } details { background:var(--surface); border:1px solid var(--line); border-radius:14px; margin:10px 0; padding:15px 18px; } details:target { border-color:var(--purple); box-shadow:0 0 0 3px var(--purple-soft); } summary { cursor:pointer; color:var(--ink); font-weight:800; } .evidence { color:var(--muted); margin:10px 0 0; }
+.interface-summary { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:20px; margin-top:32px; } .interface-summary .metric { min-height:132px; } .interface-register { margin-top:28px; overflow:hidden; } .interface-table { min-width:980px; } .interface-type { color:var(--ink); font-weight:850; } .interface-count { color:var(--purple); font-size:21px; font-weight:850; letter-spacing:-.02em; white-space:nowrap; } .interface-contracts { display:grid; gap:12px; } .interface-contract strong { display:block; color:var(--ink); font-size:15px; } .interface-contract span { color:var(--muted); display:block; font-size:13px; overflow-wrap:anywhere; }
 .opportunity { position:relative; } .opportunity .label { margin-bottom:19px; } .label { color:var(--purple); font-size:13px; font-weight:850; letter-spacing:.07em; } .opportunity .finding-contracts { margin-top:22px; } .contract-group h4 { margin:0; color:var(--ink); font-size:15px; } .contract-record { padding-top:13px; } .contract-number { color:var(--purple)!important; font-size:12px!important; font-weight:850; letter-spacing:.07em; } .contract-record strong { display:block; color:var(--ink); font-size:17px; line-height:1.3; } .review-note { margin-top:22px; padding:14px 15px; border-radius:12px; background:var(--warning-bg); color:var(--warning); font-size:15px; line-height:1.5; } .legend { display:flex; flex-wrap:wrap; gap:18px; color:var(--muted); font-size:14px; margin-top:26px; } .legend b { color:var(--ink); }
-@media (max-width:900px) { main { padding:26px 28px 56px; } .report-source { display:none; } .section-heading { font-size:39px; } .metrics { grid-template-columns:repeat(2,minmax(0,1fr)); } } @media (max-width:620px) { main { padding:22px 18px 42px; } .brand-lockup { gap:16px; } .brand-name { font-size:16px; } .report-section { margin-top:46px; } .section-heading { font-size:34px; } .summary { font-size:18px; } .tabs { gap:19px; } .metrics, .priority-findings, .opportunities { grid-template-columns:1fr; } .priority-findings, .opportunities { gap:16px; margin-top:34px; } .evidence-card, .empty-state { border-radius:16px; padding:23px 21px; } .finding-title { font-size:22px; } .toolbar { align-items:stretch; flex-direction:column; } input { width:100%; } }
+@media (max-width:900px) { main { padding:26px 28px 56px; } .report-source { display:none; } .section-heading { font-size:39px; } .metrics, .interface-summary { grid-template-columns:repeat(2,minmax(0,1fr)); } } @media (max-width:620px) { main { padding:22px 18px 42px; } .brand-lockup { gap:16px; } .brand-name { font-size:16px; } .report-section { margin-top:46px; } .section-heading { font-size:34px; } .summary { font-size:18px; } .tabs { gap:19px; } .metrics, .interface-summary, .priority-findings, .opportunities { grid-template-columns:1fr; } .priority-findings, .opportunities { gap:16px; margin-top:34px; } .evidence-card, .empty-state { border-radius:16px; padding:23px 21px; } .finding-title { font-size:22px; } .toolbar { align-items:stretch; flex-direction:column; } input { width:100%; } }
 </style></head><body><main>
 <header class="report-header"><div class="brand-lockup"><div class="brand-mark" aria-label="ODPS">ODPS</div><span class="brand-divider" aria-hidden="true"></span><div class="brand-name">Data Contract Intelligence</div></div><div class="report-source">Source: __SOURCE__</div></header>
-<div class="tabs" role="tablist" aria-label="Data Contract Intelligence views"><button id="tab-overview" role="tab" aria-selected="true" aria-controls="panel-overview">What the contracts reveal</button><button id="tab-priority-findings" role="tab" aria-selected="false" aria-controls="panel-priority-findings">Priority findings</button><button id="tab-explorer" role="tab" aria-selected="false" aria-controls="panel-explorer">Contract Intelligence Explorer</button><button id="tab-opportunities" role="tab" aria-selected="false" aria-controls="panel-opportunities">Product opportunities</button></div>
+<div class="tabs" role="tablist" aria-label="Data Contract Intelligence views"><button id="tab-overview" role="tab" aria-selected="true" aria-controls="panel-overview">What the contracts reveal</button><button id="tab-priority-findings" role="tab" aria-selected="false" aria-controls="panel-priority-findings">Priority findings</button><button id="tab-explorer" role="tab" aria-selected="false" aria-controls="panel-explorer">Contract Intelligence Explorer</button><button id="tab-interfaces" role="tab" aria-selected="false" aria-controls="panel-interfaces">Interface analysis</button><button id="tab-opportunities" role="tab" aria-selected="false" aria-controls="panel-opportunities">Product opportunities</button></div>
 <section id="panel-overview" class="report-section" role="tabpanel" aria-labelledby="tab-overview"><p class="eyebrow">OVERVIEW</p><h2 class="section-heading">What the contracts reveal</h2><div class="metrics">__METRICS__</div><p class="summary">__SUMMARY__</p></section>
 <section id="panel-priority-findings" class="report-section" role="tabpanel" aria-labelledby="tab-priority-findings" hidden><p class="eyebrow">ACTIONABLE EVIDENCE</p><h2 class="section-heading">Priority findings</h2><p class="summary">Each finding includes the contracts, source references, matching evidence, and next action.</p><div class="priority-findings">__PRIORITY_FINDINGS__</div></section>
 <section id="panel-explorer" class="report-section" role="tabpanel" aria-labelledby="tab-explorer" hidden><p class="eyebrow">EXPLORE THE EVIDENCE</p><h2 class="section-heading">Contract Intelligence Explorer</h2><p class="summary">Contracts, relationships, and missing information.</p><div class="surface-card explorer"><div class="toolbar"><span class="meta">Select a relationship or gap to inspect supporting evidence below.</span><label><span class="meta">Search</span><input id="contract-search" type="search" placeholder="Contract, domain, finding, or source"></label></div><div class="table-wrap"><table><thead><tr><th>Contract</th><th>Domain / owner</th><th>Interfaces</th><th>Relationships</th><th>Missing information</th></tr></thead><tbody id="contract-rows">__ROWS__</tbody></table></div></div><div class="details" aria-label="Relationship and finding evidence">__RELATIONSHIP_DETAILS____FINDING_DETAILS__</div></section>
+<section id="panel-interfaces" class="report-section" role="tabpanel" aria-labelledby="tab-interfaces" hidden><p class="eyebrow">DECLARED TECHNICAL INTERFACES</p><h2 class="section-heading">Interface Analysis</h2><p class="summary">__INTERFACE_TYPE_COUNT__ declared interface types. __INTERFACE_CONTRACT_COUNT__ contracts declare at least one interface; __INTERFACE_MISSING_COUNT__ contracts do not declare an interface. Counts show how many contracts declare each type; each source contract remains visible below.</p><div class="interface-summary"><div class="surface-card metric"><strong>__INTERFACE_TYPE_COUNT__</strong><span>Declared interface types</span><small>Distinct values in contract servers</small></div><div class="surface-card metric"><strong>__INTERFACE_CONTRACT_COUNT__</strong><span>Contracts with an interface</span><small>At least one declared interface</small></div><div class="surface-card metric"><strong>__INTERFACE_MISSING_COUNT__</strong><span>Contracts without an interface</span><small>No declared server type</small></div></div><div class="surface-card interface-register"><div class="table-wrap"><table class="interface-table"><thead><tr><th>Interface type</th><th>Declared by</th><th>Contracts</th></tr></thead><tbody>__INTERFACE_ROWS__</tbody></table></div></div></section>
 <section id="panel-opportunities" class="report-section" role="tabpanel" aria-labelledby="tab-opportunities" hidden><p class="eyebrow">REVIEW ONLY</p><h2 class="section-heading">Product Opportunities</h2><p class="summary">Proposed groups for human review.</p><div class="opportunities">__OPPORTUNITIES__</div><div class="legend"><span><b>Source fact</b> is declared in a contract.</span><span><b>Inference</b> is a repeatable analysis rule.</span><span><b>Proposal</b> needs a human decision.</span></div></section>
 </main><script>
 const tabs=[...document.querySelectorAll('[role="tab"]')]; const panels=[...document.querySelectorAll('[role="tabpanel"]')]; function activateTab(tab){tabs.forEach(item=>{const active=item===tab;item.setAttribute('aria-selected',String(active));document.getElementById(item.getAttribute('aria-controls')).hidden=!active;});} tabs.forEach(tab=>tab.addEventListener('click',()=>activateTab(tab))); const search=document.getElementById('contract-search'); const rows=[...document.querySelectorAll('#contract-rows tr')]; search.addEventListener('input',()=>{const term=search.value.toLowerCase().trim(); rows.forEach(row=>{row.hidden=term!==''&&!row.textContent.toLowerCase().includes(term);});});
@@ -805,6 +859,19 @@ const tabs=[...document.querySelectorAll('[role="tab"]')]; const panels=[...docu
         .replace("__ROWS__", rows)
         .replace("__RELATIONSHIP_DETAILS__", relationship_details)
         .replace("__FINDING_DETAILS__", finding_details)
+        .replace(
+            "__INTERFACE_TYPE_COUNT__",
+            str(interface_analysis["interface_type_count"]),
+        )
+        .replace(
+            "__INTERFACE_CONTRACT_COUNT__",
+            str(interface_analysis["contracts_with_declared_interface"]),
+        )
+        .replace(
+            "__INTERFACE_MISSING_COUNT__",
+            str(interface_analysis["contracts_without_declared_interface"]),
+        )
+        .replace("__INTERFACE_ROWS__", interface_rows)
         .replace("__OPPORTUNITIES__", opportunity_cards)
     )
 
@@ -814,6 +881,24 @@ def _metric_card(label: str, value: int, note: str) -> str:
     return '<div class="surface-card metric"><strong>{}</strong><span>{}</span><small>{}</small></div>'.format(
         value, _escape(label), _escape(note)
     )
+
+
+def _interface_analysis_row(
+    interface_type: str, records: Sequence[ContractInventoryRecord]
+) -> str:
+    """Render one declared interface type and every supporting contract."""
+    contracts = "".join(
+        '<div class="interface-contract"><strong>{}</strong><span>{}</span></div>'.format(
+            _escape(record.name or record.contract_id or record.logical_id),
+            _escape(record.source_reference),
+        )
+        for record in records
+    )
+    return (
+        '<tr><td><span class="interface-type">{}</span></td>'
+        '<td><span class="interface-count">{} contracts</span></td>'
+        '<td><div class="interface-contracts">{}</div></td></tr>'
+    ).format(_escape(interface_type), len(records), contracts)
 
 
 def _priority_finding(

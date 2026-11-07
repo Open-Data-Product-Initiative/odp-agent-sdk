@@ -180,6 +180,10 @@ def test_discovery_writes_contract_intelligence_summary_artifact(
     assert payload["summary"]["contracts_analyzed"] == 146
     assert payload["summary"]["reuse_findings"] == 2
     assert payload["summary"]["proposed_product_groups"] == len(result.candidates)
+    assert payload["interface_analysis"]["interface_type_count"] == 28
+    assert payload["interface_analysis"]["contracts_with_declared_interface"] == 102
+    assert payload["interface_analysis"]["types"][0]["interface_type"] == "local"
+    assert payload["interface_analysis"]["types"][0]["contract_count"] == 18
     assert all("source_contract_ids" in item for item in payload["findings"])
     assert "document" not in json.dumps(payload)
 
@@ -198,11 +202,13 @@ def test_intelligence_report_renders_explorer_and_evidence_links(
     assert 'id="tab-overview"' in report
     assert 'id="tab-priority-findings"' in report
     assert 'id="tab-explorer"' in report
+    assert 'id="tab-interfaces"' in report
     assert 'id="tab-opportunities"' in report
     assert 'role="tabpanel"' in report
     assert "Contracts analyzed" in report
     assert "Priority findings" in report
     assert "Contract Intelligence Explorer" in report
+    assert "Interface Analysis" in report
     assert "Product Opportunities" in report
     assert 'id="contract-search"' in report
     assert "data-relationship-id=" in report
@@ -215,6 +221,16 @@ def test_intelligence_report_renders_explorer_and_evidence_links(
     assert 'class="brand-mark"' in report
     assert 'class="section-heading"' in report
     assert 'class="surface-card metric"' in report
+    interfaces = report.split('id="panel-interfaces"', 1)[1].split(
+        'id="panel-opportunities"', 1
+    )[0]
+    assert "28 declared interface types" in interfaces
+    assert "102 contracts declare at least one interface" in interfaces
+    assert "44 contracts do not declare an interface" in interfaces
+    assert '<table class="interface-table">' in interfaces
+    assert "local" in interfaces
+    assert "18 contracts" in interfaces
+    assert "tests/fixtures/api/weather-service.odcs.yaml" in interfaces
     opportunities = report.split('id="panel-opportunities"', 1)[1]
     assert "Contracts in this group (2)" in opportunities
     assert "Contract 1" in opportunities
