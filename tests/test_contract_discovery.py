@@ -182,6 +182,8 @@ def test_discovery_writes_contract_intelligence_summary_artifact(
     assert payload["summary"]["proposed_product_groups"] == len(result.candidates)
     assert payload["interface_analysis"]["interface_type_count"] == 28
     assert payload["interface_analysis"]["contracts_with_declared_interface"] == 102
+    assert payload["interface_analysis"]["contracts_with_one_interface"] == 99
+    assert payload["interface_analysis"]["contracts_with_multiple_interfaces"] == 3
     assert payload["interface_analysis"]["types"][0]["interface_type"] == "local"
     assert payload["interface_analysis"]["types"][0]["contract_count"] == 18
     assert all("source_contract_ids" in item for item in payload["findings"])
@@ -226,6 +228,8 @@ def test_intelligence_report_renders_explorer_and_evidence_links(
     )[0]
     assert "28 declared interface types" in interfaces
     assert "102 contracts declare at least one interface" in interfaces
+    assert "99 contracts declare one interface" in interfaces
+    assert "3 contracts declare multiple interfaces" in interfaces
     assert "44 contracts do not declare an interface" in interfaces
     assert '<table class="interface-table">' in interfaces
     assert "local" in interfaces
