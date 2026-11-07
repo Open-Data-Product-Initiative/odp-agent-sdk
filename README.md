@@ -119,6 +119,10 @@ boundary proposals, and rationalisation opportunities; it also lists contracts
 without a current opportunity signal. Duplicate and schema-overlap findings are
 technical evidence, not approved product boundaries.
 
+Without `--json`, the command prints the same inventory, interface analysis,
+priority evidence, typed opportunities, and no-current-signal contracts as the
+HTML report. Use `--json` for the same information in structured form.
+
 Portfolio source intake can be inspected without calling an LLM:
 
 ```bash

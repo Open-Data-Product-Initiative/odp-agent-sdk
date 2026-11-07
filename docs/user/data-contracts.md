@@ -223,6 +223,11 @@ signal. Relationships are inferred unless source contracts declare them. Every
 candidate remains proposed; technical similarity does not establish a business
 objective, consumer demand, ownership, or approved product boundary.
 
+The default CLI output mirrors the report details in the terminal: overview
+counts, interface types and their contracts, priority findings, contract
+inventory, all three opportunity types, and every contract with no current
+opportunity signal. Add `--json` to receive the same data as structured output.
+
 The intelligence artifact records source contracts, evidence, why each finding
 matters, and a suggested human investigation. It normalizes safe technical
 interface identifiers such as declared server types and resource names, but it

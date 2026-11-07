@@ -82,6 +82,9 @@ def discover_contract_portfolio(
         ai_proposals, warnings = _propose_candidates_with_ai(
             inventory, relationships, client, model
         )
+    opportunities = candidates + ai_proposals
+    interface_analysis = _interface_analysis(inventory)
+    unclassified_contracts = _unclassified_contract_payloads(inventory, opportunities)
     result = ContractDiscoveryResult(
         source_id=root.name or "contracts",
         inventory=inventory,
@@ -92,6 +95,8 @@ def discover_contract_portfolio(
         ai_enabled=use_ai,
         ai_proposals=ai_proposals,
         warnings=warnings,
+        interface_analysis=interface_analysis,
+        unclassified_contracts=unclassified_contracts,
     )
     artifacts = _write_artifacts(result, Path(output))
     return ContractDiscoveryResult(
@@ -106,6 +111,8 @@ def discover_contract_portfolio(
         warnings=result.warnings,
         ai_enabled=result.ai_enabled,
         ai_proposals=result.ai_proposals,
+        interface_analysis=result.interface_analysis,
+        unclassified_contracts=result.unclassified_contracts,
     )
 
 
@@ -736,6 +743,22 @@ def _unclassified_contracts(
     ]
 
 
+def _unclassified_contract_payloads(
+    inventory: Sequence[ContractInventoryRecord],
+    candidates: Sequence[ProductCandidate],
+) -> List[Dict[str, str]]:
+    """Return safe source references for contracts without an opportunity signal."""
+    return [
+        {
+            "logical_id": record.logical_id,
+            "name": record.name or record.contract_id or record.logical_id,
+            "source_reference": record.source_reference,
+            "reason": "No current standalone, boundary, or rationalisation signal.",
+        }
+        for record in _unclassified_contracts(inventory, candidates)
+    ]
+
+
 def _write_artifacts(
     result: ContractDiscoveryResult, output: Path
 ) -> List[DiscoveryArtifact]:
@@ -759,7 +782,7 @@ def _write_artifacts(
             "kind": "ContractIntelligence",
             "source_id": result.source_id,
             "summary": result.intelligence_summary,
-            "interface_analysis": _interface_analysis(result.inventory),
+            "interface_analysis": result.interface_analysis,
             "findings": [item.to_dict() for item in result.intelligence_findings],
         },
     )
@@ -771,17 +794,7 @@ def _write_artifacts(
             "relationships": [item.to_dict() for item in result.relationships],
             "candidates": [item.to_dict() for item in result.candidates],
             "ai_proposals": [item.to_dict() for item in result.ai_proposals],
-            "unclassified_contracts": [
-                {
-                    "logical_id": record.logical_id,
-                    "name": record.name or record.contract_id,
-                    "source_reference": record.source_reference,
-                    "reason": "No current standalone, boundary, or rationalisation signal.",
-                }
-                for record in _unclassified_contracts(
-                    result.inventory, result.candidates
-                )
-            ],
+            "unclassified_contracts": result.unclassified_contracts,
         },
     )
     report_path.write_text(_render_report(result), encoding="utf-8")

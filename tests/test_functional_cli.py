@@ -21,6 +21,9 @@ ODPS_V42_PRODUCT = REPO_ROOT / "tests" / "fixtures" / "odps_v42_profiles.yaml"
 ODPG_GRAPH = REPO_ROOT / "open_data_products" / "odpg" / "data" / "graph" / "graph.yaml"
 GENERATION_SOURCE_DOCS = REPO_ROOT / "open_data_products" / "generation" / "source_docs"
 EXAMPLE_RECIPES = REPO_ROOT / "examples" / "recipes"
+DATA_CONTRACT_CORPUS = (
+    REPO_ROOT / "tests" / "fixtures" / "external_contract_sources" / "datacontract-cli"
+)
 
 
 def _fake_localization_client(prompt: str, model: str) -> str:
@@ -3243,7 +3246,41 @@ def test_portfolio_discover_contracts_writes_review_artifacts(
 
     payload = json.loads(capsys.readouterr().out)
     assert payload["kind"] == "ContractDiscovery"
+    assert "interface_analysis" in payload
+    assert "unclassified_contracts" in payload
     assert (output / "contract-inventory.json").is_file()
+
+
+def test_portfolio_discover_contracts_prints_full_intelligence_report(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert (
+        main(
+            [
+                "portfolio",
+                "discover-contracts",
+                str(DATA_CONTRACT_CORPUS),
+                "--output",
+                str(tmp_path / "discovery"),
+            ]
+        )
+        == 0
+    )
+
+    report = capsys.readouterr().out
+
+    assert "Data Contract Intelligence" in report
+    assert "Overview" in report
+    assert "Interface analysis" in report
+    assert "Priority findings" in report
+    assert "Contract inventory" in report
+    assert "Standalone product candidates (7)" in report
+    assert "Boundary proposals (2)" in report
+    assert "Rationalisation opportunities (2)" in report
+    assert "No current opportunity signal (134)" in report
+    assert "Top Artists by Year" in report
+    assert "examples/business-definitions/top-artists-by-year.odcs.yaml" in report
+    assert str(DATA_CONTRACT_CORPUS) not in report
 
 
 def test_portfolio_discover_contracts_uses_configured_ai_client(
