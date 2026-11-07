@@ -788,7 +788,7 @@ section { margin-top:30px; } .metrics { display:grid; grid-template-columns:repe
 .tabs { display:flex; gap:4px; overflow:auto; margin-top:24px; border-bottom:1px solid var(--line); } [role="tab"] { appearance:none; background:transparent; border:0; border-bottom:3px solid transparent; color:var(--muted); cursor:pointer; font:inherit; font-weight:750; padding:11px 14px 9px; white-space:nowrap; } [role="tab"]:hover { color:var(--ink); } [role="tab"][aria-selected="true"] { border-color:var(--purple); color:var(--purple); } [role="tab"]:focus-visible { outline:3px solid var(--purple-soft); outline-offset:-3px; } [role="tabpanel"] { margin-top:24px; } [role="tabpanel"][hidden] { display:none; }
 .table-wrap { overflow:auto; } table { width:100%; border-collapse:collapse; min-width:810px; } th { color:var(--muted); font-size:12px; letter-spacing:.04em; text-align:left; text-transform:uppercase; background:#FCFBFD; } th, td { padding:12px 16px; border-bottom:1px solid var(--line); vertical-align:top; } tr:last-child td { border-bottom:0; } .contract-name { font-weight:750; } .source { color:var(--muted); font-size:12px; overflow-wrap:anywhere; } .badge { display:inline-block; padding:2px 7px; border-radius:999px; background:var(--purple-soft); color:#5B21B6; font-size:12px; font-weight:750; }
 .relationship-link { display:block; color:#5B21B6; font-size:13px; margin:2px 0; text-decoration:none; } .relationship-link:hover { text-decoration:underline; } .gap { color:var(--warning); font-size:13px; margin:2px 0; } .details { margin-top:14px; } details { background:var(--surface); border:1px solid var(--line); border-radius:8px; margin:8px 0; padding:12px 14px; } details:target { border-color:var(--purple); box-shadow:0 0 0 3px var(--purple-soft); } summary { cursor:pointer; font-weight:750; } .evidence { color:var(--muted); margin:8px 0 0; }
-.opportunities { display:grid; grid-template-columns:repeat(auto-fit,minmax(310px,1fr)); gap:14px; margin-top:14px; } .opportunity, .empty-state { background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:18px; } .opportunity { border-top:3px solid var(--purple); } .opportunity h3 { margin:0; font-size:18px; } .opportunity p { color:var(--muted); } .label { color:var(--purple); font-size:12px; font-weight:800; letter-spacing:.06em; } .contracts { margin:10px 0; padding-left:18px; color:var(--muted); font-size:13px; } .review-note { margin:12px 0 0; padding:10px; border-radius:7px; background:var(--warning-bg); color:#854D0E; font-size:13px; }
+.opportunities { display:grid; grid-template-columns:repeat(auto-fit,minmax(310px,1fr)); gap:14px; margin-top:14px; } .opportunity, .empty-state { background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:18px; } .opportunity { border-top:3px solid var(--purple); } .opportunity h3 { margin:0; font-size:18px; } .opportunity p { color:var(--muted); } .label { color:var(--purple); font-size:12px; font-weight:800; letter-spacing:.06em; } .contract-group { margin:12px 0; } .contract-group h4 { margin:0 0 7px; font-size:14px; } .contract-record { border-top:1px solid var(--line); padding:8px 0; } .contract-record:first-of-type { border-top:0; } .contract-number { color:var(--purple); font-size:12px; font-weight:800; letter-spacing:.05em; } .contract-record strong, .contract-record span { display:block; } .contract-record span { color:var(--muted); font-size:12px; overflow-wrap:anywhere; } .review-note { margin:12px 0 0; padding:10px; border-radius:7px; background:var(--warning-bg); color:#854D0E; font-size:13px; }
 .legend { display:flex; flex-wrap:wrap; gap:16px; color:var(--muted); font-size:13px; margin-top:16px; } .legend b { color:var(--ink); } @media (max-width:760px) { main { padding:24px 14px 40px; } header { align-items:start; flex-direction:column; } .metrics { grid-template-columns:repeat(2,minmax(0,1fr)); } .toolbar { flex-direction:column; } input { width:100%; } } @media (max-width:420px) { .metrics { grid-template-columns:1fr; } h1 { font-size:27px; } }
 </style></head><body><main>
 <header><div><p class="eyebrow">DATA CONTRACT INTELLIGENCE</p><h1>Portfolio discovery review</h1><p class="subtitle">Evidence-led contract intelligence. Product groups remain proposals until reviewed.</p></div><div class="meta">Source: __SOURCE__</div></header>
@@ -974,40 +974,41 @@ def _opportunity_card(
 ) -> str:
     """Render one proposed product opportunity without confirming it."""
     contracts = "".join(
-        "<li>{}</li>".format(
-            _escape(
-                inventory.get(
-                    identifier, ContractInventoryRecord("", "", "unknown")
-                ).name
-                or identifier
-            )
-        )
-        for identifier in candidate.supporting_contract_ids
+        _opportunity_contract_record(index, identifier, inventory)
+        for index, identifier in enumerate(candidate.supporting_contract_ids, start=1)
     )
     return (
         '<article class="opportunity"><div class="label">{} · HUMAN REVIEW REQUIRED</div>'
-        '<h3>{}</h3><p>{}</p><ul class="contracts">{}</ul>'
+        "<h3>Proposed grouping · {} contracts</h3><p>{}</p>"
+        '<div class="contract-group"><h4>Contracts in this group ({})</h4>{}</div>'
         '<div class="review-note">Missing business context: {}</div></article>'
     ).format(
         _escape(candidate.evidence_class),
-        _escape(_candidate_title(candidate, inventory)),
+        len(candidate.supporting_contract_ids),
         _escape(candidate.rationale),
+        len(candidate.supporting_contract_ids),
         contracts,
         _escape("; ".join(candidate.unresolved_questions)),
     )
 
 
-def _candidate_title(
-    candidate: ProductCandidate,
+def _opportunity_contract_record(
+    index: int,
+    identifier: str,
     inventory: Mapping[str, ContractInventoryRecord],
 ) -> str:
-    """Return a compact evidence-derived candidate title."""
-    names = [
-        inventory[identifier].name
-        for identifier in candidate.supporting_contract_ids
-        if identifier in inventory and inventory[identifier].name
-    ]
-    return names[0] if names else "Proposed contract group"
+    """Render one named source contract within a proposed group."""
+    record = inventory.get(
+        identifier, ContractInventoryRecord("", identifier, "unknown")
+    )
+    return (
+        '<div class="contract-record"><span class="contract-number">Contract {}</span>'
+        "<strong>{}</strong><span>{}</span></div>"
+    ).format(
+        index,
+        _escape(record.name or record.contract_id or identifier),
+        _escape(record.source_reference),
+    )
 
 
 def _escape(value: object) -> str:

@@ -211,6 +211,17 @@ def test_intelligence_report_renders_explorer_and_evidence_links(
     assert "Why it matters" in report
     assert "Suggested action" in report
     assert "#6D28D9" in report
+    opportunities = report.split('id="panel-opportunities"', 1)[1]
+    assert "Contracts in this group (2)" in opportunities
+    assert "Contract 1" in opportunities
+    assert "Contract 2" in opportunities
+    assert (
+        "examples/business-definitions/top-artists-by-year.odcs.yaml" in opportunities
+    )
+    assert (
+        "examples/business-definitions/top-artists-by-year-view.odcs.yaml"
+        in opportunities
+    )
     priority = report.split('id="panel-priority-findings"', 1)[1].split(
         'id="panel-explorer"', 1
     )[0]
