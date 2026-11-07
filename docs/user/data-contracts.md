@@ -192,3 +192,22 @@ product:
 
 Practical extension-style references such as `extensions.dataContract.href` are
 also recognized when resolving product contracts.
+
+## Discover contract portfolio candidates
+
+Use deterministic discovery before deciding whether technical contracts should
+become data products:
+
+    open-data-products portfolio discover-contracts ./contracts \
+      --output ./portfolio-discovery --json
+
+The command recursively reads YAML and JSON files and writes a contract
+inventory, review-only candidate groupings, and a static report. Relationships
+are inferred unless source contracts declare them. Every candidate remains
+proposed; technical similarity does not establish a business objective,
+consumer demand, ownership, or approved product boundary.
+
+Future API sources are configured under portfolio.contractSources in
+generation.config.yaml. Credentials use credentialsRef with an env:NAME
+reference only. API retrieval is not implemented yet, so configured API
+sources return a clear status without making a network request.

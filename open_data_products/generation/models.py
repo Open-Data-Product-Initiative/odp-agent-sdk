@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, List, Optional, Sequence, Union
+from typing import Callable, Dict, List, Optional, Sequence, Union
 
 PathLike = Union[str, Path]
 ModelClient = Callable[[str, str], str]
@@ -23,6 +23,20 @@ class PortfolioPrivacySettings:
     """Portfolio document intake privacy settings."""
 
     obfuscate_personal_data: bool = True
+
+
+@dataclass(frozen=True)
+class ContractSourceSettings:
+    """Configured contract discovery source without credential values."""
+
+    source_id: str
+    source_type: str
+    endpoint: Optional[str] = None
+    credentials_ref: Optional[str] = None
+    authentication_type: Optional[str] = None
+    documents_selector: Optional[str] = None
+    pagination_type: Optional[str] = None
+    next_selector: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -61,6 +75,7 @@ class GenerationSettings:
     portfolio_privacy: PortfolioPrivacySettings = field(
         default_factory=PortfolioPrivacySettings
     )
+    contract_sources: Dict[str, ContractSourceSettings] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)

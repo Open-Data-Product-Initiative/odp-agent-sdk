@@ -30,6 +30,7 @@ from .models import (
     HOLISTIC_GENERATION_TASKS,
     GeneratedArtifact,
     GenerationSettings,
+    ContractSourceSettings,
     GenerationTask,
     ModelClient,
     PathLike,
@@ -854,7 +855,7 @@ def _validate_portfolio_config(value: object, errors: List[str]) -> None:
     if not isinstance(value, dict):
         errors.append("portfolio must be a mapping")
         return
-    allowed_portfolio = {"sourceBudget", "privacy"}
+    allowed_portfolio = {"sourceBudget", "privacy", "contractSources"}
     for key in value:
         if key not in allowed_portfolio:
             errors.append(f"Unknown generation config key: portfolio.{key}")
@@ -880,6 +881,7 @@ def _validate_portfolio_config(value: object, errors: List[str]) -> None:
             "portfolio.sourceBudget.maxPromptChars",
             errors,
         )
+    _validate_contract_sources(value.get("contractSources"), errors)
     privacy = value.get("privacy")
     if privacy is None:
         return
@@ -893,6 +895,77 @@ def _validate_portfolio_config(value: object, errors: List[str]) -> None:
     obfuscate = privacy.get("obfuscatePersonalData")
     if obfuscate is not None and not isinstance(obfuscate, bool):
         errors.append("portfolio.privacy.obfuscatePersonalData must be a boolean")
+
+
+def _validate_contract_sources(value: object, errors: List[str]) -> None:
+    """Validate safe, future-ready contract source settings."""
+    if value is None:
+        return
+    if not isinstance(value, dict):
+        errors.append("portfolio.contractSources must be a mapping")
+        return
+    for name, source in value.items():
+        path = "portfolio.contractSources.{}".format(name)
+        if not isinstance(name, str) or not name:
+            errors.append("portfolio.contractSources keys must be non-empty strings")
+            continue
+        if not isinstance(source, dict):
+            errors.append("{} must be a mapping".format(path))
+            continue
+        allowed = {
+            "type",
+            "endpoint",
+            "credentialsRef",
+            "authentication",
+            "documentsSelector",
+            "pagination",
+        }
+        for key in source:
+            if key not in allowed:
+                errors.append("Unknown generation config key: {}.{}".format(path, key))
+        source_type = source.get("type")
+        if source_type not in {"directory", "api"}:
+            errors.append("{}.type must be directory or api".format(path))
+            continue
+        if source_type == "directory":
+            continue
+        endpoint = source.get("endpoint")
+        if not isinstance(endpoint, str) or not endpoint.startswith(
+            ("http://", "https://")
+        ):
+            errors.append("{}.endpoint must be an HTTP(S) URL".format(path))
+        elif "@" in endpoint or "?" in endpoint or "#" in endpoint:
+            errors.append(
+                "{}.endpoint must not contain credentials, query, or fragment".format(
+                    path
+                )
+            )
+        credentials_ref = source.get("credentialsRef")
+        if not isinstance(credentials_ref, str) or not re.fullmatch(
+            r"env:[A-Z_][A-Z0-9_]*", credentials_ref
+        ):
+            errors.append(
+                "{}.credentialsRef must be env:ENVIRONMENT_VARIABLE".format(path)
+            )
+        authentication = source.get("authentication")
+        if (
+            not isinstance(authentication, dict)
+            or authentication.get("type") != "bearer"
+        ):
+            errors.append("{}.authentication.type must be bearer".format(path))
+        for key in ("documentsSelector",):
+            if not isinstance(source.get(key), str) or not source[key].strip():
+                errors.append("{}.{} must be a non-empty string".format(path, key))
+        pagination = source.get("pagination")
+        if pagination is not None:
+            if not isinstance(pagination, dict):
+                errors.append("{}.pagination must be a mapping".format(path))
+            elif pagination.get("type") != "cursor" or not isinstance(
+                pagination.get("nextSelector"), str
+            ):
+                errors.append(
+                    "{}.pagination requires type cursor and nextSelector".format(path)
+                )
 
 
 def _has_configured_model(
@@ -1078,6 +1151,7 @@ def resolve_generation_settings(
     resolved_prompt_path = str(resolved_prompts) if resolved_prompts else None
     portfolio_source_budget = _resolve_portfolio_source_budget(config)
     portfolio_privacy = _resolve_portfolio_privacy(config)
+    contract_sources = _resolve_contract_sources(config)
     api_version = None
     max_tokens = None
     model_path = None
@@ -1162,6 +1236,7 @@ def resolve_generation_settings(
         prompt_path=resolved_prompt_path,
         portfolio_source_budget=portfolio_source_budget,
         portfolio_privacy=portfolio_privacy,
+        contract_sources=contract_sources,
     )
 
 
@@ -1196,9 +1271,45 @@ def _resolve_portfolio_privacy(config: Dict[str, Any]) -> PortfolioPrivacySettin
     obfuscate = privacy.get("obfuscatePersonalData")
     return PortfolioPrivacySettings(
         obfuscate_personal_data=(
-            obfuscate if isinstance(obfuscate, bool) else default.obfuscate_personal_data
+            obfuscate
+            if isinstance(obfuscate, bool)
+            else default.obfuscate_personal_data
         )
     )
+
+
+def _resolve_contract_sources(
+    config: Dict[str, Any],
+) -> Dict[str, ContractSourceSettings]:
+    """Resolve validated contract source records without reading credentials."""
+    portfolio = config.get("portfolio")
+    portfolio = portfolio if isinstance(portfolio, dict) else {}
+    raw_sources = portfolio.get("contractSources")
+    raw_sources = raw_sources if isinstance(raw_sources, dict) else {}
+    resolved = {}
+    for source_id, source in raw_sources.items():
+        if not isinstance(source_id, str) or not isinstance(source, dict):
+            continue
+        authentication = source.get("authentication")
+        authentication = authentication if isinstance(authentication, dict) else {}
+        pagination = source.get("pagination")
+        pagination = pagination if isinstance(pagination, dict) else {}
+        resolved[source_id] = ContractSourceSettings(
+            source_id=source_id,
+            source_type=str(source.get("type") or ""),
+            endpoint=_optional_config_string(source.get("endpoint")),
+            credentials_ref=_optional_config_string(source.get("credentialsRef")),
+            authentication_type=_optional_config_string(authentication.get("type")),
+            documents_selector=_optional_config_string(source.get("documentsSelector")),
+            pagination_type=_optional_config_string(pagination.get("type")),
+            next_selector=_optional_config_string(pagination.get("nextSelector")),
+        )
+    return resolved
+
+
+def _optional_config_string(value: object) -> Optional[str]:
+    """Return a stripped configuration string when provided."""
+    return value.strip() if isinstance(value, str) and value.strip() else None
 
 
 def create_generation_client(settings: GenerationSettings) -> ModelClient:

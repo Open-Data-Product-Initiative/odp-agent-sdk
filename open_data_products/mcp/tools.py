@@ -30,6 +30,7 @@ from ..agent import (
 )
 from ..contracts import (
     check_product_contract_alignment,
+    discover_contract_portfolio,
     extract_contract_schema,
     generate_product_contract_report,
     resolve_product_contracts,
@@ -445,6 +446,32 @@ def _h_wrap_odcs_contract(args: Dict[str, Any]) -> Dict[str, Any]:
     )
 
 
+def _h_discover_contract_portfolio(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Write discovery artifacts only after explicit approval."""
+    if args.get("approved") is not True:
+        raise ValueError("approved must be true before discovery may write artifacts")
+    if bool(args.get("directory")) == bool(args.get("source")):
+        raise ValueError("Provide exactly one of directory or source")
+    result = discover_contract_portfolio(
+        directory=args.get("directory"),
+        source_id=args.get("source"),
+        output=args["output"],
+    )
+    payload = result.to_dict()
+    return _json_envelope(
+        {
+            "kind": payload["kind"],
+            "source_id": payload["source_id"],
+            "source_status": payload["source_status"],
+            "inventory_count": len(payload["inventory"]),
+            "relationship_count": len(payload["relationships"]),
+            "candidate_count": len(payload["candidates"]),
+            "artifacts": payload["artifacts"],
+            "warnings": payload["warnings"],
+        }
+    )
+
+
 def _redact_local_paths(value: Any) -> Any:
     """Remove local filesystem locations from MCP responses."""
     if isinstance(value, dict):
@@ -653,6 +680,14 @@ _PORTFOLIO_SOURCE_PROP = {
 _PORTFOLIO_APPROVAL_PROP = {
     "type": "boolean",
     "description": "Must be true to permit workspace writes and configured LLM calls.",
+}
+_DISCOVERY_DIRECTORY_PROP = {
+    "type": "string",
+    "description": "Local ODCS contract directory to scan.",
+}
+_DISCOVERY_SOURCE_PROP = {
+    "type": "string",
+    "description": "Configured future contract source ID.",
 }
 
 TOOLS: List[Dict[str, Any]] = [
@@ -1074,6 +1109,21 @@ TOOLS: List[Dict[str, Any]] = [
             ["contract", "output"],
         ),
         "handler": _h_wrap_odcs_contract,
+    },
+    {
+        "name": "discover_contract_portfolio",
+        "description": "Write review-only portfolio discovery artifacts from ODCS contracts.",
+        "class": "state-changing",
+        "inputSchema": _object_schema(
+            {
+                "directory": _DISCOVERY_DIRECTORY_PROP,
+                "source": _DISCOVERY_SOURCE_PROP,
+                "output": _OUTPUT_PROP,
+                "approved": _PORTFOLIO_APPROVAL_PROP,
+            },
+            ["output", "approved"],
+        ),
+        "handler": _h_discover_contract_portfolio,
     },
     {
         "name": "summarize_data_contract",

@@ -83,7 +83,34 @@ def test_mcp_initialize_and_list_tools() -> None:
         "validate_recipe",
         "plan_recipe_run",
         "search_recipe_guidance",
+        "discover_contract_portfolio",
     }
+
+
+def test_mcp_discover_contract_portfolio_requires_approval(tmp_path: Path) -> None:
+    contracts = tmp_path / "contracts"
+    contracts.mkdir()
+    (contracts / "orders.yaml").write_text(
+        "apiVersion: v3.2.0\nkind: DataContract\nid: orders\nmodels: {}\n",
+        encoding="utf-8",
+    )
+    response = handle(
+        {
+            "jsonrpc": "2.0",
+            "id": "discovery",
+            "method": "tools/call",
+            "params": {
+                "name": "discover_contract_portfolio",
+                "arguments": {
+                    "directory": str(contracts),
+                    "output": str(tmp_path / "out"),
+                },
+            },
+        }
+    )
+
+    assert response is not None
+    assert response["result"]["isError"] is True
 
 
 def test_mcp_manifest_is_json_serializable_and_preserves_tool_contracts() -> None:
@@ -98,11 +125,17 @@ def test_mcp_manifest_is_json_serializable_and_preserves_tool_contracts() -> Non
     classes = {tool["name"]: tool["class"] for tool in manifest_tools}
     assert classes["init_starter_recipe"] == "state-changing"
     assert classes["build_portfolio"] == "state-changing"
+    assert classes["discover_contract_portfolio"] == "state-changing"
     assert all(
         tool_class == "safe"
         for tool_name, tool_class in classes.items()
         if tool_name
-        not in {"init_starter_recipe", "build_portfolio", "wrap_odcs_contract"}
+        not in {
+            "init_starter_recipe",
+            "build_portfolio",
+            "discover_contract_portfolio",
+            "wrap_odcs_contract",
+        }
     )
     assert all("handler" not in tool for tool in manifest_tools)
     assert all(tool["inputSchema"]["type"] == "object" for tool in manifest_tools)

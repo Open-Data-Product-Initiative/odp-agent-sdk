@@ -106,6 +106,16 @@ open-data-products product wrap-contract --input contracts/orders.yaml --output 
 See [Data Contract workflows](docs/user/data-contracts.md) for the generated
 fields and provider configuration.
 
+Discover technical portfolio evidence from a contract repository without
+declaring any contract to be an approved data product:
+
+    open-data-products portfolio discover-contracts contracts/ \
+      --output portfolio-discovery/ --json
+
+The command writes a normalized contract inventory, review-only candidate
+groupings, and a static HTML report. Duplicate and schema-overlap findings are
+technical evidence, not approved product boundaries.
+
 Portfolio source intake can be inspected without calling an LLM:
 
 ```bash

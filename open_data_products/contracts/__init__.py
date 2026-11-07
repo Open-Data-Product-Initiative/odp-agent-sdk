@@ -15,7 +15,11 @@ from .loader import (
     summarize_contract_document,
 )
 from .models import (
+    ContractDiscoveryResult,
     ContractDocument,
+    DiscoveryArtifact,
+    ContractInventoryRecord,
+    ContractRelationship,
     ContractExportResult,
     ContractMappedField,
     ContractReference,
@@ -31,7 +35,9 @@ from .models import (
     AlignmentFinding,
     ProductContractReport,
     ProductContractAlignmentResult,
+    ProductCandidate,
 )
+from .discovery import discover_contract_portfolio
 from .product import (
     generate_product_contract_report,
     resolve_product_contracts,
@@ -40,7 +46,11 @@ from .product import (
 
 __all__ = [
     "AlignmentFinding",
+    "ContractDiscoveryResult",
     "ContractDocument",
+    "DiscoveryArtifact",
+    "ContractInventoryRecord",
+    "ContractRelationship",
     "ContractExportResult",
     "ContractMappedField",
     "ContractReference",
@@ -55,8 +65,10 @@ __all__ = [
     "Finding",
     "ProductContractAlignmentResult",
     "ProductContractReport",
+    "ProductCandidate",
     "check_product_contract_alignment",
     "detect_datacontract_cli",
+    "discover_contract_portfolio",
     "explain_contract",
     "export_contract",
     "extract_contract_schema",
