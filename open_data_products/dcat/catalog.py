@@ -7,16 +7,13 @@ import html
 import json
 from pathlib import Path
 import re
-import ssl
 from typing import Callable, Dict, Iterable, List, Optional, Sequence, Tuple
-from urllib.error import HTTPError, URLError
-from urllib.parse import unquote, urlparse, urlunparse
-from urllib.request import HTTPRedirectHandler, HTTPSHandler, build_opener
 
-import certifi
 from rdflib import BNode, Graph, Literal, URIRef
 from rdflib.namespace import DCTERMS, FOAF, RDF, RDFS
 
+from .._interop.odps_draft import DraftDistribution, DraftResource, build_odps_draft
+from .._interop.rdf import load_graphs
 from ..agent import validate_document
 from .models import (
     DcatCatalogIntelligenceResult,
@@ -32,26 +29,11 @@ DCAT = "http://www.w3.org/ns/dcat#"
 ADMS = "http://www.w3.org/ns/adms#"
 DPROD = "https://www.omg.org/spec/DPROD/"
 _UNSUPPORTED_DPROD_NAMESPACE = "https://www.omg.org/spec/DPROD/dprod/"
-_HTTP_TIMEOUT_SECONDS = 10.0
-_MAX_HTTP_DOCUMENT_BYTES = 5 * 1024 * 1024
-_MAX_HTTP_REDIRECTS = 3
-_RDF_SUFFIXES = {".rdf", ".xml", ".ttl", ".jsonld", ".json-ld", ".nt", ".n3"}
-_CREDENTIAL_QUERY_FRAGMENTS = (
-    "authorization",
-    "credential",
-    "password",
-    "secret",
-    "sig",
-    "signature",
-    "token",
-    "jwt",
-)
-_ODPS_V42_SCHEMA = "https://opendataproducts.org/v4.2/schema/odps.json"
 
 
 def discover_dcat_catalog(source: str) -> DcatCatalogIntelligenceResult:
     """Analyze local or bounded remote DCAT RDF without crawling references."""
-    graphs = _load_graphs(source)
+    graphs = load_graphs(source, label="DCAT catalog")
     resources: Dict[str, DcatResource] = {}
     relationships: List[DcatRelationship] = []
     for graph, source_ref in graphs:
@@ -250,141 +232,6 @@ def render_dcat_catalog_html(result: DcatCatalogIntelligenceResult) -> str:
             or "<p>No product opportunity is supported by the supplied metadata.</p>",
         )
     )
-
-
-def _load_graphs(source: str) -> List[Tuple[Graph, str]]:
-    """Load one file, directory, file URI, or bounded HTTP(S) RDF source."""
-    parsed = urlparse(source)
-    if parsed.scheme in {"http", "https"}:
-        text, resolved = _load_remote(source)
-        return [(_parse_rdf(text, _rdf_format(resolved)), resolved)]
-    if parsed.scheme == "file":
-        if parsed.netloc not in {"", "localhost"}:
-            raise ValueError("DCAT file URI must reference the local host")
-        return _load_local(Path(unquote(parsed.path)))
-    if parsed.scheme:
-        raise ValueError("Unsupported DCAT URI scheme")
-    return _load_local(Path(source))
-
-
-def _load_local(path: Path) -> List[Tuple[Graph, str]]:
-    """Load supported RDF files without following linked resources."""
-    paths = (
-        sorted(item for item in path.iterdir() if item.suffix.lower() in _RDF_SUFFIXES)
-        if path.is_dir()
-        else [path]
-    )
-    if not paths:
-        raise ValueError("No supported RDF files were found")
-    loaded: List[Tuple[Graph, str]] = []
-    for item in paths:
-        if not item.is_file():
-            continue
-        text = item.read_text(encoding="utf-8")
-        loaded.append(
-            (_parse_rdf(text, _rdf_format(str(item))), item.resolve().as_uri())
-        )
-    return loaded
-
-
-def _load_remote(source: str) -> Tuple[str, str]:
-    """Retrieve one bounded public catalog document over HTTP(S)."""
-    safe_source = _safe_http_uri(source)
-    try:
-        context = ssl.create_default_context(cafile=certifi.where())
-        opener = build_opener(
-            HTTPSHandler(context=context), _BoundedRedirectHandler(_MAX_HTTP_REDIRECTS)
-        )
-        with opener.open(safe_source, timeout=_HTTP_TIMEOUT_SECONDS) as response:
-            payload = response.read(_MAX_HTTP_DOCUMENT_BYTES + 1)
-            resolved = _safe_http_uri(str(response.geturl()))
-    except (HTTPError, URLError, OSError, ValueError):
-        raise ValueError("Could not load remote DCAT catalog") from None
-    if len(payload) > _MAX_HTTP_DOCUMENT_BYTES:
-        raise ValueError("Remote DCAT catalog response exceeds the maximum size")
-    try:
-        return payload.decode("utf-8"), resolved
-    except UnicodeDecodeError:
-        raise ValueError("Remote DCAT catalog is not UTF-8") from None
-
-
-class _BoundedRedirectHandler(HTTPRedirectHandler):
-    """Follow only a small number of credential-free HTTP redirects."""
-
-    def __init__(self, maximum: int) -> None:
-        super().__init__()
-        self._maximum = maximum
-        self._count = 0
-
-    def redirect_request(  # type: ignore[override]
-        self,
-        request: object,
-        file_pointer: object,
-        code: int,
-        message: str,
-        headers: object,
-        new_url: str,
-    ) -> object:
-        """Reject excessive or credential-bearing redirect destinations."""
-        self._count += 1
-        if self._count > self._maximum:
-            raise ValueError("Remote DCAT catalog redirect limit exceeded")
-        return super().redirect_request(
-            request, file_pointer, code, message, headers, _safe_http_uri(new_url)
-        )
-
-
-def _parse_rdf(text: str, rdf_format: Optional[str]) -> Graph:
-    """Parse RDF text while refusing network-loaded JSON-LD contexts."""
-    if rdf_format == "json-ld":
-        _reject_remote_jsonld_context(text)
-    graph = Graph()
-    try:
-        graph.parse(data=text, format=rdf_format)
-    except Exception as exc:
-        raise ValueError("DCAT source is not valid supported RDF") from exc
-    return graph
-
-
-def _reject_remote_jsonld_context(text: str) -> None:
-    """Reject JSON-LD documents that would dereference external contexts."""
-    try:
-        document = json.loads(text)
-    except json.JSONDecodeError as exc:
-        raise ValueError("DCAT JSON-LD is not valid JSON") from exc
-    contexts = _contexts(document)
-    if any(
-        isinstance(value, str) and urlparse(value).scheme in {"http", "https"}
-        for value in contexts
-    ):
-        raise ValueError("Remote JSON-LD contexts are not supported")
-
-
-def _contexts(value: object) -> Iterable[object]:
-    """Yield JSON-LD context declarations recursively."""
-    if isinstance(value, dict):
-        if "@context" in value:
-            context = value["@context"]
-            yield from context if isinstance(context, list) else [context]
-        for item in value.values():
-            yield from _contexts(item)
-    elif isinstance(value, list):
-        for item in value:
-            yield from _contexts(item)
-
-
-def _rdf_format(source: str) -> Optional[str]:
-    """Infer an RDFLib parser format from a source suffix."""
-    suffix = Path(urlparse(source).path).suffix.lower()
-    return {
-        ".ttl": "turtle",
-        ".rdf": "xml",
-        ".xml": "xml",
-        ".jsonld": "json-ld",
-        ".json-ld": "json-ld",
-        ".nt": "nt",
-        ".n3": "n3",
-    }.get(suffix)
 
 
 def _resource_nodes(graph: Graph) -> Iterable[Tuple[object, str]]:
@@ -589,79 +436,29 @@ def _findings(
 def _odps_draft(
     resource: DcatResource, intelligence: DcatCatalogIntelligenceResult
 ) -> Tuple[Dict[str, object], Dict[str, object], List[str]]:
-    """Map only supported source metadata into a private ODPS draft."""
-    name = _first_localized(resource.titles) or _title_from_id(
-        resource.identifiers[0] if resource.identifiers else resource.id
-    )
-    details: Dict[str, object] = {
-        "productID": _slugify(
-            resource.identifiers[0] if resource.identifiers else resource.id
+    """Adapt DCAT facts to the neutral conservative draft builder."""
+    del intelligence
+    return build_odps_draft(
+        DraftResource(
+            id=resource.id,
+            source_documents=resource.source_documents,
+            titles=resource.titles,
+            descriptions=resource.descriptions,
+            identifiers=resource.identifiers,
+            themes=resource.themes,
+            keywords=resource.keywords,
+            distributions=[
+                DraftDistribution(
+                    access_url=item.access_url,
+                    download_url=item.download_url,
+                    format=item.format,
+                )
+                for item in resource.distributions
+            ],
+            service_urls=resource.service_urls,
         ),
-        "name": name,
-        "visibility": "private",
-        "status": "draft",
-        "type": "dataset",
-    }
-    description = _first_localized(resource.descriptions)
-    if description:
-        details["description"] = description
-    tags = sorted({value for values in resource.keywords.values() for value in values})
-    if tags:
-        details["tags"] = tags
-    if resource.themes:
-        details["categories"] = resource.themes
-    document: Dict[str, object] = {
-        "schema": _ODPS_V42_SCHEMA,
-        "version": "4.2",
-        "product": {"details": {"en": details}},
-    }
-    warnings: List[str] = []
-    access = _access_profile(resource)
-    if access:
-        document["product"]["dataAccess"] = {"default": access}
-    elif resource.distributions or resource.service_urls:
-        warnings.append(
-            "DATA_ACCESS_OMITTED: DCAT metadata did not establish a safe supported access profile"
-        )
-    mapped = [
-        "identifier",
-        "title",
-        "description",
-        "keywords",
-        "themes",
-        "distribution",
-    ]
-    report = {
-        "source_resource_identifier": resource.id,
-        "source_catalog": resource.source_documents,
-        "applied_mapping_rules": mapped,
-        "mapped_fields": [
-            item
-            for item in mapped
-            if item in {"identifier", "title"}
-            or (item == "description" and description)
-            or (item == "keywords" and tags)
-            or (item == "themes" and resource.themes)
-            or (item == "distribution" and access)
-        ],
-        "source_information_not_represented": [
-            "source IRI",
-            "publisher approval status",
-            "multilingual values",
-            "access-rights interpretation",
-        ],
-        "defaults_introduced": [
-            "product.details.en.status=draft",
-            "product.details.en.visibility=private",
-            "product.details.en.type=dataset",
-        ],
-        "validation_result": "pending",
-        "odpv_profile": "ODPV-DCAT-3 is draft and is not asserted as conformance",
-    }
-    report["validation_result"] = (
-        "valid" if validate_document(document).valid else "invalid"
+        is_valid=lambda value: validate_document(value).valid,
     )
-    return document, report, warnings
 
 
 def _generate_ai_proposals(
@@ -755,59 +552,6 @@ def _apply_ai_proposals(
         warnings.append("AI_PROPOSED_TAGS_APPLIED: requires human review")
 
 
-def _access_profile(resource: DcatResource) -> Optional[Dict[str, object]]:
-    """Map only an explicit HTTP(S) access endpoint to ODPS data access."""
-    for distribution in resource.distributions:
-        if distribution.access_url and _safe_access_url(distribution.access_url):
-            profile: Dict[str, object] = {
-                "outputPortType": "API",
-                "accessURL": distribution.access_url,
-            }
-            if distribution.format in {"CSV", "JSON", "XML", "TOON"}:
-                profile["format"] = distribution.format
-            return profile
-    for service_url in resource.service_urls:
-        if _safe_access_url(service_url):
-            return {"outputPortType": "API", "accessURL": service_url}
-    return None
-
-
-def _safe_access_url(value: str) -> bool:
-    """Accept only credential-free HTTP(S) access references."""
-    try:
-        _safe_http_uri(value)
-    except ValueError:
-        return False
-    return True
-
-
-def _safe_http_uri(source: str) -> str:
-    """Return an HTTP(S) URI only when it contains no credentials or fragment."""
-    parsed = urlparse(source)
-    if (
-        parsed.scheme not in {"http", "https"}
-        or not parsed.hostname
-        or "@" in parsed.netloc
-        or "#" in source
-        or _credential_query(parsed.query)
-    ):
-        raise ValueError("Credential-bearing or malformed DCAT URL is not supported")
-    return urlunparse(
-        (parsed.scheme, parsed.netloc, parsed.path, parsed.params, parsed.query, "")
-    )
-
-
-def _credential_query(query: str) -> bool:
-    """Identify credential-like query parameter keys."""
-    for parameter in re.split(r"[&;]", query):
-        key = re.sub(r"[^a-z0-9]", "", unquote(parameter.split("=", 1)[0]).lower())
-        if key in {"apikey", "auth", "key"} or any(
-            part in key for part in _CREDENTIAL_QUERY_FRAGMENTS
-        ):
-            return True
-    return False
-
-
 def _node_id(graph: Graph, node: object) -> str:
     """Return IRIs verbatim and deterministic identifiers for blank nodes."""
     if isinstance(node, BNode):
@@ -852,14 +596,6 @@ def _text(value: Optional[object]) -> Optional[str]:
 def _first(values: Iterable[object]) -> Optional[object]:
     """Return the first RDF term if present."""
     return next(iter(values), None)
-
-
-def _first_localized(values: Dict[str, List[str]]) -> Optional[str]:
-    """Prefer English source text while retaining all values in inventory."""
-    for language in ("en", "und"):
-        if values.get(language):
-            return values[language][0]
-    return next(iter(values.values()))[0] if values else None
 
 
 def _merge_resource(first: DcatResource, second: DcatResource) -> DcatResource:
@@ -920,11 +656,3 @@ def _slugify(value: str) -> str:
     """Create a conservative ODPS identifier from source identity."""
     slug = re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
     return slug[-80:] or "dcat-resource"
-
-
-def _title_from_id(value: str) -> str:
-    """Create a human-readable fallback title."""
-    return (
-        re.sub(r"[-_/]+", " ", value.rsplit("/", 1)[-1]).strip().title()
-        or "DCAT resource"
-    )

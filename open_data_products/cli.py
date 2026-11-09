@@ -26,6 +26,7 @@ from .cli_core import (
     print_error_payload as _print_error_payload,
     split_csv as _split_csv,
 )
+from .cli_interop import add_interop_subparsers, handle_interop_command
 from .cli_product import add_product_subparser, handle_product_command
 from .odpg.graph import (
     collect_relationship_types,
@@ -1506,12 +1507,6 @@ def main(argv: Optional[List[str]] = None) -> int:
     )
     odpg_convert_parser.add_argument("--json", action="store_true", help="Emit JSON")
 
-    dprod_validate_parser = subparsers.add_parser(
-        "dprod-validate", help="Validate RDF against pinned DPROD 1.0 Beta 2 shapes"
-    )
-    dprod_validate_parser.add_argument("source", help="DPROD RDF source")
-    dprod_validate_parser.add_argument("--json", action="store_true", help="Emit JSON")
-
     subparsers.add_parser("manifest", help="Emit the ARWS agent manifest").add_argument(
         "--json", action="store_true", help="Emit JSON"
     )
@@ -1704,24 +1699,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     portfolio_intake_parser.add_argument(
         "--json", action="store_true", help="Emit JSON"
     )
-    portfolio_dcat_parser = portfolio_subparsers.add_parser(
-        "discover-dcat",
-        help="Analyze a local or bounded remote DCAT catalog",
-    )
-    portfolio_dcat_parser.add_argument(
-        "source", help="RDF file, directory, file URI, or public HTTP(S) catalog"
-    )
-    portfolio_dcat_parser.add_argument(
-        "--output", "-o", help="Optional self-contained HTML report path"
-    )
-    portfolio_dcat_parser.add_argument("--json", action="store_true", help="Emit JSON")
-    portfolio_dprod_parser = portfolio_subparsers.add_parser(
-        "discover-dprod", help="Analyze explicit DPROD 1.0 Beta 2 products"
-    )
-    portfolio_dprod_parser.add_argument(
-        "source", help="RDF file, directory, file URI, or public HTTP(S) source"
-    )
-    portfolio_dprod_parser.add_argument("--json", action="store_true", help="Emit JSON")
+    add_interop_subparsers(subparsers, portfolio_subparsers)
     portfolio_sync_parser = portfolio_subparsers.add_parser(
         "sync",
         help="Sync edited YAML artifacts without calling an LLM",
@@ -1820,18 +1798,10 @@ def main(argv: Optional[List[str]] = None) -> int:
     activity_start_time = time.monotonic()
 
     try:
-        if args.command == "dprod-validate":
-            from .dprod import validate_dprod
-
-            result = validate_dprod(args.source)
-            if args.json:
-                print(json.dumps(result.to_dict(), indent=2))
-            else:
-                print("DPROD Beta 2 SHACL conforms: {}".format(result.conforms))
-                for violation in result.violations:
-                    print("- {}: {}".format(violation.property_path, violation.message))
+        interop_exit_code = handle_interop_command(args)
+        if interop_exit_code is not None:
             return _finalize_activity(
-                args, activity_context, activity_start_time, 0 if result.conforms else 1
+                args, activity_context, activity_start_time, interop_exit_code
             )
 
         if args.command == "validate":
@@ -3049,54 +3019,6 @@ def main(argv: Optional[List[str]] = None) -> int:
             )
 
         if args.command == "portfolio":
-            if args.portfolio_command == "discover-dprod":
-                from .dprod import discover_dprod_catalog
-
-                try:
-                    result = discover_dprod_catalog(args.source)
-                except (FileNotFoundError, ValueError) as exc:
-                    _print_error_payload(exc, as_json=args.json, spec="dprod")
-                    return _finalize_activity(
-                        args, activity_context, activity_start_time, 1
-                    )
-                if args.json:
-                    print(json.dumps(result.to_dict(), indent=2))
-                else:
-                    print("DPROD products: {}".format(len(result.products)))
-                    print("SHACL conforms: {}".format(result.validation.conforms))
-                return _finalize_activity(
-                    args, activity_context, activity_start_time, 0
-                )
-            if args.portfolio_command == "discover-dcat":
-                from .dcat import discover_dcat_catalog, render_dcat_catalog_html
-
-                try:
-                    result = discover_dcat_catalog(args.source)
-                    payload = result.to_dict()
-                    if args.output:
-                        destination = Path(args.output)
-                        destination.parent.mkdir(parents=True, exist_ok=True)
-                        destination.write_text(
-                            render_dcat_catalog_html(result), encoding="utf-8"
-                        )
-                        payload["html"] = str(destination)
-                except (FileNotFoundError, ValueError) as exc:
-                    _print_error_payload(exc, as_json=args.json, spec="dcat")
-                    return _finalize_activity(
-                        args, activity_context, activity_start_time, 1
-                    )
-                if args.json:
-                    print(json.dumps(payload, indent=2))
-                else:
-                    print(f"DCAT resources: {len(result.resources)}")
-                    print(f"Relationships: {len(result.relationships)}")
-                    print(f"Findings: {len(result.findings)}")
-                    if args.output:
-                        print(f"HTML: {args.output}")
-                return _finalize_activity(
-                    args, activity_context, activity_start_time, 0
-                )
-
             from .portfolio import (
                 build_portfolio,
                 explain_portfolio,

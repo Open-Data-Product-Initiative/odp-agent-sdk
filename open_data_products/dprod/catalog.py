@@ -8,10 +8,13 @@ from typing import Dict, Iterable, List, Optional
 from rdflib import Graph, Literal, URIRef
 from rdflib.namespace import DCTERMS, RDF, RDFS
 
+from .._interop.odps_draft import (
+    DraftDistribution,
+    DraftResource,
+    build_odps_draft,
+)
+from .._interop.rdf import load_graphs, safe_access_url
 from ..agent import validate_document
-from ..dcat.catalog import _load_graphs, _safe_access_url
-from ..dcat.models import DcatDistribution, DcatResource
-from ..dcat.catalog import _odps_draft
 from .models import (
     DprodCatalogResult,
     DprodProduct,
@@ -35,7 +38,7 @@ def discover_dprod_catalog(source: str) -> DprodCatalogResult:
     resources: Dict[str, DprodResource] = {}
     relationships: List[DprodRelationship] = []
     sources: List[str] = []
-    for graph, source_ref in _load_graphs(source):
+    for graph, source_ref in load_graphs(source, label="DPROD source"):
         _reject_unsupported_namespace(graph)
         sources.append(source_ref)
         for resource in _inventory_resources(graph, source_ref):
@@ -76,8 +79,10 @@ def wrap_dprod_resource(
         raise ValueError(
             "Selected DPROD DataProduct was not found in the supplied source"
         )
-    resource = _as_dcat_resource(source, product)
-    document, base_report, warnings = _odps_draft(resource, None)  # type: ignore[arg-type]
+    resource = _as_draft_resource(source, product)
+    document, base_report, warnings = build_odps_draft(
+        resource, is_valid=lambda value: validate_document(value).valid
+    )
     warnings.extend(_conversion_warnings(product))
     mappings = _dprod_to_odps_mappings(product, document)
     report = {
@@ -196,10 +201,10 @@ def _relationships(graph: Graph) -> List[DprodRelationship]:
     ]
 
 
-def _as_dcat_resource(source: str, product: DprodProduct) -> DcatResource:
-    """Project only compatible DPROD facts into the existing draft builder."""
+def _as_draft_resource(source: str, product: DprodProduct) -> DraftResource:
+    """Project only compatible DPROD facts into the neutral draft builder."""
     graph = Graph()
-    for loaded, _source_ref in _load_graphs(source):
+    for loaded, _source_ref in load_graphs(source, label="DPROD source"):
         for triple in loaded:
             graph.add(triple)
     endpoints = []
@@ -213,8 +218,7 @@ def _as_dcat_resource(source: str, product: DprodProduct) -> DcatResource:
             URIRef(dataset), URIRef(DCAT + "distribution")
         ):
             distributions.append(
-                DcatDistribution(
-                    id=str(distribution),
+                DraftDistribution(
                     access_url=_first(
                         graph.objects(distribution, URIRef(DCAT + "accessURL"))
                     ),
@@ -224,16 +228,15 @@ def _as_dcat_resource(source: str, product: DprodProduct) -> DcatResource:
                     format=_first(graph.objects(distribution, DCTERMS.format)),
                 )
             )
-    return DcatResource(
+    return DraftResource(
         id=product.id,
-        resource_type="Dataset",
         source_documents=product.source_documents,
         titles={"und": product.labels},
         descriptions={"und": product.descriptions},
         themes=product.domains,
         distributions=distributions,
         service_urls=sorted(
-            value for value in set(endpoints) if _safe_access_url(value)
+            value for value in set(endpoints) if safe_access_url(value)
         ),
     )
 

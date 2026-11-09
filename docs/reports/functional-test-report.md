@@ -98,6 +98,12 @@ and MCP JSON-RPC surfaces against the same versioned fixtures. It verifies
 that state-changing MCP operations write only the requested output and redact
 local paths from their response bodies.
 
+DCAT and DPROD share safe RDF intake and conservative ODPS-draft mechanics
+through a private `_interop` boundary. The standard namespaces do not import
+one another's private implementation modules; namespace-layout tests enforce
+that constraint while public APIs, command names, and MCP tool names remain
+unchanged.
+
 The packaging CI additionally runs an `installed-wheel` smoke test outside the
 checkout and runs an ODPS-to-DPROD export using the packaged profile assets. It then
 cross-checks that export with Apache Jena SHACL after verifying the downloaded

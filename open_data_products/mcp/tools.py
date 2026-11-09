@@ -18,7 +18,6 @@ they encode failures into the text payload so the agent can recover.
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
@@ -38,14 +37,6 @@ from ..contracts import (
     validate_contract,
     wrap_contract,
 )
-from ..dcat import discover_dcat_catalog, wrap_dcat_resource
-from ..dprod import (
-    discover_dprod_catalog,
-    validate_dprod,
-    wrap_dprod_resource,
-    write_dprod_export,
-)
-from .._io import load_mapping
 from ..generation import get_config as get_generation_config
 from ..generation import validate_config as validate_generation_config
 from ..odpc import (
@@ -94,16 +85,19 @@ from ..profiles import (
 )
 from ..resources import get_resource, list_resources
 from ..summary import load_summary
+from ._response import envelope as _envelope
+from ._response import json_envelope as _json_envelope
+from ._response import redact_local_paths as _redact_local_paths
+from .interop import (
+    discover_dcat_catalog_handler as _discover_dcat_catalog_handler,
+    discover_dprod_catalog_handler as _discover_dprod_catalog_handler,
+    export_dprod_handler as _export_dprod_handler,
+    validate_dprod_handler as _validate_dprod_handler,
+    wrap_dcat_resource_handler as _wrap_dcat_resource_handler,
+    wrap_dprod_resource_handler as _wrap_dprod_resource_handler,
+)
 
 Handler = Callable[[Dict[str, Any]], Dict[str, Any]]
-
-
-def _envelope(text: str) -> Dict[str, Any]:
-    return {"content": [{"type": "text", "text": text}]}
-
-
-def _json_envelope(payload: Any) -> Dict[str, Any]:
-    return _envelope(json.dumps(payload, indent=2, default=str))
 
 
 def _int_arg(args: Dict[str, Any], name: str, default: int) -> int:
@@ -470,75 +464,32 @@ def _h_discover_contract_portfolio(args: Dict[str, Any]) -> Dict[str, Any]:
 
 def _h_discover_dcat_catalog(args: Dict[str, Any]) -> Dict[str, Any]:
     """Analyze one supplied DCAT catalog without writing artifacts."""
-    return _json_envelope(
-        _redact_local_paths(discover_dcat_catalog(args["source"]).to_dict())
-    )
+    return _discover_dcat_catalog_handler(args)
 
 
 def _h_wrap_dcat_resource(args: Dict[str, Any]) -> Dict[str, Any]:
     """Write one ODPS draft from an explicit DCAT resource selection."""
-    result = wrap_dcat_resource(
-        args["source"],
-        args["resource"],
-        args["output"],
-        overwrite=bool(args.get("overwrite", False)),
-        use_ai=bool(args.get("enrich", False)),
-        extend=bool(args.get("full_draft", False)),
-        config=args.get("config"),
-    )
-    payload = result.to_dict()
-    payload["source"] = Path(args["source"]).name
-    payload["output"] = Path(args["output"]).name
-    return _json_envelope(_redact_local_paths(payload))
+    return _wrap_dcat_resource_handler(args)
 
 
 def _h_discover_dprod_catalog(args: Dict[str, Any]) -> Dict[str, Any]:
     """Analyze supplied DPROD RDF without writing artifacts."""
-    return _json_envelope(
-        _redact_local_paths(discover_dprod_catalog(args["source"]).to_dict())
-    )
+    return _discover_dprod_catalog_handler(args)
 
 
 def _h_validate_dprod(args: Dict[str, Any]) -> Dict[str, Any]:
     """Validate supplied DPROD RDF without writing artifacts."""
-    return _json_envelope(validate_dprod(args["source"]).to_dict())
+    return _validate_dprod_handler(args)
 
 
 def _h_wrap_dprod_resource(args: Dict[str, Any]) -> Dict[str, Any]:
     """Write one ODPS draft from an explicit DPROD resource selection."""
-    result = wrap_dprod_resource(
-        args["source"],
-        args["resource"],
-        args["output"],
-        overwrite=bool(args.get("overwrite", False)),
-    )
-    payload = result.to_dict()
-    payload["source"] = Path(args["source"]).name
-    payload["output"] = Path(args["output"]).name
-    return _json_envelope(_redact_local_paths(payload))
+    return _wrap_dprod_resource_handler(args)
 
 
 def _h_export_dprod(args: Dict[str, Any]) -> Dict[str, Any]:
     """Write DPROD serializations from an ODPS source mapping."""
-    payload = write_dprod_export(
-        load_mapping(Path(args["source"]), root_name="ODPS document"),
-        args["output"],
-        overwrite=bool(args.get("overwrite", False)),
-    )
-    payload["turtle_output"] = Path(str(payload["turtle_output"])).name
-    payload["jsonld_output"] = Path(str(payload["jsonld_output"])).name
-    return _json_envelope(payload)
-
-
-def _redact_local_paths(value: Any) -> Any:
-    """Remove local filesystem locations from MCP responses."""
-    if isinstance(value, dict):
-        return {key: _redact_local_paths(item) for key, item in value.items()}
-    if isinstance(value, list):
-        return [_redact_local_paths(item) for item in value]
-    if isinstance(value, str) and value.startswith("file://"):
-        return "file://<local-contract>"
-    return value
+    return _export_dprod_handler(args)
 
 
 def _h_list_recipes(args: Dict[str, Any]) -> Dict[str, Any]:

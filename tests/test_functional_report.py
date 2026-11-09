@@ -23,6 +23,7 @@ def test_functional_report_lists_public_functional_suites() -> None:
         "Data Contract orchestration",
         "resolve_product_contracts",
         "check_product_contract_alignment",
+        "private `_interop` boundary",
         "pytest -q -m functional",
     ):
         assert expected in content
