@@ -150,3 +150,10 @@ def test_portfolio_facade_imports_shared_identity_helpers() -> None:
 
     assert "path_id as _path_id" in source
     assert "title_from_text as _title_from_text" in source
+
+
+def test_portfolio_facade_delegates_odps_normalization() -> None:
+    """Portfolio preserves normalizer compatibility aliases only."""
+    source = Path("open_data_products/portfolio.py").read_text(encoding="utf-8")
+    assert "from ._portfolio_normalization import" in source
+    assert "normalize_odps_product as _normalize_odps_product" in source
