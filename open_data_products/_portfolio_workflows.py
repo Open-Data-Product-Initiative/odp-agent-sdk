@@ -65,7 +65,6 @@ from ._portfolio_rendering import (
     _localized_html_filename,
     _merge_languages,
     _normalize_language_tag,
-    _normalize_product_spec_files,
     _parse_language_tags,
     _portfolio_validation_results,
     _prune_i18n_html_translations,
@@ -75,6 +74,7 @@ from ._portfolio_rendering import (
     render_portfolio,
     render_portfolio_html,
 )
+from ._portfolio_html import _normalize_product_spec_files
 from ._portfolio_values import (
     as_list as _list,
     path_id as _path_id,

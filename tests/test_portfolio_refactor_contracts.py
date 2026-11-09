@@ -129,9 +129,7 @@ def test_portfolio_facade_reexports_models_from_private_module() -> None:
 
 def test_portfolio_facade_delegates_static_presentation_assets() -> None:
     """Static CSS and JavaScript belong to the rendering boundary."""
-    source = Path("open_data_products/_portfolio_rendering.py").read_text(
-        encoding="utf-8"
-    )
+    source = Path("open_data_products/_portfolio_html.py").read_text(encoding="utf-8")
 
     assert "from ._portfolio_assets import portfolio_css, portfolio_js" in source
 
@@ -156,9 +154,7 @@ def test_portfolio_facade_imports_shared_identity_helpers() -> None:
 
 def test_portfolio_facade_imports_shared_change_counter() -> None:
     """Change summaries reuse a value helper outside workflow orchestration."""
-    source = Path("open_data_products/_portfolio_rendering.py").read_text(
-        encoding="utf-8"
-    )
+    source = Path("open_data_products/_portfolio_html.py").read_text(encoding="utf-8")
     assert "change_list_count as _change_list_count" in source
 
 
@@ -251,10 +247,18 @@ def test_portfolio_workflows_delegate_plan_transformations() -> None:
     assert "def _catalog_from_fragments(" not in source
 
 
-def test_portfolio_facade_delegates_odps_normalization() -> None:
-    """Portfolio rendering relies on the private ODPS normalizer."""
+def test_portfolio_rendering_delegates_html_composition() -> None:
+    """Workspace loading and HTML composition remain separate concerns."""
     source = Path("open_data_products/_portfolio_rendering.py").read_text(
         encoding="utf-8"
     )
+
+    assert "from ._portfolio_html import" in source
+    assert "def render_portfolio_html(" not in source
+
+
+def test_portfolio_facade_delegates_odps_normalization() -> None:
+    """Portfolio rendering relies on the private ODPS normalizer."""
+    source = Path("open_data_products/_portfolio_html.py").read_text(encoding="utf-8")
     assert "from ._portfolio_normalization import" in source
     assert "normalize_odps_product as _normalize_odps_product" in source
