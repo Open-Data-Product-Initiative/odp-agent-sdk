@@ -60,6 +60,8 @@ from ._portfolio_workspace import (
     portfolio_versions as _portfolio_versions,
     product_details as _product_details,
     product_spec_paths as _product_spec_paths,
+    write_text as _write_text,
+    write_yaml as _write_yaml,
 )
 from .generation.models import PortfolioPrivacySettings, PortfolioSourceBudget
 from .odpc import load_catalog
@@ -1796,33 +1798,8 @@ def _write_reduced_generation_source(
     return output
 
 
-def _write_yaml(path: Path, document: Dict[str, Any]) -> Tuple[Path, str]:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    content = yaml.safe_dump(document, sort_keys=False, allow_unicode=False)
-    existed = path.exists()
-    previous = path.read_text(encoding="utf-8") if existed else None
-    path.write_text(content, encoding="utf-8")
-    state = "unchanged" if previous == content else "updated" if existed else "created"
-    return path, state
-
-
 def _write_i18n(path: Path, document: Dict[str, Any]) -> Tuple[Path, str]:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    content = yaml.safe_dump(document, sort_keys=False, allow_unicode=True)
-    existed = path.exists()
-    previous = path.read_text(encoding="utf-8") if existed else None
-    path.write_text(content, encoding="utf-8")
-    state = "unchanged" if previous == content else "updated" if existed else "created"
-    return path, state
-
-
-def _write_text(path: Path, content: str) -> Tuple[Path, str]:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    existed = path.exists()
-    previous = path.read_text(encoding="utf-8") if existed else None
-    path.write_text(content, encoding="utf-8")
-    state = "unchanged" if previous == content else "updated" if existed else "created"
-    return path, state
+    return _write_yaml(path, document, allow_unicode=True)
 
 
 def _copy_binary_asset(source: Path, target: Path) -> Tuple[Path, str]:
@@ -5092,8 +5069,6 @@ def _normalize_product_spec_files(root: Path) -> List[Tuple[Path, str]]:
         _normalize_odps_product(document)
         written.append(_write_yaml(path, document))
     return written
-
-
 
 
 def _pricing_items(product: Any) -> List[Dict[str, Any]]:

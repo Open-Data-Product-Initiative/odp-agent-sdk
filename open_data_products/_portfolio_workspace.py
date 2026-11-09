@@ -5,6 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Dict, List
 
+import yaml
+
 from ._io import load_mapping
 from ._portfolio_values import change_list_count, text
 
@@ -24,6 +26,31 @@ def empty_catalog() -> Dict[str, Any]:
 def empty_graph() -> Dict[str, Any]:
     """Return the default empty graph document."""
     return {"graph": {"metadata": {}, "nodes": [], "edges": []}}
+
+
+def write_yaml(
+    path: Path, document: Dict[str, Any], *, allow_unicode: bool = False
+) -> tuple:
+    """Write YAML and classify the artifact change."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    content = yaml.safe_dump(document, sort_keys=False, allow_unicode=allow_unicode)
+    existed = path.exists()
+    previous = path.read_text(encoding="utf-8") if existed else None
+    path.write_text(content, encoding="utf-8")
+    return path, (
+        "unchanged" if previous == content else "updated" if existed else "created"
+    )
+
+
+def write_text(path: Path, content: str) -> tuple:
+    """Write text and classify the artifact change."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    existed = path.exists()
+    previous = path.read_text(encoding="utf-8") if existed else None
+    path.write_text(content, encoding="utf-8")
+    return path, (
+        "unchanged" if previous == content else "updated" if existed else "created"
+    )
 
 
 def product_spec_paths(root: Path) -> List[Path]:
