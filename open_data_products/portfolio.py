@@ -42,6 +42,7 @@ from ._portfolio_normalization import (
     normalize_odps_product as _normalize_odps_product,
 )
 from ._portfolio_prompting import (  # noqa: F401
+    chunk_localization_strings as _chunk_localization_strings,
     render_executive_summary_repair_prompt as _render_executive_summary_repair_prompt,
     render_portfolio_localization_repair_prompt as _render_portfolio_localization_repair_prompt,
     render_portfolio_plan_repair_prompt as _render_portfolio_plan_repair_prompt,
@@ -844,30 +845,6 @@ def _parse_portfolio_localization_with_repair(
             raise ValueError(
                 f"{original_error}\nRepair attempt also failed: {repair_error}"
             ) from repair_error
-
-
-def _chunk_localization_strings(
-    source_strings: List[str],
-    *,
-    max_chars: int = PORTFOLIO_LOCALIZATION_BATCH_CHARS,
-    max_items: int = PORTFOLIO_LOCALIZATION_BATCH_ITEMS,
-) -> List[List[str]]:
-    chunks: List[List[str]] = []
-    current: List[str] = []
-    current_chars = 0
-    for text in source_strings:
-        item_chars = len(text)
-        if current and (
-            len(current) >= max_items or current_chars + item_chars > max_chars
-        ):
-            chunks.append(current)
-            current = []
-            current_chars = 0
-        current.append(text)
-        current_chars += item_chars
-    if current:
-        chunks.append(current)
-    return chunks
 
 
 def _resolve_workspace_title(

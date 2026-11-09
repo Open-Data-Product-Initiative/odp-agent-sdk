@@ -42,6 +42,28 @@ def render_portfolio_localization_prompt(
     return "\n".join(lines)
 
 
+def chunk_localization_strings(
+    source_strings: List[str], *, max_chars: int = 3500, max_items: int = 50
+) -> List[List[str]]:
+    """Split source strings into bounded translation prompt batches."""
+    chunks: List[List[str]] = []
+    current: List[str] = []
+    current_chars = 0
+    for item in source_strings:
+        item_chars = len(item)
+        if current and (
+            len(current) >= max_items or current_chars + item_chars > max_chars
+        ):
+            chunks.append(current)
+            current = []
+            current_chars = 0
+        current.append(item)
+        current_chars += item_chars
+    if current:
+        chunks.append(current)
+    return chunks
+
+
 def extract_yaml_text(raw_output: str) -> str:
     """Extract YAML from a fenced or plain model response."""
     stripped = raw_output.strip()
