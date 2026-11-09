@@ -460,6 +460,18 @@ def _findings(
     """Produce bounded source-fact and inference findings without weak-signal floods."""
     findings: List[DcatFinding] = []
     for resource in resources:
+        if len(resource.source_documents) > 1:
+            findings.append(
+                DcatFinding(
+                    "shared-iri-" + _digest(resource.id),
+                    "same-resource-across-catalogs",
+                    "inference",
+                    [resource.id],
+                    "The same resource IRI occurs in more than one supplied catalog document.",
+                    list(resource.source_documents),
+                    "Confirm whether the catalogs intentionally reuse one resource or publish overlapping metadata.",
+                )
+            )
         missing = []
         if not resource.titles:
             missing.append("title")
