@@ -1,6 +1,7 @@
 """Stable public compatibility facade for Portfolio workflows."""
 
 from ._portfolio_intake import inspect_portfolio_intake  # noqa: F401
+from ._portfolio_plan import _fragment_collections  # noqa: F401
 from ._portfolio_models import (  # noqa: F401
     PortfolioBuildRequest,
     PortfolioBuildResult,
@@ -26,7 +27,6 @@ from ._portfolio_rendering import (  # noqa: F401
 )
 from ._portfolio_workflows import (  # noqa: F401
     PortfolioPipeline,
-    _fragment_collections,
     build_portfolio,
     localize_portfolio,
     refresh_portfolio,

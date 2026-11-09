@@ -148,9 +148,7 @@ def test_portfolio_facade_imports_shared_value_helpers() -> None:
 
 def test_portfolio_facade_imports_shared_identity_helpers() -> None:
     """Normalization can reuse identities without importing the facade."""
-    source = Path("open_data_products/_portfolio_workflows.py").read_text(
-        encoding="utf-8"
-    )
+    source = Path("open_data_products/_portfolio_plan.py").read_text(encoding="utf-8")
 
     assert "path_id as _path_id" in source
     assert "title_from_text as _title_from_text" in source
@@ -240,6 +238,17 @@ def test_portfolio_facade_delegates_generation_workflows() -> None:
     assert "def build_portfolio(" not in source
     assert "def sync_portfolio(" not in source
     assert "def localize_portfolio(" not in source
+
+
+def test_portfolio_workflows_delegate_plan_transformations() -> None:
+    """Plan reconciliation and catalog conversion have no workflow dependency."""
+    source = Path("open_data_products/_portfolio_workflows.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert "from ._portfolio_plan import" in source
+    assert "def _reconcile_plan_identity(" not in source
+    assert "def _catalog_from_fragments(" not in source
 
 
 def test_portfolio_facade_delegates_odps_normalization() -> None:
