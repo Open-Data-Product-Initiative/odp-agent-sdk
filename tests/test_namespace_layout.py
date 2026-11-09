@@ -131,3 +131,33 @@ def test_mcp_tools_use_concrete_modules_internally():
     ]
 
     assert parent_barrel_imports == []
+
+
+def test_dprod_namespace_does_not_import_dcat_implementation():
+    """DPROD reuses neutral interop mechanics, never DCAT private helpers."""
+    imports = []
+    for path in (REPO_ROOT / "open_data_products" / "dprod").glob("*.py"):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        imports.extend(
+            node.module
+            for node in ast.walk(tree)
+            if isinstance(node, ast.ImportFrom) and node.module == "dcat.catalog"
+        )
+
+    assert imports == []
+
+
+def test_mcp_tool_registry_imports_interop_handlers_from_domain_module():
+    """The registry aggregates handlers but does not own interop workflows."""
+    source = (REPO_ROOT / "open_data_products" / "mcp" / "tools.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert "from .interop import" in source
+
+
+def test_cli_delegates_dcat_and_dprod_commands_to_interop_module():
+    """The root CLI aggregates DCAT/DPROD commands without owning them."""
+    source = (REPO_ROOT / "open_data_products" / "cli.py").read_text(encoding="utf-8")
+
+    assert "from .cli_interop import" in source

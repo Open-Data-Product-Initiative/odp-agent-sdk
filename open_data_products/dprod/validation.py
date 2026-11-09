@@ -9,7 +9,7 @@ from pyshacl import validate
 from rdflib import Graph, URIRef
 from rdflib.namespace import RDF, SH
 
-from ..dcat.catalog import _load_graphs
+from .._interop.rdf import load_graphs
 from .models import DprodValidationResult, DprodViolation
 
 DPROD_NAMESPACE = "https://www.omg.org/spec/DPROD/"
@@ -21,7 +21,7 @@ _DATA_DIRECTORY = Path(__file__).resolve().parent / "data"
 def validate_dprod(source: str) -> DprodValidationResult:
     """Validate supplied RDF with local OMG Beta 2 shapes and no imports."""
     try:
-        loaded = _load_graphs(source)
+        loaded = load_graphs(source, label="DPROD source")
     except ValueError as exc:
         message = str(exc)
         if "Remote JSON-LD contexts" in message:
