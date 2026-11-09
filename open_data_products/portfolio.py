@@ -43,6 +43,7 @@ from ._portfolio_normalization import (
 )
 from ._portfolio_prompting import (  # noqa: F401
     extract_yaml_text as _extract_yaml_text,
+    parse_portfolio_plan,
     render_portfolio_build_prompt,
     render_portfolio_executive_summary_prompt,
 )
@@ -856,22 +857,6 @@ def _render_executive_summary_repair_prompt(raw_output: str, parser_error: str) 
             raw_output,
         ]
     )
-
-
-def parse_portfolio_plan(raw_output: str) -> Dict[str, Any]:
-    """Parse a model-generated portfolio plan YAML mapping."""
-    text = _extract_yaml_text(raw_output)
-    try:
-        data = yaml.safe_load(text)
-    except yaml.YAMLError as exc:
-        raise ValueError(
-            "Portfolio plan YAML could not be parsed. The model response may "
-            "have been truncated; increase provider maxTokens or rerun the "
-            f"command. Parser error: {exc}"
-        ) from exc
-    if not isinstance(data, dict):
-        raise ValueError("Portfolio plan must contain a YAML object at the root")
-    return data
 
 
 def parse_executive_summary(raw_output: str) -> Dict[str, Any]:

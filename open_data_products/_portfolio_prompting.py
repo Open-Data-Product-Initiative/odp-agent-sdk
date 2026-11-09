@@ -29,6 +29,21 @@ def extract_yaml_text(raw_output: str) -> str:
     return candidate
 
 
+def parse_portfolio_plan(raw_output: str) -> Dict[str, Any]:
+    """Parse a model-generated portfolio plan YAML mapping."""
+    try:
+        data = yaml.safe_load(extract_yaml_text(raw_output))
+    except yaml.YAMLError as exc:
+        raise ValueError(
+            "Portfolio plan YAML could not be parsed. The model response may "
+            "have been truncated; increase provider maxTokens or rerun the "
+            f"command. Parser error: {exc}"
+        ) from exc
+    if not isinstance(data, dict):
+        raise ValueError("Portfolio plan must contain a YAML object at the root")
+    return data
+
+
 def render_portfolio_build_prompt(lanes: Dict[str, List[Dict[str, str]]]) -> str:
     """Render the internal portfolio build prompt from source lane content."""
     reduced_lanes, _budget = reduce_source_lanes_for_prompt(lanes)
