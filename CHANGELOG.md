@@ -10,3 +10,5 @@
 - Add `pyshacl>=0.28.1,<0.29.0` for local normative SHACL evaluation.
 - Preserve mapping classifications and loss records; DPROD and ODPS coverage
   is not asserted as equivalent.
+- Extend the clean-wheel CI smoke test to load DPROD assets and cross-check an
+  exported graph with SHA-512-verified Apache Jena SHACL.

@@ -13,6 +13,9 @@
 - Explicit DPROD products are kept distinct from review-only DCAT dataset
   opportunities. No conversion treats ports, owners, policies, or service
   metadata as automatic ODPS promises, approval, or contract guarantees.
+- CI validates a generated export independently with Apache Jena SHACL after
+  verifying the pinned binary release checksum; the built wheel is also loaded
+  in a clean virtual environment before the source-suite test run.
 
 ## DCAT Catalog Intelligence
 
