@@ -49,8 +49,7 @@ dprod-shapes:
     sh:prefix "dcat" ;
     sh:namespace "http://www.w3.org/ns/dcat#" ;
   ] ;
-. 
- 
+.
 ############################# dprod Shapes  #########################
 
 dprod-shapes:DataProductShape
@@ -84,7 +83,6 @@ dprod-shapes:DataServiceShape
   sh:property dprod-shapes:DataService-endpointURL;
   sh:property dprod-shapes:DataService-endpointDescription ;
   .
-
 dprod-shapes:DistributionShape
   a sh:NodeShape ;
   rdfs:isDefinedBy dprod-shapes:;
