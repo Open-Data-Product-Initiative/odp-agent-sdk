@@ -134,3 +134,11 @@ def test_portfolio_facade_delegates_static_presentation_assets() -> None:
     assert "from ._portfolio_assets import portfolio_css, portfolio_js" in source
     assert "def _portfolio_css" not in source
     assert "def _portfolio_js" not in source
+
+
+def test_portfolio_facade_imports_shared_value_helpers() -> None:
+    """Shared formatting helpers do not stay coupled to the facade."""
+    source = Path("open_data_products/portfolio.py").read_text(encoding="utf-8")
+
+    assert "from ._portfolio_values import" in source
+    assert "def _text" not in source

@@ -157,7 +157,54 @@ git add open_data_products/portfolio.py open_data_products/_portfolio_assets.py 
 git commit -m "refactor: isolate portfolio presentation assets"
 ```
 
-### Task 4: Extract ODPS output normalization
+### Task 4: Extract shared Portfolio value helpers
+
+**Files:**
+- Create: `open_data_products/_portfolio_values.py`
+- Modify: `open_data_products/portfolio.py`
+- Modify: `tests/test_portfolio_refactor_contracts.py`
+
+- [x] **Step 1: Write a failing facade-boundary test.**
+
+```python
+def test_portfolio_facade_imports_shared_value_helpers() -> None:
+    source = Path("open_data_products/portfolio.py").read_text(encoding="utf-8")
+    assert "from ._portfolio_values import" in source
+    assert "def _text" not in source
+```
+
+- [x] **Step 2: Run the test and confirm it fails before the move.**
+
+Run: `pytest -q tests/test_portfolio_refactor_contracts.py::test_portfolio_facade_imports_shared_value_helpers`
+
+Expected: FAIL because the helpers remain in `portfolio.py`.
+
+- [x] **Step 3: Move list, count, localized-text, and HTML-escaping helpers to `_portfolio_values.py`; import them with the existing private names in the facade.**
+
+```python
+from ._portfolio_values import (
+    as_list as _list,
+    count as _count,
+    escape as _escape,
+    escape_attr as _escape_attr,
+    text as _text,
+)
+```
+
+- [x] **Step 4: Run renderer, normalization, and facade contracts.**
+
+Run: `pytest -q tests/test_portfolio_refactor_contracts.py tests/test_portfolio.py -k 'render or sync or refactor_contracts'`
+
+Expected: PASS.
+
+- [x] **Step 5: Commit the value-helper extraction.**
+
+```bash
+git add open_data_products/_portfolio_values.py open_data_products/portfolio.py tests/test_portfolio_refactor_contracts.py docs/planning/2026-11-09-portfolio-boundary-refactoring-plan.md
+git commit -m "refactor: isolate portfolio value helpers"
+```
+
+### Task 5: Extract ODPS output normalization
 
 **Files:**
 - Create: `open_data_products/_portfolio_normalization.py`
@@ -204,7 +251,7 @@ git add open_data_products/portfolio.py open_data_products/_portfolio_normalizat
 git commit -m "refactor: isolate portfolio ODPS normalization"
 ```
 
-### Task 5: Extract workspace persistence and validation
+### Task 6: Extract workspace persistence and validation
 
 **Files:**
 - Create: `open_data_products/_portfolio_workspace.py`
@@ -246,7 +293,7 @@ git add open_data_products/portfolio.py open_data_products/_portfolio_workspace.
 git commit -m "refactor: isolate portfolio workspace operations"
 ```
 
-### Task 6: Reduce the facade to workflow orchestration
+### Task 7: Reduce the facade to workflow orchestration
 
 **Files:**
 - Create: `open_data_products/_portfolio_workflow.py`
@@ -292,7 +339,7 @@ git add open_data_products/portfolio.py open_data_products/_portfolio_workflow.p
 git commit -m "refactor: reduce portfolio facade to public workflow API"
 ```
 
-### Task 7: Add release features only after the refactor stabilizes
+### Task 8: Add release features only after the refactor stabilizes
 
 **Files:**
 - To be selected from the approved 0.7.0 feature specification.

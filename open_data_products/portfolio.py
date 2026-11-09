@@ -36,9 +36,15 @@ from ._portfolio_models import (
     PortfolioLocalizationClient,
     PortfolioSourceLanes,
 )
+from ._portfolio_values import (
+    as_list as _list,
+    count as _count,
+    escape as _escape,
+    escape_attr as _escape_attr,
+    text as _text,
+)
 from .generation.models import PortfolioPrivacySettings, PortfolioSourceBudget
 from .odpc import load_catalog
-from .odpc.catalog import text_value
 from .odpg import build_graph, build_graph_explorer_html, load_graph
 from .odps._normalization import (
     ODPS_DATA_QUALITY_DIMENSION_ALIASES,
@@ -6395,28 +6401,3 @@ def _display_label(value: str) -> str:
     if current:
         words.append("".join(current))
     return " ".join(word[:1].upper() + word[1:] for word in words)
-
-
-def _list(mapping: Any, key: str) -> List[Dict[str, Any]]:
-    if not isinstance(mapping, dict):
-        return []
-    value = mapping.get(key)
-    if not isinstance(value, list):
-        return []
-    return [item for item in value if isinstance(item, dict)]
-
-
-def _count(mapping: Any, key: str) -> int:
-    return len(_list(mapping, key))
-
-
-def _text(value: Any, fallback: str = "") -> str:
-    return text_value(value, fallback)
-
-
-def _escape(value: str) -> str:
-    return html.escape(value)
-
-
-def _escape_attr(value: str) -> str:
-    return html.escape(value, quote=True)
