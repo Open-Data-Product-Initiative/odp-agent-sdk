@@ -1506,6 +1506,12 @@ def main(argv: Optional[List[str]] = None) -> int:
     )
     odpg_convert_parser.add_argument("--json", action="store_true", help="Emit JSON")
 
+    dprod_validate_parser = subparsers.add_parser(
+        "dprod-validate", help="Validate RDF against pinned DPROD 1.0 Beta 2 shapes"
+    )
+    dprod_validate_parser.add_argument("source", help="DPROD RDF source")
+    dprod_validate_parser.add_argument("--json", action="store_true", help="Emit JSON")
+
     subparsers.add_parser("manifest", help="Emit the ARWS agent manifest").add_argument(
         "--json", action="store_true", help="Emit JSON"
     )
@@ -1709,6 +1715,13 @@ def main(argv: Optional[List[str]] = None) -> int:
         "--output", "-o", help="Optional self-contained HTML report path"
     )
     portfolio_dcat_parser.add_argument("--json", action="store_true", help="Emit JSON")
+    portfolio_dprod_parser = portfolio_subparsers.add_parser(
+        "discover-dprod", help="Analyze explicit DPROD 1.0 Beta 2 products"
+    )
+    portfolio_dprod_parser.add_argument(
+        "source", help="RDF file, directory, file URI, or public HTTP(S) source"
+    )
+    portfolio_dprod_parser.add_argument("--json", action="store_true", help="Emit JSON")
     portfolio_sync_parser = portfolio_subparsers.add_parser(
         "sync",
         help="Sync edited YAML artifacts without calling an LLM",
@@ -1807,6 +1820,20 @@ def main(argv: Optional[List[str]] = None) -> int:
     activity_start_time = time.monotonic()
 
     try:
+        if args.command == "dprod-validate":
+            from .dprod import validate_dprod
+
+            result = validate_dprod(args.source)
+            if args.json:
+                print(json.dumps(result.to_dict(), indent=2))
+            else:
+                print("DPROD Beta 2 SHACL conforms: {}".format(result.conforms))
+                for violation in result.violations:
+                    print("- {}: {}".format(violation.property_path, violation.message))
+            return _finalize_activity(
+                args, activity_context, activity_start_time, 0 if result.conforms else 1
+            )
+
         if args.command == "validate":
             document_result = validate_document(args.document)
             activity_context.add_details(
@@ -3022,6 +3049,24 @@ def main(argv: Optional[List[str]] = None) -> int:
             )
 
         if args.command == "portfolio":
+            if args.portfolio_command == "discover-dprod":
+                from .dprod import discover_dprod_catalog
+
+                try:
+                    result = discover_dprod_catalog(args.source)
+                except (FileNotFoundError, ValueError) as exc:
+                    _print_error_payload(exc, as_json=args.json, spec="dprod")
+                    return _finalize_activity(
+                        args, activity_context, activity_start_time, 1
+                    )
+                if args.json:
+                    print(json.dumps(result.to_dict(), indent=2))
+                else:
+                    print("DPROD products: {}".format(len(result.products)))
+                    print("SHACL conforms: {}".format(result.validation.conforms))
+                return _finalize_activity(
+                    args, activity_context, activity_start_time, 0
+                )
             if args.portfolio_command == "discover-dcat":
                 from .dcat import discover_dcat_catalog, render_dcat_catalog_html
 

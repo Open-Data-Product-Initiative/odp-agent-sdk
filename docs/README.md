@@ -26,6 +26,7 @@ This folder is organized by audience and purpose.
 - [LLM selection guide](user/llm-selection-guide.md): model choices by SDK workflow.
 - [Data Contract workflows](user/data-contracts.md): product contract resolution, validation, alignment, and reports.
 - [DCAT Catalog Intelligence](user/dcat-catalog-intelligence.md): RDF catalog inspection and selected DCAT-to-ODPS drafts.
+- [DPROD interoperability](user/dprod-interoperability.md): pinned OMG Beta 2 RDF validation and ODPS conversion boundaries.
 - [Agent surface](user/agent-surface.md): MCP server, ARWS manifest, and bundled skills.
 - [API reference](user/API.md): Python API, models, validators, and examples.
 

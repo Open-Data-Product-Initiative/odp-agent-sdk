@@ -115,6 +115,10 @@ EXPECTED_TOOLS = {
     "discover_contract_portfolio",
     "discover_dcat_catalog",
     "wrap_dcat_resource",
+    "discover_dprod_catalog",
+    "validate_dprod",
+    "wrap_dprod_resource",
+    "export_dprod",
 }
 
 
@@ -373,6 +377,7 @@ class TestAgentManifest:
             "vocabulary-context",
             "product-contracts",
             "dcat-catalog-intelligence",
+            "dprod-beta2-interoperability",
         }
         assert {item["id"] for item in manifest["standards"]} == {
             "odps",
@@ -381,6 +386,7 @@ class TestAgentManifest:
             "odpv",
             "odpr",
             "dcat",
+            "dprod",
         }
 
     def test_manifest_describes_workflows_and_interfaces(self):
@@ -629,6 +635,8 @@ class TestAgentManifest:
             "discover_contract_portfolio",
             "wrap_odcs_contract",
             "wrap_dcat_resource",
+            "wrap_dprod_resource",
+            "export_dprod",
         ]
         assert "state-changing" in safety["cli_note"]
 

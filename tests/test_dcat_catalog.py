@@ -1,6 +1,8 @@
 """DCAT catalog intelligence and conservative ODPS draft coverage."""
 
 from pathlib import Path
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from threading import Thread
 
 import pytest
 
@@ -254,3 +256,38 @@ def test_dcat_reports_a_repeated_resource_iri_across_catalog_documents(
         and finding.evidence_level == "inference"
         for finding in result.findings
     )
+
+
+def test_dcat_remote_loading_allows_only_a_bounded_redirect_chain() -> None:
+    """Remote catalog intake rejects redirect chains beyond the documented cap."""
+    from open_data_products.dcat import discover_dcat_catalog
+
+    class RedirectHandler(BaseHTTPRequestHandler):
+        def do_GET(self) -> None:  # noqa: N802
+            count = int(self.path.rsplit("/", 1)[-1].split(".", 1)[0])
+            if count:
+                self.send_response(302)
+                self.send_header("Location", "/redirect/{}.ttl".format(count - 1))
+                self.end_headers()
+                return
+            payload = CATALOG_TURTLE.encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "text/turtle")
+            self.send_header("Content-Length", str(len(payload)))
+            self.end_headers()
+            self.wfile.write(payload)
+
+        def log_message(self, _format: str, *_args: object) -> None:
+            return
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), RedirectHandler)
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        origin = "http://127.0.0.1:{}".format(server.server_port)
+        assert len(discover_dcat_catalog(origin + "/redirect/3.ttl").resources) == 2
+        with pytest.raises(ValueError, match="Could not load remote DCAT catalog"):
+            discover_dcat_catalog(origin + "/redirect/4.ttl")
+    finally:
+        server.shutdown()
+        thread.join()
