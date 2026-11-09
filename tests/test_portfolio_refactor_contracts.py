@@ -152,6 +152,12 @@ def test_portfolio_facade_imports_shared_identity_helpers() -> None:
     assert "title_from_text as _title_from_text" in source
 
 
+def test_workspace_loading_uses_private_layout_model() -> None:
+    """Workspace loading receives one explicit layout boundary."""
+    source = Path("open_data_products/portfolio.py").read_text(encoding="utf-8")
+    assert "from ._portfolio_workspace_paths import PortfolioWorkspacePaths" in source
+
+
 def test_portfolio_facade_delegates_odps_normalization() -> None:
     """Portfolio preserves normalizer compatibility aliases only."""
     source = Path("open_data_products/portfolio.py").read_text(encoding="utf-8")

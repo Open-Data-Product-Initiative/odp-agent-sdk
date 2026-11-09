@@ -50,6 +50,7 @@ from ._portfolio_values import (
     text as _text,
     title_from_text as _title_from_text,
 )
+from ._portfolio_workspace_paths import PortfolioWorkspacePaths
 from .generation.models import PortfolioPrivacySettings, PortfolioSourceBudget
 from .odpc import load_catalog
 from .odpg import build_graph, build_graph_explorer_html, load_graph
@@ -3039,10 +3040,11 @@ def explain_portfolio(workspace: Union[str, Path]) -> Dict[str, object]:
 def load_portfolio_workspace(workspace: Union[str, Path]) -> Dict[str, Any]:
     """Load portfolio map, catalog, product specs, graph, and version metadata."""
     root = Path(workspace)
-    catalog_path = root / "odpc" / "catalog.yaml"
-    graph_path = root / "odpg" / "graph.yaml"
-    portfolio_path = root / "portfolio.yaml"
-    executive_summary_path = root / DEFAULT_EXECUTIVE_SUMMARY
+    paths = PortfolioWorkspacePaths(root)
+    catalog_path = paths.catalog
+    graph_path = paths.graph
+    portfolio_path = paths.portfolio
+    executive_summary_path = paths.executive_summary
     i18n = _load_portfolio_i18n(root)
     portfolio = _load_optional_mapping(portfolio_path)
     portfolio_warnings = (
