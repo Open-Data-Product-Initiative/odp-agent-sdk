@@ -229,3 +229,28 @@ def test_dcat_supports_rdfxml_and_inline_jsonld_without_remote_contexts(
     assert len(discover_dcat_catalog(str(jsonld)).resources) == 1
     with pytest.raises(ValueError, match="Remote JSON-LD contexts"):
         discover_dcat_catalog(str(unsafe))
+
+
+def test_dcat_reports_a_repeated_resource_iri_across_catalog_documents(
+    tmp_path: Path,
+) -> None:
+    """A shared IRI is an evidence-backed reuse signal, not a duplicate verdict."""
+    from open_data_products.dcat import discover_dcat_catalog
+
+    first = tmp_path / "first.ttl"
+    second = tmp_path / "second.ttl"
+    first.write_text(CATALOG_TURTLE, encoding="utf-8")
+    second.write_text(
+        CATALOG_TURTLE.replace(
+            "https://catalog.example/>", "https://catalog-two.example/>"
+        ),
+        encoding="utf-8",
+    )
+
+    result = discover_dcat_catalog(str(tmp_path))
+
+    assert any(
+        finding.category == "same-resource-across-catalogs"
+        and finding.evidence_level == "inference"
+        for finding in result.findings
+    )
