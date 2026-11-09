@@ -36,6 +36,14 @@ from ._portfolio_models import (
     PortfolioLocalizationClient,
     PortfolioSourceLanes,
 )
+from ._portfolio_normalization_constants import (
+    ODPS_PRICING_UNIT_ALIASES,
+    ODPS_PRICING_UNITS,
+    ODPS_STATUS_ALIASES,
+    ODPS_STATUSES,
+    ODPS_VISIBILITY_ALIASES,
+    ODPS_VISIBILITIES,
+)
 from ._portfolio_values import (
     as_list as _list,
     count as _count,
@@ -108,35 +116,6 @@ ODPC_STATUS_ALIASES = {
     "deprecated": "retired",
     "archived": "retired",
 }
-ODPS_STATUSES = {
-    "announcement",
-    "draft",
-    "development",
-    "testing",
-    "acceptance",
-    "production",
-    "sunset",
-    "retired",
-}
-ODPS_STATUS_ALIASES = {
-    "proposed": "draft",
-    "planned": "announcement",
-    "planning": "announcement",
-    "active": "production",
-    "completed": "production",
-    "paused": "sunset",
-    "deprecated": "sunset",
-    "archived": "retired",
-}
-ODPS_VISIBILITIES = {"private", "invitation", "organisation", "dataspace", "public"}
-ODPS_VISIBILITY_ALIASES = {
-    "internal": "organisation",
-    "organization": "organisation",
-    "organisation": "organisation",
-    "restricted": "invitation",
-    "external": "public",
-    "open": "public",
-}
 ODPC_SIGNAL_TYPES = {
     "demand",
     "competitive",
@@ -191,28 +170,6 @@ ODPG_EDGE_TYPE_ALIASES = {
     "influences": "impacts",
     "enables": "supports",
     "needs": "uses",
-}
-ODPS_PRICING_UNITS = {
-    "One-time-payment",
-    "Pay-per-use",
-    "Recurring",
-    "Revenue-sharing",
-    "Data-volume",
-    "Pay-what-you-want",
-    "Freemium",
-    "Open-data",
-    "Value-based",
-    "On-request",
-    "Trial",
-}
-ODPS_PRICING_UNIT_ALIASES = {
-    "free": "Open-data",
-    "open": "Open-data",
-    "subscription": "Recurring",
-    "monthly": "Recurring",
-    "month": "Recurring",
-    "usage": "Pay-per-use",
-    "request": "Pay-per-use",
 }
 EXECUTIVE_SUMMARY_CONFIDENCE_VALUES = {"high", "medium", "low"}
 EXECUTIVE_SUMMARY_SWOT_BUCKETS = (
