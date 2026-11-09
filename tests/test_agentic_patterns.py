@@ -291,6 +291,11 @@ class TestLlmsText:
             "load_summary",
             "plan_recipe_run",
             "search_recipe_guidance",
+            "docs/user/dcat-catalog-intelligence.md",
+            "docs/user/dprod-interoperability.md",
+            "discover_dprod_catalog",
+            "open-data-products product wrap-dcat",
+            "open-data-products product export-dprod",
             "AGENTS.md",
         ):
             assert expected in content

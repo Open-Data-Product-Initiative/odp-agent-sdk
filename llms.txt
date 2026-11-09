@@ -18,6 +18,8 @@ repository.
 - Claude Code project MCP config: `.mcp.json`
 - Main human README: `README.md`
 - API reference: `docs/user/API.md`
+- DCAT Catalog Intelligence: `docs/user/dcat-catalog-intelligence.md`
+- DPROD interoperability: `docs/user/dprod-interoperability.md`
 - ODPR recipe workflows: `docs/user/recipe-workflows.md`
 - Beginner setup guide: `examples/guides/00-setup-python/`
 - Course-style guide index: `examples/guides/README.md`
@@ -70,6 +72,10 @@ Use the top-level API when the input spec is unknown:
 - `discover_dcat_catalog(source)`
 - `wrap_dcat_resource(source, resource_id, output=None, use_ai=False)`
 - `wrap_dcat_resources(source, resource_ids, output)`
+- `discover_dprod_catalog(source)`
+- `validate_dprod(source)`
+- `wrap_dprod_resource(source, resource_id, output=None)`
+- `export_odps_to_dprod(product, base_iri=None)`
 - `build_catalog(input_dir, output_path=None, catalog_id=None, name=None, description=None)`
 - `render_catalog_html(document)`
 - `write_catalog_html(path, document)`
@@ -147,6 +153,12 @@ Use these commands for machine-readable workflows:
 - `open-data-products product contract-schema <contract.yaml> --json`
 - `open-data-products product export-contract <contract.yaml> --format jsonschema --json`
 - `open-data-products product audit <product.yaml> --json`
+- `open-data-products portfolio discover-dcat <catalog-or-directory> --output <report.html> --json`
+- `open-data-products product wrap-dcat --input <catalog.ttl> --resource <resource-iri> --output <draft.yaml> --json`
+- `open-data-products portfolio discover-dprod <product.ttl> --json`
+- `open-data-products dprod-validate <product.ttl> --json`
+- `open-data-products product wrap-dprod --input <product.ttl> --resource <product-iri> --output <draft.yaml> --json`
+- `open-data-products product export-dprod --input <product.yaml> --output <artifact-base> --json`
 - `open-data-products config recipes --copy-to recipes.config.yaml`
 - `open-data-products config recipes --config recipes.config.yaml --check --json`
 - `open-data-products recipe list --config recipes.config.yaml --json`
