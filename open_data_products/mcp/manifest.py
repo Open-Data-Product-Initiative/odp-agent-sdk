@@ -87,6 +87,11 @@ def _standards() -> List[Dict[str, str]]:
             "name": "Open Data Product Recipes",
             "description": "Portable recipe and recipe catalog contracts for workflow planning.",
         },
+        {
+            "id": "dcat",
+            "name": "Data Catalog Vocabulary",
+            "description": "RDF catalog intake and evidence-bounded DCAT-to-ODPS drafts.",
+        },
     ]
 
 
@@ -308,6 +313,14 @@ def _capabilities() -> List[Dict[str, Any]]:
                 "Resolve product contract references, validate contracts, inspect "
                 "schemas, and report ODPS/Data Contract alignment risks."
             ),
+        },
+        {
+            "id": "dcat-catalog-intelligence",
+            "title": "DCAT Catalog Intelligence and draft conversion",
+            "standards": ["dcat", "odps", "odpv"],
+            "interfaces": ["python", "cli", "mcp"],
+            "lifecycle": ["discover-dcat", "wrap-dcat"],
+            "summary": "Analyze supplied DCAT RDF with source-fact, inference, and proposal boundaries, then create selected ODPS 4.2 drafts.",
         },
         {
             "id": "odcs-product-wrapping",
@@ -619,6 +632,8 @@ def _safety() -> Dict[str, Any]:
             "init_starter_recipe",
             "build_portfolio",
             "discover_contract_portfolio",
+            "wrap_odcs_contract",
+            "wrap_dcat_resource",
         ],
         "mcp_note": (
             "MCP tools are safe/read-only except explicitly approved workspace "

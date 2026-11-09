@@ -113,6 +113,8 @@ EXPECTED_TOOLS = {
     "search_recipe_guidance",
     "wrap_odcs_contract",
     "discover_contract_portfolio",
+    "discover_dcat_catalog",
+    "wrap_dcat_resource",
 }
 
 
@@ -370,6 +372,7 @@ class TestAgentManifest:
             "okf-context-bundles",
             "vocabulary-context",
             "product-contracts",
+            "dcat-catalog-intelligence",
         }
         assert {item["id"] for item in manifest["standards"]} == {
             "odps",
@@ -377,6 +380,7 @@ class TestAgentManifest:
             "odpg",
             "odpv",
             "odpr",
+            "dcat",
         }
 
     def test_manifest_describes_workflows_and_interfaces(self):
@@ -623,6 +627,8 @@ class TestAgentManifest:
             "init_starter_recipe",
             "build_portfolio",
             "discover_contract_portfolio",
+            "wrap_odcs_contract",
+            "wrap_dcat_resource",
         ]
         assert "state-changing" in safety["cli_note"]
 

@@ -48,6 +48,7 @@ Python 3.8 or newer is required.
 | Agent surfaces | Run a safe-class stdio MCP server and generate an ARWS-compatible agent manifest |
 | LLM generation | Generate ODPC fragments, ODPG graphs, and ODPS product YAML from source notes using local or hosted providers |
 | Data Contracts | Wrap ODCS 3.0/3.1/3.2 contracts into conservative ODPS 4.2 drafts, resolve ODPS contract references, validate external contracts through optional `datacontract-cli`, extract schemas, check alignment, and generate reports |
+| DCAT Catalog Intelligence | Inspect supplied DCAT RDF with evidence-bounded findings, render an offline report, and convert explicitly selected resources to private ODPS 4.2 drafts |
 
 ## Quick CLI Examples
 
@@ -105,6 +106,17 @@ open-data-products product wrap-contract --input contracts/orders.yaml --output 
 
 See [Data Contract workflows](docs/user/data-contracts.md) for the generated
 fields and provider configuration.
+
+Inspect a DCAT catalog, then convert only a selected resource:
+
+```bash
+open-data-products portfolio discover-dcat ./catalogs --output catalog-intelligence.html
+open-data-products product wrap-dcat --input catalog.ttl \
+  --resource https://catalog.example/datasets/air-quality --output air-quality.yaml
+```
+
+See [DCAT Catalog Intelligence](docs/user/dcat-catalog-intelligence.md) for
+format support, evidence boundaries, conversion mapping, and optional AI proposals.
 
 Discover technical portfolio evidence from a contract repository without
 declaring any contract to be an approved data product:
@@ -177,6 +189,7 @@ Focused user guides:
 - [Agent surface](https://github.com/Open-Data-Product-Initiative/odps-python/blob/main/docs/user/agent-surface.md)
 - [Recipe workflows](https://github.com/Open-Data-Product-Initiative/odps-python/blob/main/docs/user/recipe-workflows.md)
 - [Data Contract workflows](https://github.com/Open-Data-Product-Initiative/odps-python/blob/main/docs/user/data-contracts.md)
+- [DCAT Catalog Intelligence](https://github.com/Open-Data-Product-Initiative/odps-python/blob/main/docs/user/dcat-catalog-intelligence.md)
 - [API reference](https://github.com/Open-Data-Product-Initiative/odps-python/blob/main/docs/user/API.md)
 
 Project references:

@@ -67,6 +67,9 @@ Use the top-level API when the input spec is unknown:
 - `extract_contract_schema(contract_path_or_url)`
 - `check_product_contract_alignment(product_path_or_document, contract_path_or_url)`
 - `generate_product_contract_report(product_path_or_document, contract_path=None)`
+- `discover_dcat_catalog(source)`
+- `wrap_dcat_resource(source, resource_id, output=None, use_ai=False)`
+- `wrap_dcat_resources(source, resource_ids, output)`
 - `build_catalog(input_dir, output_path=None, catalog_id=None, name=None, description=None)`
 - `render_catalog_html(document)`
 - `write_catalog_html(path, document)`
@@ -97,6 +100,13 @@ Data Contract functions are product-oriented. The SDK resolves native ODPS
 `/product/contract` entries (`$ref`, `contractURL`, inline `spec`) and
 extension-style `extensions.dataContract.href` entries. External lint/export
 uses optional `datacontract-cli`; inline specs are static-only.
+
+DCAT Catalog Intelligence parses supplied RDF catalog documents without crawling
+linked resources. It preserves declared metadata and reports source facts,
+inferences, and proposals separately. Successful parsing is not DCAT-AP profile
+conformance. DCAT conversion creates only selected private ODPS drafts; it never
+approves a product, invents a data contract, or treats a publisher as an approved
+product owner.
 
 ## CLI Commands
 

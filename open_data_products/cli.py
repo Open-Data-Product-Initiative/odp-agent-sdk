@@ -1698,6 +1698,17 @@ def main(argv: Optional[List[str]] = None) -> int:
     portfolio_intake_parser.add_argument(
         "--json", action="store_true", help="Emit JSON"
     )
+    portfolio_dcat_parser = portfolio_subparsers.add_parser(
+        "discover-dcat",
+        help="Analyze a local or bounded remote DCAT catalog",
+    )
+    portfolio_dcat_parser.add_argument(
+        "source", help="RDF file, directory, file URI, or public HTTP(S) catalog"
+    )
+    portfolio_dcat_parser.add_argument(
+        "--output", "-o", help="Optional self-contained HTML report path"
+    )
+    portfolio_dcat_parser.add_argument("--json", action="store_true", help="Emit JSON")
     portfolio_sync_parser = portfolio_subparsers.add_parser(
         "sync",
         help="Sync edited YAML artifacts without calling an LLM",
@@ -3011,6 +3022,36 @@ def main(argv: Optional[List[str]] = None) -> int:
             )
 
         if args.command == "portfolio":
+            if args.portfolio_command == "discover-dcat":
+                from .dcat import discover_dcat_catalog, render_dcat_catalog_html
+
+                try:
+                    result = discover_dcat_catalog(args.source)
+                    payload = result.to_dict()
+                    if args.output:
+                        destination = Path(args.output)
+                        destination.parent.mkdir(parents=True, exist_ok=True)
+                        destination.write_text(
+                            render_dcat_catalog_html(result), encoding="utf-8"
+                        )
+                        payload["html"] = str(destination)
+                except (FileNotFoundError, ValueError) as exc:
+                    _print_error_payload(exc, as_json=args.json, spec="dcat")
+                    return _finalize_activity(
+                        args, activity_context, activity_start_time, 1
+                    )
+                if args.json:
+                    print(json.dumps(payload, indent=2))
+                else:
+                    print(f"DCAT resources: {len(result.resources)}")
+                    print(f"Relationships: {len(result.relationships)}")
+                    print(f"Findings: {len(result.findings)}")
+                    if args.output:
+                        print(f"HTML: {args.output}")
+                return _finalize_activity(
+                    args, activity_context, activity_start_time, 0
+                )
+
             from .portfolio import (
                 build_portfolio,
                 explain_portfolio,

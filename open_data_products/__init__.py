@@ -12,7 +12,7 @@ family. Each standard lives in its own namespace:
 
 # flake8: noqa: E402
 
-__version__ = "0.6.5"
+__version__ = "0.7.0"
 version = __version__
 
 from . import odpc
@@ -21,6 +21,19 @@ from . import odpr
 from . import odps
 from . import odpv
 from . import profiles
+from .dcat import (
+    DcatCatalogIntelligenceResult,
+    DcatDistribution,
+    DcatFinding,
+    DcatRelationship,
+    DcatResource,
+    DcatWrapProposal,
+    DcatWrapResult,
+    discover_dcat_catalog,
+    render_dcat_catalog_html,
+    wrap_dcat_resource,
+    wrap_dcat_resources,
+)
 from .agent import (
     detect_document,
     explain_document,
@@ -207,6 +220,13 @@ __all__ = [
     "odpr",
     "odps",
     "odpv",
+    "DcatCatalogIntelligenceResult",
+    "DcatDistribution",
+    "DcatFinding",
+    "DcatRelationship",
+    "DcatResource",
+    "DcatWrapResult",
+    "DcatWrapProposal",
     "OkfConcept",
     "OkfValidationResult",
     "PortfolioBuildRequest",
@@ -253,6 +273,7 @@ __all__ = [
     "ProductContractReport",
     "check_product_contract_alignment",
     "detect_document",
+    "discover_dcat_catalog",
     "detect_datacontract_cli",
     "dump_graph_yaml",
     "explain_contract",
@@ -315,6 +336,7 @@ __all__ = [
     "print_recipe_config",
     "search_recipe_guidance",
     "render_catalog_gcf",
+    "render_dcat_catalog_html",
     "render_catalog_html",
     "render_catalog_toon",
     "render_catalog_schema_json",
@@ -350,6 +372,8 @@ __all__ = [
     "DiscoveryArtifact",
     "ProductCandidate",
     "discover_contract_portfolio",
+    "wrap_dcat_resource",
+    "wrap_dcat_resources",
     "validate_document",
     "validate_profile",
     "validate_vocabulary_release",

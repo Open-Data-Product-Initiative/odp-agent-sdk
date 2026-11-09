@@ -1,25 +1,33 @@
-# Open Data Products Python SDK 0.6.5 Release Notes
+# Open Data Products Python SDK 0.7.0 Release Notes
 
-## Unreleased package contents
+## DCAT Catalog Intelligence
 
-This patch release keeps the Data Contract Intelligence capabilities and
-corrects the public PyPI version badge.
+- Analyze supplied RDF/XML, Turtle, JSON-LD, N-Triples, N3, and other supported
+  RDFLib serializations with `open-data-products portfolio discover-dcat`.
+- Preserve resource IRIs, language-tagged values, declared relationships,
+  distributions, and distinct access/download URLs. Findings remain labelled as
+  source facts, inferences, or review-only proposals.
+- Generate a self-contained offline HTML report. No catalog item is
+  automatically approved as a data product.
 
-## Dynamic PyPI version badge
+## DCAT-to-ODPS 4.2 drafts
 
-- The README now uses the Shields.io PyPI-version endpoint instead of the
-  stale Badge Fury endpoint.
-- The badge automatically follows the current PyPI release and links directly
-  to the project page.
+- Convert explicitly selected Dataset, DatasetSeries, or DataService resources
+  with `open-data-products product wrap-dcat`.
+- Repeat `--resource` for batches. Reports record mappings, defaults, missing
+  business context, validation, limitations, and AI-generated proposal fields.
+- `--enrich` and `--full-draft` mark generated business language as proposed;
+  they do not establish ownership, demand, rights, commitments, or approval.
 
-## Release provenance
+## Safety and compatibility
 
-- 0.6.5 is the preferred release for the Data Contract Intelligence update.
-- It is published through the normal trusted-publishing workflow with PyPI
-  provenance attestations enabled.
-- Version 0.6.3 remains available for compatibility with pinned installs, but
-  has no PyPI provenance attestation because the external transparency log was
-  unavailable during its publication.
+- DCAT 3 is the principal vocabulary; DCAT-AP 3.0.1 is the European target.
+  Successful RDF parsing is not a DCAT-AP conformance claim.
+- HTTP(S) retrieval is bounded and rejects credential-bearing URLs. Remote
+  JSON-LD contexts and automatic linked-resource crawling are disabled.
+- `discover_dcat_catalog` is a safe MCP tool; `wrap_dcat_resource` is
+  state-changing because it writes an artifact.
+- Existing Data Contract Intelligence and ODCS-to-ODPS workflows are retained.
 
 ## Data Contract Intelligence
 
