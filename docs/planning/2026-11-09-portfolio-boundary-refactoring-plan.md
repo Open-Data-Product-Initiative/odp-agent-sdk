@@ -112,49 +112,49 @@ git add open_data_products/_portfolio_models.py open_data_products/portfolio.py 
 git commit -m "refactor: isolate portfolio models"
 ```
 
-### Task 3: Extract presentation rendering without changing output
+### Task 3: Extract static presentation assets without changing output
 
 **Files:**
-- Create: `open_data_products/_portfolio_html.py`
 - Create: `open_data_products/_portfolio_assets.py`
 - Modify: `open_data_products/portfolio.py`
 - Modify: `tests/test_portfolio_refactor_contracts.py`
 
-- [ ] **Step 1: Write a failing source-boundary test.**
+- [x] **Step 1: Write a failing source-boundary test.**
 
 ```python
-def test_portfolio_facade_delegates_html_rendering() -> None:
+def test_portfolio_facade_delegates_static_presentation_assets() -> None:
     source = Path("open_data_products/portfolio.py").read_text(encoding="utf-8")
-    assert "from ._portfolio_html import render_portfolio_html" in source
+    assert "from ._portfolio_assets import portfolio_css, portfolio_js" in source
     assert "def _portfolio_css" not in source
+    assert "def _portfolio_js" not in source
 ```
 
-- [ ] **Step 2: Run the test and confirm it fails because the renderer remains in the facade.**
+- [x] **Step 2: Run the test and confirm it fails before the move.**
 
-Run: `pytest -q tests/test_portfolio_refactor_contracts.py::test_portfolio_facade_delegates_html_rendering`
+Run: `pytest -q tests/test_portfolio_refactor_contracts.py::test_portfolio_facade_delegates_static_presentation_assets`
 
-Expected: FAIL with the missing import or retained CSS helper.
+Expected: FAIL because the static assets still live in `portfolio.py`.
 
-- [ ] **Step 3: Move `render_portfolio_html` and all renderer-only helpers to `_portfolio_html.py`; move `_portfolio_css` and `_portfolio_js` to `_portfolio_assets.py`.**
+- [x] **Step 3: Move `_portfolio_css` and `_portfolio_js` to `_portfolio_assets.py`; explicitly import `portfolio_css` and `portfolio_js` from the facade.**
 
 ```python
 # open_data_products/portfolio.py
-from ._portfolio_html import render_portfolio_html
+from ._portfolio_assets import portfolio_css, portfolio_js
 ```
 
-Keep all generated markup byte-for-byte stable. Do not change labels, CSS, JavaScript, or rendering rules in this task.
+Keep all generated markup byte-for-byte stable. Do not change labels, CSS, JavaScript, or rendering rules in this task. Extract renderer helpers in a later task after their workspace dependencies are isolated.
 
-- [ ] **Step 4: Run the focused contract and renderer tests.**
+- [x] **Step 4: Run the focused contract and renderer tests, then compare HTML output to the pre-extraction commit.**
 
 Run: `pytest -q tests/test_portfolio_refactor_contracts.py tests/test_portfolio.py -k 'render or localize or refactor_contracts'`
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit the presentation extraction.**
+- [x] **Step 5: Commit the presentation extraction.**
 
 ```bash
-git add open_data_products/portfolio.py open_data_products/_portfolio_html.py open_data_products/_portfolio_assets.py tests/test_portfolio_refactor_contracts.py
-git commit -m "refactor: isolate portfolio presentation"
+git add open_data_products/portfolio.py open_data_products/_portfolio_assets.py tests/test_portfolio_refactor_contracts.py docs/planning/2026-11-09-portfolio-boundary-refactoring-plan.md
+git commit -m "refactor: isolate portfolio presentation assets"
 ```
 
 ### Task 4: Extract ODPS output normalization

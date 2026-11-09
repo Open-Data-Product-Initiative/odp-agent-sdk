@@ -125,3 +125,12 @@ def test_portfolio_facade_reexports_models_from_private_module() -> None:
 
     assert "from ._portfolio_models import" in source
     assert "class PortfolioBuildRequest" not in source
+
+
+def test_portfolio_facade_delegates_static_presentation_assets() -> None:
+    """Static CSS and JavaScript leave the workflow facade."""
+    source = Path("open_data_products/portfolio.py").read_text(encoding="utf-8")
+
+    assert "from ._portfolio_assets import portfolio_css, portfolio_js" in source
+    assert "def _portfolio_css" not in source
+    assert "def _portfolio_js" not in source
