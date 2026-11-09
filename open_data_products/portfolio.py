@@ -45,6 +45,7 @@ from ._portfolio_prompting import (  # noqa: F401
     render_executive_summary_repair_prompt as _render_executive_summary_repair_prompt,
     render_portfolio_localization_repair_prompt as _render_portfolio_localization_repair_prompt,
     render_portfolio_plan_repair_prompt as _render_portfolio_plan_repair_prompt,
+    render_portfolio_localization_prompt as _render_portfolio_localization_prompt,
     extract_yaml_text as _extract_yaml_text,
     parse_executive_summary,
     parse_portfolio_localization,
@@ -843,34 +844,6 @@ def _parse_portfolio_localization_with_repair(
             raise ValueError(
                 f"{original_error}\nRepair attempt also failed: {repair_error}"
             ) from repair_error
-
-
-def _render_portfolio_localization_prompt(
-    language: str, source_strings: List[str]
-) -> str:
-    lines = [
-        "# Localize Portfolio HTML",
-        f"Target language: {language}",
-        "Translate the human-facing strings from one static portfolio HTML page.",
-        "Return only YAML. Do not include markdown fences, prose, or comments.",
-        "Use this exact shape:",
-        f"language: {language}",
-        "translations:",
-        '  "Source text": "Translated text"',
-        "",
-        "Rules:",
-        "- Do not translate IDs, file paths, URLs, YAML keys, or enum values.",
-        "- Keep product IDs, graph node IDs, version IDs, and artifact paths unchanged.",
-        "- Preserve numbers and units unless the target language requires normal spacing.",
-        "- Keep translations concise enough for the existing static HTML layout.",
-        "- Quote translation keys and values, or use block scalars for long values.",
-        "- Translation values often contain colons; never emit an unquoted value with a colon.",
-        "",
-        "Strings:",
-    ]
-    for text in source_strings:
-        lines.append(f"- {yaml.safe_dump(text, allow_unicode=True).strip()}")
-    return "\n".join(lines)
 
 
 def _chunk_localization_strings(

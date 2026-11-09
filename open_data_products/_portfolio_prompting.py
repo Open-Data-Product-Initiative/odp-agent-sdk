@@ -11,6 +11,37 @@ from .portfolio_budget import reduce_source_lanes_for_prompt
 from ._portfolio_values import text
 
 
+def render_portfolio_localization_prompt(
+    language: str, source_strings: List[str]
+) -> str:
+    """Render the localization prompt for static Portfolio HTML."""
+    lines = [
+        "# Localize Portfolio HTML",
+        f"Target language: {language}",
+        "Translate the human-facing strings from one static portfolio HTML page.",
+        "Return only YAML. Do not include markdown fences, prose, or comments.",
+        "Use this exact shape:",
+        f"language: {language}",
+        "translations:",
+        '  "Source text": "Translated text"',
+        "",
+        "Rules:",
+        "- Do not translate IDs, file paths, URLs, YAML keys, or enum values.",
+        "- Keep product IDs, graph node IDs, version IDs, and artifact paths unchanged.",
+        "- Preserve numbers and units unless the target language requires normal spacing.",
+        "- Keep translations concise enough for the existing static HTML layout.",
+        "- Quote translation keys and values, or use block scalars for long values.",
+        "- Translation values often contain colons; never emit an unquoted value with a colon.",
+        "",
+        "Strings:",
+    ]
+    lines.extend(
+        f"- {yaml.safe_dump(item, allow_unicode=True).strip()}"
+        for item in source_strings
+    )
+    return "\n".join(lines)
+
+
 def extract_yaml_text(raw_output: str) -> str:
     """Extract YAML from a fenced or plain model response."""
     stripped = raw_output.strip()
