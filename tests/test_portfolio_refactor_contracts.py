@@ -158,6 +158,17 @@ def test_portfolio_facade_imports_shared_change_counter() -> None:
     assert "change_list_count as _change_list_count" in source
 
 
+def test_portfolio_prompt_functions_remain_available() -> None:
+    """Prompt callers retain the established Portfolio entry points."""
+    from open_data_products.portfolio import (
+        render_portfolio_build_prompt,
+        render_portfolio_executive_summary_prompt,
+    )
+
+    assert callable(render_portfolio_build_prompt)
+    assert callable(render_portfolio_executive_summary_prompt)
+
+
 def test_workspace_loading_uses_private_layout_model() -> None:
     """Workspace loading receives one explicit layout boundary."""
     source = Path("open_data_products/portfolio.py").read_text(encoding="utf-8")
