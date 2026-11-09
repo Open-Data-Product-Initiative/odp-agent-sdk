@@ -35,9 +35,9 @@ def test_v42_portfolio_normalization_adds_default_access_profile() -> None:
 
     assert list(document["product"]["dataAccess"]) == ["default"]
     assert document["product"]["dataAccess"]["default"]["outputPortType"] == "API"
-    assert document["product"]["pricingPlans"]["declarative"]["en"][0][
-        "access"
-    ] == {"$ref": "#/product/dataAccess/default"}
+    assert document["product"]["pricingPlans"]["declarative"]["en"][0]["access"] == {
+        "$ref": "#/product/dataAccess/default"
+    }
 
 
 def test_v42_portfolio_normalization_preserves_external_access_references() -> None:
@@ -80,3 +80,27 @@ def test_v42_portfolio_normalization_keeps_primary_profile_first() -> None:
     _normalize_odps_product(document)
 
     assert list(document["product"]["dataAccess"]) == ["default", "bulk"]
+
+
+def test_v41_portfolio_normalization_keeps_existing_access_profile_name() -> None:
+    document = {
+        "schema": "https://opendataproducts.org/v4.1/schema/odps.json",
+        "version": "4.1",
+        "product": {
+            "dataAccess": {
+                "API": {"outputPortType": "API", "format": "JSON"},
+            },
+            "pricingPlans": {
+                "declarative": {
+                    "en": [{"access": {"$ref": "#/product/dataAccess/API"}}]
+                }
+            },
+        },
+    }
+
+    _normalize_odps_product(document)
+
+    assert list(document["product"]["dataAccess"]) == ["API"]
+    assert document["product"]["pricingPlans"]["declarative"]["en"][0]["access"] == {
+        "$ref": "#/product/dataAccess/API"
+    }
