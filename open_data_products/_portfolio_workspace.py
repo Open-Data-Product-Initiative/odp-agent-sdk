@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 from ._io import load_mapping
-from ._portfolio_values import text
+from ._portfolio_values import change_list_count, text
 
 
 def load_optional_mapping(path: Path) -> Dict[str, Any]:
@@ -63,3 +63,77 @@ def load_product_specs(root: Path) -> Dict[str, Dict[str, Any]]:
             "document": document,
         }
     return products
+
+
+def load_version_report(path: Path) -> Dict[str, Any]:
+    """Load a version report when available and valid."""
+    if not path.exists():
+        return {}
+    try:
+        return load_mapping(path, root_name="Portfolio version report")
+    except ValueError:
+        return {}
+
+
+def version_report_summary(report: Dict[str, Any]) -> str:
+    """Summarize artifact changes from a version report."""
+    changes = []
+    for key, label in (
+        ("created", "created"),
+        ("updated", "updated"),
+        ("removed", "removed"),
+    ):
+        count = change_list_count(report.get(key))
+        if count:
+            changes.append(f"{count} {label}")
+    return ", ".join(changes)
+
+
+def portfolio_versions(root: Path, portfolio: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Return saved version metadata or discover version reports."""
+    versions = []
+    for item in (
+        portfolio.get("versions", [])
+        if isinstance(portfolio.get("versions"), list)
+        else []
+    ):
+        if not isinstance(item, dict):
+            continue
+        version_id = str(item.get("id") or item.get("version") or "")
+        html_path = str(item.get("html") or f"versions/{version_id}/index.html")
+        if version_id:
+            report = load_version_report((root / html_path).parent / "report.json")
+            versions.append(
+                {
+                    "id": version_id,
+                    "type": str(
+                        item.get("type")
+                        or item.get("runType")
+                        or report.get("kind")
+                        or "snapshot"
+                    ),
+                    "summary": str(
+                        item.get("summary") or version_report_summary(report) or ""
+                    ),
+                    "html": html_path,
+                    "report": report,
+                }
+            )
+    if versions:
+        return versions
+    for path in (
+        sorted((root / "versions").glob("*/index.html"))
+        if (root / "versions").exists()
+        else []
+    ):
+        report = load_version_report(path.parent / "report.json")
+        versions.append(
+            {
+                "id": path.parent.name,
+                "type": str(report.get("kind") or "snapshot"),
+                "summary": version_report_summary(report),
+                "html": path.relative_to(root).as_posix(),
+                "report": report,
+            }
+        )
+    return versions

@@ -57,6 +57,7 @@ from ._portfolio_workspace import (
     empty_graph as _empty_graph,
     load_optional_mapping as _load_optional_mapping,
     load_product_specs as _load_product_specs,
+    portfolio_versions as _portfolio_versions,
     product_details as _product_details,
     product_spec_paths as _product_spec_paths,
 )
@@ -5093,80 +5094,6 @@ def _normalize_product_spec_files(root: Path) -> List[Tuple[Path, str]]:
     return written
 
 
-def _portfolio_versions(root: Path, portfolio: Dict[str, Any]) -> List[Dict[str, Any]]:
-    versions: List[Dict[str, Any]] = []
-    metadata_versions = portfolio.get("versions")
-    if isinstance(metadata_versions, list):
-        for item in metadata_versions:
-            if not isinstance(item, dict):
-                continue
-            version_id = str(item.get("id") or item.get("version") or "")
-            html_path = str(item.get("html") or f"versions/{version_id}/index.html")
-            if version_id:
-                report = _version_report_for_html(root, html_path)
-                versions.append(
-                    {
-                        "id": version_id,
-                        "type": str(
-                            item.get("type")
-                            or item.get("runType")
-                            or report.get("kind")
-                            or "snapshot"
-                        ),
-                        "summary": str(
-                            item.get("summary") or _version_report_summary(report) or ""
-                        ),
-                        "html": html_path,
-                        "report": report,
-                    }
-                )
-    if versions:
-        return versions
-    versions_root = root / "versions"
-    if versions_root.exists():
-        for path in sorted(versions_root.glob("*/index.html")):
-            version_id = path.parent.name
-            report = _load_version_report(path.parent / "report.json")
-            versions.append(
-                {
-                    "id": version_id,
-                    "type": str(report.get("kind") or "snapshot"),
-                    "summary": _version_report_summary(report),
-                    "html": path.relative_to(root).as_posix(),
-                    "report": report,
-                }
-            )
-    return versions
-
-
-def _version_report_for_html(root: Path, html_path: str) -> Dict[str, Any]:
-    path = root / html_path
-    return _load_version_report(path.parent / "report.json")
-
-
-def _load_version_report(path: Path) -> Dict[str, Any]:
-    if not path.exists():
-        return {}
-    try:
-        return load_mapping(path, root_name="Portfolio version report")
-    except ValueError:
-        return {}
-
-
-def _version_report_summary(report: Dict[str, Any]) -> str:
-    if not report:
-        return ""
-    created = _change_list_count(report.get("created"))
-    updated = _change_list_count(report.get("updated"))
-    removed = _change_list_count(report.get("removed"))
-    changes = []
-    if created:
-        changes.append(f"{created} created")
-    if updated:
-        changes.append(f"{updated} updated")
-    if removed:
-        changes.append(f"{removed} removed")
-    return ", ".join(changes)
 
 
 def _pricing_items(product: Any) -> List[Dict[str, Any]]:
