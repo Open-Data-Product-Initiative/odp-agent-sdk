@@ -128,12 +128,12 @@ def test_portfolio_facade_reexports_models_from_private_module() -> None:
 
 
 def test_portfolio_facade_delegates_static_presentation_assets() -> None:
-    """Static CSS and JavaScript leave the workflow facade."""
-    source = Path("open_data_products/portfolio.py").read_text(encoding="utf-8")
+    """Static CSS and JavaScript belong to the rendering boundary."""
+    source = Path("open_data_products/_portfolio_rendering.py").read_text(
+        encoding="utf-8"
+    )
 
     assert "from ._portfolio_assets import portfolio_css, portfolio_js" in source
-    assert "def _portfolio_css" not in source
-    assert "def _portfolio_js" not in source
 
 
 def test_portfolio_facade_imports_shared_value_helpers() -> None:
@@ -153,8 +153,10 @@ def test_portfolio_facade_imports_shared_identity_helpers() -> None:
 
 
 def test_portfolio_facade_imports_shared_change_counter() -> None:
-    """Change summaries reuse a value helper outside the facade."""
-    source = Path("open_data_products/portfolio.py").read_text(encoding="utf-8")
+    """Change summaries reuse a value helper outside workflow orchestration."""
+    source = Path("open_data_products/_portfolio_rendering.py").read_text(
+        encoding="utf-8"
+    )
     assert "change_list_count as _change_list_count" in source
 
 
@@ -177,7 +179,9 @@ def test_portfolio_facade_imports_prompt_yaml_helper() -> None:
 
 def test_workspace_loading_uses_private_layout_model() -> None:
     """Workspace loading receives one explicit layout boundary."""
-    source = Path("open_data_products/portfolio.py").read_text(encoding="utf-8")
+    source = Path("open_data_products/_portfolio_rendering.py").read_text(
+        encoding="utf-8"
+    )
     assert "from ._portfolio_workspace_paths import PortfolioWorkspacePaths" in source
 
 
@@ -207,8 +211,20 @@ def test_portfolio_facade_delegates_read_only_intake() -> None:
     assert "def inspect_portfolio_intake" not in source
 
 
-def test_portfolio_facade_delegates_odps_normalization() -> None:
-    """Portfolio preserves normalizer compatibility aliases only."""
+def test_portfolio_facade_delegates_rendering_and_workspace_loading() -> None:
+    """Rendering concerns remain outside orchestration workflows."""
     source = Path("open_data_products/portfolio.py").read_text(encoding="utf-8")
+
+    assert "from ._portfolio_rendering import" in source
+    assert "def render_portfolio(" not in source
+    assert "def load_portfolio_workspace(" not in source
+    assert "def render_portfolio_html(" not in source
+
+
+def test_portfolio_facade_delegates_odps_normalization() -> None:
+    """Portfolio rendering relies on the private ODPS normalizer."""
+    source = Path("open_data_products/_portfolio_rendering.py").read_text(
+        encoding="utf-8"
+    )
     assert "from ._portfolio_normalization import" in source
     assert "normalize_odps_product as _normalize_odps_product" in source
