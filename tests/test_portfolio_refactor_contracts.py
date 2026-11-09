@@ -138,7 +138,9 @@ def test_portfolio_facade_delegates_static_presentation_assets() -> None:
 
 def test_portfolio_facade_imports_shared_value_helpers() -> None:
     """Shared formatting helpers do not stay coupled to the facade."""
-    source = Path("open_data_products/portfolio.py").read_text(encoding="utf-8")
+    source = Path("open_data_products/_portfolio_workflows.py").read_text(
+        encoding="utf-8"
+    )
 
     assert "from ._portfolio_values import" in source
     assert "def _text" not in source
@@ -146,7 +148,9 @@ def test_portfolio_facade_imports_shared_value_helpers() -> None:
 
 def test_portfolio_facade_imports_shared_identity_helpers() -> None:
     """Normalization can reuse identities without importing the facade."""
-    source = Path("open_data_products/portfolio.py").read_text(encoding="utf-8")
+    source = Path("open_data_products/_portfolio_workflows.py").read_text(
+        encoding="utf-8"
+    )
 
     assert "path_id as _path_id" in source
     assert "title_from_text as _title_from_text" in source
@@ -187,19 +191,25 @@ def test_workspace_loading_uses_private_layout_model() -> None:
 
 def test_portfolio_facade_imports_workspace_document_helpers() -> None:
     """Workspace document defaults do not stay coupled to the facade."""
-    source = Path("open_data_products/portfolio.py").read_text(encoding="utf-8")
+    source = Path("open_data_products/_portfolio_workflows.py").read_text(
+        encoding="utf-8"
+    )
     assert "from ._portfolio_workspace import" in source
 
 
 def test_portfolio_facade_imports_workspace_product_helpers() -> None:
     """Product discovery is provided by the workspace module."""
-    source = Path("open_data_products/portfolio.py").read_text(encoding="utf-8")
+    source = Path("open_data_products/_portfolio_workflows.py").read_text(
+        encoding="utf-8"
+    )
     assert "load_product_specs as _load_product_specs" in source
 
 
 def test_portfolio_facade_imports_workspace_version_helpers() -> None:
     """Version discovery is provided by the workspace module."""
-    source = Path("open_data_products/portfolio.py").read_text(encoding="utf-8")
+    source = Path("open_data_products/_portfolio_workflows.py").read_text(
+        encoding="utf-8"
+    )
     assert "portfolio_versions as _portfolio_versions" in source
 
 
@@ -219,6 +229,17 @@ def test_portfolio_facade_delegates_rendering_and_workspace_loading() -> None:
     assert "def render_portfolio(" not in source
     assert "def load_portfolio_workspace(" not in source
     assert "def render_portfolio_html(" not in source
+
+
+def test_portfolio_facade_delegates_generation_workflows() -> None:
+    """Build, sync, and localization workflows leave the public facade."""
+    source = Path("open_data_products/portfolio.py").read_text(encoding="utf-8")
+
+    assert "from ._portfolio_workflows import" in source
+    assert "class PortfolioPipeline" not in source
+    assert "def build_portfolio(" not in source
+    assert "def sync_portfolio(" not in source
+    assert "def localize_portfolio(" not in source
 
 
 def test_portfolio_facade_delegates_odps_normalization() -> None:
