@@ -89,6 +89,13 @@ def test_package_metadata_includes_interoperability_helpers() -> None:
     assert '"open_data_products._interop",' in content
 
 
+def test_explicit_package_data_does_not_trigger_implicit_discovery() -> None:
+    """Data-only directories remain package data, not namespace packages."""
+    metadata = tomllib.loads(PYPROJECT.read_text(encoding="utf-8"))
+
+    assert metadata["tool"]["setuptools"]["include-package-data"] is False
+
+
 def test_package_metadata_includes_portfolio_icon_assets() -> None:
     content = PYPROJECT.read_text(encoding="utf-8")
 

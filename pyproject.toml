@@ -107,6 +107,7 @@ Repository = "https://github.com/Open-Data-Product-Initiative/odp-agent-sdk"
 "Bug Tracker" = "https://github.com/Open-Data-Product-Initiative/odp-agent-sdk/issues"
 
 [tool.setuptools]
+include-package-data = false
 packages = [
     "open_data_products",
     "open_data_products._interop",
