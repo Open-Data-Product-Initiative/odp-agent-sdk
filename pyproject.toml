@@ -60,6 +60,7 @@ dependencies = [
     "certifi>=2026.10.19",
     "jsonschema>=4.0",
     "rdflib>=7.1",
+    "pyshacl>=0.28.1,<0.29.0",
 ]
 
 [project.scripts]
@@ -110,6 +111,7 @@ packages = [
     "open_data_products",
     "open_data_products.contracts",
     "open_data_products.dcat",
+    "open_data_products.dprod",
     "open_data_products.generation",
     "open_data_products.generation.data",
     "open_data_products.generation.data.prompts",
@@ -191,6 +193,10 @@ packages = [
     "data/v1_1/vocab/*.yaml",
     "data/v1_1/schema/*.json",
     "data/v1_1/profiles/*.yaml",
+]
+"open_data_products.dprod" = [
+    "data/*.json",
+    "data/*.ttl",
 ]
 
 [tool.setuptools.dynamic]

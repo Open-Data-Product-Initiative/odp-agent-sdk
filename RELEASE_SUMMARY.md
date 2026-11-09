@@ -1,5 +1,19 @@
 # Open Data Products Python SDK 0.7.0 Release Notes
 
+## DPROD 1.0 Beta 2 interoperability
+
+- Bundle the normative OMG 2026-06-01 ontology and SHACL artifacts for local,
+  offline validation; artifacts retain source provenance and checksums.
+- Support bounded RDF ingestion, explicit DPROD product inventory, structured
+  SHACL violations, DPROD-to-ODPS 4.2 drafts, and deterministic ODPS-to-DPROD
+  Turtle/JSON-LD export with machine-readable mapping/loss records.
+- DPROD is an OMG in-process Beta 2 specification. Only
+  `https://www.omg.org/spec/DPROD/` is supported; the separate GitHub
+  development namespace and experimental Data Contracts profile are excluded.
+- Explicit DPROD products are kept distinct from review-only DCAT dataset
+  opportunities. No conversion treats ports, owners, policies, or service
+  metadata as automatic ODPS promises, approval, or contract guarantees.
+
 ## DCAT Catalog Intelligence
 
 - Analyze supplied RDF/XML, Turtle, JSON-LD, N-Triples, N3, and other supported

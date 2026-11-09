@@ -2,3 +2,4 @@ PyYAML>=6.0.2
 certifi>=2026.10.19
 jsonschema>=4.0
 rdflib>=7.1
+pyshacl>=0.28.1,<0.29.0

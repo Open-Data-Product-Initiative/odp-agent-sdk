@@ -159,6 +159,8 @@ def test_mcp_manifest_is_json_serializable_and_preserves_tool_contracts() -> Non
     assert classes["build_portfolio"] == "state-changing"
     assert classes["discover_contract_portfolio"] == "state-changing"
     assert classes["wrap_dcat_resource"] == "state-changing"
+    assert classes["wrap_dprod_resource"] == "state-changing"
+    assert classes["export_dprod"] == "state-changing"
     assert all(
         tool_class == "safe"
         for tool_name, tool_class in classes.items()
@@ -169,6 +171,8 @@ def test_mcp_manifest_is_json_serializable_and_preserves_tool_contracts() -> Non
             "discover_contract_portfolio",
             "wrap_odcs_contract",
             "wrap_dcat_resource",
+            "wrap_dprod_resource",
+            "export_dprod",
         }
     )
     assert all("handler" not in tool for tool in manifest_tools)

@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import argparse
 import json
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from .agent import validate_document
+from ._io import load_mapping
 
 if TYPE_CHECKING:
     from .contracts import ProductContractReport
@@ -23,6 +25,8 @@ Data Contract workflow commands:
   export-contract     Export a Data Contract through datacontract-cli
   wrap-contract       Generate an ODPS 4.2 draft from an ODCS contract
   wrap-dcat           Generate an ODPS 4.2 draft from a selected DCAT resource
+  wrap-dprod          Generate an ODPS 4.2 draft from an explicit DPROD product
+  export-dprod        Export an ODPS 4.2 definition as DPROD Turtle and JSON-LD
 
 Examples:
   open-data-products product resolve-contracts product.yaml --json
@@ -218,6 +222,29 @@ def add_product_subparser(subparsers: argparse._SubParsersAction) -> None:
         help="Allow replacement of an existing output",
     )
     wrap_dcat_parser.add_argument("--json", action="store_true", help="Emit JSON")
+    wrap_dprod_parser = product_subparsers.add_parser(
+        "wrap-dprod", help="Generate an ODPS 4.2 draft from a DPROD DataProduct"
+    )
+    wrap_dprod_parser.add_argument("--input", required=True, help="DPROD RDF source")
+    wrap_dprod_parser.add_argument(
+        "--resource", required=True, help="DPROD DataProduct IRI"
+    )
+    wrap_dprod_parser.add_argument(
+        "--output", "-o", required=True, help="Output ODPS YAML path"
+    )
+    wrap_dprod_parser.add_argument("--overwrite", action="store_true")
+    wrap_dprod_parser.add_argument("--json", action="store_true", help="Emit JSON")
+    export_dprod_parser = product_subparsers.add_parser(
+        "export-dprod", help="Write deterministic DPROD Turtle and JSON-LD from ODPS"
+    )
+    export_dprod_parser.add_argument(
+        "--input", required=True, help="ODPS 4.2 YAML or JSON"
+    )
+    export_dprod_parser.add_argument(
+        "--output", "-o", required=True, help="Output basename"
+    )
+    export_dprod_parser.add_argument("--overwrite", action="store_true")
+    export_dprod_parser.add_argument("--json", action="store_true", help="Emit JSON")
 
 
 def handle_product_command(args: argparse.Namespace) -> int:
@@ -262,6 +289,36 @@ def handle_product_command(args: argparse.Namespace) -> int:
                 for error in item.validation.errors:
                     print(f"- ODPS_VALIDATION: {error}")
         return 0 if all(item.validation.valid for item in results) else 1
+
+    if args.product_command == "wrap-dprod":
+        from .dprod import wrap_dprod_resource
+
+        result = wrap_dprod_resource(
+            args.input, args.resource, args.output, overwrite=args.overwrite
+        )
+        if args.json:
+            print(json.dumps(result.to_dict(), indent=2))
+        else:
+            state = "valid" if result.validation.valid else "invalid"
+            print("ODPS 4.2 DPROD draft {}: {}".format(state, result.output))
+            for warning in result.warnings:
+                print("- " + warning)
+        return 0 if result.validation.valid else 1
+
+    if args.product_command == "export-dprod":
+        from .dprod import write_dprod_export
+
+        result = write_dprod_export(
+            load_mapping(Path(args.input), root_name="ODPS document"),
+            args.output,
+            overwrite=args.overwrite,
+        )
+        if args.json:
+            print(json.dumps(result, indent=2))
+        else:
+            print("DPROD Turtle: " + str(result["turtle_output"]))
+            print("DPROD JSON-LD: " + str(result["jsonld_output"]))
+        return 0 if result["validation"]["conforms"] else 1
 
     if args.product_command == "wrap-contract":
         from .contracts import wrap_contract

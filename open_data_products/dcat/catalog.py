@@ -11,11 +11,11 @@ import ssl
 from typing import Callable, Dict, Iterable, List, Optional, Sequence, Tuple
 from urllib.error import HTTPError, URLError
 from urllib.parse import unquote, urlparse, urlunparse
-from urllib.request import urlopen
+from urllib.request import HTTPRedirectHandler, HTTPSHandler, build_opener
 
 import certifi
 from rdflib import BNode, Graph, Literal, URIRef
-from rdflib.namespace import DCTERMS, FOAF, RDF
+from rdflib.namespace import DCTERMS, FOAF, RDF, RDFS
 
 from ..agent import validate_document
 from .models import (
@@ -30,8 +30,11 @@ from .models import (
 
 DCAT = "http://www.w3.org/ns/dcat#"
 ADMS = "http://www.w3.org/ns/adms#"
+DPROD = "https://www.omg.org/spec/DPROD/"
+_UNSUPPORTED_DPROD_NAMESPACE = "https://www.omg.org/spec/DPROD/dprod/"
 _HTTP_TIMEOUT_SECONDS = 10.0
 _MAX_HTTP_DOCUMENT_BYTES = 5 * 1024 * 1024
+_MAX_HTTP_REDIRECTS = 3
 _RDF_SUFFIXES = {".rdf", ".xml", ".ttl", ".jsonld", ".json-ld", ".nt", ".n3"}
 _CREDENTIAL_QUERY_FRAGMENTS = (
     "authorization",
@@ -52,6 +55,7 @@ def discover_dcat_catalog(source: str) -> DcatCatalogIntelligenceResult:
     resources: Dict[str, DcatResource] = {}
     relationships: List[DcatRelationship] = []
     for graph, source_ref in graphs:
+        _reject_unsupported_dprod_namespace(graph)
         for node, resource_type in _resource_nodes(graph):
             resource = _resource(graph, node, resource_type, source_ref)
             existing = resources.get(resource.id)
@@ -70,6 +74,18 @@ def discover_dcat_catalog(source: str) -> DcatCatalogIntelligenceResult:
         findings=findings,
         product_opportunities=opportunities,
     )
+
+
+def _reject_unsupported_dprod_namespace(graph: Graph) -> None:
+    """Avoid silently treating a development DPROD vocabulary as Beta 2."""
+    for subject, predicate, obj in graph:
+        if any(
+            _UNSUPPORTED_DPROD_NAMESPACE in str(value)
+            for value in (subject, predicate, obj)
+        ):
+            raise ValueError(
+                "Unsupported DPROD namespace: " + _UNSUPPORTED_DPROD_NAMESPACE
+            )
 
 
 def wrap_dcat_resource(
@@ -276,9 +292,10 @@ def _load_remote(source: str) -> Tuple[str, str]:
     safe_source = _safe_http_uri(source)
     try:
         context = ssl.create_default_context(cafile=certifi.where())
-        with urlopen(
-            safe_source, timeout=_HTTP_TIMEOUT_SECONDS, context=context
-        ) as response:
+        opener = build_opener(
+            HTTPSHandler(context=context), _BoundedRedirectHandler(_MAX_HTTP_REDIRECTS)
+        )
+        with opener.open(safe_source, timeout=_HTTP_TIMEOUT_SECONDS) as response:
             payload = response.read(_MAX_HTTP_DOCUMENT_BYTES + 1)
             resolved = _safe_http_uri(str(response.geturl()))
     except (HTTPError, URLError, OSError, ValueError):
@@ -289,6 +306,32 @@ def _load_remote(source: str) -> Tuple[str, str]:
         return payload.decode("utf-8"), resolved
     except UnicodeDecodeError:
         raise ValueError("Remote DCAT catalog is not UTF-8") from None
+
+
+class _BoundedRedirectHandler(HTTPRedirectHandler):
+    """Follow only a small number of credential-free HTTP redirects."""
+
+    def __init__(self, maximum: int) -> None:
+        super().__init__()
+        self._maximum = maximum
+        self._count = 0
+
+    def redirect_request(  # type: ignore[override]
+        self,
+        request: object,
+        file_pointer: object,
+        code: int,
+        message: str,
+        headers: object,
+        new_url: str,
+    ) -> object:
+        """Reject excessive or credential-bearing redirect destinations."""
+        self._count += 1
+        if self._count > self._maximum:
+            raise ValueError("Remote DCAT catalog redirect limit exceeded")
+        return super().redirect_request(
+            request, file_pointer, code, message, headers, _safe_http_uri(new_url)
+        )
 
 
 def _parse_rdf(text: str, rdf_format: Optional[str]) -> Graph:
@@ -347,6 +390,7 @@ def _rdf_format(source: str) -> Optional[str]:
 def _resource_nodes(graph: Graph) -> Iterable[Tuple[object, str]]:
     """Yield recognized DCAT resources, excluding distributions from inventory."""
     types = (
+        ("DPRODDataProduct", "DPRODDataProduct"),
         ("Catalog", "Catalog"),
         ("Dataset", "Dataset"),
         ("DatasetSeries", "DatasetSeries"),
@@ -354,7 +398,9 @@ def _resource_nodes(graph: Graph) -> Iterable[Tuple[object, str]]:
         ("CatalogRecord", "CatalogRecord"),
     )
     for local, label in types:
-        for node in graph.subjects(RDF.type, URIRef(DCAT + local)):
+        namespace = DPROD if local == "DPRODDataProduct" else DCAT
+        type_name = "DataProduct" if local == "DPRODDataProduct" else local
+        for node in graph.subjects(RDF.type, URIRef(namespace + type_name)):
             yield node, label
 
 
@@ -376,7 +422,11 @@ def _resource(
         id=_node_id(graph, node),
         resource_type=resource_type,
         source_documents=[source],
-        titles=_localized(graph.objects(node, DCTERMS.title)),
+        titles=_localized(
+            graph.objects(node, RDFS.label)
+            if resource_type == "DPRODDataProduct"
+            else graph.objects(node, DCTERMS.title)
+        ),
         descriptions=_localized(graph.objects(node, DCTERMS.description)),
         identifiers=_texts(graph.objects(node, DCTERMS.identifier)),
         publisher=_label(graph, _first(graph.objects(node, DCTERMS.publisher))),
@@ -816,7 +866,11 @@ def _merge_resource(first: DcatResource, second: DcatResource) -> DcatResource:
     """Merge repeated resource IRIs from several supplied catalog documents."""
     return DcatResource(
         id=first.id,
-        resource_type=first.resource_type,
+        resource_type=(
+            "DPRODDataProduct"
+            if "DPRODDataProduct" in {first.resource_type, second.resource_type}
+            else first.resource_type
+        ),
         source_documents=sorted(set(first.source_documents + second.source_documents)),
         titles=_merge_localized(first.titles, second.titles),
         descriptions=_merge_localized(first.descriptions, second.descriptions),

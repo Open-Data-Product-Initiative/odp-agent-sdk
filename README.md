@@ -49,6 +49,7 @@ Python 3.8 or newer is required.
 | LLM generation | Generate ODPC fragments, ODPG graphs, and ODPS product YAML from source notes using local or hosted providers |
 | Data Contracts | Wrap ODCS 3.0/3.1/3.2 contracts into conservative ODPS 4.2 drafts, resolve ODPS contract references, validate external contracts through optional `datacontract-cli`, extract schemas, check alignment, and generate reports |
 | DCAT Catalog Intelligence | Inspect supplied DCAT RDF with evidence-bounded findings, render an offline report, and convert explicitly selected resources to private ODPS 4.2 drafts |
+| DPROD interoperability | Validate explicit OMG DPROD 1.0 Beta 2 products offline, create ODPS 4.2 drafts, and export deterministic DPROD RDF with loss reports |
 
 ## Quick CLI Examples
 
@@ -117,6 +118,19 @@ open-data-products product wrap-dcat --input catalog.ttl \
 
 See [DCAT Catalog Intelligence](docs/user/dcat-catalog-intelligence.md) for
 format support, evidence boundaries, conversion mapping, and optional AI proposals.
+
+Validate an explicit DPROD Beta 2 product, create an ODPS draft, or export an
+ODPS definition as DPROD Turtle and JSON-LD:
+
+```bash
+open-data-products dprod-validate product.ttl --json
+open-data-products product wrap-dprod --input product.ttl --resource https://example.test/products/air --output air.yaml
+open-data-products product export-dprod --input air.yaml --output air
+```
+
+See [DPROD interoperability](docs/user/dprod-interoperability.md) for the
+normative namespace, offline SHACL profile, mapping constraints, and loss
+boundaries.
 
 Discover technical portfolio evidence from a contract repository without
 declaring any contract to be an approved data product:

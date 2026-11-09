@@ -342,6 +342,17 @@ standards-ready YAML fragments:
 - `open_data_products.contracts`: optional Data Contract validation adapter,
   ODPS contract reference resolution, schema extraction, alignment checks, and
   product-level reports
+- `open_data_products.dprod`: pinned OMG DPROD 1.0 Beta 2 RDF ingestion,
+  offline SHACL validation, ODPS draft conversion, and deterministic RDF export
+
+## DPROD boundary
+
+DPROD support is limited to the normative OMG 1.0 Beta 2 namespace
+`https://www.omg.org/spec/DPROD/`. The SDK rejects the separate development
+namespace and never claims ODPS/DPROD semantic equivalence. Use
+`discover_dprod_catalog`, `validate_dprod`, `wrap_dprod_resource`, and
+`export_odps_to_dprod`; inspect the mapping and loss records before making
+governance or contract decisions.
 
 ## Safety
 

@@ -39,6 +39,13 @@ from ..contracts import (
     wrap_contract,
 )
 from ..dcat import discover_dcat_catalog, wrap_dcat_resource
+from ..dprod import (
+    discover_dprod_catalog,
+    validate_dprod,
+    wrap_dprod_resource,
+    write_dprod_export,
+)
+from .._io import load_mapping
 from ..generation import get_config as get_generation_config
 from ..generation import validate_config as validate_generation_config
 from ..odpc import (
@@ -481,6 +488,44 @@ def _h_wrap_dcat_resource(args: Dict[str, Any]) -> Dict[str, Any]:
     payload["source"] = Path(args["source"]).name
     payload["output"] = Path(args["output"]).name
     payload["document"] = _redact_local_paths(payload["document"])
+    return _json_envelope(payload)
+
+
+def _h_discover_dprod_catalog(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Analyze supplied DPROD RDF without writing artifacts."""
+    return _json_envelope(
+        _redact_local_paths(discover_dprod_catalog(args["source"]).to_dict())
+    )
+
+
+def _h_validate_dprod(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Validate supplied DPROD RDF without writing artifacts."""
+    return _json_envelope(validate_dprod(args["source"]).to_dict())
+
+
+def _h_wrap_dprod_resource(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Write one ODPS draft from an explicit DPROD resource selection."""
+    result = wrap_dprod_resource(
+        args["source"],
+        args["resource"],
+        args["output"],
+        overwrite=bool(args.get("overwrite", False)),
+    )
+    payload = result.to_dict()
+    payload["source"] = Path(args["source"]).name
+    payload["output"] = Path(args["output"]).name
+    return _json_envelope(_redact_local_paths(payload))
+
+
+def _h_export_dprod(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Write DPROD serializations from an ODPS source mapping."""
+    payload = write_dprod_export(
+        load_mapping(Path(args["source"]), root_name="ODPS document"),
+        args["output"],
+        overwrite=bool(args.get("overwrite", False)),
+    )
+    payload["turtle_output"] = Path(str(payload["turtle_output"])).name
+    payload["jsonld_output"] = Path(str(payload["jsonld_output"])).name
     return _json_envelope(payload)
 
 
@@ -1169,6 +1214,49 @@ TOOLS: List[Dict[str, Any]] = [
             ["source", "resource", "output"],
         ),
         "handler": _h_wrap_dcat_resource,
+    },
+    {
+        "name": "discover_dprod_catalog",
+        "description": "Analyze explicit DPROD 1.0 Beta 2 products from supplied RDF.",
+        "class": "safe",
+        "inputSchema": _object_schema({"source": {"type": "string"}}, ["source"]),
+        "handler": _h_discover_dprod_catalog,
+    },
+    {
+        "name": "validate_dprod",
+        "description": "Validate RDF against local pinned DPROD 1.0 Beta 2 SHACL shapes.",
+        "class": "safe",
+        "inputSchema": _object_schema({"source": {"type": "string"}}, ["source"]),
+        "handler": _h_validate_dprod,
+    },
+    {
+        "name": "wrap_dprod_resource",
+        "description": "Write a validated ODPS draft from one explicit DPROD product.",
+        "class": "state-changing",
+        "inputSchema": _object_schema(
+            {
+                "source": {"type": "string"},
+                "resource": {"type": "string"},
+                "output": _OUTPUT_PROP,
+                "overwrite": {"type": "boolean", "default": False},
+            },
+            ["source", "resource", "output"],
+        ),
+        "handler": _h_wrap_dprod_resource,
+    },
+    {
+        "name": "export_dprod",
+        "description": "Write deterministic DPROD Turtle and JSON-LD from an ODPS 4.2 definition.",
+        "class": "state-changing",
+        "inputSchema": _object_schema(
+            {
+                "source": _PATH_PROP,
+                "output": _OUTPUT_PROP,
+                "overwrite": {"type": "boolean", "default": False},
+            },
+            ["source", "output"],
+        ),
+        "handler": _h_export_dprod,
     },
     {
         "name": "summarize_data_contract",

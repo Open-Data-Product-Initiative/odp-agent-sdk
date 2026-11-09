@@ -92,6 +92,11 @@ def _standards() -> List[Dict[str, str]]:
             "name": "Data Catalog Vocabulary",
             "description": "RDF catalog intake and evidence-bounded DCAT-to-ODPS drafts.",
         },
+        {
+            "id": "dprod",
+            "name": "Data Products Ontology",
+            "description": "Pinned OMG DPROD 1.0 Beta 2 RDF and SHACL interoperability.",
+        },
     ]
 
 
@@ -321,6 +326,19 @@ def _capabilities() -> List[Dict[str, Any]]:
             "interfaces": ["python", "cli", "mcp"],
             "lifecycle": ["discover-dcat", "wrap-dcat"],
             "summary": "Analyze supplied DCAT RDF with source-fact, inference, and proposal boundaries, then create selected ODPS 4.2 drafts.",
+        },
+        {
+            "id": "dprod-beta2-interoperability",
+            "title": "DPROD 1.0 Beta 2 interoperability",
+            "standards": ["dprod", "dcat", "odps"],
+            "interfaces": ["python", "cli", "mcp"],
+            "lifecycle": [
+                "discover-dprod",
+                "dprod-validate",
+                "wrap-dprod",
+                "export-dprod",
+            ],
+            "summary": "Use pinned offline OMG Beta 2 artifacts to inventory and validate explicit data products, draft ODPS definitions, and export deterministic DPROD RDF with mapping-loss records.",
         },
         {
             "id": "odcs-product-wrapping",
@@ -634,6 +652,8 @@ def _safety() -> Dict[str, Any]:
             "discover_contract_portfolio",
             "wrap_odcs_contract",
             "wrap_dcat_resource",
+            "wrap_dprod_resource",
+            "export_dprod",
         ],
         "mcp_note": (
             "MCP tools are safe/read-only except explicitly approved workspace "
