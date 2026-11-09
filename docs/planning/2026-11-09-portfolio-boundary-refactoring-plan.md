@@ -212,7 +212,7 @@ git commit -m "refactor: isolate portfolio value helpers"
 - Modify: `tests/test_portfolio_odps_v42.py`
 - Modify: `tests/test_portfolio_refactor_contracts.py`
 
-- [ ] **Step 1: Write a failing boundary test for a delegated normalizer.**
+- [x] **Step 1: Write a failing boundary test for a delegated normalizer.**
 
 ```python
 def test_portfolio_facade_delegates_odps_normalization() -> None:
@@ -220,13 +220,13 @@ def test_portfolio_facade_delegates_odps_normalization() -> None:
     assert "from ._portfolio_normalization import normalize_odps_product" in source
 ```
 
-- [ ] **Step 2: Run the boundary test and confirm it fails.**
+- [x] **Step 2: Run the boundary test and confirm it fails.**
 
 Run: `pytest -q tests/test_portfolio_refactor_contracts.py::test_portfolio_facade_delegates_odps_normalization`
 
 Expected: FAIL because the normalizer has not been extracted.
 
-- [ ] **Step 3: Move only ODPS normalization helpers and constants to `_portfolio_normalization.py`; keep a private compatibility wrapper in the facade until direct private test imports are updated.**
+- [x] **Step 3: Move only ODPS normalization helpers and constants to `_portfolio_normalization.py`; keep a private compatibility wrapper in the facade until direct private test imports are updated.**
 
 ```python
 # open_data_products/portfolio.py
@@ -238,13 +238,13 @@ def _normalize_odps_product(document: Dict[str, Any]) -> None:
 
 Preserve ODPS 4.1 and 4.2 output shapes and external `$ref` behavior.
 
-- [ ] **Step 4: Run normalization, sync, and build tests.**
+- [x] **Step 4: Run normalization, sync, and build tests.**
 
 Run: `pytest -q tests/test_portfolio_odps_v42.py tests/test_portfolio.py -k 'normaliz or sync or build'`
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit the normalization extraction.**
+- [x] **Step 5: Commit the normalization extraction.**
 
 ```bash
 git add open_data_products/portfolio.py open_data_products/_portfolio_normalization.py tests/test_portfolio_odps_v42.py tests/test_portfolio_refactor_contracts.py
@@ -258,7 +258,7 @@ git commit -m "refactor: isolate portfolio ODPS normalization"
 - Modify: `open_data_products/portfolio.py`
 - Modify: `tests/test_portfolio_refactor_contracts.py`
 
-- [ ] **Step 1: Write failing tests for the facade boundary and file-layout preservation.**
+- [x] **Step 1: Write failing tests for the facade boundary and file-layout preservation.**
 
 ```python
 def test_portfolio_facade_delegates_workspace_loading() -> None:
@@ -270,23 +270,23 @@ def test_refactor_preserves_workspace_artifact_paths(tmp_path: Path) -> None:
     assert result["html"].endswith("index.html")
 ```
 
-- [ ] **Step 2: Run the tests and confirm the facade-boundary test fails.**
+- [x] **Step 2: Run the tests and confirm the facade-boundary test fails.**
 
 Run: `pytest -q tests/test_portfolio_refactor_contracts.py -k 'workspace'`
 
 Expected: FAIL for the missing delegated import before production changes.
 
-- [ ] **Step 3: Move workspace load, validation aggregation, artifact file helpers, version discovery, and i18n persistence to `_portfolio_workspace.py`.**
+- [x] **Step 3: Move workspace load, validation aggregation, artifact file helpers, version discovery, and i18n persistence to `_portfolio_workspace.py`.**
 
 Keep public `load_portfolio_workspace` behavior available through the facade if callers require it. Keep filesystem paths internal to MCP responses through the existing adapter layer.
 
-- [ ] **Step 4: Run focused workflow tests.**
+- [x] **Step 4: Run focused workflow tests.**
 
 Run: `pytest -q tests/test_portfolio.py -k 'sync or refresh or explain or localize'`
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit the workspace extraction.**
+- [x] **Step 5: Commit the workspace extraction.**
 
 ```bash
 git add open_data_products/portfolio.py open_data_products/_portfolio_workspace.py tests/test_portfolio_refactor_contracts.py
@@ -301,7 +301,7 @@ git commit -m "refactor: isolate portfolio workspace operations"
 - Modify: `open_data_products/portfolio.py`
 - Modify: `tests/test_portfolio_refactor_contracts.py`
 
-- [ ] **Step 1: Write failing tests proving public facade functions retain their legacy call signatures and delegate to the workflow module.**
+- [x] **Step 1: Write failing tests proving public facade functions retain their legacy call signatures and delegate to the workflow module.**
 
 ```python
 def test_portfolio_facade_exports_workflow_functions() -> None:
@@ -310,13 +310,13 @@ def test_portfolio_facade_exports_workflow_functions() -> None:
     assert callable(portfolio.refresh_portfolio)
 ```
 
-- [ ] **Step 2: Run the new test, confirm the delegation assertion fails, then extract prompt parsing and orchestration.**
+- [x] **Step 2: Run the new test, confirm the delegation assertion fails, then extract prompt parsing and orchestration.**
 
 Run: `pytest -q tests/test_portfolio_refactor_contracts.py::test_portfolio_facade_exports_workflow_functions`
 
 Expected: FAIL before adding the explicit facade delegation assertion; PASS after the extraction.
 
-- [ ] **Step 3: Move prompt rendering/parsing to `_portfolio_prompting.py` and build/refresh orchestration internals to `_portfolio_workflow.py`; keep dataclasses and public wrappers in `portfolio.py`.**
+- [x] **Step 3: Move prompt rendering/parsing to `_portfolio_prompting.py` and build/refresh orchestration internals to `_portfolio_workflows.py`; keep dataclasses and public wrappers in `portfolio.py`.**
 
 ```python
 # open_data_products/portfolio.py
@@ -326,13 +326,13 @@ def build_portfolio(workspace: Union[str, Path], **kwargs: object) -> Dict[str, 
 
 Use explicit typed wrapper signatures rather than `**kwargs` in the final implementation.
 
-- [ ] **Step 4: Run the full project verification.**
+- [x] **Step 4: Run the full project verification.**
 
 Run: `pytest -q && python3 -c "import open_data_products" && python3 -m open_data_products.cli manifest --json | python3 -m json.tool > /dev/null && python3 -m build --quiet && python3 -m twine check dist/*`
 
 Expected: all commands succeed.
 
-- [ ] **Step 5: Commit the completed Portfolio boundary refactor.**
+- [x] **Step 5: Commit the completed Portfolio boundary refactor.**
 
 ```bash
 git add open_data_products/portfolio.py open_data_products/_portfolio_workflow.py open_data_products/_portfolio_prompting.py tests/test_portfolio_refactor_contracts.py
