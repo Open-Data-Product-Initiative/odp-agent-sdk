@@ -16,6 +16,16 @@ def test_ci_cross_checks_dprod_export_with_verified_apache_jena() -> None:
     assert "export_odps_to_dprod" in workflow
 
 
+def test_ci_jena_validation_is_independent_of_remote_ontology_imports() -> None:
+    """Jena validates local shapes without relying on ontology-host redirects."""
+    workflow = (
+        Path(__file__).resolve().parents[1] / ".github" / "workflows" / "ci.yml"
+    ).read_text(encoding="utf-8")
+
+    assert "dprod-shapes-no-imports.ttl" in workflow
+    assert 'if "owl:imports" not in line' in workflow
+
+
 def test_ci_wheel_smoke_loads_packaged_dprod_and_dcat_features() -> None:
     """The installed-wheel check exercises packaged DPROD and DCAT features."""
     workflow = (
@@ -26,3 +36,13 @@ def test_ci_wheel_smoke_loads_packaged_dprod_and_dcat_features() -> None:
     assert "dprod_export.validation.conforms" in workflow
     assert "from open_data_products.dcat import discover_dcat_catalog" in workflow
     assert "dcat_inventory = discover_dcat_catalog" in workflow
+
+
+def test_ci_wheel_smoke_exercises_stdio_mcp_transport() -> None:
+    """The installed distribution starts the MCP JSON-RPC process itself."""
+    workflow = (
+        Path(__file__).resolve().parents[1] / ".github" / "workflows" / "ci.yml"
+    ).read_text(encoding="utf-8")
+
+    assert '"-m", "open_data_products.mcp.server"' in workflow
+    assert "subprocess.run(" in workflow

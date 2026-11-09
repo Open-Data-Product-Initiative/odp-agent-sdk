@@ -35,6 +35,9 @@ jobs:
           cd /tmp
           /tmp/open-data-products-wheel/bin/python - <<'PY'
           import os
+          import json
+          import subprocess
+          import sys
           from pathlib import Path
 
           from open_data_products.agent import validate_document
@@ -84,6 +87,35 @@ jobs:
               resource.id == "https://wheel.example.test/datasets/air"
               for resource in dcat_inventory.resources
           )
+          requests = [
+              {"jsonrpc": "2.0", "id": 1, "method": "initialize"},
+              {"jsonrpc": "2.0", "id": 2, "method": "tools/list"},
+              {
+                  "jsonrpc": "2.0",
+                  "id": 3,
+                  "method": "tools/call",
+                  "params": {
+                      "name": "get_resource",
+                      "arguments": {"id": "odps.v4.2.schema.yaml"},
+                  },
+              },
+              {"jsonrpc": "2.0", "id": 4, "method": "exit"},
+          ]
+          process = subprocess.run(
+              [sys.executable, "-m", "open_data_products.mcp.server"],
+              input="\n".join(json.dumps(request) for request in requests) + "\n",
+              text=True,
+              capture_output=True,
+              check=True,
+          )
+          responses = [json.loads(line) for line in process.stdout.splitlines()]
+          assert [response["id"] for response in responses] == [1, 2, 3, 4]
+          assert responses[0]["result"]["serverInfo"]["name"] == "open-data-products"
+          assert any(
+              tool["name"] == "get_resource"
+              for tool in responses[1]["result"]["tools"]
+          )
+          assert responses[2]["result"].get("isError") is not True
           PY
 
       - name: Set up Java for independent DPROD SHACL validation
@@ -114,9 +146,20 @@ jobs:
           result = export_odps_to_dprod(load_mapping(fixture))
           assert result.validation.conforms
           Path(os.environ["DPROD_EXPORT"]).write_text(result.turtle, encoding="utf-8")
+          source_shapes = Path(os.environ["WORKSPACE"]) / "open_data_products/dprod/data/dprod-shapes.ttl"
+          target_shapes = Path(os.environ["RUNNER_TEMP"]) / "dprod-shapes-no-imports.ttl"
+          target_shapes.write_text(
+              "\n".join(
+                  line
+                  for line in source_shapes.read_text(encoding="utf-8").splitlines()
+                  if "owl:imports" not in line
+              )
+              + "\n",
+              encoding="utf-8",
+          )
           PY
           "${RUNNER_TEMP}/apache-jena-${JENA_VERSION}/bin/shacl" validate \
-            --shapes "${WORKSPACE}/open_data_products/dprod/data/dprod-shapes.ttl" \
+            --shapes "${RUNNER_TEMP}/dprod-shapes-no-imports.ttl" \
             --data "${DPROD_EXPORT}"
 
       - name: Run the test suite
