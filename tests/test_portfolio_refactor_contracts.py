@@ -3,6 +3,9 @@
 import inspect
 from pathlib import Path
 
+import pytest
+
+from open_data_products.generation.models import PortfolioSourceBudget
 from open_data_products import (
     PortfolioBuildRequest,
     PortfolioBuildResult,
@@ -15,6 +18,7 @@ from open_data_products import (
     render_portfolio,
     sync_portfolio,
 )
+from open_data_products.portfolio import inspect_portfolio_intake
 
 
 def _write_render_workspace(workspace: Path) -> None:
@@ -262,3 +266,191 @@ def test_portfolio_facade_delegates_odps_normalization() -> None:
     source = Path("open_data_products/_portfolio_html.py").read_text(encoding="utf-8")
     assert "from ._portfolio_normalization import" in source
     assert "normalize_odps_product as _normalize_odps_product" in source
+
+
+def test_portfolio_public_workflow_signatures_remain_stable() -> None:
+    """The facade preserves the complete workflow-call contract."""
+    assert list(inspect.signature(explain_portfolio).parameters) == ["workspace"]
+    assert list(inspect.signature(sync_portfolio).parameters) == ["workspace"]
+    assert list(inspect.signature(render_portfolio).parameters) == [
+        "workspace",
+        "output_path",
+    ]
+    assert list(inspect.signature(refresh_portfolio).parameters) == [
+        "workspace",
+        "objectives",
+        "use_cases",
+        "signals",
+        "products",
+        "title",
+        "client",
+        "model",
+        "all_sources",
+        "context_format",
+        "source_budget",
+        "source_privacy",
+    ]
+    assert list(inspect.signature(localize_portfolio).parameters) == [
+        "workspace",
+        "languages",
+        "client",
+        "model",
+        "default_language",
+    ]
+
+
+def test_explain_empty_workspace_is_read_only(tmp_path: Path) -> None:
+    """Read-only explanation does not create implicit workspace artifacts."""
+    workspace = tmp_path / "empty"
+    workspace.mkdir()
+
+    result = explain_portfolio(workspace)
+
+    assert result["kind"] == "PortfolioExplain"
+    assert result["businessObjectiveCount"] == 0
+    assert result["productSpecCount"] == 0
+    assert result["hasExecutiveSummary"] is False
+    assert list(workspace.iterdir()) == []
+
+
+def test_rendering_to_custom_path_does_not_create_default_html(tmp_path: Path) -> None:
+    """An explicit render destination stays isolated from the workspace default."""
+    workspace = tmp_path / "portfolio"
+    output = tmp_path / "published" / "portfolio.html"
+    _write_render_workspace(workspace)
+
+    result = render_portfolio(workspace, output_path=output)
+
+    assert result["html"] == str(output)
+    assert output.is_file()
+    assert not (workspace / "index.html").exists()
+
+
+def test_custom_render_path_is_idempotent(tmp_path: Path) -> None:
+    """A repeated custom render reports the HTML artifact as unchanged."""
+    workspace = tmp_path / "portfolio"
+    output = tmp_path / "published" / "portfolio.html"
+    _write_render_workspace(workspace)
+
+    render_portfolio(workspace, output_path=output)
+    result = render_portfolio(workspace, output_path=output)
+
+    assert str(output) in result["unchanged"]
+    assert str(output) not in result["created"]
+    assert str(output) not in result["updated"]
+
+
+def test_sync_preserves_unrelated_workspace_files(tmp_path: Path) -> None:
+    """Synchronizing managed artifacts leaves user-owned workspace files intact."""
+    workspace = tmp_path / "portfolio"
+    _write_render_workspace(workspace)
+    notes = workspace / "review-notes.md"
+    notes.write_text("Keep this reviewer note.", encoding="utf-8")
+
+    sync_portfolio(workspace)
+
+    assert notes.read_text(encoding="utf-8") == "Keep this reviewer note."
+
+
+def test_intake_is_read_only_for_source_documents(tmp_path: Path) -> None:
+    """Inspection neither changes source content nor creates generated artifacts."""
+    objectives = tmp_path / "objectives"
+    objectives.mkdir()
+    source = objectives / "goal.md"
+    source.write_text("Improve service reliability.", encoding="utf-8")
+
+    result = inspect_portfolio_intake(objectives=objectives)
+
+    assert result["llmCallCount"] == 0
+    assert result["sourceCounts"]["objectives"] == 1
+    assert source.read_text(encoding="utf-8") == "Improve service reliability."
+    assert sorted(path.name for path in tmp_path.iterdir()) == ["objectives"]
+
+
+def test_intake_rejects_zero_source_character_budget(tmp_path: Path) -> None:
+    """Intake fails before reducing source text with an invalid source budget."""
+    objectives = tmp_path / "objectives"
+    objectives.mkdir()
+
+    with pytest.raises(ValueError, match="max_source_chars"):
+        inspect_portfolio_intake(
+            objectives=objectives,
+            source_budget=PortfolioSourceBudget(max_source_chars=0),
+        )
+
+
+def test_intake_rejects_zero_prompt_character_budget(tmp_path: Path) -> None:
+    """Intake fails before prompting with an invalid prompt budget."""
+    objectives = tmp_path / "objectives"
+    objectives.mkdir()
+
+    with pytest.raises(ValueError, match="max_prompt_chars"):
+        inspect_portfolio_intake(
+            objectives=objectives,
+            source_budget=PortfolioSourceBudget(max_prompt_chars=0),
+        )
+
+
+def test_localize_rejects_default_language_without_calling_client(
+    tmp_path: Path,
+) -> None:
+    """Localization refuses a no-op request before invoking an LLM client."""
+    workspace = tmp_path / "portfolio"
+    _write_render_workspace(workspace)
+    calls = []
+
+    def client(prompt: str, model: str) -> str:
+        calls.append((prompt, model))
+        return "translations: {}"
+
+    with pytest.raises(ValueError, match="non-default language"):
+        localize_portfolio(
+            workspace,
+            languages="en",
+            client=client,
+            model="test-model",
+        )
+
+    assert calls == []
+    assert not (workspace / "portfolio-i18n.yaml").exists()
+
+
+def test_localize_deduplicates_case_insensitive_language_tags(tmp_path: Path) -> None:
+    """Duplicate language requests result in one localized artifact per language."""
+    workspace = tmp_path / "portfolio"
+    _write_render_workspace(workspace)
+    calls = []
+
+    def client(prompt: str, model: str) -> str:
+        calls.append((prompt, model))
+        return "translations: {}"
+
+    result = localize_portfolio(
+        workspace,
+        languages="fi,FI,en",
+        client=client,
+        model="test-model",
+    )
+
+    assert result["languages"] == ["fi"]
+    assert (workspace / "index.fi.html").is_file()
+    assert calls
+    assert all("Target language: fi" in prompt for prompt, _model in calls)
+
+
+def test_localize_rejects_invalid_bcp47_tag_before_writing_files(
+    tmp_path: Path,
+) -> None:
+    """Invalid localization language tags fail without creating i18n output."""
+    workspace = tmp_path / "portfolio"
+    _write_render_workspace(workspace)
+
+    with pytest.raises(ValueError, match="Invalid BCP 47 language tag"):
+        localize_portfolio(
+            workspace,
+            languages="not a language",
+            client=lambda _prompt, _model: "translations: {}",
+            model="test-model",
+        )
+
+    assert not (workspace / "portfolio-i18n.yaml").exists()
