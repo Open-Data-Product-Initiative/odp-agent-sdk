@@ -51,6 +51,11 @@ from ._portfolio_values import (
     title_from_text as _title_from_text,
 )
 from ._portfolio_workspace_paths import PortfolioWorkspacePaths
+from ._portfolio_workspace import (
+    empty_catalog as _empty_catalog,
+    empty_graph as _empty_graph,
+    load_optional_mapping as _load_optional_mapping,
+)
 from .generation.models import PortfolioPrivacySettings, PortfolioSourceBudget
 from .odpc import load_catalog
 from .odpg import build_graph, build_graph_explorer_html, load_graph
@@ -5074,20 +5079,6 @@ def _render_footer(data: Dict[str, Any]) -> str:
         "</div>"
         "</footer>"
     )
-
-
-def _load_optional_mapping(path: Path) -> Dict[str, Any]:
-    if not path.exists():
-        return {}
-    return load_mapping(path, root_name="Portfolio")
-
-
-def _empty_catalog() -> Dict[str, Any]:
-    return {"catalog": {"metadata": {"name": {"en": "Portfolio"}}}}
-
-
-def _empty_graph() -> Dict[str, Any]:
-    return {"graph": {"metadata": {}, "nodes": [], "edges": []}}
 
 
 def _load_product_specs(root: Path) -> Dict[str, Dict[str, Any]]:

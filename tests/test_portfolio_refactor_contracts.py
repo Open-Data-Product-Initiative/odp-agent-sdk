@@ -158,6 +158,12 @@ def test_workspace_loading_uses_private_layout_model() -> None:
     assert "from ._portfolio_workspace_paths import PortfolioWorkspacePaths" in source
 
 
+def test_portfolio_facade_imports_workspace_document_helpers() -> None:
+    """Workspace document defaults do not stay coupled to the facade."""
+    source = Path("open_data_products/portfolio.py").read_text(encoding="utf-8")
+    assert "from ._portfolio_workspace import" in source
+
+
 def test_portfolio_facade_delegates_odps_normalization() -> None:
     """Portfolio preserves normalizer compatibility aliases only."""
     source = Path("open_data_products/portfolio.py").read_text(encoding="utf-8")
