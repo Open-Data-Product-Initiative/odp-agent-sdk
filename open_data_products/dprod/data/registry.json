@@ -4,8 +4,8 @@
   "namespace": "https://www.omg.org/spec/DPROD/",
   "unsupported_namespaces": ["https://www.omg.org/spec/DPROD/dprod/"],
   "artifacts": [
-    {"file": "dprod-ontology.ttl", "source": "https://www.omg.org/spec/DPROD/20260601/dprod-ontology.ttl", "source_sha256": "2d1c1d3b7555741ea61d6ca0d7b1c0b2e0f97c2ececd6cabb0c9820ef3310a61", "bundled_sha256": "0e48d8f25ca13bd4836f6c00fdea43a083cbce5d34868e2acc62d83ca7f01f62", "license": "CC-BY-4.0", "normalization": "CRLF source normalized to LF when bundled"},
-    {"file": "dprod-shapes.ttl", "source": "https://www.omg.org/spec/DPROD/20260601/dprod-shapes.ttl", "source_sha256": "e7673313bff02f9a72e9cc76f79fbb706846001055598440d75948fa6c30e01c", "bundled_sha256": "c31e4716c0aea4c1aae2e5511eb7c892aa4a09270b6bac9e9a1fc36ce50001a5", "license": "CC-BY-4.0", "normalization": "CRLF source normalized to LF when bundled"}
+    {"file": "dprod-ontology.ttl", "source": "https://www.omg.org/spec/DPROD/20260601/dprod-ontology.ttl", "source_sha256": "2d1c1d3b7555741ea61d6ca0d7b1c0b2e0f97c2ececd6cabb0c9820ef3310a61", "bundled_sha256": "6bd89824069aa6682aaf3dce0e62264b29f9b3c10b2d3f23d0ae942ff915d588", "license": "CC-BY-4.0", "normalization": "CRLF source normalized to LF with trailing whitespace removed when bundled"},
+    {"file": "dprod-shapes.ttl", "source": "https://www.omg.org/spec/DPROD/20260601/dprod-shapes.ttl", "source_sha256": "e7673313bff02f9a72e9cc76f79fbb706846001055598440d75948fa6c30e01c", "bundled_sha256": "1a8b5eca9e31bcaa83dcad10a019166d88ad9db073529200ff63aba3b0b7e074", "license": "CC-BY-4.0", "normalization": "CRLF source normalized to LF with trailing whitespace removed when bundled"}
   ],
   "informative_examples": {
     "source": "https://www.omg.org/cgi-bin/doc?ptc/26-05-33.zip",

@@ -51,7 +51,6 @@ dprod:DataProduct
   rdfs:label "data product" ;
   rdfs:subClassOf dcat:Resource ;
 .
-
 dprod:DataProductLifecycleStatus
   a owl:Class, rdfs:Class ;
   dct:description
