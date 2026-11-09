@@ -65,7 +65,54 @@ git add docs/planning/2026-11-09-portfolio-boundary-refactoring-plan.md tests/te
 git commit -m "test: characterize portfolio refactor contracts"
 ```
 
-### Task 2: Extract presentation rendering without changing output
+### Task 2: Extract typed Portfolio models
+
+**Files:**
+- Create: `open_data_products/_portfolio_models.py`
+- Modify: `open_data_products/portfolio.py`
+- Modify: `tests/test_portfolio_refactor_contracts.py`
+
+- [x] **Step 1: Write the failing facade-boundary test.**
+
+```python
+def test_portfolio_facade_reexports_models_from_private_module() -> None:
+    source = Path("open_data_products/portfolio.py").read_text(encoding="utf-8")
+    assert "from ._portfolio_models import" in source
+    assert "class PortfolioBuildRequest" not in source
+```
+
+- [x] **Step 2: Run the test and confirm it fails before the move.**
+
+Run: `pytest -q tests/test_portfolio_refactor_contracts.py::test_portfolio_facade_reexports_models_from_private_module`
+
+Expected: FAIL because models still live in `portfolio.py`.
+
+- [x] **Step 3: Move the source-lane, build-request, and build-result dataclasses plus client aliases to `_portfolio_models.py`; explicitly import them from the facade.**
+
+```python
+from ._portfolio_models import (
+    PortfolioBuildClient,
+    PortfolioBuildRequest,
+    PortfolioBuildResult,
+    PortfolioLocalizationClient,
+    PortfolioSourceLanes,
+)
+```
+
+- [x] **Step 4: Run the focused contracts and Portfolio regression suite.**
+
+Run: `pytest -q tests/test_portfolio_refactor_contracts.py tests/test_portfolio.py tests/test_portfolio_odps_v42.py tests/test_portfolio_fragment_deduplication.py`
+
+Expected: PASS.
+
+- [x] **Step 5: Commit the models extraction.**
+
+```bash
+git add open_data_products/_portfolio_models.py open_data_products/portfolio.py tests/test_portfolio_refactor_contracts.py docs/planning/2026-11-09-portfolio-boundary-refactoring-plan.md
+git commit -m "refactor: isolate portfolio models"
+```
+
+### Task 3: Extract presentation rendering without changing output
 
 **Files:**
 - Create: `open_data_products/_portfolio_html.py`
@@ -110,7 +157,7 @@ git add open_data_products/portfolio.py open_data_products/_portfolio_html.py op
 git commit -m "refactor: isolate portfolio presentation"
 ```
 
-### Task 3: Extract ODPS output normalization
+### Task 4: Extract ODPS output normalization
 
 **Files:**
 - Create: `open_data_products/_portfolio_normalization.py`
@@ -157,7 +204,7 @@ git add open_data_products/portfolio.py open_data_products/_portfolio_normalizat
 git commit -m "refactor: isolate portfolio ODPS normalization"
 ```
 
-### Task 4: Extract workspace persistence and validation
+### Task 5: Extract workspace persistence and validation
 
 **Files:**
 - Create: `open_data_products/_portfolio_workspace.py`
@@ -199,7 +246,7 @@ git add open_data_products/portfolio.py open_data_products/_portfolio_workspace.
 git commit -m "refactor: isolate portfolio workspace operations"
 ```
 
-### Task 5: Reduce the facade to workflow orchestration
+### Task 6: Reduce the facade to workflow orchestration
 
 **Files:**
 - Create: `open_data_products/_portfolio_workflow.py`
@@ -245,7 +292,7 @@ git add open_data_products/portfolio.py open_data_products/_portfolio_workflow.p
 git commit -m "refactor: reduce portfolio facade to public workflow API"
 ```
 
-### Task 6: Add release features only after the refactor stabilizes
+### Task 7: Add release features only after the refactor stabilizes
 
 **Files:**
 - To be selected from the approved 0.7.0 feature specification.

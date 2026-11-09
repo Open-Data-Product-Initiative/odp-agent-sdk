@@ -117,3 +117,11 @@ def test_rendering_a_workspace_twice_keeps_artifacts_and_html_stable(
     assert 'class="topbar"' in first_html
     assert 'class="panels"' in first_html
     assert "document.addEventListener" in first_html
+
+
+def test_portfolio_facade_reexports_models_from_private_module() -> None:
+    """The public facade keeps model imports stable while moving their home."""
+    source = Path("open_data_products/portfolio.py").read_text(encoding="utf-8")
+
+    assert "from ._portfolio_models import" in source
+    assert "class PortfolioBuildRequest" not in source
