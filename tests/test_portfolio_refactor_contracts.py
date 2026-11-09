@@ -199,6 +199,14 @@ def test_portfolio_facade_imports_workspace_version_helpers() -> None:
     assert "portfolio_versions as _portfolio_versions" in source
 
 
+def test_portfolio_facade_delegates_read_only_intake() -> None:
+    """Read-only intake has direct private-module dependencies."""
+    source = Path("open_data_products/portfolio.py").read_text(encoding="utf-8")
+
+    assert "from ._portfolio_intake import inspect_portfolio_intake" in source
+    assert "def inspect_portfolio_intake" not in source
+
+
 def test_portfolio_facade_delegates_odps_normalization() -> None:
     """Portfolio preserves normalizer compatibility aliases only."""
     source = Path("open_data_products/portfolio.py").read_text(encoding="utf-8")
