@@ -1,0 +1,5 @@
+{
+  "@context": "https://fixtures.example.test/context.jsonld",
+  "@id": "https://fixtures.example.test/datasets/unsafe",
+  "@type": "http://www.w3.org/ns/dcat#Dataset"
+}

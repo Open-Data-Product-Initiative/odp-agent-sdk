@@ -1,0 +1,25 @@
+@prefix dcat: <http://www.w3.org/ns/dcat#> .
+@prefix dct: <http://purl.org/dc/terms/> .
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
+
+<https://fixtures.example.test/catalogs/environment> a dcat:Catalog ;
+  dct:title "Environmental data catalog"@en ;
+  dcat:dataset <https://fixtures.example.test/datasets/air-quality> .
+
+<https://fixtures.example.test/datasets/air-quality> a dcat:Dataset ;
+  dct:identifier "air-quality" ;
+  dct:title "Air quality"@en, "Luftqualitat"@de ;
+  dct:description "Daily air-quality observations."@en ;
+  dct:publisher <https://fixtures.example.test/agents/environment> ;
+  dcat:keyword "air"@en, "environment"@en ;
+  dcat:theme <https://fixtures.example.test/themes/environment> ;
+  dcat:distribution <https://fixtures.example.test/distributions/air-quality> .
+
+<https://fixtures.example.test/agents/environment> a foaf:Organization ;
+  foaf:name "Environment Office" .
+
+<https://fixtures.example.test/distributions/air-quality> a dcat:Distribution ;
+  dcat:accessURL <https://data.fixtures.example.test/air-quality> ;
+  dcat:downloadURL <https://data.fixtures.example.test/air-quality.csv> ;
+  dct:format "CSV" ;
+  dcat:mediaType "text/csv" .

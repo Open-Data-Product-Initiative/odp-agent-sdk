@@ -470,7 +470,9 @@ def _h_discover_contract_portfolio(args: Dict[str, Any]) -> Dict[str, Any]:
 
 def _h_discover_dcat_catalog(args: Dict[str, Any]) -> Dict[str, Any]:
     """Analyze one supplied DCAT catalog without writing artifacts."""
-    return _json_envelope(discover_dcat_catalog(args["source"]).to_dict())
+    return _json_envelope(
+        _redact_local_paths(discover_dcat_catalog(args["source"]).to_dict())
+    )
 
 
 def _h_wrap_dcat_resource(args: Dict[str, Any]) -> Dict[str, Any]:
@@ -487,8 +489,7 @@ def _h_wrap_dcat_resource(args: Dict[str, Any]) -> Dict[str, Any]:
     payload = result.to_dict()
     payload["source"] = Path(args["source"]).name
     payload["output"] = Path(args["output"]).name
-    payload["document"] = _redact_local_paths(payload["document"])
-    return _json_envelope(payload)
+    return _json_envelope(_redact_local_paths(payload))
 
 
 def _h_discover_dprod_catalog(args: Dict[str, Any]) -> Dict[str, Any]:

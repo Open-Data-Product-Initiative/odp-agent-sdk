@@ -8,6 +8,8 @@ import pytest
 
 from open_data_products.cli import main
 
+pytestmark = pytest.mark.functional
+
 CATALOG_TURTLE = """\
 @prefix dcat: <http://www.w3.org/ns/dcat#> .
 @prefix dct: <http://purl.org/dc/terms/> .
