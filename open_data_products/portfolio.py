@@ -43,6 +43,8 @@ from ._portfolio_normalization import (
 )
 from ._portfolio_prompting import (  # noqa: F401
     extract_yaml_text as _extract_yaml_text,
+    parse_executive_summary,
+    parse_portfolio_localization,
     parse_portfolio_plan,
     render_portfolio_build_prompt,
     render_portfolio_executive_summary_prompt,
@@ -857,46 +859,6 @@ def _render_executive_summary_repair_prompt(raw_output: str, parser_error: str) 
             raw_output,
         ]
     )
-
-
-def parse_executive_summary(raw_output: str) -> Dict[str, Any]:
-    """Parse a model-generated portfolio executive summary YAML mapping."""
-    text = _extract_yaml_text(raw_output)
-    try:
-        data = yaml.safe_load(text)
-    except yaml.YAMLError as exc:
-        raise ValueError(f"Executive Summary YAML could not be parsed: {exc}") from exc
-    if not isinstance(data, dict):
-        raise ValueError("Executive Summary must contain a YAML object at the root")
-    if data.get("executiveSummary") and isinstance(data.get("executiveSummary"), dict):
-        data = data["executiveSummary"]
-    data.setdefault("kind", "PortfolioExecutiveSummary")
-    return data
-
-
-def parse_portfolio_localization(raw_output: str) -> Dict[str, Any]:
-    """Parse a model-generated portfolio localization YAML mapping."""
-    text = _extract_yaml_text(raw_output)
-    try:
-        data = yaml.safe_load(text)
-    except yaml.YAMLError as exc:
-        raise ValueError(
-            f"Portfolio localization YAML could not be parsed: {exc}"
-        ) from exc
-    if not isinstance(data, dict):
-        raise ValueError(
-            "Portfolio localization must contain a YAML object at the root"
-        )
-    translations = data.get("translations")
-    if not isinstance(translations, dict):
-        data["translations"] = {}
-        return data
-    data["translations"] = {
-        str(key): _text(value)
-        for key, value in translations.items()
-        if isinstance(key, str) and _text(value)
-    }
-    return data
 
 
 def _parse_portfolio_localization_with_repair(

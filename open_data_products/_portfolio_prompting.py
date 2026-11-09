@@ -8,6 +8,7 @@ from typing import Any, Dict, List
 import yaml
 
 from .portfolio_budget import reduce_source_lanes_for_prompt
+from ._portfolio_values import text
 
 
 def extract_yaml_text(raw_output: str) -> str:
@@ -41,6 +42,44 @@ def parse_portfolio_plan(raw_output: str) -> Dict[str, Any]:
         ) from exc
     if not isinstance(data, dict):
         raise ValueError("Portfolio plan must contain a YAML object at the root")
+    return data
+
+
+def parse_executive_summary(raw_output: str) -> Dict[str, Any]:
+    """Parse a model-generated portfolio executive summary YAML mapping."""
+    try:
+        data = yaml.safe_load(extract_yaml_text(raw_output))
+    except yaml.YAMLError as exc:
+        raise ValueError(f"Executive Summary YAML could not be parsed: {exc}") from exc
+    if not isinstance(data, dict):
+        raise ValueError("Executive Summary must contain a YAML object at the root")
+    if data.get("executiveSummary") and isinstance(data.get("executiveSummary"), dict):
+        data = data["executiveSummary"]
+    data.setdefault("kind", "PortfolioExecutiveSummary")
+    return data
+
+
+def parse_portfolio_localization(raw_output: str) -> Dict[str, Any]:
+    """Parse a model-generated portfolio localization YAML mapping."""
+    try:
+        data = yaml.safe_load(extract_yaml_text(raw_output))
+    except yaml.YAMLError as exc:
+        raise ValueError(
+            f"Portfolio localization YAML could not be parsed: {exc}"
+        ) from exc
+    if not isinstance(data, dict):
+        raise ValueError(
+            "Portfolio localization must contain a YAML object at the root"
+        )
+    translations = data.get("translations")
+    if not isinstance(translations, dict):
+        data["translations"] = {}
+        return data
+    data["translations"] = {
+        str(key): text(value)
+        for key, value in translations.items()
+        if isinstance(key, str) and text(value)
+    }
     return data
 
 
