@@ -86,6 +86,20 @@ def test_readme_describes_dcat_and_dprod_interoperability_boundaries() -> None:
     assert "[DPROD interoperability]" in documentation
 
 
+def test_readme_github_links_are_pinned_to_the_release_tag() -> None:
+    """PyPI readers must reach the documentation shipped by this release."""
+    content = README.read_text(encoding="utf-8")
+
+    assert "github.com/Open-Data-Product-Initiative/odps-python/blob/v0.7.0/" in content
+    assert "github.com/Open-Data-Product-Initiative/odps-python/tree/v0.7.0/" in content
+    assert (
+        "github.com/Open-Data-Product-Initiative/odps-python/blob/main/" not in content
+    )
+    assert (
+        "github.com/Open-Data-Product-Initiative/odps-python/tree/main/" not in content
+    )
+
+
 def test_package_metadata_includes_mcp_package() -> None:
     content = PYPROJECT.read_text(encoding="utf-8")
 
@@ -144,7 +158,7 @@ def test_markdown_links_point_to_existing_repo_files() -> None:
     markdown_link = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
     missing = []
 
-    for path in [README := REPO_ROOT / "README.md", *DOCS_DIR.rglob("*.md")]:
+    for path in [README, *DOCS_DIR.rglob("*.md")]:
         for match in markdown_link.finditer(path.read_text(encoding="utf-8")):
             target = match.group(1).split("#", 1)[0]
             if not target or "://" in target or target.startswith("mailto:"):

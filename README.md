@@ -199,25 +199,25 @@ open-data-products generate \
 
 The full SDK guide that used to live in this README is now here:
 
-- [Full SDK guide](https://github.com/Open-Data-Product-Initiative/odps-python/blob/main/docs/user/full-sdk-guide.md)
+- [Full SDK guide](https://github.com/Open-Data-Product-Initiative/odps-python/blob/v0.7.0/docs/user/full-sdk-guide.md)
 
 Focused user guides:
 
-- [Command guide](https://github.com/Open-Data-Product-Initiative/odps-python/blob/main/docs/user/commands.md)
-- [Portfolio intake guide](https://github.com/Open-Data-Product-Initiative/odps-python/blob/main/docs/user/portfolio-intake.md)
-- [LLM generation](https://github.com/Open-Data-Product-Initiative/odps-python/blob/main/docs/user/generation.md)
-- [Agent surface](https://github.com/Open-Data-Product-Initiative/odps-python/blob/main/docs/user/agent-surface.md)
-- [Recipe workflows](https://github.com/Open-Data-Product-Initiative/odps-python/blob/main/docs/user/recipe-workflows.md)
-- [Data Contract workflows](https://github.com/Open-Data-Product-Initiative/odps-python/blob/main/docs/user/data-contracts.md)
-- [DCAT Catalog Intelligence](https://github.com/Open-Data-Product-Initiative/odps-python/blob/main/docs/user/dcat-catalog-intelligence.md)
-- [DPROD interoperability](https://github.com/Open-Data-Product-Initiative/odps-python/blob/main/docs/user/dprod-interoperability.md)
-- [API reference](https://github.com/Open-Data-Product-Initiative/odps-python/blob/main/docs/user/API.md)
+- [Command guide](https://github.com/Open-Data-Product-Initiative/odps-python/blob/v0.7.0/docs/user/commands.md)
+- [Portfolio intake guide](https://github.com/Open-Data-Product-Initiative/odps-python/blob/v0.7.0/docs/user/portfolio-intake.md)
+- [LLM generation](https://github.com/Open-Data-Product-Initiative/odps-python/blob/v0.7.0/docs/user/generation.md)
+- [Agent surface](https://github.com/Open-Data-Product-Initiative/odps-python/blob/v0.7.0/docs/user/agent-surface.md)
+- [Recipe workflows](https://github.com/Open-Data-Product-Initiative/odps-python/blob/v0.7.0/docs/user/recipe-workflows.md)
+- [Data Contract workflows](https://github.com/Open-Data-Product-Initiative/odps-python/blob/v0.7.0/docs/user/data-contracts.md)
+- [DCAT Catalog Intelligence](https://github.com/Open-Data-Product-Initiative/odps-python/blob/v0.7.0/docs/user/dcat-catalog-intelligence.md)
+- [DPROD interoperability](https://github.com/Open-Data-Product-Initiative/odps-python/blob/v0.7.0/docs/user/dprod-interoperability.md)
+- [API reference](https://github.com/Open-Data-Product-Initiative/odps-python/blob/v0.7.0/docs/user/API.md)
 
 Project references:
 
-- [Documentation index](https://github.com/Open-Data-Product-Initiative/odps-python/blob/main/docs/README.md)
-- [Examples](https://github.com/Open-Data-Product-Initiative/odps-python/tree/main/examples)
-- [Agent handoff](https://github.com/Open-Data-Product-Initiative/odps-python/blob/main/llms.txt)
+- [Documentation index](https://github.com/Open-Data-Product-Initiative/odps-python/blob/v0.7.0/docs/README.md)
+- [Examples](https://github.com/Open-Data-Product-Initiative/odps-python/tree/v0.7.0/examples)
+- [Agent handoff](https://github.com/Open-Data-Product-Initiative/odps-python/blob/v0.7.0/llms.txt)
 
 ## Development
 
