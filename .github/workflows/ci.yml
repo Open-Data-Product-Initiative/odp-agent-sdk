@@ -38,6 +38,8 @@ jobs:
           from pathlib import Path
 
           from open_data_products.agent import validate_document
+          from open_data_products.dprod import export_odps_to_dprod
+          from open_data_products._io import load_mapping
           from open_data_products.profiles import (
               profile_ref,
               transform_profile,
@@ -63,7 +65,42 @@ jobs:
               allow_draft=True,
           )
           assert dcat["status"] == "executed"
+          dprod_export = export_odps_to_dprod(load_mapping(fixture))
+          assert dprod_export.validation.conforms
           PY
+
+      - name: Set up Java for independent DPROD SHACL validation
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Cross-check exported DPROD RDF with Apache Jena SHACL
+        env:
+          JENA_VERSION: 6.2.0
+          JENA_SHA512: 2b467d2ff940c207aea935e012ecbb0f0ab3e6bf59b3fc4b3fbc6cf9cea11f1428e97882ec078a5ffc57e114e0f5c88ea98c4575e687cc1dd232f99324b7b2a2
+          WORKSPACE: ${{ github.workspace }}
+          DPROD_EXPORT: ${{ runner.temp }}/dprod-export.ttl
+        run: |
+          cd "${RUNNER_TEMP}"
+          curl -fsSLO "https://downloads.apache.org/jena/binaries/apache-jena-${JENA_VERSION}.tar.gz"
+          echo "${JENA_SHA512}  apache-jena-${JENA_VERSION}.tar.gz" | sha512sum -c -
+          tar -xzf "apache-jena-${JENA_VERSION}.tar.gz"
+          python - <<'PY'
+          import os
+          from pathlib import Path
+
+          from open_data_products._io import load_mapping
+          from open_data_products.dprod import export_odps_to_dprod
+
+          fixture = Path(os.environ["WORKSPACE"]) / "tests/fixtures/odps_v42_profiles.yaml"
+          result = export_odps_to_dprod(load_mapping(fixture))
+          assert result.validation.conforms
+          Path(os.environ["DPROD_EXPORT"]).write_text(result.turtle, encoding="utf-8")
+          PY
+          "${RUNNER_TEMP}/apache-jena-${JENA_VERSION}/bin/shacl" validate \
+            --shapes "${WORKSPACE}/open_data_products/dprod/data/dprod-shapes.ttl" \
+            --data "${DPROD_EXPORT}"
 
       - name: Run the test suite
         run: pytest -q

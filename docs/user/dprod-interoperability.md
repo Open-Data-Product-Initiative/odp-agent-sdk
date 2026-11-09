@@ -80,3 +80,10 @@ export = export_odps_to_dprod(draft.document)
 MCP exposes safe `discover_dprod_catalog` and `validate_dprod` tools, and
 state-changing `wrap_dprod_resource` and `export_dprod` tools because they
 write artifacts. Local paths are redacted from MCP results.
+
+## Release verification
+
+CI installs the built wheel into a clean virtual environment and validates an
+ODPS export using Apache Jena SHACL in addition to the SDK's pySHACL check.
+Jena is downloaded from Apache with a pinned release and verified SHA-512; it
+is a CI-only independent validator and is not an SDK runtime dependency.
