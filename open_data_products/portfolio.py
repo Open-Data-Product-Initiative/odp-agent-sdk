@@ -43,6 +43,7 @@ from ._portfolio_normalization import (
 )
 from ._portfolio_prompting import (  # noqa: F401
     render_executive_summary_repair_prompt as _render_executive_summary_repair_prompt,
+    render_portfolio_localization_repair_prompt as _render_portfolio_localization_repair_prompt,
     render_portfolio_plan_repair_prompt as _render_portfolio_plan_repair_prompt,
     extract_yaml_text as _extract_yaml_text,
     parse_executive_summary,
@@ -842,33 +843,6 @@ def _parse_portfolio_localization_with_repair(
             raise ValueError(
                 f"{original_error}\nRepair attempt also failed: {repair_error}"
             ) from repair_error
-
-
-def _render_portfolio_localization_repair_prompt(
-    language: str,
-    raw_output: str,
-    parser_error: str,
-) -> str:
-    return "\n".join(
-        [
-            "# Repair Portfolio Localization YAML",
-            f"Target language: {language}",
-            "Repair one portfolio localization YAML document.",
-            "Return only YAML. Do not include markdown fences, prose, or comments.",
-            "Preserve the translation keys and translated values.",
-            "Fix only YAML syntax, quoting, block scalars, indentation, and malformed mappings.",
-            "Use this shape:",
-            f"language: {language}",
-            "translations:",
-            "  Source text: Translated text",
-            "",
-            "Parser error:",
-            parser_error,
-            "",
-            "Malformed localization YAML:",
-            raw_output,
-        ]
-    )
 
 
 def _render_portfolio_localization_prompt(

@@ -103,6 +103,33 @@ def render_portfolio_plan_repair_prompt(raw_output: str, parser_error: str) -> s
     )
 
 
+def render_portfolio_localization_repair_prompt(
+    language: str,
+    raw_output: str,
+    parser_error: str,
+) -> str:
+    return "\n".join(
+        [
+            "# Repair Portfolio Localization YAML",
+            f"Target language: {language}",
+            "Repair one portfolio localization YAML document.",
+            "Return only YAML. Do not include markdown fences, prose, or comments.",
+            "Preserve the translation keys and translated values.",
+            "Fix only YAML syntax, quoting, block scalars, indentation, and malformed mappings.",
+            "Use this shape:",
+            f"language: {language}",
+            "translations:",
+            "  Source text: Translated text",
+            "",
+            "Parser error:",
+            parser_error,
+            "",
+            "Malformed localization YAML:",
+            raw_output,
+        ]
+    )
+
+
 def render_executive_summary_repair_prompt(raw_output: str, parser_error: str) -> str:
     return "\n".join(
         [
