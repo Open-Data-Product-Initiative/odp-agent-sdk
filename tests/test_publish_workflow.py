@@ -76,6 +76,16 @@ def test_readme_uses_the_dynamic_pypi_version_badge() -> None:
     assert "badge.fury.io/py/open-data-products" not in content
 
 
+def test_readme_describes_dcat_and_dprod_interoperability_boundaries() -> None:
+    """The release overview keeps catalog conversion claims evidence-bounded."""
+    content = README.read_text(encoding="utf-8")
+
+    assert "Catalog interoperability stays deliberately conservative" in content
+    assert "Neither workflow approves a product" in content
+    documentation = content.split("## Documentation", maxsplit=1)[1]
+    assert "[DPROD interoperability]" in documentation
+
+
 def test_package_metadata_includes_mcp_package() -> None:
     content = PYPROJECT.read_text(encoding="utf-8")
 

@@ -51,6 +51,12 @@ Python 3.8 or newer is required.
 | DCAT Catalog Intelligence | Inspect supplied DCAT RDF with evidence-bounded findings, render an offline report, and convert explicitly selected resources to private ODPS 4.2 drafts |
 | DPROD interoperability | Validate explicit OMG DPROD 1.0 Beta 2 products offline, create ODPS 4.2 drafts, and export deterministic DPROD RDF with loss reports |
 
+Catalog interoperability stays deliberately conservative: DCAT inspection and
+conversion use only caller-selected resources and produce private drafts;
+DPROD validation is pinned to the normative Beta 2 namespace and exports
+mapping-loss records. Neither workflow approves a product, invents missing
+contract or business evidence, or claims ODPS/DPROD semantic equivalence.
+
 ## Quick CLI Examples
 
 Most commands print human-readable output by default. Add `--json` for CI,
@@ -204,6 +210,7 @@ Focused user guides:
 - [Recipe workflows](https://github.com/Open-Data-Product-Initiative/odps-python/blob/main/docs/user/recipe-workflows.md)
 - [Data Contract workflows](https://github.com/Open-Data-Product-Initiative/odps-python/blob/main/docs/user/data-contracts.md)
 - [DCAT Catalog Intelligence](https://github.com/Open-Data-Product-Initiative/odps-python/blob/main/docs/user/dcat-catalog-intelligence.md)
+- [DPROD interoperability](https://github.com/Open-Data-Product-Initiative/odps-python/blob/main/docs/user/dprod-interoperability.md)
 - [API reference](https://github.com/Open-Data-Product-Initiative/odps-python/blob/main/docs/user/API.md)
 
 Project references:
