@@ -42,6 +42,7 @@ from ._portfolio_normalization import (
     normalize_odps_product as _normalize_odps_product,
 )
 from ._portfolio_prompting import (  # noqa: F401
+    extract_yaml_text as _extract_yaml_text,
     render_portfolio_build_prompt,
     render_portfolio_executive_summary_prompt,
 )
@@ -2555,24 +2556,6 @@ def _executive_summary_counts(value: Any) -> Dict[str, int]:
         "leadershipDecisions": len(_list(value, "leadershipDecisions")),
         "evidenceGaps": len(_list(value, "evidenceGaps")),
     }
-
-
-def _extract_yaml_text(raw_output: str) -> str:
-    stripped = raw_output.strip()
-    if stripped.startswith("```"):
-        lines = stripped.splitlines()
-        if len(lines) >= 2:
-            return "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:])
-        return ""
-    if "```" not in raw_output:
-        return raw_output
-    parts = raw_output.split("```")
-    if len(parts) < 3:
-        return raw_output
-    candidate = parts[1]
-    if candidate.lstrip().startswith(("yaml", "yml")):
-        candidate = candidate.split("\n", 1)[1] if "\n" in candidate else ""
-    return candidate
 
 
 def _file_id(item: Dict[str, Any]) -> str:

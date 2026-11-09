@@ -10,6 +10,25 @@ import yaml
 from .portfolio_budget import reduce_source_lanes_for_prompt
 
 
+def extract_yaml_text(raw_output: str) -> str:
+    """Extract YAML from a fenced or plain model response."""
+    stripped = raw_output.strip()
+    if stripped.startswith("```"):
+        lines = stripped.splitlines()
+        if len(lines) >= 2:
+            return "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:])
+        return ""
+    if "```" not in raw_output:
+        return raw_output
+    parts = raw_output.split("```")
+    if len(parts) < 3:
+        return raw_output
+    candidate = parts[1]
+    if candidate.lstrip().startswith(("yaml", "yml")):
+        candidate = candidate.split("\n", 1)[1] if "\n" in candidate else ""
+    return candidate
+
+
 def render_portfolio_build_prompt(lanes: Dict[str, List[Dict[str, str]]]) -> str:
     """Render the internal portfolio build prompt from source lane content."""
     reduced_lanes, _budget = reduce_source_lanes_for_prompt(lanes)
