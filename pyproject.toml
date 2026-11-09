@@ -109,6 +109,7 @@ Repository = "https://github.com/Open-Data-Product-Initiative/odp-agent-sdk"
 [tool.setuptools]
 packages = [
     "open_data_products",
+    "open_data_products._interop",
     "open_data_products.contracts",
     "open_data_products.dcat",
     "open_data_products.dprod",

@@ -82,6 +82,13 @@ def test_package_metadata_includes_mcp_package() -> None:
     assert '"open_data_products.mcp",' in content
 
 
+def test_package_metadata_includes_interoperability_helpers() -> None:
+    """DCAT and DPROD package imports require the internal interop package."""
+    content = PYPROJECT.read_text(encoding="utf-8")
+
+    assert '"open_data_products._interop",' in content
+
+
 def test_package_metadata_includes_portfolio_icon_assets() -> None:
     content = PYPROJECT.read_text(encoding="utf-8")
 
