@@ -8,6 +8,8 @@ import pytest
 
 from open_data_products.cli import main
 
+pytestmark = pytest.mark.functional
+
 DPROD_PRODUCT = """\
 @prefix dprod: <https://www.omg.org/spec/DPROD/> .
 @prefix dcat: <http://www.w3.org/ns/dcat#> .
