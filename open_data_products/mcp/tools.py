@@ -38,6 +38,7 @@ from ..contracts import (
     validate_contract,
     wrap_contract,
 )
+from ..dcat import discover_dcat_catalog, wrap_dcat_resource
 from ..generation import get_config as get_generation_config
 from ..generation import validate_config as validate_generation_config
 from ..odpc import (
@@ -458,6 +459,29 @@ def _h_discover_contract_portfolio(args: Dict[str, Any]) -> Dict[str, Any]:
         output=args["output"],
     )
     return _json_envelope(_redact_local_paths(result.to_dict()))
+
+
+def _h_discover_dcat_catalog(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Analyze one supplied DCAT catalog without writing artifacts."""
+    return _json_envelope(discover_dcat_catalog(args["source"]).to_dict())
+
+
+def _h_wrap_dcat_resource(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Write one ODPS draft from an explicit DCAT resource selection."""
+    result = wrap_dcat_resource(
+        args["source"],
+        args["resource"],
+        args["output"],
+        overwrite=bool(args.get("overwrite", False)),
+        use_ai=bool(args.get("enrich", False)),
+        extend=bool(args.get("full_draft", False)),
+        config=args.get("config"),
+    )
+    payload = result.to_dict()
+    payload["source"] = Path(args["source"]).name
+    payload["output"] = Path(args["output"]).name
+    payload["document"] = _redact_local_paths(payload["document"])
+    return _json_envelope(payload)
 
 
 def _redact_local_paths(value: Any) -> Any:
@@ -1112,6 +1136,39 @@ TOOLS: List[Dict[str, Any]] = [
             ["output", "approved"],
         ),
         "handler": _h_discover_contract_portfolio,
+    },
+    {
+        "name": "discover_dcat_catalog",
+        "description": "Analyze a supplied DCAT RDF catalog without crawling linked resources.",
+        "class": "safe",
+        "inputSchema": _object_schema(
+            {
+                "source": {
+                    "type": "string",
+                    "description": "DCAT RDF file, directory, or public HTTP(S) URL.",
+                }
+            },
+            ["source"],
+        ),
+        "handler": _h_discover_dcat_catalog,
+    },
+    {
+        "name": "wrap_dcat_resource",
+        "description": "Write a validated ODPS draft from one selected DCAT resource.",
+        "class": "state-changing",
+        "inputSchema": _object_schema(
+            {
+                "source": {"type": "string"},
+                "resource": {"type": "string"},
+                "output": _OUTPUT_PROP,
+                "overwrite": {"type": "boolean", "default": False},
+                "enrich": {"type": "boolean", "default": False},
+                "full_draft": {"type": "boolean", "default": False},
+                "config": {"type": "string"},
+            },
+            ["source", "resource", "output"],
+        ),
+        "handler": _h_wrap_dcat_resource,
     },
     {
         "name": "summarize_data_contract",
