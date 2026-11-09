@@ -83,6 +83,46 @@ def parse_portfolio_localization(raw_output: str) -> Dict[str, Any]:
     return data
 
 
+def render_portfolio_plan_repair_prompt(raw_output: str, parser_error: str) -> str:
+    return "\n".join(
+        [
+            "# Repair Portfolio Plan YAML",
+            "Repair one Open Data Products portfolio plan YAML document.",
+            "Return only YAML. Do not include markdown fences, prose, or comments.",
+            "Preserve the generated facts, IDs, links, warnings, and artifact lists.",
+            "Fix only YAML syntax, indentation, incomplete keys, and malformed mappings.",
+            "Do not add new unsupported facts. If a broken value cannot be recovered,",
+            "drop that broken field and preserve the rest of the artifact.",
+            "",
+            "Parser error:",
+            parser_error,
+            "",
+            "Malformed portfolio plan YAML:",
+            raw_output,
+        ]
+    )
+
+
+def render_executive_summary_repair_prompt(raw_output: str, parser_error: str) -> str:
+    return "\n".join(
+        [
+            "# Repair Portfolio Executive Summary YAML",
+            "Repair one PortfolioExecutiveSummary YAML document.",
+            "Return only YAML. Do not include markdown fences, prose, or comments.",
+            "Preserve the generated facts, evidence IDs, and leadership wording.",
+            "Fix only YAML syntax, indentation, incomplete keys, and malformed mappings.",
+            "Do not add unsupported facts. If a broken value cannot be recovered,",
+            "drop that broken field and preserve the rest of the summary.",
+            "",
+            "Parser error:",
+            parser_error,
+            "",
+            "Malformed executive summary YAML:",
+            raw_output,
+        ]
+    )
+
+
 def render_portfolio_build_prompt(lanes: Dict[str, List[Dict[str, str]]]) -> str:
     """Render the internal portfolio build prompt from source lane content."""
     reduced_lanes, _budget = reduce_source_lanes_for_prompt(lanes)

@@ -42,6 +42,8 @@ from ._portfolio_normalization import (
     normalize_odps_product as _normalize_odps_product,
 )
 from ._portfolio_prompting import (  # noqa: F401
+    render_executive_summary_repair_prompt as _render_executive_summary_repair_prompt,
+    render_portfolio_plan_repair_prompt as _render_portfolio_plan_repair_prompt,
     extract_yaml_text as _extract_yaml_text,
     parse_executive_summary,
     parse_portfolio_localization,
@@ -819,46 +821,6 @@ def _parse_executive_summary_with_repair(
         if isinstance(notes, list):
             notes.append("Executive Summary YAML required syntax repair.")
         return summary, True
-
-
-def _render_portfolio_plan_repair_prompt(raw_output: str, parser_error: str) -> str:
-    return "\n".join(
-        [
-            "# Repair Portfolio Plan YAML",
-            "Repair one Open Data Products portfolio plan YAML document.",
-            "Return only YAML. Do not include markdown fences, prose, or comments.",
-            "Preserve the generated facts, IDs, links, warnings, and artifact lists.",
-            "Fix only YAML syntax, indentation, incomplete keys, and malformed mappings.",
-            "Do not add new unsupported facts. If a broken value cannot be recovered,",
-            "drop that broken field and preserve the rest of the artifact.",
-            "",
-            "Parser error:",
-            parser_error,
-            "",
-            "Malformed portfolio plan YAML:",
-            raw_output,
-        ]
-    )
-
-
-def _render_executive_summary_repair_prompt(raw_output: str, parser_error: str) -> str:
-    return "\n".join(
-        [
-            "# Repair Portfolio Executive Summary YAML",
-            "Repair one PortfolioExecutiveSummary YAML document.",
-            "Return only YAML. Do not include markdown fences, prose, or comments.",
-            "Preserve the generated facts, evidence IDs, and leadership wording.",
-            "Fix only YAML syntax, indentation, incomplete keys, and malformed mappings.",
-            "Do not add unsupported facts. If a broken value cannot be recovered,",
-            "drop that broken field and preserve the rest of the summary.",
-            "",
-            "Parser error:",
-            parser_error,
-            "",
-            "Malformed executive summary YAML:",
-            raw_output,
-        ]
-    )
 
 
 def _parse_portfolio_localization_with_repair(
