@@ -49,3 +49,8 @@ def path_id(value: str) -> str:
 def title_from_text(value: str) -> str:
     """Return a title-cased display label from a slug-like value."""
     return " ".join(word.capitalize() for word in value.replace("_", " ").split())
+
+
+def change_list_count(value: Any) -> int:
+    """Return the number of recorded changes when value is a list."""
+    return len(value) if isinstance(value, list) else 0

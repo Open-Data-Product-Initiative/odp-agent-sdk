@@ -43,6 +43,7 @@ from ._portfolio_normalization import (
 )
 from ._portfolio_values import (
     as_list as _list,
+    change_list_count as _change_list_count,
     count as _count,
     escape as _escape,
     escape_attr as _escape_attr,
@@ -4430,10 +4431,6 @@ def _latest_version(versions: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
     if not versions:
         return None
     return max(versions, key=lambda version: _text(version.get("id")))
-
-
-def _change_list_count(value: Any) -> int:
-    return len(value) if isinstance(value, list) else 0
 
 
 def _change_validation_label(report: Dict[str, Any]) -> str:

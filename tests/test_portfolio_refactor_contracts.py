@@ -152,6 +152,12 @@ def test_portfolio_facade_imports_shared_identity_helpers() -> None:
     assert "title_from_text as _title_from_text" in source
 
 
+def test_portfolio_facade_imports_shared_change_counter() -> None:
+    """Change summaries reuse a value helper outside the facade."""
+    source = Path("open_data_products/portfolio.py").read_text(encoding="utf-8")
+    assert "change_list_count as _change_list_count" in source
+
+
 def test_workspace_loading_uses_private_layout_model() -> None:
     """Workspace loading receives one explicit layout boundary."""
     source = Path("open_data_products/portfolio.py").read_text(encoding="utf-8")
