@@ -164,6 +164,12 @@ def test_portfolio_facade_imports_workspace_document_helpers() -> None:
     assert "from ._portfolio_workspace import" in source
 
 
+def test_portfolio_facade_imports_workspace_product_helpers() -> None:
+    """Product discovery is provided by the workspace module."""
+    source = Path("open_data_products/portfolio.py").read_text(encoding="utf-8")
+    assert "load_product_specs as _load_product_specs" in source
+
+
 def test_portfolio_facade_delegates_odps_normalization() -> None:
     """Portfolio preserves normalizer compatibility aliases only."""
     source = Path("open_data_products/portfolio.py").read_text(encoding="utf-8")

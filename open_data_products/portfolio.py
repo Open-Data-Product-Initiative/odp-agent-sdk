@@ -55,6 +55,9 @@ from ._portfolio_workspace import (
     empty_catalog as _empty_catalog,
     empty_graph as _empty_graph,
     load_optional_mapping as _load_optional_mapping,
+    load_product_specs as _load_product_specs,
+    product_details as _product_details,
+    product_spec_paths as _product_spec_paths,
 )
 from .generation.models import PortfolioPrivacySettings, PortfolioSourceBudget
 from .odpc import load_catalog
@@ -5081,19 +5084,6 @@ def _render_footer(data: Dict[str, Any]) -> str:
     )
 
 
-def _load_product_specs(root: Path) -> Dict[str, Dict[str, Any]]:
-    products: Dict[str, Dict[str, Any]] = {}
-    for path in _product_spec_paths(root):
-        try:
-            document = load_mapping(path, root_name="ODPS product")
-        except ValueError:
-            continue
-        details = _product_details(document)
-        product_id = _text(details.get("productID") or details.get("id"), path.stem)
-        products[product_id] = {"path": path, "document": document}
-    return products
-
-
 def _normalize_product_spec_files(root: Path) -> List[Tuple[Path, str]]:
     written: List[Tuple[Path, str]] = []
     for path in _product_spec_paths(root):
@@ -5104,17 +5094,6 @@ def _normalize_product_spec_files(root: Path) -> List[Tuple[Path, str]]:
         _normalize_odps_product(document)
         written.append(_write_yaml(path, document))
     return written
-
-
-def _product_spec_paths(root: Path) -> List[Path]:
-    product_dir = root / "odps" / "products"
-    return sorted(
-        [
-            *product_dir.glob("*.yaml"),
-            *product_dir.glob("*.yml"),
-            *product_dir.glob("*.json"),
-        ]
-    )
 
 
 def _portfolio_versions(root: Path, portfolio: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -5191,18 +5170,6 @@ def _version_report_summary(report: Dict[str, Any]) -> str:
     if removed:
         changes.append(f"{removed} removed")
     return ", ".join(changes)
-
-
-def _product_details(document: Dict[str, Any]) -> Dict[str, Any]:
-    product = document.get("product")
-    if not isinstance(product, dict):
-        return {}
-    details = product.get("details")
-    if isinstance(details, dict):
-        english = details.get("en")
-        if isinstance(english, dict):
-            return english
-    return product
 
 
 def _pricing_items(product: Any) -> List[Dict[str, Any]]:
