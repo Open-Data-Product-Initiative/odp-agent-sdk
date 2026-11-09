@@ -142,3 +142,11 @@ def test_portfolio_facade_imports_shared_value_helpers() -> None:
 
     assert "from ._portfolio_values import" in source
     assert "def _text" not in source
+
+
+def test_portfolio_facade_imports_shared_identity_helpers() -> None:
+    """Normalization can reuse identities without importing the facade."""
+    source = Path("open_data_products/portfolio.py").read_text(encoding="utf-8")
+
+    assert "path_id as _path_id" in source
+    assert "title_from_text as _title_from_text" in source

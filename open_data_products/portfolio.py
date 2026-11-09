@@ -41,7 +41,9 @@ from ._portfolio_values import (
     count as _count,
     escape as _escape,
     escape_attr as _escape_attr,
+    path_id as _path_id,
     text as _text,
+    title_from_text as _title_from_text,
 )
 from .generation.models import PortfolioPrivacySettings, PortfolioSourceBudget
 from .odpc import load_catalog
@@ -3639,10 +3641,6 @@ def _source_signal_description(source: Dict[str, str]) -> str:
     return description or f"Draft signal created from {source['path']}."
 
 
-def _title_from_text(value: str) -> str:
-    return " ".join(word.capitalize() for word in value.replace("_", " ").split())
-
-
 def _meaningful_terms(value: str) -> set:
     stopwords = {
         "and",
@@ -3861,13 +3859,6 @@ def _extract_yaml_text(raw_output: str) -> str:
 
 def _file_id(item: Dict[str, Any]) -> str:
     return _path_id(_text(item.get("id") or item.get("productID"), "item"))
-
-
-def _path_id(value: str) -> str:
-    cleaned = "".join(
-        char if char.isalnum() or char in "._-" else "-" for char in value
-    )
-    return cleaned.strip("-") or "item"
 
 
 def render_portfolio(

@@ -36,3 +36,16 @@ def escape(value: str) -> str:
 def escape_attr(value: str) -> str:
     """Escape text for an HTML attribute."""
     return html.escape(value, quote=True)
+
+
+def path_id(value: str) -> str:
+    """Return a filesystem-safe logical identifier."""
+    cleaned = "".join(
+        char if char.isalnum() or char in "._-" else "-" for char in value
+    )
+    return cleaned.strip("-") or "item"
+
+
+def title_from_text(value: str) -> str:
+    """Return a title-cased display label from a slug-like value."""
+    return " ".join(word.capitalize() for word in value.replace("_", " ").split())
