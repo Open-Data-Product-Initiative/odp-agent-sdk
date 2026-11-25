@@ -288,11 +288,11 @@ CLI status report the mismatch or uncertainty along with the product ID.
 
 ```sh
 open-data-products integrations products create openmetadata \
-  --config ~/connections.yaml --source product.yaml --domain YOUR_DOMAIN
+  --config ~/connections.yaml --source product.yaml --domain "YOUR_DOMAIN"
 
 # Use review_sha256 from the review, without changing the source or target.
 open-data-products integrations products create openmetadata \
-  --config ~/connections.yaml --source product.yaml --domain YOUR_DOMAIN \
+  --config ~/connections.yaml --source product.yaml --domain "YOUR_DOMAIN" \
   --execute --reviewed-sha256 REVIEW_SHA256
 ```
 
@@ -366,7 +366,7 @@ assignment unchanged.
 
 ```sh
 open-data-products integrations products create openmetadata \
-  --config ~/connections.yaml --source product.yaml --domain Banking \
+  --config ~/connections.yaml --source product.yaml --domain "Banking" \
   --owner user:jarkko --tag PII.NonSensitive --json
 # After inspecting the review, repeat the same arguments with:
 #   --execute --reviewed-sha256 REVIEW_DIGEST
@@ -412,7 +412,7 @@ candidate lookup:
 
 ```sh
 open-data-products integrations products recover-create openmetadata \
-  --config ~/connections.yaml --source product.yaml --domain YOUR_DOMAIN --json
+  --config ~/connections.yaml --source product.yaml --domain "YOUR_DOMAIN" --json
 ```
 
 The lookup compares the reviewed product identifier with paginated native
@@ -429,7 +429,7 @@ OpenMetadata:
 ```sh
 open-data-products integrations products compare openmetadata \
   --config ~/connections.yaml --id PRODUCT_UUID --source product.yaml \
-  --domain YOUR_DOMAIN --output comparison.json --json
+  --domain "YOUR_DOMAIN" --output comparison.json --json
 ```
 
 The output includes the source SHA-256 and validation findings, product ID,
@@ -475,10 +475,10 @@ domain FQN and review the consequences before executing:
 
 ```sh
 open-data-products integrations products update openmetadata \
-  --config ~/connections.yaml --id PRODUCT_UUID --domain Retail
+  --config ~/connections.yaml --id PRODUCT_UUID --domain "Retail"
 
 open-data-products integrations products update openmetadata \
-  --config ~/connections.yaml --id PRODUCT_UUID --domain Retail \
+  --config ~/connections.yaml --id PRODUCT_UUID --domain "Retail" \
   --execute --reviewed-sha256 REVIEW_SHA256
 ```
 
