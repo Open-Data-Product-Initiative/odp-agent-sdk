@@ -140,14 +140,16 @@ jobs:
           JENA_SHA512: 2b467d2ff940c207aea935e012ecbb0f0ab3e6bf59b3fc4b3fbc6cf9cea11f1428e97882ec078a5ffc57e114e0f5c88ea98c4575e687cc1dd232f99324b7b2a2
           WORKSPACE: ${{ github.workspace }}
           DPROD_EXPORT: ${{ runner.temp }}/dprod-export.ttl
+          DPROD_SHAPES: ${{ runner.temp }}/dprod-shapes-no-imports.ttl
         run: |
           cd "${RUNNER_TEMP}"
-          curl -fsSLO "https://archive.apache.org/dist/jena/binaries/apache-jena-${JENA_VERSION}.tar.gz"
+          curl -fsSLO "https://repo.maven.apache.org/maven2/org/apache/jena/apache-jena/${JENA_VERSION}/apache-jena-${JENA_VERSION}.tar.gz"
           echo "${JENA_SHA512}  apache-jena-${JENA_VERSION}.tar.gz" | sha512sum -c -
           tar -xzf "apache-jena-${JENA_VERSION}.tar.gz"
           python - <<'PY'
           import os
           from pathlib import Path
+          from rdflib import Graph, OWL
 
           from open_data_products._io import load_mapping
           from open_data_products.dprod import export_odps_to_dprod
@@ -156,9 +158,12 @@ jobs:
           result = export_odps_to_dprod(load_mapping(fixture))
           assert result.validation.conforms
           Path(os.environ["DPROD_EXPORT"]).write_text(result.turtle, encoding="utf-8")
+          shapes = Graph().parse(Path(os.environ["WORKSPACE"]) / "open_data_products/dprod/data/dprod-shapes.ttl", format="turtle")
+          shapes.remove((None, OWL.imports, None))
+          shapes.serialize(destination=os.environ["DPROD_SHAPES"], format="turtle")
           PY
           "${RUNNER_TEMP}/apache-jena-${JENA_VERSION}/bin/shacl" validate \
-            --shapes "${WORKSPACE}/open_data_products/dprod/data/dprod-shapes.ttl" \
+            --shapes "${DPROD_SHAPES}" \
             --data "${DPROD_EXPORT}"
 
       - name: Run the test suite
