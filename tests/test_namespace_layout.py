@@ -2,9 +2,26 @@
 
 import ast
 import importlib.util
+import re
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_distribution_includes_all_python_package_directories():
+    """Prevent an installed wheel from omitting importable SDK packages."""
+    metadata = (REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    match = re.search(r"(?ms)^packages\s*=\s*(\[.*?^\])", metadata)
+    assert match is not None
+    declared = set(ast.literal_eval(match.group(1)))
+    root = REPO_ROOT / "open_data_products"
+    actual = {
+        ".".join(path.parent.relative_to(REPO_ROOT).parts)
+        for path in root.rglob("__init__.py")
+    }
+    assert actual <= declared, "Undeclared packages: " + ", ".join(
+        sorted(actual - declared)
+    )
 
 
 def test_public_spec_and_profile_namespaces_are_importable():
@@ -28,10 +45,10 @@ def test_top_level_package_exposes_version_alias():
     assert open_data_products.odps.__version__ == open_data_products.__version__
 
 
-def test_current_release_version_is_0_6_5():
+def test_current_release_version_is_0_8_0():
     import open_data_products
 
-    assert open_data_products.__version__ == "0.7.0"
+    assert open_data_products.__version__ == "0.8.0"
 
 
 def test_release_summary_matches_package_version():

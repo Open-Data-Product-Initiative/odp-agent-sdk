@@ -12,7 +12,7 @@ pip install build
 python -m build --quiet
 
 # Install locally for testing
-pip install dist/open_data_products-0.2.0-py3-none-any.whl
+pip install dist/open_data_products-0.8.0-py3-none-any.whl
 
 # Test functionality
 python -c "import open_data_products; print(open_data_products.__version__)"
@@ -37,8 +37,8 @@ pip install build
 python -m build --quiet
 
 # This creates files in dist/:
-# - open_data_products-0.2.0-py3-none-any.whl (wheel file)
-# - open_data_products-0.2.0.tar.gz (source distribution)
+# - open_data_products-0.8.0-py3-none-any.whl (wheel file)
+# - open_data_products-0.8.0.tar.gz (source distribution)
 ```
 
 ## Method 2: Build with specific options
@@ -61,7 +61,7 @@ After building, install the wheel locally for testing:
 
 ```bash
 # Install the built wheel
-pip install dist/open_data_products-0.2.0-py3-none-any.whl
+pip install dist/open_data_products-0.8.0-py3-none-any.whl
 
 # Or install in development mode with extras
 pip install -e ".[dev]"
@@ -73,7 +73,7 @@ Test the installed package:
 
 ```python
 import open_data_products
-print(open_data_products.__version__)  # Should print 0.7.0
+print(open_data_products.__version__)  # Should print 0.8.0
 
 from open_data_products.odps import OpenDataProduct, ODPSValidator
 from open_data_products.odps.models import ProductDetails
@@ -100,7 +100,7 @@ print("✓ Package working correctly")
 python -m twine upload --repository testpypi dist/*
 
 # Install from Test PyPI to verify
-pip install --index-url https://test.pypi.org/simple/ odps-python
+pip install --index-url https://test.pypi.org/simple/ open-data-products
 ```
 
 ### Production PyPI
@@ -117,13 +117,13 @@ python -m twine upload dist/*
 
 The built wheel contains:
 ```
-odps_python-0.2.0-py3-none-any.whl
-├── odps/
-│   ├── __init__.py          # Package entry point with version
-│   ├── core.py              # Main OpenDataProduct class
-│   ├── models.py            # Data models for ODPS components  
-│   └── validators.py        # International standards validation
-├── odps_python-0.2.0.dist-info/
+open_data_products-0.8.0-py3-none-any.whl
+├── open_data_products/
+│   ├── __init__.py          # Public SDK API and version
+│   ├── cli.py               # Unified command-line interface
+│   ├── integrations/        # Platform integrations
+│   └── odps/                # ODPS models and validation
+├── open_data_products-0.8.0.dist-info/
 │   ├── METADATA             # Package metadata
 │   ├── WHEEL                # Wheel metadata
 │   ├── RECORD               # File checksums

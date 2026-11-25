@@ -90,6 +90,7 @@ class GeneratedArtifact:
     review_notes: List[str] = field(default_factory=list)
     drafted_components: List[str] = field(default_factory=list)
     evidence_gaps: List[str] = field(default_factory=list)
+    source_evidence: Dict[str, str] = field(default_factory=dict)
 
     def to_dict(self) -> dict:
         """Return a JSON-ready artifact summary."""
@@ -102,6 +103,7 @@ class GeneratedArtifact:
             "review_notes": list(self.review_notes),
             "drafted_components": list(self.drafted_components),
             "evidence_gaps": list(self.evidence_gaps),
+            "source_evidence": dict(self.source_evidence),
         }
 
 
