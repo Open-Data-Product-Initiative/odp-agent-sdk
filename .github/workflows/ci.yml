@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   test-python38:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -142,7 +142,7 @@ jobs:
           DPROD_EXPORT: ${{ runner.temp }}/dprod-export.ttl
         run: |
           cd "${RUNNER_TEMP}"
-          curl -fsSLO "https://downloads.apache.org/jena/binaries/apache-jena-${JENA_VERSION}.tar.gz"
+          curl -fsSLO "https://archive.apache.org/dist/jena/binaries/apache-jena-${JENA_VERSION}.tar.gz"
           echo "${JENA_SHA512}  apache-jena-${JENA_VERSION}.tar.gz" | sha512sum -c -
           tar -xzf "apache-jena-${JENA_VERSION}.tar.gz"
           python - <<'PY'
