@@ -1,5 +1,9 @@
 [build-system]
-requires = ["setuptools>=77", "wheel"]
+requires = [
+    "setuptools>=75.3,<75.4; python_version < '3.9'",
+    "setuptools>=77; python_version >= '3.9'",
+    "wheel",
+]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -7,7 +11,7 @@ name = "open-data-products"
 dynamic = ["version"]
 description = "Python SDK and AI agent toolkit for the OpenDataProducts.org standards family, supporting ODPS, ODPC, ODPG, ODPV, MCP, CLI workflows, and LLM-assisted generation"
 readme = "README.md"
-license = "Apache-2.0"
+license = {text = "Apache-2.0"}
 authors = [
     {name = "Jarkko Moilanen", email = "jarkko@vimo.fi"}
 ]
@@ -54,11 +58,13 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Information Analysis",
     "Topic :: Database",
 ]
-requires-python = ">=3.8"
+requires-python = ">=3.8.1"
 dependencies = [
     "PyYAML>=6.0.2",
     "certifi>=2026.10.19",
     "jsonschema>=4.0",
+    "rdflib>=7.1",
+    "pyshacl>=0.28.1,<0.29.0",
 ]
 
 [project.scripts]
@@ -88,6 +94,7 @@ llama-cpp = [
 ]
 dev = [
     "pytest>=6.0",
+    "tomli>=1.1; python_version < '3.11'",
     "pytest-cov>=3.0.0",
     "black>=22.0",
     "flake8>=4.0",
@@ -107,7 +114,11 @@ Repository = "https://github.com/Open-Data-Product-Initiative/odp-agent-sdk"
 [tool.setuptools]
 packages = [
     "open_data_products",
+    "open_data_products._interop",
     "open_data_products.contracts",
+    "open_data_products.dcat",
+    "open_data_products.dprod",
+    "open_data_products.integrations",
     "open_data_products.generation",
     "open_data_products.generation.data",
     "open_data_products.generation.data.prompts",
@@ -138,6 +149,7 @@ packages = [
 ]
 
 [tool.setuptools.package-data]
+"open_data_products.integrations" = ["connections.yaml"]
 "open_data_products" = [
     "okf_spec.md",
     "data/portfolio/*.png",
@@ -189,6 +201,10 @@ packages = [
     "data/v1_1/vocab/*.yaml",
     "data/v1_1/schema/*.json",
     "data/v1_1/profiles/*.yaml",
+]
+"open_data_products.dprod" = [
+    "data/*.json",
+    "data/*.ttl",
 ]
 
 [tool.setuptools.dynamic]

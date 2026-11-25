@@ -18,7 +18,6 @@ they encode failures into the text payload so the agent can recover.
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
@@ -30,6 +29,7 @@ from ..agent import (
 )
 from ..contracts import (
     check_product_contract_alignment,
+    discover_contract_portfolio,
     extract_contract_schema,
     generate_product_contract_report,
     resolve_product_contracts,
@@ -85,16 +85,19 @@ from ..profiles import (
 )
 from ..resources import get_resource, list_resources
 from ..summary import load_summary
+from ._response import envelope as _envelope
+from ._response import json_envelope as _json_envelope
+from ._response import redact_local_paths as _redact_local_paths
+from .interop import (
+    discover_dcat_catalog_handler as _discover_dcat_catalog_handler,
+    discover_dprod_catalog_handler as _discover_dprod_catalog_handler,
+    export_dprod_handler as _export_dprod_handler,
+    validate_dprod_handler as _validate_dprod_handler,
+    wrap_dcat_resource_handler as _wrap_dcat_resource_handler,
+    wrap_dprod_resource_handler as _wrap_dprod_resource_handler,
+)
 
 Handler = Callable[[Dict[str, Any]], Dict[str, Any]]
-
-
-def _envelope(text: str) -> Dict[str, Any]:
-    return {"content": [{"type": "text", "text": text}]}
-
-
-def _json_envelope(payload: Any) -> Dict[str, Any]:
-    return _envelope(json.dumps(payload, indent=2, default=str))
 
 
 def _int_arg(args: Dict[str, Any], name: str, default: int) -> int:
@@ -445,15 +448,48 @@ def _h_wrap_odcs_contract(args: Dict[str, Any]) -> Dict[str, Any]:
     )
 
 
-def _redact_local_paths(value: Any) -> Any:
-    """Remove local filesystem locations from MCP responses."""
-    if isinstance(value, dict):
-        return {key: _redact_local_paths(item) for key, item in value.items()}
-    if isinstance(value, list):
-        return [_redact_local_paths(item) for item in value]
-    if isinstance(value, str) and value.startswith("file://"):
-        return "file://<local-contract>"
-    return value
+def _h_discover_contract_portfolio(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Write discovery artifacts only after explicit approval."""
+    if args.get("approved") is not True:
+        raise ValueError("approved must be true before discovery may write artifacts")
+    if bool(args.get("directory")) == bool(args.get("source")):
+        raise ValueError("Provide exactly one of directory or source")
+    result = discover_contract_portfolio(
+        directory=args.get("directory"),
+        source_id=args.get("source"),
+        output=args["output"],
+    )
+    return _json_envelope(_redact_local_paths(result.to_dict()))
+
+
+def _h_discover_dcat_catalog(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Analyze one supplied DCAT catalog without writing artifacts."""
+    return _discover_dcat_catalog_handler(args)
+
+
+def _h_wrap_dcat_resource(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Write one ODPS draft from an explicit DCAT resource selection."""
+    return _wrap_dcat_resource_handler(args)
+
+
+def _h_discover_dprod_catalog(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Analyze supplied DPROD RDF without writing artifacts."""
+    return _discover_dprod_catalog_handler(args)
+
+
+def _h_validate_dprod(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Validate supplied DPROD RDF without writing artifacts."""
+    return _validate_dprod_handler(args)
+
+
+def _h_wrap_dprod_resource(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Write one ODPS draft from an explicit DPROD resource selection."""
+    return _wrap_dprod_resource_handler(args)
+
+
+def _h_export_dprod(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Write DPROD serializations from an ODPS source mapping."""
+    return _export_dprod_handler(args)
 
 
 def _h_list_recipes(args: Dict[str, Any]) -> Dict[str, Any]:
@@ -653,6 +689,14 @@ _PORTFOLIO_SOURCE_PROP = {
 _PORTFOLIO_APPROVAL_PROP = {
     "type": "boolean",
     "description": "Must be true to permit workspace writes and configured LLM calls.",
+}
+_DISCOVERY_DIRECTORY_PROP = {
+    "type": "string",
+    "description": "Local ODCS contract directory to scan.",
+}
+_DISCOVERY_SOURCE_PROP = {
+    "type": "string",
+    "description": "Configured future contract source ID.",
 }
 
 TOOLS: List[Dict[str, Any]] = [
@@ -1074,6 +1118,97 @@ TOOLS: List[Dict[str, Any]] = [
             ["contract", "output"],
         ),
         "handler": _h_wrap_odcs_contract,
+    },
+    {
+        "name": "discover_contract_portfolio",
+        "description": "Write review-only portfolio discovery artifacts and return evidence-backed intelligence metadata from ODCS contracts.",
+        "class": "state-changing",
+        "inputSchema": _object_schema(
+            {
+                "directory": _DISCOVERY_DIRECTORY_PROP,
+                "source": _DISCOVERY_SOURCE_PROP,
+                "output": _OUTPUT_PROP,
+                "approved": _PORTFOLIO_APPROVAL_PROP,
+            },
+            ["output", "approved"],
+        ),
+        "handler": _h_discover_contract_portfolio,
+    },
+    {
+        "name": "discover_dcat_catalog",
+        "description": "Analyze a supplied DCAT RDF catalog without crawling linked resources.",
+        "class": "safe",
+        "inputSchema": _object_schema(
+            {
+                "source": {
+                    "type": "string",
+                    "description": "DCAT RDF file, directory, or public HTTP(S) URL.",
+                }
+            },
+            ["source"],
+        ),
+        "handler": _h_discover_dcat_catalog,
+    },
+    {
+        "name": "wrap_dcat_resource",
+        "description": "Write a validated ODPS draft from one selected DCAT resource.",
+        "class": "state-changing",
+        "inputSchema": _object_schema(
+            {
+                "source": {"type": "string"},
+                "resource": {"type": "string"},
+                "output": _OUTPUT_PROP,
+                "overwrite": {"type": "boolean", "default": False},
+                "enrich": {"type": "boolean", "default": False},
+                "full_draft": {"type": "boolean", "default": False},
+                "config": {"type": "string"},
+            },
+            ["source", "resource", "output"],
+        ),
+        "handler": _h_wrap_dcat_resource,
+    },
+    {
+        "name": "discover_dprod_catalog",
+        "description": "Analyze explicit DPROD 1.0 Beta 2 products from supplied RDF.",
+        "class": "safe",
+        "inputSchema": _object_schema({"source": {"type": "string"}}, ["source"]),
+        "handler": _h_discover_dprod_catalog,
+    },
+    {
+        "name": "validate_dprod",
+        "description": "Validate RDF against local pinned DPROD 1.0 Beta 2 SHACL shapes.",
+        "class": "safe",
+        "inputSchema": _object_schema({"source": {"type": "string"}}, ["source"]),
+        "handler": _h_validate_dprod,
+    },
+    {
+        "name": "wrap_dprod_resource",
+        "description": "Write a validated ODPS draft from one explicit DPROD product.",
+        "class": "state-changing",
+        "inputSchema": _object_schema(
+            {
+                "source": {"type": "string"},
+                "resource": {"type": "string"},
+                "output": _OUTPUT_PROP,
+                "overwrite": {"type": "boolean", "default": False},
+            },
+            ["source", "resource", "output"],
+        ),
+        "handler": _h_wrap_dprod_resource,
+    },
+    {
+        "name": "export_dprod",
+        "description": "Write deterministic DPROD Turtle and JSON-LD from an ODPS 4.2 definition.",
+        "class": "state-changing",
+        "inputSchema": _object_schema(
+            {
+                "source": _PATH_PROP,
+                "output": _OUTPUT_PROP,
+                "overwrite": {"type": "boolean", "default": False},
+            },
+            ["source", "output"],
+        ),
+        "handler": _h_export_dprod,
     },
     {
         "name": "summarize_data_contract",

@@ -2,7 +2,10 @@
 
 import re
 from pathlib import Path
-import tomllib
+try:
+    import tomllib
+except ModuleNotFoundError:
+    import tomli as tomllib
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 TESTPYPI_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "publish-testpypi.yml"
@@ -11,6 +14,7 @@ PYPROJECT = REPO_ROOT / "pyproject.toml"
 MANIFEST = REPO_ROOT / "MANIFEST.in"
 DOCS_DIR = REPO_ROOT / "docs"
 DEVELOPMENT_DOC = DOCS_DIR / "development" / "README.md"
+README = REPO_ROOT / "README.md"
 
 
 def test_testpypi_workflow_uses_manual_trusted_publishing() -> None:
@@ -47,6 +51,32 @@ def test_pypi_workflow_uses_release_trusted_publishing_with_version_guard() -> N
         assert expected in content
 
     assert "repository-url: https://test.pypi.org/legacy/" not in content
+
+
+def test_manual_pypi_dispatch_keeps_attestations_enabled_by_default() -> None:
+    content = PYPI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert (
+        "attestations:\n"
+        '        description: "Generate PyPI provenance attestations"\n'
+        "        required: false\n"
+        "        type: boolean\n"
+        "        default: true"
+    ) in content
+    assert (
+        "attestations: ${{ github.event_name != 'workflow_dispatch' || "
+        "inputs.attestations }}"
+    ) in content
+
+
+def test_readme_uses_the_dynamic_pypi_version_badge() -> None:
+    content = README.read_text(encoding="utf-8")
+
+    assert (
+        "[![PyPI version](https://img.shields.io/pypi/v/open-data-products.svg)]"
+        "(https://pypi.org/project/open-data-products/)"
+    ) in content
+    assert "badge.fury.io/py/open-data-products" not in content
 
 
 def test_package_metadata_includes_mcp_package() -> None:

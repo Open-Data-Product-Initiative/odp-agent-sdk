@@ -70,6 +70,34 @@ def load_source_documents(source_dir: PathLike) -> str:
 
 def source_document_context(path: Path) -> tuple[str, str]:
     """Return prompt heading and content for one source document."""
+    if path.suffix.lower() == ".docx":
+        from zipfile import BadZipFile, ZipFile
+        from ..source_documents.documents import load_source_documents as load_records
+
+        try:
+            with ZipFile(path) as archive:
+                members = [
+                    item
+                    for item in archive.infolist()
+                    if item.filename == "word/document.xml"
+                ]
+                if len(members) != 1:
+                    raise ValueError(
+                        f"Word document has no extractable text: {path.name}"
+                    )
+                if members[0].file_size > 10 * 1024 * 1024:
+                    raise ValueError(
+                        f"Word document text exceeds the 10 MiB extraction limit: {path.name}"
+                    )
+        except (BadZipFile, OSError):
+            raise ValueError(
+                f"Word document has no extractable text: {path.name}"
+            ) from None
+        records = load_records(path)
+        text = "\n\n".join(record.get("text", "").strip() for record in records).strip()
+        if not text:
+            raise ValueError(f"Word document has no extractable text: {path.name}")
+        return f"--- Source file: {path.name} ---", text
     if path.suffix.lower() in {".yaml", ".yml"}:
         try:
             artifact = select_context_artifact(path, preferred=("gcf", "toon"))
@@ -93,7 +121,10 @@ def source_document_paths(source: PathLike) -> List[Path]:
             path
             for path in root.iterdir()
             if path.is_file()
-            and (path.suffix.lower() in {".md", ".txt"} or has_context_sidecar(path))
+            and (
+                path.suffix.lower() in {".md", ".txt", ".docx"}
+                or has_context_sidecar(path)
+            )
         )
     raise FileNotFoundError(f"Source document path not found: {root}")
 

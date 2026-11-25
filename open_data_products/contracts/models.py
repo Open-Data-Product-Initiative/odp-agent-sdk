@@ -154,6 +154,147 @@ class ContractDocument:
 
 
 @dataclass(frozen=True)
+class ContractInventoryRecord:
+    """Technical evidence found for one source contract."""
+
+    logical_id: str
+    source_reference: str
+    status: str
+    contract_id: Optional[str] = None
+    name: Optional[str] = None
+    version: Optional[str] = None
+    odcs_version: Optional[str] = None
+    domain: Optional[str] = None
+    owner: Optional[str] = None
+    lifecycle_status: Optional[str] = None
+    purpose: Optional[str] = None
+    tags: List[str] = field(default_factory=list)
+    technical_interfaces: List[str] = field(default_factory=list)
+    technical_resources: List[str] = field(default_factory=list)
+    server_count: int = 0
+    model_count: int = 0
+    field_count: int = 0
+    fingerprint: Optional[str] = None
+    schema_signature: List[str] = field(default_factory=list)
+    validation_status: str = "unavailable"
+    findings: List[Finding] = field(default_factory=list)
+
+    def to_dict(self) -> Dict[str, object]:
+        """Return a JSON-serializable representation."""
+        data = asdict(self)
+        data["findings"] = [finding.to_dict() for finding in self.findings]
+        return data
+
+
+@dataclass(frozen=True)
+class ContractRelationship:
+    """Evidence-backed relationship between discovered contracts."""
+
+    source_id: str
+    target_id: str
+    kind: str
+    evidence_class: str
+    rationale: str
+    score: float = 1.0
+
+    def to_dict(self) -> Dict[str, object]:
+        """Return a JSON-serializable representation."""
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class IntelligenceFinding:
+    """One source-linked finding from contract intelligence analysis."""
+
+    finding_id: str
+    category: str
+    kind: str
+    evidence_class: str
+    source_contract_ids: List[str]
+    evidence: List[str]
+    rationale: str
+    why_it_matters: str
+    suggested_action: str
+    score: float = 1.0
+
+    def to_dict(self) -> Dict[str, object]:
+        """Return a JSON-serializable representation."""
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class ProductCandidate:
+    """Review-only opportunity derived from contract evidence."""
+
+    candidate_id: str
+    status: str
+    evidence_class: str
+    supporting_contract_ids: List[str]
+    rationale: str
+    unresolved_questions: List[str] = field(default_factory=list)
+    score: float = 0.0
+    opportunity_type: str = "boundary_proposal"
+
+    def to_dict(self) -> Dict[str, object]:
+        """Return a JSON-serializable representation."""
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class DiscoveryArtifact:
+    """Logical metadata for one generated discovery artifact."""
+
+    artifact_id: str
+    kind: str
+
+    def to_dict(self) -> Dict[str, object]:
+        """Return a JSON-serializable representation."""
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class ContractDiscoveryResult:
+    """Result of one contract portfolio discovery run."""
+
+    source_id: str
+    inventory: List[ContractInventoryRecord]
+    relationships: List[ContractRelationship]
+    candidates: List[ProductCandidate]
+    intelligence_findings: List[IntelligenceFinding] = field(default_factory=list)
+    intelligence_summary: Dict[str, int] = field(default_factory=dict)
+    source_status: str = "loaded"
+    artifacts: List[DiscoveryArtifact] = field(default_factory=list)
+    warnings: List[str] = field(default_factory=list)
+    ai_enabled: bool = False
+    ai_proposals: List[ProductCandidate] = field(default_factory=list)
+    interface_analysis: Dict[str, object] = field(default_factory=dict)
+    unclassified_contracts: List[Dict[str, str]] = field(default_factory=list)
+
+    def to_dict(self) -> Dict[str, object]:
+        """Return a JSON-serializable representation."""
+        return {
+            "kind": "ContractDiscovery",
+            "source_id": self.source_id,
+            "source_status": self.source_status,
+            "inventory": [item.to_dict() for item in self.inventory],
+            "relationships": [item.to_dict() for item in self.relationships],
+            "intelligence_findings": [
+                item.to_dict() for item in self.intelligence_findings
+            ],
+            "intelligence_summary": dict(self.intelligence_summary),
+            "candidates": [item.to_dict() for item in self.candidates],
+            "artifacts": [item.to_dict() for item in self.artifacts],
+            "warnings": list(self.warnings),
+            "ai_enabled": self.ai_enabled,
+            "ai_proposals": [item.to_dict() for item in self.ai_proposals],
+            "interface_analysis": dict(self.interface_analysis),
+            "unclassified_contracts": [
+                dict(item) for item in self.unclassified_contracts
+            ],
+        }
+
+
+@dataclass(frozen=True)
 class ContractMappedField:
     """One deterministic ODCS-to-ODPS field mapping."""
 

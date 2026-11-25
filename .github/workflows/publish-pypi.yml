@@ -6,6 +6,11 @@ on:
       version:
         description: "Package version to publish, for example 0.1.0"
         required: true
+      attestations:
+        description: "Generate PyPI provenance attestations"
+        required: false
+        type: boolean
+        default: true
   release:
     types: [published]
 
@@ -80,3 +85,5 @@ jobs:
 
       - name: Publish distribution to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          attestations: ${{ github.event_name != 'workflow_dispatch' || inputs.attestations }}

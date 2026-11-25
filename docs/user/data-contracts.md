@@ -192,3 +192,54 @@ product:
 
 Practical extension-style references such as `extensions.dataContract.href` are
 also recognized when resolving product contracts.
+
+## Discover contract portfolio candidates
+
+Use deterministic discovery before deciding whether technical contracts should
+become data products:
+
+    open-data-products portfolio discover-contracts ./contracts \
+      --output ./portfolio-discovery --json
+
+The command recursively reads YAML and JSON files and writes:
+
+- `contract-inventory.json` with normalized source references and contract
+  metadata.
+- `contract-intelligence.json` with evidence-linked similarities, reuse
+  findings, actionable investigation guidance, and information gaps.
+- `product-candidates.json` with review-only standalone product candidates,
+  boundary proposals, rationalisation opportunities, and source references for
+  contracts with no current opportunity signal.
+- `discovery-report.html`, a self-contained offline Data Contract Intelligence
+  report with an overview, searchable contract explorer, relationship evidence,
+  and product opportunities.
+
+The report separates three different portfolio decisions: a standalone product
+candidate requires a declared name, domain, and purpose; a boundary proposal
+requires repeatable shared-domain capability evidence; and a rationalisation
+opportunity requires exact-duplicate evidence. Contracts that meet none of
+these conservative rules remain visible as having no current opportunity
+signal. Relationships are inferred unless source contracts declare them. Every
+candidate remains proposed; technical similarity does not establish a business
+objective, consumer demand, ownership, or approved product boundary.
+
+The default CLI output mirrors the report details in the terminal: overview
+counts, interface types and their contracts, priority findings, contract
+inventory, all three opportunity types, and every contract with no current
+opportunity signal. Add `--json` to receive the same data as structured output.
+
+The Python API returns the same metadata through
+`discover_contract_portfolio(...).to_dict()`. The state-changing MCP tool
+`discover_contract_portfolio` requires `approved: true` because it writes
+artifacts; its response then carries the same metadata-only intelligence result,
+without raw contract document bodies or absolute local paths.
+
+The intelligence artifact records source contracts, evidence, why each finding
+matters, and a suggested human investigation. It normalizes safe technical
+interface identifiers such as declared server types and resource names, but it
+does not expose server locations or credentials.
+
+Future API sources are configured under portfolio.contractSources in
+generation.config.yaml. Credentials use credentialsRef with an env:NAME
+reference only. API retrieval is not implemented yet, so configured API
+sources return a clear status without making a network request.

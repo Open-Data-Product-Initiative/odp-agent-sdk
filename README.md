@@ -1,6 +1,6 @@
 # Open Data Products Python SDK
 
-[![PyPI version](https://badge.fury.io/py/open-data-products.svg)](https://badge.fury.io/py/open-data-products)
+[![PyPI version](https://img.shields.io/pypi/v/open-data-products.svg)](https://pypi.org/project/open-data-products/)
 [![Python Support](https://img.shields.io/badge/python-3.8%2B-blue.svg)](https://github.com/Open-Data-Product-Initiative/odps-python)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![PyPI Downloads](https://static.pepy.tech/personalized-badge/open-data-products?period=total&units=INTERNATIONAL_SYSTEM&left_color=BLACK&right_color=GREEN&left_text=downloads)](https://pepy.tech/projects/open-data-products)
@@ -35,7 +35,12 @@ pip install "open-data-products[llama-cpp]"
 pip install "open-data-products[dev]"
 ```
 
-Python 3.8 or newer is required.
+Python 3.8.1 or newer is required.
+
+The experimental [OpenMetadata integration](docs/integrations/openmetadata.md)
+supports product discovery, ODPS export, reviewed creation and updates, domain
+management, and contract attachment. It was tested against one OpenMetadata
+2.1.0 deployment. Other versions and their export behavior require verification.
 
 ## What It Provides
 
@@ -47,7 +52,10 @@ Python 3.8 or newer is required.
 | Document intake | Read Markdown, text, YAML, JSON, EML, MSG with the `email` extra, DOCX, PPTX, PDF, CSV, and XLSX source files for portfolio workflows |
 | Agent surfaces | Run a safe-class stdio MCP server and generate an ARWS-compatible agent manifest |
 | LLM generation | Generate ODPC fragments, ODPG graphs, and ODPS product YAML from source notes using local or hosted providers |
+| OpenMetadata | Connect, review and create products, manage domains, compare retrieved metadata, and attach ODCS contracts |
 | Data Contracts | Wrap ODCS 3.0/3.1/3.2 contracts into conservative ODPS 4.2 drafts, resolve ODPS contract references, validate external contracts through optional `datacontract-cli`, extract schemas, check alignment, and generate reports |
+| DCAT Catalog Intelligence | Inspect supplied DCAT RDF with evidence-bounded findings, render an offline report, and convert explicitly selected resources to private ODPS 4.2 drafts |
+| DPROD interoperability | Validate explicit OMG DPROD 1.0 Beta 2 products offline, create ODPS 4.2 drafts, and export deterministic DPROD RDF with loss reports |
 
 ## Quick CLI Examples
 
@@ -79,6 +87,48 @@ open-data-products validate examples/product.yaml
 open-data-products explain examples/product.yaml --json
 ```
 
+Create OpenMetadata products from reviewed ODPS 4.1 documents:
+
+```bash
+# Copy the bundled example into your project, then edit its endpoint.
+open-data-products config integrations --copy-to connections.yaml
+# Set OPENMETADATA_TOKEN in the environment, then select the connection.
+open-data-products connect openmetadata --config connections.yaml
+
+# Create new 4.1 drafts from business documents using a configured provider.
+open-data-products generate --input business-brief.md --kind odps-product \
+  --odps-version 4.1 --output products/
+
+# Review the folder and confirm creation in OpenMetadata.
+open-data-products openmetadata products create ./products --domain "Retail Banking"
+open-data-products openmetadata products list
+open-data-products openmetadata products search "campaign"
+open-data-products openmetadata products export --output catalog.yaml
+
+# Review changes to an existing product by UUID.
+open-data-products openmetadata products update --id PRODUCT_UUID \
+  --input product.yaml
+```
+
+The connection file references an environment variable, like `OPENAI_API_KEY`;
+the SDK does not automatically load `.env`. The platform command requires a
+write-enabled profile and appropriate platform permissions. It checks for
+possible duplicates and reports fields that might not be imported; generated
+metadata is not evidence of approval. See the [integration guide](docs/integrations/openmetadata.md)
+for setup, comparison, update and deletion, contract limitations, and JSON
+automation.
+
+Replace `Retail Banking` with the domain's exact OpenMetadata fully qualified
+name (FQN); quote values with spaces. The FQN may differ from the display name.
+For updates, the input product ID must match the OpenMetadata product name.
+The review shows which source fields are applied; currently the file supplies
+the title and description, while other ODPS fields are not applied.
+
+OpenMetadata list, search and catalog export produce validated ODPC 1.0
+catalogs. The catalog's `productVersion` records the OpenMetadata metadata
+revision and labels its origin; it is not an independently verified product
+release version.
+
 Wrap an ODCS contract without changing its source:
 
 ```bash
@@ -105,6 +155,47 @@ open-data-products product wrap-contract --input contracts/orders.yaml --output 
 
 See [Data Contract workflows](docs/user/data-contracts.md) for the generated
 fields and provider configuration.
+
+Inspect a DCAT catalog, then convert only a selected resource:
+
+```bash
+open-data-products portfolio discover-dcat ./catalogs --output catalog-intelligence.html
+open-data-products product wrap-dcat --input catalog.ttl \
+  --resource https://catalog.example/datasets/air-quality --output air-quality.yaml
+```
+
+See [DCAT Catalog Intelligence](docs/user/dcat-catalog-intelligence.md) for
+format support, evidence boundaries, conversion mapping, and optional AI proposals.
+
+Validate an explicit DPROD Beta 2 product, create an ODPS draft, or export an
+ODPS definition as DPROD Turtle and JSON-LD:
+
+```bash
+open-data-products dprod-validate product.ttl --json
+open-data-products product wrap-dprod --input product.ttl --resource https://example.test/products/air --output air.yaml
+open-data-products product export-dprod --input air.yaml --output air
+```
+
+See [DPROD interoperability](docs/user/dprod-interoperability.md) for the
+normative namespace, offline SHACL profile, mapping constraints, and loss
+boundaries.
+
+Discover technical portfolio evidence from a contract repository without
+declaring any contract to be an approved data product:
+
+    open-data-products portfolio discover-contracts contracts/ \
+      --output portfolio-discovery/ --json
+
+The command writes a normalized contract inventory, a source-linked Data
+Contract Intelligence artifact, review-only typed opportunities, and a static
+HTML report. The report separates standalone product candidates, multi-contract
+boundary proposals, and rationalisation opportunities; it also lists contracts
+without a current opportunity signal. Duplicate and schema-overlap findings are
+technical evidence, not approved product boundaries.
+
+Without `--json`, the command prints the same inventory, interface analysis,
+priority evidence, typed opportunities, and no-current-signal contracts as the
+HTML report. Use `--json` for the same information in structured form.
 
 Portfolio source intake can be inspected without calling an LLM:
 
@@ -160,6 +251,7 @@ Focused user guides:
 - [Agent surface](https://github.com/Open-Data-Product-Initiative/odps-python/blob/main/docs/user/agent-surface.md)
 - [Recipe workflows](https://github.com/Open-Data-Product-Initiative/odps-python/blob/main/docs/user/recipe-workflows.md)
 - [Data Contract workflows](https://github.com/Open-Data-Product-Initiative/odps-python/blob/main/docs/user/data-contracts.md)
+- [DCAT Catalog Intelligence](https://github.com/Open-Data-Product-Initiative/odps-python/blob/main/docs/user/dcat-catalog-intelligence.md)
 - [API reference](https://github.com/Open-Data-Product-Initiative/odps-python/blob/main/docs/user/API.md)
 
 Project references:
@@ -188,8 +280,8 @@ python3 -m twine check dist/*
 
 Thanks to the Open Data Product Initiative community, Chris Howard / Kitard for
 the original `odps-python` foundation, devlouie for the MCP layer and agent
-surface, and the Data Contract CLI project for the optional contract execution
-engine.
+surface, the OpenMetadata platform, and the Data Contract CLI project for the
+optional contract execution engine.
 
 ## License
 

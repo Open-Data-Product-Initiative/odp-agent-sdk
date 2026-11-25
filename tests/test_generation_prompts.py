@@ -496,6 +496,80 @@ def test_list_ollama_models_reads_local_tags(monkeypatch):
     assert list_ollama_models() == ["qwen2.5:latest", "llama3.2"]
 
 
+@pytest.mark.parametrize(
+    "body",
+    [b"not json secret", b"[]", b'{"response": null}', b'{"response": ""}', b"\xff"],
+)
+def test_ollama_generation_rejects_bad_responses(monkeypatch, body):
+    from open_data_products.generation import ollama_generate
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+        def read(self, limit):
+            return body
+
+    monkeypatch.setattr(
+        "open_data_products.generation.request.urlopen",
+        lambda *args, **kwargs: FakeResponse(),
+    )
+    with pytest.raises(RuntimeError) as caught:
+        ollama_generate("prompt")
+    assert "secret" not in str(caught.value)
+
+
+def test_ollama_generation_rejects_oversized_response(monkeypatch):
+    from open_data_products.generation import (
+        ollama_generate,
+        MAX_GENERATION_RESPONSE_BYTES,
+    )
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+        def read(self, limit):
+            assert limit == MAX_GENERATION_RESPONSE_BYTES + 1
+            return b"x" * limit
+
+    monkeypatch.setattr(
+        "open_data_products.generation.request.urlopen",
+        lambda *args, **kwargs: FakeResponse(),
+    )
+    with pytest.raises(RuntimeError, match="size limit"):
+        ollama_generate("prompt")
+
+
+@pytest.mark.parametrize(
+    "body", [b"secret invalid", b"[]", b"{}", b'{"models": null}', b"\xff"]
+)
+def test_ollama_model_discovery_rejects_bad_responses(monkeypatch, body):
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+        def read(self):
+            return body
+
+    monkeypatch.setattr(
+        "open_data_products.generation.request.urlopen",
+        lambda *args, **kwargs: FakeResponse(),
+    )
+    with pytest.raises(RuntimeError) as caught:
+        list_ollama_models()
+    assert "secret" not in str(caught.value)
+
+
 def test_ensure_ollama_model_accepts_qwen_latest(monkeypatch):
     """Test that qwen2.5 is accepted when Ollama has qwen2.5:latest."""
     monkeypatch.setattr(
@@ -628,12 +702,14 @@ providers:
     report = validate_config("generation", config)
 
     assert report["valid"] is False
-    assert "portfolio.sourceBudget.maxSourceChars must be a positive integer" in report[
-        "errors"
-    ]
-    assert "portfolio.sourceBudget.maxPromptChars must be a positive integer" in report[
-        "errors"
-    ]
+    assert (
+        "portfolio.sourceBudget.maxSourceChars must be a positive integer"
+        in report["errors"]
+    )
+    assert (
+        "portfolio.sourceBudget.maxPromptChars must be a positive integer"
+        in report["errors"]
+    )
 
 
 def test_validate_generation_config_rejects_invalid_portfolio_privacy(tmp_path):
@@ -658,12 +734,12 @@ providers:
     report = validate_config("generation", config)
 
     assert report["valid"] is False
-    assert "portfolio.privacy.obfuscatePersonalData must be a boolean" in report[
-        "errors"
-    ]
-    assert "Unknown generation config key: portfolio.privacy.unknown" in report[
-        "errors"
-    ]
+    assert (
+        "portfolio.privacy.obfuscatePersonalData must be a boolean" in report["errors"]
+    )
+    assert (
+        "Unknown generation config key: portfolio.privacy.unknown" in report["errors"]
+    )
 
 
 def test_resolve_generation_settings_allows_overrides(tmp_path):
@@ -1892,7 +1968,7 @@ product:
     ]
     assert artifact.name == "odpsProduct:airport-operations-performance"
     assert artifact.prompt_name == "odps_product_minimal_yaml.md"
-    assert artifact.review_notes == []
+    assert any("field-level evidence" in note for note in artifact.review_notes)
     assert artifact.drafted_components == []
     assert artifact.evidence_gaps == []
     assert artifact.output_path == (
@@ -2108,7 +2184,8 @@ product:
     assert artifact.valid_yaml is True
     assert artifact.drafted_components == ["SLA", "dataQuality", "pricingPlans"]
     assert artifact.review_notes == [
-        "pricingPlans drafted because no pricing terms were provided."
+        "Generated fields require review against the source; field-level evidence is not verified.",
+        "pricingPlans drafted because no pricing terms were provided.",
     ]
     assert artifact.evidence_gaps == ["No pricing terms were provided."]
     document = yaml.safe_load(artifact.output_path.read_text(encoding="utf-8"))
@@ -2331,7 +2408,7 @@ product:
 
     assert len(component_prompts) == 1
     assert artifact.drafted_components == ["dataAccess", "license"]
-    assert artifact.review_notes == ["dataAccess drafted from API context."]
+    assert "dataAccess drafted from API context." in artifact.review_notes
 
 
 def test_generate_odps_product_repairs_scalar_optional_component(tmp_path):
@@ -3238,3 +3315,57 @@ def test_generate_local_artifact_rejects_unknown_kind(tmp_path):
         assert "Unknown generation artifact kind" in str(exc)
     else:
         raise AssertionError("unknown artifact kind did not raise KeyError")
+
+
+def test_generation_config_resolves_safe_contract_source_settings(tmp_path):
+    config = tmp_path / "generation.config.yaml"
+    config.write_text(
+        """\
+provider: ollama
+model: qwen2.5
+portfolio:
+  contractSources:
+    registry:
+      type: api
+      endpoint: https://contracts.example.test/v1/contracts
+      credentialsRef: env:CONTRACT_REGISTRY_TOKEN
+      authentication:
+        type: bearer
+      documentsSelector: items
+      pagination:
+        type: cursor
+        nextSelector: nextCursor
+""",
+        encoding="utf-8",
+    )
+
+    report = validate_config(config_path=config)
+    settings = resolve_generation_settings(config_path=config)
+
+    assert report["valid"] is True
+    assert settings.contract_sources["registry"].credentials_ref == (
+        "env:CONTRACT_REGISTRY_TOKEN"
+    )
+
+
+@pytest.mark.parametrize("reference", ["token", "env:bad-name", "env:sk-secret"])
+def test_generation_config_rejects_invalid_contract_source_credentials(
+    tmp_path: Path, reference: str
+):
+    config = tmp_path / "generation.config.yaml"
+    config.write_text(
+        """\
+provider: ollama
+model: qwen2.5
+portfolio:
+  contractSources:
+    registry:
+      type: api
+      endpoint: https://contracts.example.test/v1/contracts
+      credentialsRef: """ + reference + "\n",
+        encoding="utf-8",
+    )
+
+    report = validate_config(config_path=config)
+
+    assert any("credentialsRef" in error for error in report["errors"])

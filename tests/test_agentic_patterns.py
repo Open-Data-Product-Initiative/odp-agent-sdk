@@ -8,7 +8,10 @@ from __future__ import annotations
 
 import hashlib
 import json
-import tomllib
+try:
+    import tomllib
+except ModuleNotFoundError:
+    import tomli as tomllib
 from pathlib import Path
 
 import pytest
@@ -112,6 +115,13 @@ EXPECTED_TOOLS = {
     "plan_recipe_run",
     "search_recipe_guidance",
     "wrap_odcs_contract",
+    "discover_contract_portfolio",
+    "discover_dcat_catalog",
+    "wrap_dcat_resource",
+    "discover_dprod_catalog",
+    "validate_dprod",
+    "wrap_dprod_resource",
+    "export_dprod",
 }
 
 
@@ -369,6 +379,8 @@ class TestAgentManifest:
             "okf-context-bundles",
             "vocabulary-context",
             "product-contracts",
+            "dcat-catalog-intelligence",
+            "dprod-beta2-interoperability",
         }
         assert {item["id"] for item in manifest["standards"]} == {
             "odps",
@@ -376,6 +388,8 @@ class TestAgentManifest:
             "odpg",
             "odpv",
             "odpr",
+            "dcat",
+            "dprod",
         }
 
     def test_manifest_describes_workflows_and_interfaces(self):
@@ -621,6 +635,11 @@ class TestAgentManifest:
         assert safety["mcp_state_changing_tools"] == [
             "init_starter_recipe",
             "build_portfolio",
+            "discover_contract_portfolio",
+            "wrap_odcs_contract",
+            "wrap_dcat_resource",
+            "wrap_dprod_resource",
+            "export_dprod",
         ]
         assert "state-changing" in safety["cli_note"]
 

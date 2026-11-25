@@ -1,0 +1,16 @@
+{
+  "upstream": "https://github.com/datacontract/datacontract-cli",
+  "commit": "09e779dfeaec63ee60edc102e7a3d6970e34e16b",
+  "retrieved": "2026-11-07",
+  "license": "MIT",
+  "license_file": "LICENSE",
+  "selection": "All parseable ODCS v3 DataContract YAML or JSON documents in the pinned upstream tree.",
+  "contract_count": 146,
+  "api_version_counts": {
+    "v3.0.0": 4,
+    "v3.0.1": 2,
+    "v3.0.2": 28,
+    "v3.1.0": 52,
+    "v3.2.0": 60
+  }
+}

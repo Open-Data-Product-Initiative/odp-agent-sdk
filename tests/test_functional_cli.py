@@ -21,6 +21,9 @@ ODPS_V42_PRODUCT = REPO_ROOT / "tests" / "fixtures" / "odps_v42_profiles.yaml"
 ODPG_GRAPH = REPO_ROOT / "open_data_products" / "odpg" / "data" / "graph" / "graph.yaml"
 GENERATION_SOURCE_DOCS = REPO_ROOT / "open_data_products" / "generation" / "source_docs"
 EXAMPLE_RECIPES = REPO_ROOT / "examples" / "recipes"
+DATA_CONTRACT_CORPUS = (
+    REPO_ROOT / "tests" / "fixtures" / "external_contract_sources" / "datacontract-cli"
+)
 
 
 def _fake_localization_client(prompt: str, model: str) -> str:
@@ -1395,10 +1398,7 @@ def test_recipe_cli_init_defaults_to_recipes_directory(
 ) -> None:
     monkeypatch.chdir(tmp_path)
 
-    assert (
-        main(["recipe", "init", "build-data-product-portfolio", "--json"])
-        == 0
-    )
+    assert main(["recipe", "init", "build-data-product-portfolio", "--json"]) == 0
 
     payload = _json_output(capsys)
     output = tmp_path / "recipes" / "build-data-product-portfolio"
@@ -1440,9 +1440,9 @@ def test_recipe_cli_init_parameterized_creates_values_files(
     assert (output / "recipe.values.yaml").is_file()
     assert (output / "values.schema.yaml").is_file()
     assert payload["created"]["values"] == (output / "recipe.values.yaml").as_posix()
-    assert payload["created"]["valuesSchema"] == (
-        output / "values.schema.yaml"
-    ).as_posix()
+    assert (
+        payload["created"]["valuesSchema"] == (output / "values.schema.yaml").as_posix()
+    )
 
 
 def test_recipe_cli_init_refuses_existing_output(
@@ -1494,8 +1494,7 @@ def test_recipe_cli_initialized_starter_execute_requires_llm_and_review(
     _json_output(capsys)
 
     assert (
-        main(["recipe", "run", str(output / "recipe.yaml"), "--execute", "--json"])
-        == 1
+        main(["recipe", "run", str(output / "recipe.yaml"), "--execute", "--json"]) == 1
     )
     payload = _json_output(capsys)
 
@@ -1558,10 +1557,7 @@ def test_recipe_cli_initialized_starter_review_does_not_allow_llm(
 def test_recipe_cli_explain_starter_uses_packaged_catalog(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    assert (
-        main(["recipe", "explain", "build-data-product-portfolio", "--json"])
-        == 0
-    )
+    assert main(["recipe", "explain", "build-data-product-portfolio", "--json"]) == 0
 
     payload = _json_output(capsys)
 
@@ -2584,6 +2580,8 @@ def test_unified_cli_odps_generation_passes_profile_and_components(
         profile: str = "minimal",
         include_components: Optional[List[str]] = None,
         max_source_chars: Optional[int] = None,
+        overwrite: bool = False,
+        odps_version: Optional[str] = None,
     ) -> List[generation.GeneratedArtifact]:
         observed.update(
             {
@@ -2593,6 +2591,8 @@ def test_unified_cli_odps_generation_passes_profile_and_components(
                 "profile": profile,
                 "include_components": include_components,
                 "max_source_chars": max_source_chars,
+                "overwrite": overwrite,
+                "odps_version": odps_version,
             }
         )
         output = Path(output_dir) / "odps_product_customer-retention.yaml"
@@ -2638,6 +2638,9 @@ def test_unified_cli_odps_generation_passes_profile_and_components(
                 "pricingPlans,dataAccess",
                 "--max-source-chars",
                 "12000",
+                "--overwrite",
+                "--odps-version",
+                "4.1",
                 "--output",
                 str(output_dir),
                 "--json",
@@ -2650,9 +2653,12 @@ def test_unified_cli_odps_generation_passes_profile_and_components(
     assert observed["profile"] == "complete-draft"
     assert observed["include_components"] == ["pricingPlans", "dataAccess"]
     assert observed["max_source_chars"] == 12000
+    assert observed["overwrite"] is True
+    assert observed["odps_version"] == "4.1"
     assert payload["profile"] == "complete-draft"
     assert payload["include_components"] == ["pricingPlans", "dataAccess"]
     assert payload["max_source_chars"] == 12000
+    assert payload["odps_version"] == "4.1"
     assert payload["artifacts"][0]["review_notes"] == [
         "pricingPlans drafted for review."
     ]
@@ -3221,3 +3227,102 @@ models:
     assert audit_payload["summary"].startswith(
         "Product valid; 1 Data Contract reference"
     )
+
+
+def test_portfolio_discover_contracts_writes_review_artifacts(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    contracts = tmp_path / "contracts"
+    contracts.mkdir()
+    (contracts / "orders.yaml").write_text(
+        "apiVersion: v3.2.0\nkind: DataContract\nid: orders\nmodels: {}\n",
+        encoding="utf-8",
+    )
+    output = tmp_path / "discovery"
+
+    assert (
+        main(
+            [
+                "portfolio",
+                "discover-contracts",
+                str(contracts),
+                "--output",
+                str(output),
+                "--json",
+            ]
+        )
+        == 0
+    )
+
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["kind"] == "ContractDiscovery"
+    assert "interface_analysis" in payload
+    assert "unclassified_contracts" in payload
+    assert (output / "contract-inventory.json").is_file()
+
+
+def test_portfolio_discover_contracts_prints_full_intelligence_report(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert (
+        main(
+            [
+                "portfolio",
+                "discover-contracts",
+                str(DATA_CONTRACT_CORPUS),
+                "--output",
+                str(tmp_path / "discovery"),
+            ]
+        )
+        == 0
+    )
+
+    report = capsys.readouterr().out
+
+    assert "Data Contract Intelligence" in report
+    assert "Overview" in report
+    assert "Interface analysis" in report
+    assert "Priority findings" in report
+    assert "Contract inventory" in report
+    assert "Standalone product candidates (7)" in report
+    assert "Boundary proposals (2)" in report
+    assert "Rationalisation opportunities (2)" in report
+    assert "No current opportunity signal (134)" in report
+    assert "Top Artists by Year" in report
+    assert "examples/business-definitions/top-artists-by-year.odcs.yaml" in report
+    assert str(DATA_CONTRACT_CORPUS) not in report
+
+
+def test_portfolio_discover_contracts_uses_configured_ai_client(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from open_data_products import generation
+
+    contracts = tmp_path / "contracts"
+    contracts.mkdir()
+    (contracts / "orders.yaml").write_text(
+        "apiVersion: v3.2.0\nkind: DataContract\nid: orders\nmodels: {}\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        generation,
+        "create_generation_client",
+        lambda settings: lambda prompt, model: '{"suggestions":[]}',
+    )
+
+    assert (
+        main(
+            [
+                "portfolio",
+                "discover-contracts",
+                str(contracts),
+                "--output",
+                str(tmp_path / "discovery"),
+                "--ai",
+                "--json",
+            ]
+        )
+        == 0
+    )
+
+    assert json.loads(capsys.readouterr().out)["ai_enabled"] is True

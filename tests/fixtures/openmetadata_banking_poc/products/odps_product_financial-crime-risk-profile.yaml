@@ -1,0 +1,31 @@
+schema: https://opendataproducts.org/v4.1/schema/odps.json
+version: '4.1'
+product:
+  details:
+    en:
+      productID: financial-crime-risk-profile
+      name: Financial Crime Risk Profile
+      visibility: private
+      status: draft
+      type: dataset
+      description: 'Financial Crime Risk Profile is a proposed banking data product
+        for the Retail Banking Customer Growth and Risk Portfolio. It gives authorised
+        teams and agents a consistent view of customer information so they can reason
+        about customer growth, engagement, credit, fraud, and collections activity
+        without rebuilding context from source systems.
+
+
+        Fictional proposed proof of concept; not a production contract.
+
+
+        Retail banking teams need a trusted way to connect financial crime risk profile
+        evidence with customer decisions. Without this product, analysts and agents
+        must infer context from fragmented operational systems, which creates inconsistent
+        eligibility decisions, delayed risk response, and weak explanations when business
+        users ask why a recommendation or alert was produced.
+
+
+        The product exists to support Fraud detection, Credit risk assessment. It
+        helps consumers identify the relevant customer, understand the current business
+        situation, check restrictions, and decide whether the next action should be
+        a recommendation, review, escalation, suppression, or operational follow-up.'

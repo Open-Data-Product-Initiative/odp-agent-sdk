@@ -26,6 +26,7 @@ from .cli_core import (
     print_error_payload as _print_error_payload,
     split_csv as _split_csv,
 )
+from .cli_interop import add_interop_subparsers, handle_interop_command
 from .cli_product import add_product_subparser, handle_product_command
 from .odpg.graph import (
     collect_relationship_types,
@@ -524,6 +525,212 @@ Examples:
 """
 
 
+def _print_contract_discovery_report(payload: Dict[str, object]) -> None:
+    """Print the complete human-readable contract intelligence report."""
+    inventory = _payload_mapping_list(payload.get("inventory"))
+    relationships = _payload_mapping_list(payload.get("relationships"))
+    findings = _payload_mapping_list(payload.get("intelligence_findings"))
+    candidates = _payload_mapping_list(payload.get("candidates"))
+    candidates.extend(_payload_mapping_list(payload.get("ai_proposals")))
+    summary = payload.get("intelligence_summary")
+    summary = summary if isinstance(summary, dict) else {}
+    interface_analysis = payload.get("interface_analysis")
+    interface_analysis = (
+        interface_analysis if isinstance(interface_analysis, dict) else {}
+    )
+    unclassified = _payload_mapping_list(payload.get("unclassified_contracts"))
+    inventory_by_id = {
+        str(item.get("logical_id")): item
+        for item in inventory
+        if isinstance(item.get("logical_id"), str)
+    }
+
+    print("Data Contract Intelligence")
+    print("Overview")
+    print("Contracts analyzed: {}".format(summary.get("contracts_analyzed", 0)))
+    print("Relationships detected: {}".format(summary.get("relationships_detected", 0)))
+    print("Reuse or duplication findings: {}".format(summary.get("reuse_findings", 0)))
+    print("Product opportunities: {}".format(summary.get("product_opportunities", 0)))
+
+    print("\nInterface analysis")
+    print(
+        "Declared interface types: {}".format(
+            interface_analysis.get("interface_type_count", 0)
+        )
+    )
+    print(
+        "Contracts with one interface: {}".format(
+            interface_analysis.get("contracts_with_one_interface", 0)
+        )
+    )
+    print(
+        "Contracts with multiple interfaces: {}".format(
+            interface_analysis.get("contracts_with_multiple_interfaces", 0)
+        )
+    )
+    print(
+        "Contracts without an interface: {}".format(
+            interface_analysis.get("contracts_without_declared_interface", 0)
+        )
+    )
+    for interface_type in _payload_mapping_list(interface_analysis.get("types")):
+        print(
+            "- {}: {} contracts".format(
+                _payload_text(interface_type.get("interface_type"), "unknown"),
+                interface_type.get("contract_count", 0),
+            )
+        )
+        for contract in _payload_mapping_list(interface_type.get("contracts")):
+            print(
+                "  - {} — {}".format(
+                    _contract_label(contract), _contract_source(contract)
+                )
+            )
+
+    print("\nPriority findings")
+    priority_findings = [
+        finding
+        for finding in findings
+        if finding.get("category") in {"reuse", "similarity"}
+    ]
+    if not priority_findings:
+        print("- None detected")
+    for finding in priority_findings:
+        print(
+            "- {}".format(
+                _payload_text(finding.get("kind"), "finding").replace("_", " ")
+            )
+        )
+        for identifier in _payload_string_list(finding.get("source_contract_ids")):
+            record = inventory_by_id.get(identifier, {})
+            print(
+                "  - {} — {}".format(_contract_label(record), _contract_source(record))
+            )
+        print(
+            "  Evidence: {}".format(
+                " ".join(_payload_string_list(finding.get("evidence")))
+            )
+        )
+        print(
+            "  Next: {}".format(
+                _payload_text(finding.get("suggested_action"), "Review the evidence.")
+            )
+        )
+
+    print("\nContract inventory")
+    for record in inventory:
+        identifier = _payload_text(record.get("logical_id"), "")
+        related = [
+            _payload_text(item.get("kind"), "relationship").replace("_", " ")
+            for item in relationships
+            if identifier
+            in {
+                _payload_text(item.get("source_id"), ""),
+                _payload_text(item.get("target_id"), ""),
+            }
+        ]
+        gaps = [
+            _payload_text(item.get("kind"), "gap").replace("missing_", "missing ")
+            for item in findings
+            if item.get("category") == "information_gap"
+            and identifier in _payload_string_list(item.get("source_contract_ids"))
+        ]
+        print("- {} — {}".format(_contract_label(record), _contract_source(record)))
+        print(
+            "  Domain / owner: {} / {}".format(
+                _payload_text(record.get("domain"), "—"),
+                _payload_text(record.get("owner"), "—"),
+            )
+        )
+        print(
+            "  Interfaces: {}".format(
+                ", ".join(_payload_string_list(record.get("technical_interfaces")))
+                or "—"
+            )
+        )
+        print("  Relationships: {}".format(", ".join(related) or "None detected"))
+        print("  Missing information: {}".format(", ".join(gaps) or "None recorded"))
+
+    print("\nProduct opportunities")
+    for opportunity_type, title in (
+        ("standalone_product_candidate", "Standalone product candidates"),
+        ("boundary_proposal", "Boundary proposals"),
+        ("rationalisation_opportunity", "Rationalisation opportunities"),
+    ):
+        typed_candidates = [
+            candidate
+            for candidate in candidates
+            if candidate.get("opportunity_type") == opportunity_type
+        ]
+        print("{} ({})".format(title, len(typed_candidates)))
+        for candidate in typed_candidates:
+            print(
+                "- {}".format(
+                    _payload_text(candidate.get("rationale"), "Evidence unavailable.")
+                )
+            )
+            for identifier in _payload_string_list(
+                candidate.get("supporting_contract_ids")
+            ):
+                record = inventory_by_id.get(identifier, {})
+                print(
+                    "  - {} — {}".format(
+                        _contract_label(record), _contract_source(record)
+                    )
+                )
+            questions = _payload_string_list(candidate.get("unresolved_questions"))
+            if questions:
+                print("  Human review: {}".format("; ".join(questions)))
+
+    print("No current opportunity signal ({})".format(len(unclassified)))
+    for record in unclassified:
+        print(
+            "- {} — {} — {}".format(
+                _contract_label(record),
+                _contract_source(record),
+                _payload_text(record.get("reason"), "No current evidence signal."),
+            )
+        )
+    print("\nArtifacts")
+    for artifact in _payload_mapping_list(payload.get("artifacts")):
+        print("- {}".format(_payload_text(artifact.get("kind"), "artifact")))
+
+
+def _payload_mapping_list(value: object) -> List[Dict[str, object]]:
+    """Return mapping items from a JSON-ready CLI payload."""
+    if not isinstance(value, list):
+        return []
+    return [item for item in value if isinstance(item, dict)]
+
+
+def _payload_string_list(value: object) -> List[str]:
+    """Return text items from a JSON-ready CLI payload."""
+    if not isinstance(value, list):
+        return []
+    return [item for item in value if isinstance(item, str)]
+
+
+def _payload_text(value: object, default: str) -> str:
+    """Return one displayable scalar from a JSON-ready CLI payload."""
+    return value if isinstance(value, str) and value else default
+
+
+def _contract_label(record: Dict[str, object]) -> str:
+    """Return one contract name for terminal output."""
+    return _payload_text(
+        record.get("name"),
+        _payload_text(
+            record.get("contract_id"),
+            _payload_text(record.get("logical_id"), "Unnamed contract"),
+        ),
+    )
+
+
+def _contract_source(record: Dict[str, object]) -> str:
+    """Return one contract source reference for terminal output."""
+    return _payload_text(record.get("source_reference"), "Unknown source")
+
+
 def main(argv: Optional[List[str]] = None) -> int:
     """Run the top-level Open Data Products CLI."""
     cli_argv = list(sys.argv[1:] if argv is None else argv)
@@ -610,7 +817,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     config_parser.add_argument(
         "domain",
         nargs="?",
-        choices=["generation", "recipes"],
+        choices=["generation", "recipes", "integrations"],
         default="generation",
         help="Config domain to inspect. Defaults to generation.",
     )
@@ -934,6 +1141,11 @@ def main(argv: Optional[List[str]] = None) -> int:
         ),
     )
     generate_parser.add_argument(
+        "--odps-version",
+        choices=["4.1", "4.2"],
+        help="Generate a new ODPS product for the selected version (no conversion)",
+    )
+    generate_parser.add_argument(
         "--include-components",
         help=(
             "Comma-separated ODPS product components to draft for --kind "
@@ -951,6 +1163,11 @@ def main(argv: Optional[List[str]] = None) -> int:
     generate_parser.add_argument(
         "--ollama-url",
         help="Local Ollama base URL. Defaults to http://localhost:11434.",
+    )
+    generate_parser.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="Replace existing ODPS product output files",
     )
     generate_parser.add_argument("--json", action="store_true", help="Emit JSON")
 
@@ -1376,6 +1593,42 @@ def main(argv: Optional[List[str]] = None) -> int:
         ),
     )
     portfolio_build_parser.add_argument("--json", action="store_true", help="Emit JSON")
+    portfolio_discover_parser = portfolio_subparsers.add_parser(
+        "discover-contracts",
+        help="Discover review-only candidates from ODCS contracts",
+    )
+    portfolio_discover_parser.add_argument(
+        "contracts", nargs="?", help="Directory containing ODCS YAML or JSON files"
+    )
+    portfolio_discover_parser.add_argument(
+        "--source", help="Configured contract source ID"
+    )
+    portfolio_discover_parser.add_argument(
+        "--output", "-o", required=True, help="Discovery artifact directory"
+    )
+    portfolio_discover_parser.add_argument(
+        "--config", help="Generation configuration containing contract sources"
+    )
+    portfolio_discover_parser.add_argument(
+        "--ai", action="store_true", help="Add review-only AI candidate proposals."
+    )
+    portfolio_discover_parser.add_argument(
+        "--provider", help="LLM provider override for --ai."
+    )
+    portfolio_discover_parser.add_argument(
+        "--model", help="LLM model override for --ai."
+    )
+    portfolio_discover_parser.add_argument(
+        "--ollama-url", help="Local Ollama URL override for --ai."
+    )
+    portfolio_discover_parser.add_argument(
+        "--strict-validation",
+        action="store_true",
+        help="Return non-zero when external validation is unavailable or failed.",
+    )
+    portfolio_discover_parser.add_argument(
+        "--json", action="store_true", help="Emit JSON"
+    )
     portfolio_refresh_parser = portfolio_subparsers.add_parser(
         "refresh",
         help="Refresh a portfolio workspace from saved source lanes",
@@ -1456,6 +1709,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     portfolio_intake_parser.add_argument(
         "--json", action="store_true", help="Emit JSON"
     )
+    add_interop_subparsers(subparsers, portfolio_subparsers)
     portfolio_sync_parser = portfolio_subparsers.add_parser(
         "sync",
         help="Sync edited YAML artifacts without calling an LLM",
@@ -1542,6 +1796,12 @@ def main(argv: Optional[List[str]] = None) -> int:
     )
 
     add_product_subparser(subparsers)
+    from .integrations.cli import add_integrations_parser
+
+    add_integrations_parser(subparsers)
+    from .integrations._guided_cli import add_guided_parsers
+
+    add_guided_parsers(subparsers)
 
     try:
         args = parser.parse_args(cli_argv)
@@ -1554,6 +1814,24 @@ def main(argv: Optional[List[str]] = None) -> int:
     activity_start_time = time.monotonic()
 
     try:
+        if args.command in ("connect", "products", "openmetadata"):
+            from .integrations._guided_cli import handle_guided
+
+            return _finalize_activity(
+                args, activity_context, activity_start_time, handle_guided(args)
+            )
+        if args.command == "integrations":
+            from .integrations.cli import handle_integrations
+
+            return _finalize_activity(
+                args, activity_context, activity_start_time, handle_integrations(args)
+            )
+        interop_exit_code = handle_interop_command(args)
+        if interop_exit_code is not None:
+            return _finalize_activity(
+                args, activity_context, activity_start_time, interop_exit_code
+            )
+
         if args.command == "validate":
             document_result = validate_document(args.document)
             activity_context.add_details(
@@ -1728,11 +2006,25 @@ def main(argv: Optional[List[str]] = None) -> int:
                 print_recipe_config,
                 validate_recipe_config,
             )
+            from .integrations._template import (
+                TEMPLATE as integration_template,
+                copy_integration_config_template,
+                get_integration_config,
+                validate_integration_config,
+            )
+            from .integrations.config import ConfigurationError
 
             try:
                 if args.print:
                     if args.domain == "recipes":
                         print(print_recipe_config(args.config_path), end="")
+                    elif args.domain == "integrations":
+                        print(
+                            Path(args.config_path or integration_template).read_text(
+                                encoding="utf-8"
+                            ),
+                            end="",
+                        )
                     else:
                         print(print_config(args.domain, args.config_path), end="")
                     return _finalize_activity(
@@ -1743,11 +2035,15 @@ def main(argv: Optional[List[str]] = None) -> int:
                         payload = validate_recipe_config(
                             args.config_path or get_recipe_config_path()
                         )
+                    elif args.domain == "integrations":
+                        payload = validate_integration_config(args.config_path)
                     else:
                         payload = validate_config(args.domain, args.config_path)
                 else:
                     if args.domain == "recipes":
                         payload = get_recipe_config(args.config_path)
+                    elif args.domain == "integrations":
+                        payload = get_integration_config(args.config_path)
                     else:
                         payload = get_config(args.domain, args.config_path)
                 if args.copy_to:
@@ -1755,6 +2051,10 @@ def main(argv: Optional[List[str]] = None) -> int:
                         copied_to = copy_recipe_config_template(
                             args.copy_to,
                             overwrite=args.overwrite,
+                        )
+                    elif args.domain == "integrations":
+                        copied_to = copy_integration_config_template(
+                            args.copy_to, overwrite=args.overwrite
                         )
                     else:
                         copied_to = copy_config_template(
@@ -1766,7 +2066,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                     payload["config_path"] = str(copied_to)
                     payload["editable"] = True
                 if args.copy_prompts_to:
-                    if args.domain == "recipes":
+                    if args.domain != "generation":
                         raise ValueError(
                             "--copy-prompts-to is only available for generation config"
                         )
@@ -1776,7 +2076,13 @@ def main(argv: Optional[List[str]] = None) -> int:
                     )
                     payload["prompt_dir"] = str(Path(args.copy_prompts_to))
                     payload["copied_prompts"] = [path.name for path in copied_prompts]
-            except (FileExistsError, FileNotFoundError, KeyError, ValueError) as exc:
+            except (
+                FileExistsError,
+                FileNotFoundError,
+                KeyError,
+                ValueError,
+                ConfigurationError,
+            ) as exc:
                 print(str(exc), file=sys.stderr)
                 return _finalize_activity(
                     args, activity_context, activity_start_time, 1
@@ -1816,6 +2122,14 @@ def main(argv: Optional[List[str]] = None) -> int:
                     print(
                         "Edit a copied config and pass it with "
                         "`open-data-products recipe list --config <path>`."
+                    )
+                    return _finalize_activity(
+                        args, activity_context, activity_start_time, 0
+                    )
+                if args.domain == "integrations":
+                    print(f"Default connection: {payload['default_connection']}")
+                    print(
+                        "Edit the copied config and connect with `open-data-products connect --config <path>`."
                     )
                     return _finalize_activity(
                         args, activity_context, activity_start_time, 0
@@ -2075,11 +2389,20 @@ def main(argv: Optional[List[str]] = None) -> int:
                 {"prompt_dir": settings.prompt_path} if settings.prompt_path else {}
             )
             include_components = _split_csv(args.include_components)
+            if args.odps_version and args.kind != "odps-product":
+                print("--odps-version requires --kind odps-product", file=sys.stderr)
+                return _finalize_activity(
+                    args, activity_context, activity_start_time, 1
+                )
             odps_kwargs = (
                 {
                     "profile": args.profile,
                     "include_components": include_components,
                     "max_source_chars": args.max_source_chars,
+                    "overwrite": args.overwrite,
+                    **(
+                        {"odps_version": args.odps_version} if args.odps_version else {}
+                    ),
                 }
                 if args.kind == "odps-product"
                 else {}
@@ -2095,7 +2418,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                     **prompt_kwargs,
                     **odps_kwargs,
                 )
-            except (KeyError, RuntimeError, ValueError) as exc:
+            except (KeyError, RuntimeError, ValueError, OSError) as exc:
                 print(str(exc), file=sys.stderr)
                 return _finalize_activity(
                     args, activity_context, activity_start_time, 1
@@ -2123,6 +2446,8 @@ def main(argv: Optional[List[str]] = None) -> int:
                 payload["profile"] = args.profile
                 payload["include_components"] = include_components
                 payload["max_source_chars"] = args.max_source_chars
+                if args.odps_version:
+                    payload["odps_version"] = args.odps_version
             if args.json:
                 print(json.dumps(payload, indent=2))
             else:
@@ -2813,6 +3138,48 @@ def main(argv: Optional[List[str]] = None) -> int:
                         source_budget=settings.portfolio_source_budget,
                         source_privacy=settings.portfolio_privacy,
                     )
+                elif args.portfolio_command == "discover-contracts":
+                    from .contracts import discover_contract_portfolio
+                    from .generation import (
+                        create_generation_client,
+                        resolve_generation_settings,
+                    )
+
+                    if bool(args.contracts) == bool(args.source):
+                        raise ValueError(
+                            "Provide exactly one contract directory or --source."
+                        )
+                    settings = (
+                        resolve_generation_settings(
+                            config_path=args.config,
+                            provider=args.provider,
+                            model=args.model,
+                            ollama_url=args.ollama_url,
+                        )
+                        if args.source or args.ai
+                        else None
+                    )
+                    client = (
+                        create_generation_client(settings)
+                        if args.ai and settings is not None
+                        else None
+                    )
+                    result = discover_contract_portfolio(
+                        directory=args.contracts,
+                        source_id=args.source,
+                        output=args.output,
+                        source_settings=(
+                            settings.contract_sources if settings is not None else None
+                        ),
+                        use_ai=args.ai,
+                        client=client,
+                        model=(
+                            settings.model
+                            if settings is not None
+                            else "contract-discovery"
+                        ),
+                    )
+                    payload = result.to_dict()
                 elif args.portfolio_command == "refresh":
                     from .generation import (
                         create_generation_client,
@@ -2910,6 +3277,9 @@ def main(argv: Optional[List[str]] = None) -> int:
                 if isinstance(source_budget, dict):
                     print(f"Max prompt chars: {source_budget.get('maxPromptChars')}")
                     print(f"Omitted chunks: {source_budget.get('omittedChunkCount')}")
+                print(f"Validation mode: {payload['validationMode']}")
+            elif payload.get("kind") == "ContractDiscovery":
+                _print_contract_discovery_report(payload)
                 print(f"Validation mode: {payload['validationMode']}")
             else:
                 print(f"Workspace: {payload['workspace']}")

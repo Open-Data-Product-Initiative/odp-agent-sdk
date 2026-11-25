@@ -1,0 +1,37 @@
+version: 1.0.0
+kind: DataContract
+apiVersion: v3.2.0
+id: my-data-contract
+name: FootballSchema
+status: draft
+schema:
+- name: FootballSchema
+  physicalType: object
+  description: Schema for football team and person details
+  businessName: FootballSchema
+  logicalType: object
+  physicalName: FootballSchema
+  properties:
+  - name: first_name
+    physicalType: string
+    logicalType: string
+    required: true
+  - name: last_name
+    physicalType: string
+    logicalType: string
+    required: true
+  - name: age
+    physicalType: integer
+    logicalType: integer
+    required: true
+  - name: name
+    physicalType: string
+    logicalType: string
+    required: true
+  - name: league
+    physicalType: string
+    logicalType: string
+    required: true
+  - name: year_founded
+    physicalType: integer
+    logicalType: integer
