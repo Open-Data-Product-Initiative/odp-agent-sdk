@@ -52,7 +52,7 @@ management, and contract attachment. It was tested against one OpenMetadata
 | Document intake | Read Markdown, text, YAML, JSON, EML, MSG with the `email` extra, DOCX, PPTX, PDF, CSV, and XLSX source files for portfolio workflows |
 | Agent surfaces | Run a safe-class stdio MCP server and generate an ARWS-compatible agent manifest |
 | LLM generation | Generate ODPC fragments, ODPG graphs, and ODPS product YAML from source notes using local or hosted providers |
-| Platform integration | Connect to OpenMetadata; review and create products, manage domains, compare retrieved metadata, and attach ODCS contracts |
+| OpenMetadata | Connect, review and create products, manage domains, compare retrieved metadata, and attach ODCS contracts |
 | Data Contracts | Wrap ODCS 3.0/3.1/3.2 contracts into conservative ODPS 4.2 drafts, resolve ODPS contract references, validate external contracts through optional `datacontract-cli`, extract schemas, check alignment, and generate reports |
 | DCAT Catalog Intelligence | Inspect supplied DCAT RDF with evidence-bounded findings, render an offline report, and convert explicitly selected resources to private ODPS 4.2 drafts |
 | DPROD interoperability | Validate explicit OMG DPROD 1.0 Beta 2 products offline, create ODPS 4.2 drafts, and export deterministic DPROD RDF with loss reports |
@@ -280,8 +280,8 @@ python3 -m twine check dist/*
 
 Thanks to the Open Data Product Initiative community, Chris Howard / Kitard for
 the original `odps-python` foundation, devlouie for the MCP layer and agent
-surface, and the Data Contract CLI project for the optional contract execution
-engine.
+surface, the OpenMetadata platform, and the Data Contract CLI project for the
+optional contract execution engine.
 
 ## License
 
