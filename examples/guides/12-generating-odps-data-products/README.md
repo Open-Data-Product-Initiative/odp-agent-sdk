@@ -23,7 +23,7 @@ cd odps-sdk-guides/12-odps-products
 ```
 
 You can also write your own business requirement notes into the same shape.
-Each Markdown or text file becomes one ODPS product draft.
+Each Markdown, text, or Word `.docx` file becomes one ODPS product draft.
 
 ## 3. Generate minimal ODPS products
 
@@ -38,6 +38,26 @@ open-data-products generate \
 
 The default `minimal` profile is evidence-only. It creates valid ODPS product
 YAML from source-backed facts and avoids drafting optional business components.
+It can retain a source-backed description and value proposition. If the model
+omits the description, one unambiguous `Description:` line in the source is
+copied verbatim and noted for review. Review generated content against its
+source; schema validation does not establish factual correctness.
+The structured result includes exact, uniquely labelled source values that
+match generated fields in `source_evidence`, and model-reported missing details
+in `evidence_gaps`. Source evidence may contain sensitive document text. Fields
+without a matching label are not necessarily unsupported; verify them against
+the source. Word extraction uses main document text and does not guarantee
+coverage of headers, footers, comments or embedded content. Main document XML
+is limited to 10 MiB before extraction.
+Existing product output files are protected by default; use `--overwrite` to
+replace one deliberately. Multiple inputs producing the same filename are
+rejected even with that option.
+ODPS generation limits source size, model response size, nesting and the number
+of facts chunks. Source documents are untrusted inputs: instruction-like text
+and labeled critical-field differences produce review notes, but these checks
+cannot guarantee that a model ignores instructions or invents no facts.
+For Ollama, a connection failure, malformed response or empty generated text
+stops generation with an error; check the server and model before retrying.
 
 ## 4. Generate complete draft products
 

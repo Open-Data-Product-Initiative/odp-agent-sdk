@@ -72,7 +72,9 @@ that confusion already exists and should be merged, not extended.
 ## Security
 
 - No hardcoded secrets in source or fixtures. The SDK has no credential
-  surface today; if you add one, read from env vars and document it here.
+  literals in configuration; platform connections reference environment
+  variables or macOS Keychain references for bearer tokens, resolved only when
+  making a request. Never log or persist their values in repository files.
 - The MCP server is `safe`-class only today (read-only). When you add a
   `state-changing` or `destructive` tool, set the `class` field in
   `mcp/tools.py` accordingly and update `tests/test_agentic_patterns.py`.

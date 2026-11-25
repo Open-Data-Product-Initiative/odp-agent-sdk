@@ -35,7 +35,12 @@ pip install "open-data-products[llama-cpp]"
 pip install "open-data-products[dev]"
 ```
 
-Python 3.8 or newer is required.
+Python 3.8.1 or newer is required.
+
+The experimental [OpenMetadata integration](docs/integrations/openmetadata.md)
+supports product discovery, ODPS export, reviewed creation and updates, domain
+management, and contract attachment. It was tested against one OpenMetadata
+2.1.0 deployment. Other versions and their export behavior require verification.
 
 ## What It Provides
 
@@ -47,6 +52,7 @@ Python 3.8 or newer is required.
 | Document intake | Read Markdown, text, YAML, JSON, EML, MSG with the `email` extra, DOCX, PPTX, PDF, CSV, and XLSX source files for portfolio workflows |
 | Agent surfaces | Run a safe-class stdio MCP server and generate an ARWS-compatible agent manifest |
 | LLM generation | Generate ODPC fragments, ODPG graphs, and ODPS product YAML from source notes using local or hosted providers |
+| Platform integration | Connect to OpenMetadata; review and create products, manage domains, compare retrieved metadata, and attach ODCS contracts |
 | Data Contracts | Wrap ODCS 3.0/3.1/3.2 contracts into conservative ODPS 4.2 drafts, resolve ODPS contract references, validate external contracts through optional `datacontract-cli`, extract schemas, check alignment, and generate reports |
 | DCAT Catalog Intelligence | Inspect supplied DCAT RDF with evidence-bounded findings, render an offline report, and convert explicitly selected resources to private ODPS 4.2 drafts |
 | DPROD interoperability | Validate explicit OMG DPROD 1.0 Beta 2 products offline, create ODPS 4.2 drafts, and export deterministic DPROD RDF with loss reports |
@@ -80,6 +86,48 @@ After installation, the console script provides the same commands:
 open-data-products validate examples/product.yaml
 open-data-products explain examples/product.yaml --json
 ```
+
+Create OpenMetadata products from reviewed ODPS 4.1 documents:
+
+```bash
+# Copy the bundled example into your project, then edit its endpoint.
+open-data-products config integrations --copy-to connections.yaml
+# Set OPENMETADATA_TOKEN in the environment, then select the connection.
+open-data-products connect openmetadata --config connections.yaml
+
+# Create new 4.1 drafts from business documents using a configured provider.
+open-data-products generate --input business-brief.md --kind odps-product \
+  --odps-version 4.1 --output products/
+
+# Review the folder and confirm creation in OpenMetadata.
+open-data-products openmetadata products create ./products --domain "Retail Banking"
+open-data-products openmetadata products list
+open-data-products openmetadata products search "campaign"
+open-data-products openmetadata products export --output catalog.yaml
+
+# Review changes to an existing product by UUID.
+open-data-products openmetadata products update --id PRODUCT_UUID \
+  --input product.yaml
+```
+
+The connection file references an environment variable, like `OPENAI_API_KEY`;
+the SDK does not automatically load `.env`. The platform command requires a
+write-enabled profile and appropriate platform permissions. It checks for
+possible duplicates and reports fields that might not be imported; generated
+metadata is not evidence of approval. See the [integration guide](docs/integrations/openmetadata.md)
+for setup, comparison, update and deletion, contract limitations, and JSON
+automation.
+
+Replace `Retail Banking` with the domain's exact OpenMetadata fully qualified
+name (FQN); quote values with spaces. The FQN may differ from the display name.
+For updates, the input product ID must match the OpenMetadata product name.
+The review shows which source fields are applied; currently the file supplies
+the title and description, while other ODPS fields are not applied.
+
+OpenMetadata list, search and catalog export produce validated ODPC 1.0
+catalogs. The catalog's `productVersion` records the OpenMetadata metadata
+revision and labels its origin; it is not an independently verified product
+release version.
 
 Wrap an ODCS contract without changing its source:
 

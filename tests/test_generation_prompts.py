@@ -496,6 +496,80 @@ def test_list_ollama_models_reads_local_tags(monkeypatch):
     assert list_ollama_models() == ["qwen2.5:latest", "llama3.2"]
 
 
+@pytest.mark.parametrize(
+    "body",
+    [b"not json secret", b"[]", b'{"response": null}', b'{"response": ""}', b"\xff"],
+)
+def test_ollama_generation_rejects_bad_responses(monkeypatch, body):
+    from open_data_products.generation import ollama_generate
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+        def read(self, limit):
+            return body
+
+    monkeypatch.setattr(
+        "open_data_products.generation.request.urlopen",
+        lambda *args, **kwargs: FakeResponse(),
+    )
+    with pytest.raises(RuntimeError) as caught:
+        ollama_generate("prompt")
+    assert "secret" not in str(caught.value)
+
+
+def test_ollama_generation_rejects_oversized_response(monkeypatch):
+    from open_data_products.generation import (
+        ollama_generate,
+        MAX_GENERATION_RESPONSE_BYTES,
+    )
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+        def read(self, limit):
+            assert limit == MAX_GENERATION_RESPONSE_BYTES + 1
+            return b"x" * limit
+
+    monkeypatch.setattr(
+        "open_data_products.generation.request.urlopen",
+        lambda *args, **kwargs: FakeResponse(),
+    )
+    with pytest.raises(RuntimeError, match="size limit"):
+        ollama_generate("prompt")
+
+
+@pytest.mark.parametrize(
+    "body", [b"secret invalid", b"[]", b"{}", b'{"models": null}', b"\xff"]
+)
+def test_ollama_model_discovery_rejects_bad_responses(monkeypatch, body):
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+        def read(self):
+            return body
+
+    monkeypatch.setattr(
+        "open_data_products.generation.request.urlopen",
+        lambda *args, **kwargs: FakeResponse(),
+    )
+    with pytest.raises(RuntimeError) as caught:
+        list_ollama_models()
+    assert "secret" not in str(caught.value)
+
+
 def test_ensure_ollama_model_accepts_qwen_latest(monkeypatch):
     """Test that qwen2.5 is accepted when Ollama has qwen2.5:latest."""
     monkeypatch.setattr(
@@ -1894,7 +1968,7 @@ product:
     ]
     assert artifact.name == "odpsProduct:airport-operations-performance"
     assert artifact.prompt_name == "odps_product_minimal_yaml.md"
-    assert artifact.review_notes == []
+    assert any("field-level evidence" in note for note in artifact.review_notes)
     assert artifact.drafted_components == []
     assert artifact.evidence_gaps == []
     assert artifact.output_path == (
@@ -2110,7 +2184,8 @@ product:
     assert artifact.valid_yaml is True
     assert artifact.drafted_components == ["SLA", "dataQuality", "pricingPlans"]
     assert artifact.review_notes == [
-        "pricingPlans drafted because no pricing terms were provided."
+        "Generated fields require review against the source; field-level evidence is not verified.",
+        "pricingPlans drafted because no pricing terms were provided.",
     ]
     assert artifact.evidence_gaps == ["No pricing terms were provided."]
     document = yaml.safe_load(artifact.output_path.read_text(encoding="utf-8"))
@@ -2333,7 +2408,7 @@ product:
 
     assert len(component_prompts) == 1
     assert artifact.drafted_components == ["dataAccess", "license"]
-    assert artifact.review_notes == ["dataAccess drafted from API context."]
+    assert "dataAccess drafted from API context." in artifact.review_notes
 
 
 def test_generate_odps_product_repairs_scalar_optional_component(tmp_path):

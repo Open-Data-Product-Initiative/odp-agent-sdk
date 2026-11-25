@@ -9,6 +9,8 @@ include llms.txt
 include .mcp.json
 include .flake8
 include .gitignore
+include .env.example
+include RELEASE_SUMMARY.md
 
 recursive-include docs *.md
 recursive-include open_data_products/odps/data/schema *.json *.yaml
@@ -17,3 +19,7 @@ recursive-include images *.png
 recursive-include skills */SKILL.md
 
 recursive-exclude tests *
+exclude examples/integrations/connections.yaml
+exclude connections.yaml
+global-exclude .env
+global-exclude *.local.json

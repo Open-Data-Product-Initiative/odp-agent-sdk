@@ -12,7 +12,7 @@ family. Each standard lives in its own namespace:
 
 # flake8: noqa: E402
 
-__version__ = "0.7.0"
+__version__ = "0.8.0"
 version = __version__
 
 from . import odpc
@@ -21,6 +21,42 @@ from . import odpr
 from . import odps
 from . import odpv
 from . import profiles
+from .integrations import (
+    ConfigurationError,
+    ConnectionProfile,
+    CreateResult,
+    CreateReview,
+    DeleteResult,
+    DeleteReview,
+    DomainCreateResult,
+    DomainCreateReview,
+    ContractImportResult,
+    ContractImportReview,
+    IntegrationConfig,
+    IntegrationError,
+    NormalizedOdpsExport,
+    OpenMetadataAdapter,
+    PlatformAdapter,
+    PlatformError,
+    ProductPage,
+    FieldComparison,
+    ProductComparison,
+    ProductSearchPage,
+    ProductResult,
+    Provenance,
+    UnsupportedOperation,
+    UnknownCreateOutcome,
+    UnknownDeleteOutcome,
+    UnknownDomainCreateOutcome,
+    UnknownContractImportOutcome,
+    UnknownUpdateOutcome,
+    UpdateResult,
+    UpdateReview,
+    UpdatedDateChange,
+    load_integration_config,
+    open_integration,
+    normalize_openmetadata_updated_dates,
+)
 from .dprod import (
     DPROD_NAMESPACE,
     DprodCatalogResult,
@@ -229,6 +265,40 @@ from .results import Reference, Resource, ValidationResult
 from .summary import load_summary
 
 __all__ = [
+    "ConfigurationError",
+    "ConnectionProfile",
+    "CreateResult",
+    "CreateReview",
+    "DeleteResult",
+    "DeleteReview",
+    "DomainCreateResult",
+    "DomainCreateReview",
+    "ContractImportResult",
+    "ContractImportReview",
+    "IntegrationConfig",
+    "IntegrationError",
+    "NormalizedOdpsExport",
+    "OpenMetadataAdapter",
+    "PlatformAdapter",
+    "PlatformError",
+    "ProductPage",
+    "FieldComparison",
+    "ProductComparison",
+    "ProductSearchPage",
+    "ProductResult",
+    "Provenance",
+    "UnsupportedOperation",
+    "UnknownCreateOutcome",
+    "UnknownDeleteOutcome",
+    "UnknownDomainCreateOutcome",
+    "UnknownContractImportOutcome",
+    "UnknownUpdateOutcome",
+    "UpdateResult",
+    "UpdateReview",
+    "UpdatedDateChange",
+    "load_integration_config",
+    "open_integration",
+    "normalize_openmetadata_updated_dates",
     "__version__",
     "version",
     "odpc",

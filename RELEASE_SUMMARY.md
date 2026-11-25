@@ -1,137 +1,73 @@
-# Open Data Products Python SDK 0.7.0 Release Notes
+# Open Data Products Python SDK 0.8.0 Release Notes
 
-## DPROD 1.0 Beta 2 interoperability
+This feature release adds an experimental OpenMetadata integration to the SDK
+and its CLI. Existing public APIs and Python 3.8 support are retained from
+Python 3.8.1 onward. The
+integration was tested against one OpenMetadata **2.1.0** deployment; support
+for other versions has not been established.
 
-- Bundle the normative OMG 2026-06-01 ontology and SHACL artifacts for local,
-  offline validation; artifacts retain source provenance and checksums.
-- Support bounded RDF ingestion, explicit DPROD product inventory, structured
-  SHACL violations, DPROD-to-ODPS 4.2 drafts, and deterministic ODPS-to-DPROD
-  Turtle/JSON-LD export with machine-readable mapping/loss records.
-- DPROD is an OMG in-process Beta 2 specification. Only
-  `https://www.omg.org/spec/DPROD/` is supported; the separate GitHub
-  development namespace and experimental Data Contracts profile are excluded.
-- Explicit DPROD products are kept distinct from review-only DCAT dataset
-  opportunities. No conversion treats ports, owners, policies, or service
-  metadata as automatic ODPS promises, approval, or contract guarantees.
-- CI validates a generated export independently with Apache Jena SHACL after
-  verifying the pinned binary release checksum; the built wheel is also loaded
-  in a clean virtual environment before the source-suite test run.
+## From business documents to OpenMetadata products
 
-## DCAT Catalog Intelligence
+- Generate ODPS product drafts from Markdown or Word business documents using
+  an existing configured LLM provider. Select ODPS `4.1` explicitly for
+  OpenMetadata creation; the default generation target is 4.2. The SDK does
+  not convert existing documents between versions.
+- Select a named YAML connection, discover products and domains, retrieve native
+  metadata or ODPS export, and compare the retrieved product with its reviewed
+  ODPS source. Comparisons include validation, provenance, timestamps and
+  field-level differences. CLI list and search return ODPC 1.0 catalogs, and
+  full catalogs can be exported as YAML or JSON. This changes the earlier CLI
+  list and search JSON shape; native Python listing and search APIs remain.
+- Copy a bundled connection template into a user-owned file with
+  `open-data-products config integrations --copy-to connections.yaml`. Quoted
+  multiword domain FQNs are preserved in product operations.
+- Use `open-data-products openmetadata products` to review and create a file or
+  folder of ODPS documents, and to list, search, retrieve, compare, update or
+  delete products. Guided creation checks for possible duplicates, skips
+  ineligible files, and requests one terminal confirmation. Retrieval, update,
+  delete and comparison identify the target by UUID. Scripted writes retain the explicit
+  review digest and execution mechanism.
+- Create domains, select product domains, and assign existing OpenMetadata
+  users, teams and classification tags. Unless an owner is specified, creation
+  uses the account associated with the configured token. Owner and tag
+  assignment after product creation is a separate operation and may fail after
+  the product has been created.
 
-- Analyze supplied RDF/XML, Turtle, JSON-LD, N-Triples, N3, and other supported
-  RDFLib serializations with `open-data-products portfolio discover-dcat`.
-- Preserve resource IRIs, language-tagged values, declared relationships,
-  distributions, and distinct access/download URLs. Findings remain labelled as
-  source facts, inferences, or review-only proposals.
-- Generate a self-contained offline HTML report. No catalog item is
-  automatically approved as a data product.
+## Contracts and source fidelity
 
-## DCAT-to-ODPS 4.2 drafts
+- Import ODCS 3.1 contracts for existing products or from inline or linked
+  contracts in supported ODPS sources. On the tested deployment, the SDK
+  imports a schema-free native projection and retains the complete source
+  contract and its version in contract metadata for SDK retrieval.
+  OpenMetadata does not validate that preserved schema as its native product
+  contract schema; native ODCS export does not reconstruct the preserved source.
+- The tested ODPS exports contain a numeric `updated` timestamp that fails SDK
+  ODPS validation. Retrieval exposes findings; an explicit option can derive a
+  UTC date while keeping the original and recording the loss of precision.
+  Invalid exports can only be saved when strict validation is disabled.
+- ODPC catalog `productVersion` is the OpenMetadata entity metadata revision,
+  explicitly labelled as such; it is not an independently verified product
+  release version. The catalog's model reference points to the native platform
+  API, not to a claim of valid ODPS export.
 
-- Convert explicitly selected Dataset, DatasetSeries, or DataService resources
-  with `open-data-products product wrap-dcat`.
-- Repeat `--resource` for batches. Reports record mappings, defaults, missing
-  business context, validation, limitations, and AI-generated proposal fields.
-- `--enrich` and `--full-draft` mark generated business language as proposed;
-  they do not establish ownership, demand, rights, commitments, or approval.
+## Boundaries and verification
 
-## Safety and compatibility
+- Only mapped fields are imported into OpenMetadata; review and comparison
+  reports identify omissions and unverified values. A validated metadata
+  record does not prove that data, business claims, controls or contracts are
+  verified or approved.
+- Writes require a write-enabled connection and platform permission. A review
+  digest binds execution to the reviewed input; interrupted or ambiguous
+  outcomes are reported without automatic retries. Permanent product deletion
+  is recursive. Revision checks request a platform precondition, whose
+  enforcement depends on the deployment.
+- Connection configuration references a token in the process environment,
+  like the OpenAI provider's `OPENAI_API_KEY`; the SDK does not automatically
+  load `.env` files. Tokens and local connection files must stay out of Git.
+- Live tests are opt-in. The six fictional banking briefs and their reviewed
+  drafts are retained as fixtures; the persistent banking workflow deliberately
+  does not delete its products.
 
-- DCAT 3 is the principal vocabulary; DCAT-AP 3.0.1 is the European target.
-  Successful RDF parsing is not a DCAT-AP conformance claim.
-- HTTP(S) retrieval is bounded and rejects credential-bearing URLs. Remote
-  JSON-LD contexts and automatic linked-resource crawling are disabled.
-- `discover_dcat_catalog` is a safe MCP tool; `wrap_dcat_resource` is
-  state-changing because it writes an artifact.
-- Existing Data Contract Intelligence and ODCS-to-ODPS workflows are retained.
-
-## Data Contract Intelligence
-
-- Discover and inventory ODCS contracts from local folders or configured API
-  sources, with source references and declared metadata retained as evidence.
-- Identify exact duplicates, schema overlap, shared technical resources, and
-  shared domain/capability signals without treating inferred relationships as
-  source facts.
-- Report metadata gaps, interface coverage and types, and contracts that have
-  no current opportunity signal.
-- Classify review-only opportunities as standalone product candidates,
-  boundary proposals, or rationalisation opportunities. No data product is
-  created or approved automatically.
-- Produce the same evidence-backed intelligence through the Python API, CLI,
-  MCP response, structured JSON artifacts, and a self-contained offline HTML
-  report.
-
-## Explicit ODCS wrapper input
-
-- Use `open-data-products product wrap-contract --input contract.yaml` in all
-  documented wrapper workflows.
-- The former positional contract input remains a compatibility alias, but it
-  cannot be combined with `--input`.
-
-## MCP product drafting
-
-- `wrap_odcs_contract` is a state-changing MCP tool for writing a validated
-  ODPS draft from an ODCS contract.
-- It accepts the same enrichment and full-draft options as the CLI and redacts
-  local filesystem paths from its response.
-
-## ODCS-to-ODPS product drafting
-
-- Wrap ODCS 3.0, 3.1, and 3.2 contracts as validated ODPS 4.2 drafts with
-  `open-data-products product wrap-contract`.
-- Use `--enrich` for a business-language description and discovery tags, or
-  `--enrich --full-draft` for wider AI-generated ODPS product details.
-
-## ODPS v4.2 support
-
-The SDK supports ODPS v4.2 while retaining v4.1 parsing and validation. It
-understands profile-based Contracts and Data Access, including required default
-profiles, output-port types, profile references, and malformed URL checks.
-New generation and portfolio workflows produce v4.2 artifacts. The CLI and MCP
-surfaces detect v4.1 and v4.2 through schema URI or version value.
-
-## Draft ODPV 1.1 interoperability support
-
-This package also bundles ODPV 1.1 vocabulary and five interoperability profiles:
-DCAT 3, ODCS 3, OpenLineage 1, PROV-O, and ODRL 2. ODPV 1.1 and every bundled
-profile remain draft. Existing ODPV 1.0 behaviour remains the default.
-The executable profile API is `open_data_products.profiles`; ODPV retains the
-versioned vocabulary and source-profile assets.
-
-## ODPC v1.1 AI products
-
-- `validate_ai_product` validates a standalone `AIProduct` profile, including
-  its purpose, structured ownership, governance, and evaluation requirements.
-- `validate_ai_product_bundle` checks that a standalone profile, an ODPC v1.1
-  catalog entry, and an ODPG `AIProduct` node have consistent identities and
-  profile references.
-- The unified Python agent API and `open-data-products validate` command
-  automatically detect an ODPC v1.1 `AIProduct` from its canonical schema URI.
-
-## Other user-facing capabilities
-
-- Select ODPV 1.1 explicitly with `load_vocabulary_release("1.1.0")`; no
-  existing call is upgraded silently.
-- Use `open_data_products.profiles` for profile validation, mapping resolution,
-  and bounded transformations; importing those operations from
-  `open_data_products.odpv` is not supported.
-- Validate an exact profile id and version, then resolve or explain mappings
-  only with `allow_draft=True`. Every mapping result includes vocabulary and
-  profile identity, lifecycle status, evidence, direction, and a SHA-256
-  content digest.
-- Use `odpv-profile-validate`, `odpv-profile-resolve`, and
-  `odpv-profile-transform` from the unified CLI, or use the safe MCP profile
-  tools for validation, resolution, explanation, and bounded transformation.
-- DCAT 3, ODCS 3, OpenLineage 1, PROV-O, and ODRL 2 adapters execute only
-  profile-permitted mappings. They preserve declared-versus-observed state and
-  report missing bindings, missing policy rules, unsupported directions, and
-  out-of-scope concepts as reviewable refusals or skips.
-## Compatibility and release confidence
-
-ODPV 1.0 remains the default vocabulary and retains its existing URI and helper
-behaviour. The test suite validates every bundled profile against the supplied
-Draft 2020-12 schema, checks all five pinned mapping counts, and exercises
-adapter direction, prerequisite, and provenance boundaries. CI remains the
-final distribution-build check. Existing ODPC v1.0 catalog validation remains
-unchanged; an AI product is a separate ODPC v1.1 profile.
+See the [OpenMetadata integration guide](docs/integrations/openmetadata.md)
+and [changelog](CHANGELOG.md) for command examples and details. Previous release
+notes are retained in [0.7.0 release notes](docs/releases/0.7.0.md).

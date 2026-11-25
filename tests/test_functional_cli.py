@@ -2580,6 +2580,8 @@ def test_unified_cli_odps_generation_passes_profile_and_components(
         profile: str = "minimal",
         include_components: Optional[List[str]] = None,
         max_source_chars: Optional[int] = None,
+        overwrite: bool = False,
+        odps_version: Optional[str] = None,
     ) -> List[generation.GeneratedArtifact]:
         observed.update(
             {
@@ -2589,6 +2591,8 @@ def test_unified_cli_odps_generation_passes_profile_and_components(
                 "profile": profile,
                 "include_components": include_components,
                 "max_source_chars": max_source_chars,
+                "overwrite": overwrite,
+                "odps_version": odps_version,
             }
         )
         output = Path(output_dir) / "odps_product_customer-retention.yaml"
@@ -2634,6 +2638,9 @@ def test_unified_cli_odps_generation_passes_profile_and_components(
                 "pricingPlans,dataAccess",
                 "--max-source-chars",
                 "12000",
+                "--overwrite",
+                "--odps-version",
+                "4.1",
                 "--output",
                 str(output_dir),
                 "--json",
@@ -2646,9 +2653,12 @@ def test_unified_cli_odps_generation_passes_profile_and_components(
     assert observed["profile"] == "complete-draft"
     assert observed["include_components"] == ["pricingPlans", "dataAccess"]
     assert observed["max_source_chars"] == 12000
+    assert observed["overwrite"] is True
+    assert observed["odps_version"] == "4.1"
     assert payload["profile"] == "complete-draft"
     assert payload["include_components"] == ["pricingPlans", "dataAccess"]
     assert payload["max_source_chars"] == 12000
+    assert payload["odps_version"] == "4.1"
     assert payload["artifacts"][0]["review_notes"] == [
         "pricingPlans drafted for review."
     ]

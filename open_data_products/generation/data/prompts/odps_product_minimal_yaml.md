@@ -14,6 +14,7 @@ Output rules:
   ODPS product type.
 - Use `public` visibility and `draft` status only when the facts do not provide
   better values.
+- Include description or valueProposition only when supported by the source.
 - Keep the document minimal. Do not invent `SLA`, `dataQuality`,
   `pricingPlans`, `license`, `dataAccess`, `dataHolder`, `contract`,
   `paymentGateways`, or `productStrategy`.

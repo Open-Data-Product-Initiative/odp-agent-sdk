@@ -817,7 +817,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     config_parser.add_argument(
         "domain",
         nargs="?",
-        choices=["generation", "recipes"],
+        choices=["generation", "recipes", "integrations"],
         default="generation",
         help="Config domain to inspect. Defaults to generation.",
     )
@@ -1141,6 +1141,11 @@ def main(argv: Optional[List[str]] = None) -> int:
         ),
     )
     generate_parser.add_argument(
+        "--odps-version",
+        choices=["4.1", "4.2"],
+        help="Generate a new ODPS product for the selected version (no conversion)",
+    )
+    generate_parser.add_argument(
         "--include-components",
         help=(
             "Comma-separated ODPS product components to draft for --kind "
@@ -1158,6 +1163,11 @@ def main(argv: Optional[List[str]] = None) -> int:
     generate_parser.add_argument(
         "--ollama-url",
         help="Local Ollama base URL. Defaults to http://localhost:11434.",
+    )
+    generate_parser.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="Replace existing ODPS product output files",
     )
     generate_parser.add_argument("--json", action="store_true", help="Emit JSON")
 
@@ -1786,6 +1796,12 @@ def main(argv: Optional[List[str]] = None) -> int:
     )
 
     add_product_subparser(subparsers)
+    from .integrations.cli import add_integrations_parser
+
+    add_integrations_parser(subparsers)
+    from .integrations._guided_cli import add_guided_parsers
+
+    add_guided_parsers(subparsers)
 
     try:
         args = parser.parse_args(cli_argv)
@@ -1798,6 +1814,18 @@ def main(argv: Optional[List[str]] = None) -> int:
     activity_start_time = time.monotonic()
 
     try:
+        if args.command in ("connect", "products", "openmetadata"):
+            from .integrations._guided_cli import handle_guided
+
+            return _finalize_activity(
+                args, activity_context, activity_start_time, handle_guided(args)
+            )
+        if args.command == "integrations":
+            from .integrations.cli import handle_integrations
+
+            return _finalize_activity(
+                args, activity_context, activity_start_time, handle_integrations(args)
+            )
         interop_exit_code = handle_interop_command(args)
         if interop_exit_code is not None:
             return _finalize_activity(
@@ -1978,11 +2006,25 @@ def main(argv: Optional[List[str]] = None) -> int:
                 print_recipe_config,
                 validate_recipe_config,
             )
+            from .integrations._template import (
+                TEMPLATE as integration_template,
+                copy_integration_config_template,
+                get_integration_config,
+                validate_integration_config,
+            )
+            from .integrations.config import ConfigurationError
 
             try:
                 if args.print:
                     if args.domain == "recipes":
                         print(print_recipe_config(args.config_path), end="")
+                    elif args.domain == "integrations":
+                        print(
+                            Path(args.config_path or integration_template).read_text(
+                                encoding="utf-8"
+                            ),
+                            end="",
+                        )
                     else:
                         print(print_config(args.domain, args.config_path), end="")
                     return _finalize_activity(
@@ -1993,11 +2035,15 @@ def main(argv: Optional[List[str]] = None) -> int:
                         payload = validate_recipe_config(
                             args.config_path or get_recipe_config_path()
                         )
+                    elif args.domain == "integrations":
+                        payload = validate_integration_config(args.config_path)
                     else:
                         payload = validate_config(args.domain, args.config_path)
                 else:
                     if args.domain == "recipes":
                         payload = get_recipe_config(args.config_path)
+                    elif args.domain == "integrations":
+                        payload = get_integration_config(args.config_path)
                     else:
                         payload = get_config(args.domain, args.config_path)
                 if args.copy_to:
@@ -2005,6 +2051,10 @@ def main(argv: Optional[List[str]] = None) -> int:
                         copied_to = copy_recipe_config_template(
                             args.copy_to,
                             overwrite=args.overwrite,
+                        )
+                    elif args.domain == "integrations":
+                        copied_to = copy_integration_config_template(
+                            args.copy_to, overwrite=args.overwrite
                         )
                     else:
                         copied_to = copy_config_template(
@@ -2016,7 +2066,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                     payload["config_path"] = str(copied_to)
                     payload["editable"] = True
                 if args.copy_prompts_to:
-                    if args.domain == "recipes":
+                    if args.domain != "generation":
                         raise ValueError(
                             "--copy-prompts-to is only available for generation config"
                         )
@@ -2026,7 +2076,13 @@ def main(argv: Optional[List[str]] = None) -> int:
                     )
                     payload["prompt_dir"] = str(Path(args.copy_prompts_to))
                     payload["copied_prompts"] = [path.name for path in copied_prompts]
-            except (FileExistsError, FileNotFoundError, KeyError, ValueError) as exc:
+            except (
+                FileExistsError,
+                FileNotFoundError,
+                KeyError,
+                ValueError,
+                ConfigurationError,
+            ) as exc:
                 print(str(exc), file=sys.stderr)
                 return _finalize_activity(
                     args, activity_context, activity_start_time, 1
@@ -2066,6 +2122,14 @@ def main(argv: Optional[List[str]] = None) -> int:
                     print(
                         "Edit a copied config and pass it with "
                         "`open-data-products recipe list --config <path>`."
+                    )
+                    return _finalize_activity(
+                        args, activity_context, activity_start_time, 0
+                    )
+                if args.domain == "integrations":
+                    print(f"Default connection: {payload['default_connection']}")
+                    print(
+                        "Edit the copied config and connect with `open-data-products connect --config <path>`."
                     )
                     return _finalize_activity(
                         args, activity_context, activity_start_time, 0
@@ -2325,11 +2389,20 @@ def main(argv: Optional[List[str]] = None) -> int:
                 {"prompt_dir": settings.prompt_path} if settings.prompt_path else {}
             )
             include_components = _split_csv(args.include_components)
+            if args.odps_version and args.kind != "odps-product":
+                print("--odps-version requires --kind odps-product", file=sys.stderr)
+                return _finalize_activity(
+                    args, activity_context, activity_start_time, 1
+                )
             odps_kwargs = (
                 {
                     "profile": args.profile,
                     "include_components": include_components,
                     "max_source_chars": args.max_source_chars,
+                    "overwrite": args.overwrite,
+                    **(
+                        {"odps_version": args.odps_version} if args.odps_version else {}
+                    ),
                 }
                 if args.kind == "odps-product"
                 else {}
@@ -2345,7 +2418,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                     **prompt_kwargs,
                     **odps_kwargs,
                 )
-            except (KeyError, RuntimeError, ValueError) as exc:
+            except (KeyError, RuntimeError, ValueError, OSError) as exc:
                 print(str(exc), file=sys.stderr)
                 return _finalize_activity(
                     args, activity_context, activity_start_time, 1
@@ -2373,6 +2446,8 @@ def main(argv: Optional[List[str]] = None) -> int:
                 payload["profile"] = args.profile
                 payload["include_components"] = include_components
                 payload["max_source_chars"] = args.max_source_chars
+                if args.odps_version:
+                    payload["odps_version"] = args.odps_version
             if args.json:
                 print(json.dumps(payload, indent=2))
             else:
