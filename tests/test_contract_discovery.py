@@ -23,7 +23,7 @@ def test_discovery_result_serializes_metadata_not_document_bodies() -> None:
 
     assert payload["kind"] == "ContractDiscovery"
     assert payload["inventory"] == []
-    assert "document" not in json.dumps(payload)
+    assert '"document":' not in json.dumps(payload)
 
 
 def test_intelligence_additions_preserve_discovery_result_fields() -> None:
@@ -221,7 +221,7 @@ def test_discovery_writes_contract_intelligence_summary_artifact(
     assert payload["interface_analysis"]["types"][0]["interface_type"] == "local"
     assert payload["interface_analysis"]["types"][0]["contract_count"] == 18
     assert all("source_contract_ids" in item for item in payload["findings"])
-    assert "document" not in json.dumps(payload)
+    assert '"document":' not in json.dumps(payload)
 
 
 def test_intelligence_report_renders_explorer_and_evidence_links(

@@ -38,6 +38,10 @@ pip install "open-data-products[llama-cpp]"
 pip install "open-data-products[dev]"
 ```
 
+The `contracts` extra installs `datacontract-cli` on Python 3.8–3.12. On Python
+3.13 and later, use a compatible separate environment and make its
+`datacontract` executable available on `PATH`; see [Data Contract workflows](data-contracts.md).
+
 ## AI Agent-First SDK
 
 ### Why Agent First
@@ -194,6 +198,8 @@ focused references below for implementation details:
 - [ODPR RecipeCatalog](../recipes/catalog.md): metadata-only starter and project recipe discovery.
 - [ODPR recipe examples](../recipes/examples.md): complete example workspace map.
 - [LLM generation](generation.md): Ollama, embedded llama.cpp, or configured external LLM source-doc to ODPC fragment and ODPG graph workflow.
+- [Business one-pager](business-one-pager.md): a short, plain-language starting point for a data product idea.
+- [Coding-assistant handoff](../integrations/handoff.md): generate and deliver a draft planning package.
 - [ODPR recipe workflows](recipe-workflows.md): recipe files, runner config, provider readiness, dry-run planning, guarded execution, review status, and run manifests.
 - [Provider and model matrix](provider-model-matrix.md): direct hosted and local provider/model lookup.
 - [Embedded llama.cpp guide](llama-cpp.md): install the optional extra, configure a GGUF model path, and run local generation without a separate LLM server.

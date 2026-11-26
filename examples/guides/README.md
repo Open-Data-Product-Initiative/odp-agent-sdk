@@ -12,6 +12,9 @@ pip install open-data-products
 Start with the setup guide if you have never worked with Python, `pip`, PyPI,
 or virtual environments before. Then follow the lecture numbers.
 
+For business contributors, the [data product idea one-pager](../../docs/user/business-one-pager.md)
+provides a short plain-language template for describing a need.
+
 ## Getting Started
 
 0. [Set up Python, pip, PyPI, and the SDK](00-setup-python/)

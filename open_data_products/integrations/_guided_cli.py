@@ -35,6 +35,15 @@ def add_guided_parsers(subparsers: argparse._SubParsersAction) -> None:
     )
     actions = products.add_subparsers(dest="guided_action", required=True)
     _add_product_actions(actions)
+    discover = actions.add_parser(
+        "discover", help="Discover read-only catalog evidence"
+    )
+    discover.add_argument("--config", help="Override connection configuration")
+    discover.add_argument("--connection", help="Override connection profile")
+    discover.add_argument("--id", help="Explicit product UUID")
+    discover.add_argument("--query", help="Catalog search query")
+    discover.add_argument("--limit", type=int, default=20)
+    discover.add_argument("--json", action="store_true", help="Emit structured JSON")
     nested = actions.add_parser("products", help="Manage OpenMetadata data products")
     _add_product_actions(
         nested.add_subparsers(dest="guided_action", required=True), mutations=True
@@ -468,6 +477,7 @@ def handle_guided(args):  # type: ignore[no-untyped-def]
                 )
                 return 0
             required = {
+                "discover": ("discover_context",),
                 "list": ("list_products_odpc",),
                 "search": ("search_products_odpc",),
                 "get": ("get_product",),
@@ -483,6 +493,14 @@ def handle_guided(args):  # type: ignore[no-untyped-def]
                 raise IntegrationError(
                     "The selected platform does not support this operation"
                 )
+            if args.guided_action == "discover":
+                _emit(
+                    adapter.discover_context(
+                        product_id=args.id, query=args.query, limit=args.limit
+                    ),
+                    args.json,
+                )
+                return 0
             if args.guided_action == "list":
                 _emit(adapter.list_products_odpc(), args.json)
                 return 0

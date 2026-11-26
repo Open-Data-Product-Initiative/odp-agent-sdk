@@ -791,3 +791,28 @@ def test_integration_template_matches_repository_example():
         / "examples/integrations/connections.example.yaml"
     )
     assert TEMPLATE.read_text(encoding="utf-8") == example.read_text(encoding="utf-8")
+
+
+def test_openmetadata_discover_uses_selected_adapter(setup, monkeypatch, capsys):
+    config, adapters = setup
+    assert main(["connect", "alpha", "--config", str(config), "--json"]) == 0
+    capsys.readouterr()
+    adapter = FakeAdapter(adapters[0].profile)
+    monkeypatch.setattr(guided, "open_integration", lambda profile: adapter)
+    monkeypatch.setattr(
+        adapter,
+        "discover_context",
+        lambda **kwargs: {"arguments": kwargs},
+        raising=False,
+    )
+    assert (
+        main(
+            ["openmetadata", "discover", "--id", "product-id", "--limit", "4", "--json"]
+        )
+        == 0
+    )
+    assert json.loads(capsys.readouterr().out)["arguments"] == {
+        "product_id": "product-id",
+        "query": None,
+        "limit": 4,
+    }

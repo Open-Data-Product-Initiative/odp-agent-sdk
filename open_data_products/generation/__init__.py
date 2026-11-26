@@ -62,6 +62,27 @@ MAX_ODPS_FACT_CHUNKS = 100
 DEFAULT_OPENAI_GENERATE_TIMEOUT = 300
 DEFAULT_OPENAI_USER_AGENT = "open-data-products-python/0.2"
 DEFAULT_GENERATION_CONFIG = Path(__file__).resolve().parent / "generation.config.yaml"
+
+
+class _NoProviderRedirect(request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+def _provider_urlopen(req, timeout, context=None):
+    handlers = [_NoProviderRedirect()]
+    if context is not None:
+        handlers.append(request.HTTPSHandler(context=context))
+    return request.build_opener(*handlers).open(req, timeout=timeout)
+
+
+def _read_provider_json(response):
+    raw = response.read(MAX_GENERATION_RESPONSE_BYTES + 1)
+    if len(raw) > MAX_GENERATION_RESPONSE_BYTES:
+        raise RuntimeError("Provider response exceeds the generation size limit.")
+    return json.loads(raw.decode("utf-8"))
+
+
 ODPS_SCHEMA_PATH = (
     Path(__file__).resolve().parent.parent / "odps/data/schema/odps-v4.2.json"
 )
@@ -390,10 +411,10 @@ def openai_generate(
     )
     try:
         context = ssl.create_default_context(cafile=certifi.where())
-        with request.urlopen(
+        with _provider_urlopen(
             req, timeout=DEFAULT_OPENAI_GENERATE_TIMEOUT, context=context
         ) as response:
-            data = json.loads(response.read().decode("utf-8"))
+            data = _read_provider_json(response)
     except error.HTTPError as exc:
         detail = _http_error_detail(exc)
         message = f"OpenAI generation request failed with HTTP {exc.code}."
@@ -466,8 +487,10 @@ def openai_chat_generate(
         method="POST",
     )
     try:
-        with request.urlopen(req, timeout=DEFAULT_OPENAI_GENERATE_TIMEOUT) as response:
-            data = json.loads(response.read().decode("utf-8"))
+        with _provider_urlopen(
+            req, timeout=DEFAULT_OPENAI_GENERATE_TIMEOUT
+        ) as response:
+            data = _read_provider_json(response)
     except error.HTTPError as exc:
         detail = _http_error_detail(exc)
         message = f"OpenAI-compatible chat request failed with HTTP {exc.code}."
@@ -535,10 +558,10 @@ def anthropic_generate(
     )
     try:
         context = ssl.create_default_context(cafile=certifi.where())
-        with request.urlopen(
+        with _provider_urlopen(
             req, timeout=DEFAULT_OPENAI_GENERATE_TIMEOUT, context=context
         ) as response:
-            data = json.loads(response.read().decode("utf-8"))
+            data = _read_provider_json(response)
     except error.HTTPError as exc:
         detail = _http_error_detail(exc)
         message = f"Anthropic generation request failed with HTTP {exc.code}."
@@ -617,7 +640,7 @@ def _require_ascii_api_key(api_key: str, api_key_env: str, provider: str) -> Non
 def _http_error_detail(exc: error.HTTPError) -> str:
     """Return a short, non-secret provider error detail when available."""
     try:
-        raw = exc.read().decode("utf-8", errors="replace")
+        raw = exc.read(65536).decode("utf-8", errors="replace")
     except OSError:
         return ""
     if not raw:

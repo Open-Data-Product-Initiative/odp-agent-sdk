@@ -13,6 +13,12 @@ Install the optional adapter when you need external contract linting or export:
 pip install "open-data-products[contracts]"
 ```
 
+This extra installs `datacontract-cli` on Python 3.8 through 3.12. On Python
+3.13 and later it does not install the validator. Use a compatible separate
+environment with its `datacontract` executable on `PATH`, or perform contract
+validation in that environment; the SDK reports validation as unavailable if
+it cannot find the tool.
+
 ## ODPS v4.2 profiles
 
 ODPS v4.2 stores Contracts as named profiles under `product.contract`. An

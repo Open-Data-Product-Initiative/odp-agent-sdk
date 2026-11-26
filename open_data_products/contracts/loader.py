@@ -178,7 +178,7 @@ def summarize_contract_document(
     contract_format: Optional[str] = None,
 ) -> ContractSummary:
     """Return a compact summary for an already-loaded Data Contract."""
-    models = _mapping_values(document.get("models"))
+    models = _mapping_values(_contract_models(document))
     return ContractSummary(
         path=path,
         contract_format=contract_format,
@@ -233,7 +233,7 @@ def extract_contract_schema_from_document(
     contract_format: Optional[str] = None,
 ) -> ContractSchemaSummary:
     """Extract a normalized schema summary from an already-loaded contract."""
-    models = _schema_models(document.get("models"))
+    models = _schema_models(_contract_models(document))
     findings = []
     if not models:
         findings.append(
@@ -256,6 +256,15 @@ def _mapping(value: object) -> Dict[str, object]:
     return value if isinstance(value, dict) else {}
 
 
+def _contract_models(document: Dict[str, object]) -> object:
+    """Return model definitions for the declared contract format."""
+    if document.get("kind") == "DataContract" and str(
+        document.get("apiVersion", "")
+    ).startswith("v3."):
+        return document.get("schema")
+    return document.get("models")
+
+
 def _mapping_values(value: object) -> List[Dict[str, object]]:
     if isinstance(value, dict):
         return [item for item in value.values() if isinstance(item, dict)]
@@ -265,7 +274,7 @@ def _mapping_values(value: object) -> List[Dict[str, object]]:
 
 
 def _field_count(model: Dict[str, object]) -> int:
-    fields = model.get("fields") or model.get("columns")
+    fields = model.get("fields") or model.get("columns") or model.get("properties")
     return len(list(_field_items(fields)))
 
 
@@ -297,7 +306,9 @@ def _schema_model(name: str, model: Dict[str, object]) -> ContractSchemaModel:
     return ContractSchemaModel(
         name=_optional_str(model.get("name")) or name,
         description=_optional_str(model.get("description")),
-        fields=_schema_fields(model.get("fields") or model.get("columns")),
+        fields=_schema_fields(
+            model.get("fields") or model.get("columns") or model.get("properties")
+        ),
     )
 
 
@@ -320,7 +331,9 @@ def _schema_fields(value: object) -> List[ContractSchemaField]:
 def _schema_field(name: str, field: Dict[str, object]) -> ContractSchemaField:
     return ContractSchemaField(
         name=_optional_str(field.get("name")) or name,
-        type=_optional_str(field.get("type") or field.get("dataType")),
+        type=_optional_str(
+            field.get("type") or field.get("dataType") or field.get("logicalType")
+        ),
         required=_field_required(field),
         description=_optional_str(field.get("description")),
     )

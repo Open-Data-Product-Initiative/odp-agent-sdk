@@ -25,6 +25,12 @@ class PlatformAdapter(ABC):
     def check_connection(self) -> Dict[str, str]:
         """Perform a safe connectivity check."""
 
+    def discover_context(self, *, product_id=None, query=None, limit=20):
+        """Return bounded, read-only metadata evidence when advertised as supported."""
+        raise IntegrationError(
+            "The selected integration does not support metadata discovery"
+        )
+
     @abstractmethod
     def close(self) -> None:
         """Release adapter resources."""

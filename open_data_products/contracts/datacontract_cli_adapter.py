@@ -45,7 +45,9 @@ def validate_contract(path_or_url: str) -> ContractValidationResult:
     return _missing_dependency_result()
 
 
-def export_contract(path_or_url: str, format: str = "jsonschema") -> ContractExportResult:
+def export_contract(
+    path_or_url: str, format: str = "jsonschema"
+) -> ContractExportResult:
     """Export a Data Contract through datacontract-cli when available."""
     availability = detect_datacontract_cli()
     if availability.python_package:
@@ -74,6 +76,8 @@ def _validate_with_python_api(
         run = lint()
         passed = _run_passed(run)
         findings = _findings_from_run(run)
+        if any(finding.severity.lower() == "error" for finding in findings):
+            passed = False
         if not passed and not findings:
             findings = [
                 Finding(
@@ -320,11 +324,11 @@ def _run_command(command: Sequence[str]) -> subprocess.CompletedProcess[str]:
 def _run_passed(run: object) -> bool:
     has_passed = getattr(run, "has_passed", None)
     if callable(has_passed):
-        return bool(has_passed())
+        return has_passed() is True
     passed = getattr(run, "passed", None)
     if passed is not None:
-        return bool(passed)
-    return True
+        return passed is True
+    return False
 
 
 def _findings_from_run(run: object) -> List[Finding]:
@@ -341,6 +345,18 @@ def _findings_from_collection(value: object) -> List[Finding]:
         return []
     findings = []
     for item in value:
+        outcome = (
+            item.get("result")
+            if isinstance(item, dict)
+            else getattr(item, "result", None)
+        )
+        outcome = getattr(outcome, "value", outcome)
+        if isinstance(outcome, str) and outcome.lower() in (
+            "passed",
+            "pass",
+            "success",
+        ):
+            continue
         if isinstance(item, Finding):
             findings.append(item)
         elif isinstance(item, dict):

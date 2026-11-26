@@ -2,6 +2,31 @@
 
 ## Unreleased
 
+## 0.9.0
+
+- Add a reviewed coding-assistant handover workflow for one business brief or a
+  folder, with generated OpenSpec planning drafts, enriched ODPS, field mappings,
+  proposed output schemas and separate ODCS drafts; unsupported details remain open.
+- Support optional read-only metadata discovery by named connection, with bounded
+  searches, provenance, incomplete-result reporting and a 1 MiB evidence gate.
+  OpenMetadata is the first implemented discovery adapter.
+- Add an independent Jira Cloud REST adapter and reviewed delivery of handover
+  packages, enriched ODPS, source documents and ODCS drafts. Report
+  uncertain outcomes without automatic retries.
+- Add `handover validate`, which invokes an optional OpenSpec CLI in an isolated
+  temporary project, reports its version and distinguishes passed, failed,
+  incomplete and not-performed results. CI tests OpenSpec CLI 2.2.0; SDK
+  installation does not require it.
+- Add a short business one-pager guide, input size and security screening,
+  provider-input reviews and machine-readable folder results. Discovery search
+  remains bounded and lexical; matches and generated artifacts require review.
+- Do not assess ODPS-to-ODCS schema alignment when either independent schema is
+  missing. Preserved contract integrity is distinct from platform schema validation.
+- Default unsupported public visibility to a reviewable private value in guided
+  handover drafts; infer candidate output types only from matching column names.
+  Do not report passed datacontract-cli checks as errors.
+
+
 ## 0.8.0
 
 - Set the minimum Python patch version to 3.8.1, matching the existing RDF

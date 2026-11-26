@@ -27,6 +27,15 @@ def add_integrations_parser(subparsers: argparse._SubParsersAction) -> None:
     check.add_argument("connection")
     check.add_argument("--config", required=True)
     check.add_argument("--json", action="store_true")
+    discovery = commands.add_parser(
+        "discover", help="Discover bounded read-only context"
+    )
+    discovery.add_argument("connection")
+    discovery.add_argument("--config", required=True)
+    discovery.add_argument("--id")
+    discovery.add_argument("--query")
+    discovery.add_argument("--limit", type=int, default=20)
+    discovery.add_argument("--json", action="store_true")
     domains = commands.add_parser("domains", help="List available OpenMetadata domains")
     domains.add_argument("connection")
     domains.add_argument("--config", required=True)
@@ -309,6 +318,10 @@ def handle_integrations(args: argparse.Namespace) -> int:
         with OpenMetadataAdapter(config.select(args.connection)) as adapter:
             if args.integration_command == "check":
                 payload = dict(adapter.check_connection())
+            elif args.integration_command == "discover":
+                payload = adapter.discover_context(
+                    product_id=args.id, query=args.query, limit=args.limit
+                )
             elif args.integration_command == "domains":
                 page = adapter.list_domains(limit=args.limit, after=args.after)
                 payload = {
