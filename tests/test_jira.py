@@ -170,6 +170,7 @@ def test_post_timeout_is_unknown_and_not_retried(monkeypatch, failure):
 
 @pytest.mark.parametrize("status", [302, 408, 500, 503])
 def test_uncertain_http_creation_response_is_unknown(monkeypatch, status):
+    from io import BytesIO
     from urllib.error import HTTPError
     from open_data_products.integrations.jira import JiraUnknownOutcome
 
@@ -182,7 +183,7 @@ def test_uncertain_http_creation_response_is_unknown(monkeypatch, status):
 
     def fail(request, timeout):
         calls.append(request.method)
-        raise HTTPError(request.full_url, status, "failure", {}, None)
+        raise HTTPError(request.full_url, status, "failure", {}, BytesIO())
 
     monkeypatch.setattr(adapter._opener, "open", fail)
     with pytest.raises(JiraUnknownOutcome, match="unknown"):
