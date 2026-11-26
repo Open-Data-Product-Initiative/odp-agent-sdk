@@ -27,6 +27,7 @@ stores the config path and profile name in the ignored
 open-data-products config integrations --copy-to connections.yaml
 # Edit the copied file's base_url and set OPENMETADATA_TOKEN in your environment.
 open-data-products connect openmetadata --config connections.yaml
+open-data-products openmetadata discover --id PRODUCT_UUID --json
 open-data-products openmetadata products list
 open-data-products openmetadata products search "campaign"
 open-data-products openmetadata products export --output catalog.yaml
@@ -640,3 +641,25 @@ does not convert versions or establish that arbitrary generated documents are
 ready for use. Review generated drafts and their source before creating a real
 product. The cleanup has the same uncertain-outcome limitations as other
 reviewed deletes.
+
+### Fictional banking catalog samples
+
+`examples.integrations.synthetic_banking_samples` provides a separate, opt-in
+reviewed upload for the synthetic banking seed and source split. It prepares
+three fictional rows for each of the seven schemas in both source and curated
+metadata tables. Matching identifiers make the samples coherent; they are
+catalog samples, not physical database tables or a tested source connection.
+The normal discovery workflow does not retrieve or send these rows to an LLM.
+
+Run `python -m examples.integrations.synthetic_banking_samples review` with
+`--config`, `--env-file`, `--seed-manifest` and `--split-manifest`. The JSON
+preview includes all values, destination digest and table IDs. The review checks
+OpenMetadata 2.1.0, table identity, schemas, Banking domain, permissions and
+absence of existing samples. Execution requires the same options plus
+`--sample-manifest`, `--reviewed-sha256` from the preview and `--confirm`.
+It rechecks the review and each table before writing, records progress locally,
+and stops on conflicts or unknown outcomes. Sample writes are not atomic: a
+concurrent change between the final check and write could still be overwritten.
+Inspect the manifest and remote state before any recovery; no automatic retry or
+sample deletion is provided. Keep the manifest for any separately reviewed
+cleanup. Existing metadata cleanup scripts do not track these sample rows.

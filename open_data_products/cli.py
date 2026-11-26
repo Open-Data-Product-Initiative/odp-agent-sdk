@@ -315,7 +315,12 @@ def _portfolio_exit_code(payload: Dict[str, object], args: argparse.Namespace) -
 def _activity_command_id(args: argparse.Namespace) -> str:
     """Return the canonical command id for a parsed CLI namespace."""
     command = str(getattr(args, "command", "") or "cli")
-    for nested in ("recipe_command", "portfolio_command", "product_command"):
+    for nested in (
+        "recipe_command",
+        "portfolio_command",
+        "product_command",
+        "handover_command",
+    ):
         value = getattr(args, nested, None)
         if value:
             return f"{command}.{value}"
@@ -1795,6 +1800,132 @@ def main(argv: Optional[List[str]] = None) -> int:
         "--json", action="store_true", help="Emit JSON"
     )
 
+    handover_parser = subparsers.add_parser(
+        "handover", help="Prepare coding-assistant handovers"
+    )
+    handover_commands = handover_parser.add_subparsers(
+        dest="handover_command", required=True
+    )
+    prepare_parser = handover_commands.add_parser(
+        "prepare", help="Prepare a draft handoff for each business document"
+    )
+    prepare_parser.add_argument(
+        "--input",
+        dest="business_document",
+        required=True,
+        help="Business document or folder of documents to review and use",
+    )
+    prepare_parser.add_argument(
+        "--output", default="handoffs", help="Directory for local draft packages"
+    )
+    prepare_parser.add_argument(
+        "--config", help="Override local generation.config.yaml"
+    )
+    prepare_parser.add_argument(
+        "--env-file", help="Override the default local .env file"
+    )
+    prepare_parser.add_argument("--provider", help="LLM provider override")
+    prepare_parser.add_argument("--model", help="LLM model override")
+    prepare_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Write machine-readable preparation results to stdout; reviews go to stderr",
+    )
+    prepare_parser.add_argument(
+        "--discovery", help="Named metadata discovery connection"
+    )
+    prepare_parser.add_argument(
+        "--connections",
+        default="connections.yaml",
+        help="Named integration configuration",
+    )
+
+    handover_validate = handover_commands.add_parser(
+        "validate", help="Validate a generated handover with the OpenSpec CLI"
+    )
+    handover_validate.add_argument(
+        "--input",
+        required=True,
+        help="Generated handover workspace or change directory",
+    )
+    handover_validate.add_argument(
+        "--json", action="store_true", help="Emit structured validation results"
+    )
+
+    handoff_parser = subparsers.add_parser(
+        "handoff", help="Prepare an OpenSpec handoff"
+    )
+    handoff_parser.add_argument("business_document")
+    handoff_parser.add_argument("product")
+    handoff_parser.add_argument("--output", required=True)
+    handoff_parser.add_argument("--change", required=True)
+    handoff_parser.add_argument("--config")
+    handoff_parser.add_argument("--provider")
+    handoff_parser.add_argument("--model")
+    handoff_parser.add_argument("--business-product-id")
+    handoff_parser.add_argument("--business-reference")
+    handoff_parser.add_argument("--product-reference")
+    handoff_parser.add_argument("--context", help="Saved OpenMetadata discovery JSON")
+    handoff_parser.add_argument(
+        "--asset-id", help="Explicit candidate asset ID from the context snapshot"
+    )
+    handoff_parser.add_argument(
+        "--preparation-only",
+        action="store_true",
+        help="Generate the earlier preparation-only package",
+    )
+    handoff_parser.add_argument("--include-full-business", action="store_true")
+    handoff_parser.add_argument("--execute", action="store_true")
+    handoff_parser.add_argument("--reviewed-sha256")
+
+    jira_parser = subparsers.add_parser(
+        "jira", help="Review or create a Jira Cloud issue"
+    )
+    jira_parser.add_argument(
+        "action", nargs="?", help="Use 'deliver' for guided package delivery"
+    )
+    jira_parser.add_argument(
+        "--input", dest="workspace", help="Prepared handoff workspace for delivery"
+    )
+    jira_parser.add_argument(
+        "--env-file", help="Override the default local .env for guided delivery"
+    )
+    jira_parser.add_argument(
+        "--connections",
+        default="connections.yaml",
+        help="Named integration configuration for guided delivery",
+    )
+    jira_parser.add_argument(
+        "--config", help="Connection configuration for general issue requests"
+    )
+    jira_parser.add_argument("--connection", help="Jira connection profile")
+    jira_parser.add_argument(
+        "--request", help="JSON file containing a general issue request"
+    )
+    jira_parser.add_argument("--handoff", help="Local handoff change directory")
+    jira_parser.add_argument("--project")
+    jira_parser.add_argument("--issue-type-id")
+    delivery = jira_parser.add_mutually_exclusive_group()
+    delivery.add_argument("--package-url")
+    delivery.add_argument(
+        "--package-attachment", help="ZIP containing exactly the handoff change files"
+    )
+    delivery.add_argument(
+        "--shared-filesystem",
+        help="Absolute path on a filesystem shared with the assistant",
+    )
+    jira_parser.add_argument("--business-url")
+    jira_parser.add_argument("--product-url")
+    jira_parser.add_argument("--fields", help="JSON file containing Jira custom fields")
+    jira_parser.add_argument(
+        "--attachment",
+        action="append",
+        default=[],
+        help="Explicit file to attach after issue creation",
+    )
+    jira_parser.add_argument("--execute", action="store_true")
+    jira_parser.add_argument("--reviewed-sha256")
+
     add_product_subparser(subparsers)
     from .integrations.cli import add_integrations_parser
 
@@ -1814,6 +1945,195 @@ def main(argv: Optional[List[str]] = None) -> int:
     activity_start_time = time.monotonic()
 
     try:
+        if args.command == "jira":
+            if args.action == "deliver":
+                if not args.workspace:
+                    raise ValueError(
+                        "Jira delivery requires --input with a prepared workspace"
+                    )
+                if any(
+                    (
+                        args.config,
+                        args.request,
+                        args.handoff,
+                        args.project,
+                        args.issue_type_id,
+                        args.package_url,
+                        args.package_attachment,
+                        args.shared_filesystem,
+                        args.business_url,
+                        args.product_url,
+                        args.attachment,
+                        args.execute,
+                        args.reviewed_sha256,
+                    )
+                ):
+                    raise ValueError(
+                        "General Jira issue options cannot be combined with guided delivery"
+                    )
+                args.connection = args.connection or "jira"
+                from ._guided_handoff import run_guided_delivery
+
+                return _finalize_activity(
+                    args,
+                    activity_context,
+                    activity_start_time,
+                    run_guided_delivery(args),
+                )
+            if args.action is not None or args.workspace is not None:
+                raise ValueError(
+                    "Use jira deliver --input WORKSPACE for guided delivery"
+                )
+            if not args.config or not args.connection:
+                raise ValueError(
+                    "General Jira issue requests require --config and --connection"
+                )
+            from .integrations.jira import (
+                JiraCloudAdapter,
+                JiraIssueRequest,
+                load_jira_connection,
+            )
+            from .handoff import handoff_jira_request
+
+            if bool(args.request) == bool(args.handoff):
+                raise ValueError("Specify exactly one of --request or --handoff")
+            adapter = JiraCloudAdapter(
+                load_jira_connection(args.config, args.connection)
+            )
+            if args.request:
+                issue_data = json.loads(Path(args.request).read_text(encoding="utf-8"))
+                issue = JiraIssueRequest(**issue_data)
+            else:
+                if not args.project or not args.issue_type_id:
+                    raise ValueError(
+                        "Handoff delivery requires project and issue type ID"
+                    )
+                issue = handoff_jira_request(
+                    args.handoff,
+                    project=args.project,
+                    issue_type_id=args.issue_type_id,
+                    package_url=args.package_url,
+                    business_url=args.business_url,
+                    product_url=args.product_url,
+                    package_attachment=args.package_attachment,
+                    shared_filesystem=args.shared_filesystem,
+                    fields=(
+                        json.loads(Path(args.fields).read_text(encoding="utf-8"))
+                        if args.fields
+                        else None
+                    ),
+                    attachments=tuple(args.attachment),
+                )
+            if args.execute:
+                if not args.reviewed_sha256:
+                    raise ValueError("Jira execution requires a reviewed digest")
+                result = adapter.create_issue(
+                    issue, reviewed_sha256=args.reviewed_sha256
+                )
+            else:
+                result = adapter.review_issue(issue)
+            print(json.dumps(result, indent=2))
+            return 0
+        if args.command == "handover" and args.handover_command == "validate":
+            from ._openspec_validation import validate_openspec_handover
+
+            validation = validate_openspec_handover(args.input)
+            if args.json:
+                print(json.dumps(validation, indent=2, ensure_ascii=False))
+            else:
+                print("OpenSpec validation:", validation["status"])
+                print(
+                    "OpenSpec CLI version:", validation["cli_version"] or "unavailable"
+                )
+                print("CLI validation:", validation["cli_validation"])
+                if validation.get("reason"):
+                    print(validation["reason"])
+                if validation.get("installation_guidance"):
+                    print(validation["installation_guidance"])
+                for issue in validation["issues"]:
+                    if isinstance(issue, dict):
+                        print("-", issue.get("message", "OpenSpec validation issue"))
+                print(validation["scope"])
+            code = {"passed": 0, "failed": 1, "incomplete": 2, "not_performed": 2}[
+                validation["status"]
+            ]
+            return _finalize_activity(args, activity_context, activity_start_time, code)
+        if args.command == "handover" and args.handover_command == "prepare":
+            from ._guided_handoff import run_guided_handoff
+
+            return _finalize_activity(
+                args, activity_context, activity_start_time, run_guided_handoff(args)
+            )
+        if args.command == "handoff":
+            from .handoff import preview_handoff, generate_handoff
+            from ._handoff_implementation import (
+                preview_implementation_handoff,
+                generate_implementation_handoff,
+            )
+            from .generation import resolve_generation_settings
+
+            settings = resolve_generation_settings(
+                config_path=args.config, provider=args.provider, model=args.model
+            )
+            context = (
+                json.loads(Path(args.context).read_text(encoding="utf-8"))
+                if args.context
+                else None
+            )
+            if args.preparation_only:
+                if args.asset_id:
+                    raise ValueError("--asset-id requires an implementation draft")
+                preview = preview_handoff(
+                    args.business_document,
+                    args.product,
+                    settings,
+                    business_product_id=args.business_product_id,
+                )
+            else:
+                preview = preview_implementation_handoff(
+                    args.business_document,
+                    args.product,
+                    settings,
+                    business_product_id=args.business_product_id,
+                    context_snapshot=context,
+                    asset_id=args.asset_id,
+                )
+            if not args.execute:
+                print(json.dumps(preview.to_dict(), indent=2))
+            else:
+                if not args.reviewed_sha256:
+                    raise ValueError(
+                        "Execution requires --reviewed-sha256 from preview"
+                    )
+                kwargs = {
+                    "reviewed_sha256": args.reviewed_sha256,
+                    "include_full_business": args.include_full_business,
+                    "business_reference": args.business_reference,
+                    "product_reference": args.product_reference,
+                }
+                if args.preparation_only:
+                    path = generate_handoff(
+                        preview,
+                        args.output,
+                        args.change,
+                        settings,
+                        context_snapshot=context,
+                        **kwargs,
+                    )
+                else:
+                    path = generate_implementation_handoff(
+                        preview, args.output, args.change, settings, **kwargs
+                    )
+                print(
+                    json.dumps(
+                        {
+                            "change": str(path),
+                            "state": "draft",
+                            "openspec_cli_compatibility": "unverified",
+                        }
+                    )
+                )
+            return 0
         if args.command in ("connect", "products", "openmetadata"):
             from .integrations._guided_cli import handle_guided
 

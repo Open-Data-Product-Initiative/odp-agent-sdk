@@ -57,6 +57,15 @@ def check_product_contract_alignment(
         product_validation.valid
         and contract_valid
         and not _has_blocking_findings(findings)
+        and not any(
+            f.code
+            in {
+                "ODPS_SCHEMA_NOT_FOUND",
+                "CONTRACT_SCHEMA_EMPTY",
+                "CONTRACT_SCHEMA_EXTRACTION_FAILED",
+            }
+            for f in findings
+        )
     )
     return ProductContractAlignmentResult(
         passed=passed,
@@ -101,7 +110,9 @@ def _check_schema_alignment(
     product_models = _product_schema_models(product_document)
     try:
         if isinstance(contract_path_or_url, dict):
-            contract_schema = extract_contract_schema_from_document(contract_path_or_url)
+            contract_schema = extract_contract_schema_from_document(
+                contract_path_or_url
+            )
         else:
             contract_schema = extract_contract_schema(str(contract_path_or_url))
     except Exception as exc:
@@ -199,7 +210,9 @@ def _compare_field_sets(
             )
 
 
-def _product_schema_models(document: Dict[str, object]) -> Dict[str, List[Tuple[str, Optional[str]]]]:
+def _product_schema_models(
+    document: Dict[str, object],
+) -> Dict[str, List[Tuple[str, Optional[str]]]]:
     product = _mapping(document.get("product"))
     candidates = [
         product.get("datasets"),
@@ -219,7 +232,9 @@ def _models_from_candidate(value: object) -> Dict[str, List[Tuple[str, Optional[
     if isinstance(value, dict):
         if "fields" in value or "columns" in value:
             name = _optional_str(value.get("name")) or "default"
-            return {name: _fields_from_value(value.get("fields") or value.get("columns"))}
+            return {
+                name: _fields_from_value(value.get("fields") or value.get("columns"))
+            }
         models = {}
         for name, item in value.items():
             if isinstance(item, dict):
@@ -351,6 +366,19 @@ def _alignment_summary(
     return (
         f"Product {product_state}; Data Contract {contract_state}; "
         f"{len(findings)} alignment finding(s), {blocking} blocking."
+        + (
+            " Schema alignment could not be assessed."
+            if any(
+                finding.code
+                in {
+                    "ODPS_SCHEMA_NOT_FOUND",
+                    "CONTRACT_SCHEMA_EMPTY",
+                    "CONTRACT_SCHEMA_EXTRACTION_FAILED",
+                }
+                for finding in findings
+            )
+            else ""
+        )
     )
 
 

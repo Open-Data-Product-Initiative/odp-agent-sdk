@@ -1,5 +1,6 @@
 include LICENSE
 include README.md
+include CHANGELOG.md
 include pyproject.toml
 include requirements.txt
 include BUILD.md
@@ -21,5 +22,6 @@ recursive-include skills */SKILL.md
 recursive-exclude tests *
 exclude examples/integrations/connections.yaml
 exclude connections.yaml
+exclude generation.config.yaml
 global-exclude .env
 global-exclude *.local.json

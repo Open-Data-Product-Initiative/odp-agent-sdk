@@ -45,10 +45,10 @@ def test_top_level_package_exposes_version_alias():
     assert open_data_products.odps.__version__ == open_data_products.__version__
 
 
-def test_current_release_version_is_0_8_0():
+def test_current_release_version_is_0_9_0():
     import open_data_products
 
-    assert open_data_products.__version__ == "0.8.0"
+    assert open_data_products.__version__ == "0.9.0"
 
 
 def test_release_summary_matches_package_version():

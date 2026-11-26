@@ -9,6 +9,7 @@ dist/
 /generated/
 /examples/portfolio/workspace/
 /examples/integrations/connections.yaml
+/generation.config.yaml
 /connections.yaml
 /tests/fixtures/openmetadata_banking_poc/live-results.local.json
 /tests/fixtures/openmetadata_banking_poc/banking-results.local.json
