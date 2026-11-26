@@ -430,6 +430,32 @@ def test_extract_contract_schema_reports_empty_models(tmp_path: Path) -> None:
     assert schema.findings[0].code == "CONTRACT_SCHEMA_EMPTY"
 
 
+def test_odcs_31_schema_is_counted_and_extracted(tmp_path: Path) -> None:
+    from open_data_products.contracts import extract_contract_schema, summarize_contract
+
+    contract = tmp_path / "holdings.yaml"
+    contract.write_text(
+        """apiVersion: v3.1.0
+kind: DataContract
+schema:
+  - name: holdings
+    properties:
+      - name: holding_id
+        logicalType: string
+        required: true
+      - name: customer_id
+        logicalType: string
+""",
+        encoding="utf-8",
+    )
+    summary = summarize_contract(str(contract))
+    schema = extract_contract_schema(str(contract))
+    assert (summary.model_count, summary.field_count) == (1, 2)
+    assert (schema.model_count, schema.field_count) == (1, 2)
+    assert schema.models[0].fields[0].type == "string"
+    assert schema.models[0].fields[0].required is True
+
+
 def test_export_contract_returns_install_hint_when_dependency_missing(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -659,7 +685,8 @@ models:
 
     report = generate_product_contract_report(ODPS_PRODUCT, str(contract))
 
-    assert report.passed is True
+    assert report.passed is False
+    assert any(f.code == "ODPS_SCHEMA_NOT_FOUND" for f in report.alignments[0].findings)
     assert report.product_valid is True
     assert report.contract_count == 1
     assert report.contract_tests_run is False
@@ -783,8 +810,9 @@ models:
     )
 
     payload = json.loads(capsys.readouterr().out)
-    assert exit_code == 0
+    assert exit_code == 1
     assert payload["contract_count"] == 1
+    assert payload["alignments"][0]["passed"] is False
     assert payload["summaries"][0]["contract_id"] == "orders-contract"
 
 
@@ -1065,3 +1093,28 @@ def test_product_check_contract_cli_json_failure(
     assert exit_code == 1
     assert payload["passed"] is False
     assert payload["contract"]["findings"][0]["message"] == "invalid contract"
+
+
+def test_datacontract_passed_checks_are_not_reported_as_errors():
+    from enum import Enum
+    from types import SimpleNamespace
+    from open_data_products.contracts.datacontract_cli_adapter import _findings_from_run
+
+    class Result(Enum):
+        passed = "passed"
+        failed = "failed"
+
+    passed = SimpleNamespace(result=Result.passed, name="Contract is valid")
+    failed = SimpleNamespace(result=Result.failed, name="Missing property")
+    assert _findings_from_run(SimpleNamespace(checks=[passed])) == []
+    findings = _findings_from_run(SimpleNamespace(checks=[passed, failed]))
+    assert len(findings) == 1 and findings[0].severity == "error"
+    assert "Missing property" in findings[0].message
+
+
+def test_unknown_datacontract_status_does_not_pass():
+    from types import SimpleNamespace
+    from open_data_products.contracts.datacontract_cli_adapter import _run_passed
+
+    assert _run_passed(SimpleNamespace(checks=[])) is False
+    assert _run_passed(SimpleNamespace(passed="false")) is False

@@ -16,6 +16,8 @@ This folder is organized by audience and purpose.
 - [ODPR recipe examples](recipes/examples.md): example workspace map and
   commands.
 - [LLM generation](user/generation.md): source documents, providers, prompts, and generated artifacts.
+- [Business one-pager](user/business-one-pager.md): a short plain-language template for a data product idea.
+- [Coding-assistant handoff](integrations/handoff.md): generate and deliver a reviewable implementation draft.
 - [ODPR recipe workflows](user/recipe-workflows.md): recipe files, runner config, provider readiness, dry-run planning, guarded execution, review status, and run manifests.
 - [Provider and model matrix](user/provider-model-matrix.md): direct hosted and local provider/model lookup.
 - [Embedded llama.cpp](user/llama-cpp.md): local GGUF model setup without a separate server.

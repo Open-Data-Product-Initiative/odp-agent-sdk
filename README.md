@@ -87,6 +87,19 @@ open-data-products validate examples/product.yaml
 open-data-products explain examples/product.yaml --json
 ```
 
+Prepare a coding-assistant handover from one business document or a folder:
+
+```bash
+open-data-products handover prepare --input business-briefs/ --json > results.json
+# Add --discovery CONNECTION_NAME for optional metadata discovery.
+open-data-products jira deliver --input handoffs/data-product-WORKSPACE
+```
+
+Use the workspace returned in `results.json`. Preparation and Jira delivery are
+separately reviewed; the resulting OpenSpec and data product artifacts are
+unapproved drafts. See the [handover guide](docs/integrations/handoff.md) for
+provider, discovery and Jira setup, evidence limits and review requirements.
+
 Create OpenMetadata products from reviewed ODPS 4.1 documents:
 
 ```bash
@@ -111,7 +124,9 @@ open-data-products openmetadata products update --id PRODUCT_UUID \
 ```
 
 The connection file references an environment variable, like `OPENAI_API_KEY`;
-the SDK does not automatically load `.env`. The platform command requires a
+the standalone platform commands do not automatically load `.env`. Guided
+handover preparation and Jira delivery do read `.env` from the working directory
+when present. The platform command requires a
 write-enabled profile and appropriate platform permissions. It checks for
 possible duplicates and reports fields that might not be imported; generated
 metadata is not evidence of approval. See the [integration guide](docs/integrations/openmetadata.md)

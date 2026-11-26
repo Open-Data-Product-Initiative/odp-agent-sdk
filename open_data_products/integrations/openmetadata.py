@@ -220,6 +220,7 @@ class OpenMetadataAdapter(PlatformAdapter):
     def capabilities(self) -> Dict[str, object]:
         """Describe adapter implementation separately from deployment and permission."""
         return {
+            "metadata_discovery": "supported",
             "list_products": "supported",
             "list_domains": "supported",
             "search_products": "supported",
@@ -604,6 +605,401 @@ class OpenMetadataAdapter(PlatformAdapter):
             ),
         )
 
+    def discover_context(
+        self,
+        *,
+        product_id: Optional[str] = None,
+        query: Optional[str] = None,
+        limit: int = 20,
+    ) -> dict:
+        """Collect bounded, read-only candidate metadata for a preparation task."""
+        if not product_id and not query:
+            raise IntegrationError("Provide a product ID or search query")
+        if (
+            isinstance(limit, bool)
+            or not isinstance(limit, int)
+            or not 1 <= limit <= 100
+        ):
+            raise IntegrationError("Discovery limit must be between 1 and 100")
+        result = {
+            "product": None,
+            "candidates": [],
+            "errors": [],
+            "incomplete": True,
+            "notes": [
+                "Candidates require independent review; no sample rows were retrieved.",
+                "Asset and lineage retrieval is bounded; unsupported or inaccessible resources are reported.",
+            ],
+        }
+        if product_id:
+            try:
+                path = (
+                    "dataProducts/"
+                    + quote(product_id, safe="")
+                    + "?"
+                    + urlencode({"fields": "assets,owners,domains,tags"})
+                )
+                data = self._json(path)
+                result["product"] = {
+                    k: data[k]
+                    for k in (
+                        "id",
+                        "name",
+                        "displayName",
+                        "description",
+                        "fullyQualifiedName",
+                        "owners",
+                        "domains",
+                        "tags",
+                        "assets",
+                    )
+                    if k in data
+                }
+                if isinstance(result["product"].get("assets"), list):
+                    result["product"]["assets"] = [
+                        {
+                            k: ref[k]
+                            for k in (
+                                "id",
+                                "type",
+                                "name",
+                                "displayName",
+                                "fullyQualifiedName",
+                                "description",
+                            )
+                            if k in ref
+                        }
+                        for ref in result["product"]["assets"][:limit]
+                        if isinstance(ref, dict)
+                    ]
+            except PlatformError as exc:
+                result["errors"].append(
+                    {"resource": "product", "message": str(exc), "status": exc.status}
+                )
+                result["incomplete"] = True
+            if result["product"] is not None:
+                try:
+                    asset_page = self._json(
+                        "dataProducts/"
+                        + quote(product_id, safe="")
+                        + "/assets?"
+                        + urlencode({"limit": limit})
+                    )
+                    linked = asset_page.get("data")
+                    if not isinstance(linked, list) or len(linked) > limit:
+                        raise PlatformError(
+                            "Platform returned an unexpected product-assets page"
+                        )
+                    result["product"]["assets"] = [
+                        {
+                            k: ref[k]
+                            for k in (
+                                "id",
+                                "type",
+                                "name",
+                                "displayName",
+                                "fullyQualifiedName",
+                                "description",
+                            )
+                            if k in ref
+                        }
+                        for ref in linked
+                        if isinstance(ref, dict)
+                    ]
+                    paging = asset_page.get("paging", {})
+                    if isinstance(paging, dict) and (
+                        paging.get("after")
+                        or (
+                            isinstance(paging.get("total"), int)
+                            and paging["total"] > len(linked)
+                        )
+                    ):
+                        result["notes"].append(
+                            "Product assets are limited to one page."
+                        )
+                except PlatformError as exc:
+                    result["errors"].append(
+                        {
+                            "resource": "product assets",
+                            "message": str(exc),
+                            "status": exc.status,
+                        }
+                    )
+                    result["incomplete"] = True
+        if query:
+            if (
+                not isinstance(query, str)
+                or not query.strip()
+                or len(query) > 1024
+                or any(ord(c) < 32 for c in query)
+            ):
+                raise IntegrationError("Invalid search query")
+            try:
+                params = {
+                    "q": query,
+                    "index": "all",
+                    "from": "0",
+                    "size": str(limit),
+                    "deleted": "false",
+                }
+                data = self._json("search/query?" + urlencode(params))
+                hits = data.get("hits", {}).get("hits")
+                if not isinstance(hits, list) or len(hits) > limit:
+                    raise PlatformError(
+                        "Platform returned an unexpected search response"
+                    )
+                for hit in hits:
+                    source = hit.get("_source", {}) if isinstance(hit, dict) else {}
+                    if isinstance(source, dict):
+                        result["candidates"].append(
+                            {
+                                k: source[k]
+                                for k in (
+                                    "id",
+                                    "entityType",
+                                    "name",
+                                    "displayName",
+                                    "fullyQualifiedName",
+                                    "description",
+                                    "domain",
+                                    "owners",
+                                    "tags",
+                                )
+                                if k in source
+                            }
+                        )
+                result["incomplete"] = True
+                result["notes"].append(
+                    "Search is bounded to one page and may be incomplete."
+                )
+            except PlatformError as exc:
+                result["errors"].append(
+                    {
+                        "resource": "catalog search",
+                        "message": str(exc),
+                        "status": exc.status,
+                    }
+                )
+                result["incomplete"] = True
+        # Linked and searched assets remain candidates until independently reviewed.
+        assets = []
+        product = result.get("product")
+        if isinstance(product, dict) and isinstance(product.get("assets"), list):
+            assets.extend(product["assets"])
+        assets.extend(result["candidates"])
+        result["assets"] = []
+        result["lineage"] = []
+        result["contracts"] = []
+        if len(assets) > limit:
+            result["notes"].append(
+                "Asset inspection was truncated at the requested limit."
+            )
+        resource_types = {
+            "table": "tables",
+            "dashboard": "dashboards",
+            "topic": "topics",
+            "pipeline": "pipelines",
+            "mlmodel": "mlmodels",
+            "container": "containers",
+        }
+        for ref in assets[:limit]:
+            if not isinstance(ref, dict):
+                continue
+            kind = str(ref.get("type") or ref.get("entityType") or "")
+            identifier = ref.get("id")
+            if kind.lower() in ("dataproduct", "data_product") and isinstance(
+                identifier, str
+            ):
+                note = "Product search matches are candidates; select a product to inspect its linked assets and contract."
+                if note not in result["notes"]:
+                    result["notes"].append(note)
+                continue
+            if not isinstance(identifier, str) or kind not in resource_types:
+                result["errors"].append(
+                    {
+                        "resource": "asset",
+                        "message": "Unsupported asset type or missing ID",
+                    }
+                )
+                continue
+            safe_id = quote(identifier, safe="")
+            try:
+                data = self._json(
+                    resource_types[kind]
+                    + "/"
+                    + safe_id
+                    + "?"
+                    + urlencode({"fields": "owners,domains,tags"})
+                )
+                item = {
+                    k: data[k]
+                    for k in (
+                        "id",
+                        "name",
+                        "displayName",
+                        "fullyQualifiedName",
+                        "description",
+                        "owners",
+                        "domains",
+                        "tags",
+                    )
+                    if k in data
+                }
+                item["type"] = kind
+                if isinstance(data.get("columns"), list):
+                    item["columns"] = [
+                        {k: c[k] for k in ("name", "dataType", "description") if k in c}
+                        for c in data["columns"]
+                        if isinstance(c, dict)
+                    ][:1000]
+                    if len(data["columns"]) > 1000:
+                        result["notes"].append("Asset columns were truncated at 1000.")
+                result["assets"].append(item)
+            except PlatformError as exc:
+                result["errors"].append(
+                    {
+                        "resource": "asset " + identifier,
+                        "message": str(exc),
+                        "status": exc.status,
+                    }
+                )
+            try:
+                lineage = self._json(
+                    "lineage/"
+                    + quote(kind, safe="")
+                    + "/"
+                    + safe_id
+                    + "?upstreamDepth=1&downstreamDepth=1"
+                )
+
+                def lineage_refs(key):
+                    values = lineage.get(key, [])
+                    if not isinstance(values, list):
+                        return []
+                    return [
+                        {
+                            k: entry[k]
+                            for k in (
+                                "id",
+                                "type",
+                                "name",
+                                "fullyQualifiedName",
+                                "fromEntity",
+                                "toEntity",
+                            )
+                            if k in entry
+                        }
+                        for entry in values[:limit]
+                        if isinstance(entry, dict)
+                    ]
+
+                result["lineage"].append(
+                    {
+                        "asset_id": identifier,
+                        "nodes": lineage_refs("nodes"),
+                        "upstreamEdges": lineage_refs("upstreamEdges"),
+                        "downstreamEdges": lineage_refs("downstreamEdges"),
+                    }
+                )
+            except PlatformError as exc:
+                result["errors"].append(
+                    {
+                        "resource": "lineage " + identifier,
+                        "message": str(exc),
+                        "status": exc.status,
+                    }
+                )
+        if product_id:
+            import hashlib
+
+            retrieved_at = datetime.now(timezone.utc).isoformat()
+            provenance = {
+                "connection": self.profile.name,
+                "product_id": product_id,
+                "retrieved_at": retrieved_at,
+                "platform": "openmetadata",
+            }
+            max_contract_bytes = 1024 * 1024
+            contract = None
+            try:
+                contract = self.get_contract_for_product(product_id)
+                encoded = json.dumps(
+                    contract, sort_keys=True, ensure_ascii=False, separators=(",", ":")
+                ).encode("utf-8")
+                if len(encoded) > max_contract_bytes:
+                    raise IntegrationError(
+                        "Product contract exceeds the 1 MiB evidence limit"
+                    )
+                result["contracts"].append(
+                    {
+                        "origin": "OpenMetadata product contract",
+                        "provenance": dict(provenance, contract_id=contract.get("id")),
+                        "validation_status": "not validated by discovery",
+                        "content_status": "complete response within limit; platform completeness unknown",
+                        "size_bytes": len(encoded),
+                        "sha256": hashlib.sha256(encoded).hexdigest(),
+                        "data": contract,
+                    }
+                )
+            except (IntegrationError, TypeError, ValueError) as exc:
+                message = str(exc)
+                if getattr(exc, "status", None) == 404:
+                    message = (
+                        "No product contract returned by the entity lookup (HTTP 404); "
+                        "absence, endpoint support and access cannot be distinguished "
+                        "from this response alone"
+                    )
+                result["errors"].append(
+                    {
+                        "resource": "product contract",
+                        "message": message,
+                        "status": getattr(exc, "status", None),
+                        "incomplete": True,
+                    }
+                )
+            try:
+                if contract is None:
+                    raise IntegrationError(
+                        "Preserved ODCS source was not checked because the product "
+                        "contract lookup did not return a contract"
+                    )
+                source = self._preserved_contract_source(
+                    product_id, contract, max_bytes=max_contract_bytes
+                )
+                body = source["yaml"]
+                size = len(body.encode("utf-8"))
+                if size > max_contract_bytes:
+                    raise IntegrationError(
+                        "Preserved ODCS source exceeds the 1 MiB evidence limit"
+                    )
+                result["contracts"].append(
+                    {
+                        "origin": "SDK-preserved ODCS source",
+                        "provenance": dict(
+                            provenance, contract_id=source["contract_id"]
+                        ),
+                        "validation_status": "integrity checked only; preserved schema not validated by OpenMetadata",
+                        "content_status": "integrity-checked stored source; source completeness unknown",
+                        "size_bytes": size,
+                        "sha256": source["sha256"],
+                        "version": source["version"],
+                        "yaml": body,
+                    }
+                )
+            except (IntegrationError, KeyError, TypeError, UnicodeError) as exc:
+                result["errors"].append(
+                    {
+                        "resource": "preserved ODCS source",
+                        "message": str(exc),
+                        "status": getattr(exc, "status", None),
+                        "incomplete": True,
+                    }
+                )
+        result["notes"].append(
+            "Stored ODCS source material is not evidence of a natively validated OpenMetadata contract."
+        )
+        return result
+
     def export_odps(self, product_id: str) -> ProductResult:
         """Retrieve and locally validate a server-provided ODPS YAML document."""
         if not isinstance(product_id, str) or not product_id or len(product_id) > 1024:
@@ -700,17 +1096,27 @@ class OpenMetadataAdapter(PlatformAdapter):
             + urlencode({"entityId": canonical, "entityType": "dataProduct"})
         )
 
-    def get_preserved_contract_source(self, product_id: str) -> Dict[str, str]:
+    def get_preserved_contract_source(
+        self, product_id: str, *, max_bytes: Optional[int] = None
+    ) -> Dict[str, str]:
         """Retrieve and integrity-check an SDK-preserved ODCS source document."""
-        import hashlib
         from uuid import UUID
-        from .create import _load_unambiguous_yaml
 
         try:
             product_id = str(UUID(product_id))
         except (ValueError, TypeError, AttributeError):
             raise IntegrationError("A valid product UUID is required") from None
         contract = self.get_contract_for_product(product_id)
+        return self._preserved_contract_source(
+            product_id, contract, max_bytes=max_bytes
+        )
+
+    def _preserved_contract_source(
+        self, product_id: str, contract: dict, *, max_bytes: Optional[int] = None
+    ) -> Dict[str, str]:
+        import hashlib
+        from .create import _load_unambiguous_yaml
+
         contract_id = contract.get("id")
         if not isinstance(contract_id, str) or not contract_id:
             raise IntegrationError("Platform contract has no usable ID")
@@ -737,6 +1143,10 @@ class OpenMetadataAdapter(PlatformAdapter):
         ):
             raise IntegrationError("No SDK-preserved ODCS source is available")
         body = source["yaml"]
+        if max_bytes is not None and len(body.encode("utf-8")) > max_bytes:
+            raise IntegrationError(
+                "Preserved ODCS source exceeds the evidence size limit"
+            )
         digest = hashlib.sha256(body.encode("utf-8")).hexdigest()
         try:
             document = _load_unambiguous_yaml(body)

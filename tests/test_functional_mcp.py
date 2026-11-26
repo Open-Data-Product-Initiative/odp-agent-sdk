@@ -134,14 +134,14 @@ def test_mcp_discover_contract_portfolio_returns_full_intelligence_metadata(
     assert payload["interface_analysis"]["contracts_with_one_interface"] == 99
     assert payload["interface_analysis"]["contracts_with_multiple_interfaces"] == 3
     assert len(payload["inventory"]) == 146
-    assert len(payload["intelligence_findings"]) == 379
+    assert len(payload["intelligence_findings"]) == 644
     assert {item["opportunity_type"] for item in payload["candidates"]} == {
         "standalone_product_candidate",
         "boundary_proposal",
         "rationalisation_opportunity",
     }
     assert len(payload["unclassified_contracts"]) == 134
-    assert "document" not in result["content"][0]["text"]
+    assert '"document":' not in result["content"][0]["text"]
     assert str(DATA_CONTRACT_CORPUS) not in result["content"][0]["text"]
 
 

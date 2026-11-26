@@ -1,0 +1,12 @@
+schema: https://opendataproducts.org/v4.1/schema/odps.json
+version: '4.1'
+product:
+  details:
+    en:
+      productID: product-holdings
+      name: Product Holdings
+      visibility: private
+      status: draft
+      type: dataset
+      description: Draft data product; business requirements are provided in the paired
+        document.

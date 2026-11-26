@@ -34,6 +34,22 @@ jobs:
       - name: Install test and packaging dependencies
         run: python -m pip install --upgrade pip ".[dev]"
 
+      - name: Set up Node for OpenSpec CLI
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install pinned OpenSpec CLI
+        run: |
+          npm install --prefix "$RUNNER_TEMP/odp-openspec" --no-save --no-audit --no-fund @fission-ai/openspec@2.2.0
+          echo "$RUNNER_TEMP/odp-openspec/node_modules/.bin" >> "$GITHUB_PATH"
+
+      - name: Validate generated handovers with OpenSpec CLI
+        env:
+          ODPS_OPENSPEC_CLI_TEST: "1"
+          OPENSPEC_TELEMETRY: "0"
+        run: python -m pytest -q tests/test_openspec_cli_live.py
+
       - name: Build and inspect the distribution
         run: |
           cp examples/integrations/connections.example.yaml examples/integrations/connections.yaml
@@ -49,6 +65,11 @@ jobs:
           wheel = next(Path("dist").glob("*.whl"))
           with zipfile.ZipFile(wheel) as archive:
               assert "open_data_products/integrations/openmetadata.py" in archive.namelist()
+              assert "open_data_products/integrations/jira.py" in archive.namelist()
+              assert "open_data_products/handoff.py" in archive.namelist()
+              assert "open_data_products/_guided_handoff.py" in archive.namelist()
+              assert "open_data_products/_openspec_validation.py" in archive.namelist()
+              assert "open_data_products/_handoff_implementation.py" in archive.namelist()
               assert "open_data_products/integrations/_guided_cli.py" in archive.namelist()
               assert "open_data_products/integrations/_odpc_catalog.py" in archive.namelist()
               assert "open_data_products/integrations/connections.yaml" in archive.namelist()
@@ -59,8 +80,12 @@ jobs:
           with tarfile.open(sdist) as archive:
               names = archive.getnames()
               assert any(name.endswith("/examples/integrations/connections.example.yaml") for name in names)
+              assert any(name.endswith("/CHANGELOG.md") for name in names)
+              assert any(name.endswith("/docs/releases/0.8.0.md") for name in names)
+              assert any(name.endswith("/docs/integrations/handoff.md") for name in names)
               assert not any(name.endswith("/examples/integrations/connections.yaml") for name in names)
               assert not any(name.endswith("/.env") or name.endswith(".local.json") for name in names)
+              assert not any(name.count("/") == 1 and name.endswith("/generation.config.yaml") for name in names)
           PY
           rm examples/integrations/connections.yaml examples/integrations/release-check.local.json .env
 
@@ -90,6 +115,9 @@ jobs:
 
           assert callable(load_integration_config)
           assert OpenMetadataAdapter.__module__ == "open_data_products.integrations.openmetadata"
+          from open_data_products import JiraCloudAdapter, preview_implementation_handoff
+          assert callable(preview_implementation_handoff)
+          assert JiraCloudAdapter.__module__ == "open_data_products.integrations.jira"
 
           fixture = Path(os.environ["WORKSPACE"]) / "tests/fixtures/odps_v42_profiles.yaml"
           assert validate_document(fixture).valid

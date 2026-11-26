@@ -12,7 +12,7 @@ family. Each standard lives in its own namespace:
 
 # flake8: noqa: E402
 
-__version__ = "0.8.0"
+__version__ = "0.9.0"
 version = __version__
 
 from . import odpc
@@ -21,6 +21,13 @@ from . import odpr
 from . import odps
 from . import odpv
 from . import profiles
+from .integrations.jira import (
+    JiraCloudAdapter,
+    JiraConnection,
+    JiraIssueRequest,
+    JiraUnknownOutcome,
+    load_jira_connection,
+)
 from .integrations import (
     ConfigurationError,
     ConnectionProfile,
@@ -132,6 +139,17 @@ from .contracts import (
     summarize_contract_document,
     validate_contract,
     wrap_contract,
+)
+from .handoff import (
+    HandoffPreview,
+    preview_handoff,
+    generate_handoff,
+    handoff_jira_request,
+)
+from ._handoff_implementation import (
+    ImplementationHandoffPreview,
+    preview_implementation_handoff,
+    generate_implementation_handoff,
 )
 from .generation import (
     anthropic_generate,
@@ -474,6 +492,18 @@ __all__ = [
     "validate_dprod",
     "wrap_dprod_resource",
     "write_dprod_export",
+    "JiraCloudAdapter",
+    "JiraConnection",
+    "JiraIssueRequest",
+    "JiraUnknownOutcome",
+    "load_jira_connection",
+    "HandoffPreview",
+    "preview_handoff",
+    "generate_handoff",
+    "handoff_jira_request",
+    "ImplementationHandoffPreview",
+    "preview_implementation_handoff",
+    "generate_implementation_handoff",
     "validate_document",
     "validate_profile",
     "validate_vocabulary_release",

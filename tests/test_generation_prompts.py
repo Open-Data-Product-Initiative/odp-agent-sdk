@@ -1368,7 +1368,7 @@ def test_openai_generate_reads_responses_output_text(monkeypatch):
         def __exit__(self, exc_type, exc, tb):
             return None
 
-        def read(self) -> bytes:
+        def read(self, size=-1) -> bytes:
             return b'{"output_text":"generated yaml"}'
 
     def fake_urlopen(req, timeout, context=None):
@@ -1384,7 +1384,7 @@ def test_openai_generate_reads_responses_output_text(monkeypatch):
         return FakeResponse()
 
     monkeypatch.setenv("TEST_OPENAI_API_KEY", "sk-test")
-    monkeypatch.setattr("open_data_products.generation.request.urlopen", fake_urlopen)
+    monkeypatch.setattr("open_data_products.generation._provider_urlopen", fake_urlopen)
 
     assert (
         openai_generate(
@@ -1407,7 +1407,7 @@ def test_openai_chat_generate_reads_chat_completion(monkeypatch):
         def __exit__(self, exc_type, exc, tb):
             return None
 
-        def read(self) -> bytes:
+        def read(self, size=-1) -> bytes:
             return b'{"choices":[{"message":{"content":"generated yaml"}}]}'
 
     def fake_urlopen(req, timeout, context=None):
@@ -1421,7 +1421,7 @@ def test_openai_chat_generate_reads_chat_completion(monkeypatch):
         assert context is None
         return FakeResponse()
 
-    monkeypatch.setattr("open_data_products.generation.request.urlopen", fake_urlopen)
+    monkeypatch.setattr("open_data_products.generation._provider_urlopen", fake_urlopen)
 
     assert (
         openai_chat_generate(
@@ -1441,7 +1441,7 @@ def test_openai_generate_reports_transport_reason(monkeypatch):
         raise OSError("network unavailable")
 
     monkeypatch.setenv("TEST_OPENAI_API_KEY", "sk-test")
-    monkeypatch.setattr("open_data_products.generation.request.urlopen", fake_urlopen)
+    monkeypatch.setattr("open_data_products.generation._provider_urlopen", fake_urlopen)
 
     try:
         openai_generate("prompt", "gpt-test", api_key_env="TEST_OPENAI_API_KEY")
@@ -1469,7 +1469,7 @@ def test_openai_generate_reports_http_error_message(monkeypatch):
         )
 
     monkeypatch.setenv("TEST_OPENAI_API_KEY", "sk-test")
-    monkeypatch.setattr("open_data_products.generation.request.urlopen", fake_urlopen)
+    monkeypatch.setattr("open_data_products.generation._provider_urlopen", fake_urlopen)
 
     try:
         openai_generate("prompt", "gpt-test", api_key_env="TEST_OPENAI_API_KEY")
@@ -1508,7 +1508,7 @@ def test_anthropic_generate_reads_message_text(monkeypatch):
         def __exit__(self, exc_type, exc, tb):
             return None
 
-        def read(self) -> bytes:
+        def read(self, size=-1) -> bytes:
             return b'{"content":[{"type":"text","text":"signals:\\n- id: test"}]}'
 
     def fake_urlopen(req, timeout, context=None):
@@ -1528,7 +1528,7 @@ def test_anthropic_generate_reads_message_text(monkeypatch):
         return FakeResponse()
 
     monkeypatch.setenv("TEST_ANTHROPIC_API_KEY", "sk-ant-test")
-    monkeypatch.setattr("open_data_products.generation.request.urlopen", fake_urlopen)
+    monkeypatch.setattr("open_data_products.generation._provider_urlopen", fake_urlopen)
 
     assert (
         anthropic_generate(
@@ -3369,3 +3369,88 @@ portfolio:
     report = validate_config(config_path=config)
 
     assert any("credentialsRef" in error for error in report["errors"])
+
+
+def test_provider_redirect_handler_rejects_cross_origin_redirect():
+    from urllib.request import Request
+    from open_data_products.generation import _NoProviderRedirect
+
+    req = Request("https://provider.example", headers={"Authorization": "Bearer test"})
+    assert (
+        _NoProviderRedirect().redirect_request(
+            req, None, 302, "Found", {}, "https://other.example"
+        )
+        is None
+    )
+
+
+def test_hosted_provider_response_is_bounded(monkeypatch):
+    from open_data_products.generation import MAX_GENERATION_RESPONSE_BYTES
+
+    class Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return None
+
+        def read(self, limit):
+            assert limit == MAX_GENERATION_RESPONSE_BYTES + 1
+            return b"x" * limit
+
+    monkeypatch.setenv("TEST_OPENAI_API_KEY", "test")
+    monkeypatch.setattr(
+        "open_data_products.generation._provider_urlopen", lambda *a, **k: Response()
+    )
+    with pytest.raises(RuntimeError, match="size limit"):
+        openai_generate("prompt", "model", api_key_env="TEST_OPENAI_API_KEY")
+
+
+def test_provider_does_not_follow_redirect_with_api_key(monkeypatch):
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+    from threading import Thread
+
+    received = []
+
+    class Target(BaseHTTPRequestHandler):
+        def do_GET(self):
+            received.append(self.headers.get("Authorization"))
+            self.send_response(200)
+            self.end_headers()
+
+        def log_message(self, *args):
+            pass
+
+    target = ThreadingHTTPServer(("127.0.0.1", 0), Target)
+
+    class Redirect(BaseHTTPRequestHandler):
+        def do_POST(self):
+            self.send_response(302)
+            self.send_header("Location", "http://127.0.0.1:%s/" % target.server_port)
+            self.end_headers()
+
+        def log_message(self, *args):
+            pass
+
+    origin = ThreadingHTTPServer(("127.0.0.1", 0), Redirect)
+    threads = [
+        Thread(target=server.serve_forever, daemon=True) for server in (target, origin)
+    ]
+    for thread in threads:
+        thread.start()
+    monkeypatch.setenv("SYNTHETIC_PROVIDER_TOKEN", "synthetic-only")
+    try:
+        with pytest.raises(RuntimeError, match="HTTP 302"):
+            openai_generate(
+                "prompt",
+                "model",
+                api_key_env="SYNTHETIC_PROVIDER_TOKEN",
+                base_url="http://127.0.0.1:%s" % origin.server_port,
+            )
+        assert received == []
+    finally:
+        for server in (origin, target):
+            server.shutdown()
+            server.server_close()
+        for thread in threads:
+            thread.join()
