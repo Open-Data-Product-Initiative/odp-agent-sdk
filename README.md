@@ -9,9 +9,11 @@
 [OpenDataProducts.org](https://opendataproducts.org/) standards family:
 ODPS, ODPC, ODPG, ODPV, and ODPR.
 
-Use it to validate data product documents, build catalogs and graphs, inspect
-portfolio source intake, run LLM-assisted generation workflows, expose a local
-MCP server, and give AI agents a consistent standards-aware API.
+Use it to create and validate data product specifications from business needs,
+build catalogs and graphs, and explore portfolio inputs. Connect to OpenMetadata
+to discover evidence and manage product metadata, or prepare a coding-assistant
+handover and deliver it to Jira. The SDK also supports LLM-assisted generation,
+a local MCP server, and a standards-aware API for AI agents.
 
 ## Install
 
@@ -53,6 +55,8 @@ management, and contract attachment. It was tested against one OpenMetadata
 | Agent surfaces | Run a safe-class stdio MCP server and generate an ARWS-compatible agent manifest |
 | LLM generation | Generate ODPC fragments, ODPG graphs, and ODPS product YAML from source notes using local or hosted providers |
 | OpenMetadata | Connect, review and create products, manage domains, compare retrieved metadata, and attach ODCS contracts |
+| Coding-assistant handover | Prepare OpenSpec planning drafts, enriched ODPS and a separate ODCS draft from business documents, with optional metadata discovery |
+| Jira Cloud | Review and deliver handover packages, or create general issues through a reusable Jira adapter |
 | Data Contracts | Wrap ODCS 3.0/3.1/3.2 contracts into conservative ODPS 4.2 drafts, resolve ODPS contract references, validate external contracts through optional `datacontract-cli`, extract schemas, check alignment, and generate reports |
 | DCAT Catalog Intelligence | Inspect supplied DCAT RDF with evidence-bounded findings, render an offline report, and convert explicitly selected resources to private ODPS 4.2 drafts |
 | DPROD interoperability | Validate explicit OMG DPROD 1.0 Beta 2 products offline, create ODPS 4.2 drafts, and export deterministic DPROD RDF with loss reports |
@@ -88,6 +92,9 @@ open-data-products explain examples/product.yaml --json
 ```
 
 Prepare a coding-assistant handover from one business document or a folder:
+
+The handover and Jira commands require SDK 0.9.0 or later. Check the installed
+version with `open-data-products --version`.
 
 ```bash
 open-data-products handover prepare --input business-briefs/ --json > results.json
