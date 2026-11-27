@@ -103,6 +103,19 @@ open-data-products validate examples/product.yaml
 open-data-products explain examples/product.yaml --json
 ```
 
+Create an ODPS draft from a business document using the configured LLM:
+
+```bash
+open-data-products generate --input business-brief.md --kind odps-product --output products/
+```
+
+Or create a draft product from an existing data contract without configuring
+an LLM or metadata platform:
+
+```bash
+open-data-products product wrap-contract --input contract.yaml --output product.yaml
+```
+
 Prepare a coding-assistant handover from one business document or a folder:
 
 The handover and Jira commands require SDK 0.9.0 or later. Check the installed
@@ -114,9 +127,9 @@ open-data-products handover prepare --input business-briefs/ --json > results.js
 open-data-products jira deliver --input handoffs/data-product-WORKSPACE
 ```
 
-Use the workspace returned in `results.json`. Preparation and Jira delivery are
-separately reviewed; the resulting OpenSpec and data product artifacts are
-unapproved drafts. See the [handover guide](docs/integrations/handoff.md) for
+Use the workspace returned in `results.json`. Preparation and Jira delivery support
+interactive reviews by default or non-interactive operation with `--mode agent`;
+the resulting OpenSpec and data product artifacts are unapproved drafts. See the [handover guide](docs/integrations/handoff.md) for
 provider, discovery and Jira setup, evidence limits and review requirements.
 
 Create OpenMetadata products from reviewed ODPS 4.1 documents:
@@ -320,3 +333,26 @@ optional contract execution engine.
 ## License
 
 Apache License 2.0. See `LICENSE` for details.
+
+### Organization defaults for ODPS
+
+Configure the organization used as the default data holder in generated ODPS drafts:
+
+```sh
+open-data-products config organization edit
+open-data-products config organization show
+open-data-products config show
+```
+
+You can also select **Organization** in `config setup`. The editor supports all
+data holder fields in ODPS 4.1 and 4.2, including optional contact and address
+details. It reviews the values before saving them in
+`.open-data-products/organization.yaml`; this project-local file is ignored by
+Git in this SDK checkout. Treat contact details as potentially personal data.
+
+The configured details are added locally after product generation and to
+offline ODCS-to-ODPS drafts. ODPS 4.1 uses `product.dataHolder`; ODPS 4.2
+uses a language-keyed holder. Existing conflicting holder values are preserved
+and reported for review. These defaults are proposals, not proof of ownership.
+Organization details in a generated ODPS may be sent to an LLM during subsequent
+handover preparation, subject to that workflow's provider review.

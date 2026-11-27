@@ -63,6 +63,16 @@ YAML rewrites its comments and formatting. Selected connection profiles can be
 replaced, as shown during review. Existing process environment variables take
 precedence over `.env`; keep `.env` out of version control.
 
+When configuring Jira, setup can use the supplied credentials in memory to list
+visible projects and create-capable standalone issue types. The lookup makes
+read-only requests, displays at most the first 50 results per list, and offers
+manual entry if a result is missing or the lookup fails. Credentials are not
+saved until the final review is approved. A listed issue type does not guarantee
+that a particular issue can be created; required fields and permissions are
+checked during delivery. The API endpoints are described in the Jira Cloud
+documentation for [project search](https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-projects/)
+and [create metadata](https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issues/).
+
 Status reports local configuration and credential presence without printing
 secrets, with commands for missing credentials or other next steps. `--json`
 provides machine-readable output including `next_steps`. To perform read-only
@@ -87,10 +97,14 @@ To add or select LLM providers later, run:
 open-data-products config llm add
 open-data-products config llm list
 open-data-products config llm use --name company
+open-data-products config llm edit --name company
 ```
 
 Adding a provider does not select it automatically. The `use` command changes
-the active provider after review. The `list --json` form is machine-readable.
+the active provider after review. `edit` updates a configured provider's model,
+endpoint or credential without changing the active selection. The `list --json`
+form is machine-readable. Each setup section shows its current local settings
+and the commands for changing them; credentials remain hidden.
 
 To manage named platform connections, use:
 
@@ -155,15 +169,14 @@ For a machine-readable result, use `--json` and redirect standard output:
 open-data-products handover prepare --input path/to/business-briefs/ --json > results.json
 ```
 
-Reviews and prompts still appear on standard error and require an interactive
-terminal. `results.json` contains a `documents` array with each source and
+In the default `human` mode, reviews and prompts appear on standard error and
+require an interactive terminal. `results.json` contains a `documents` array with each source and
 status (`prepared`, `declined`, or `failed`), a `workspace` path for prepared
 packages, and an error for failures. Paths are interpreted from the working
 directory used for preparation. `skipped` lists unsupported folder entries.
 The command exits nonzero if a document fails; inspect the JSON for partial
-results. Input or configuration errors before processing can exit without JSON.
-Use each prepared `workspace` with `jira deliver`; delivery remains separately
-reviewed and interactive.
+results. With `--json`, errors before processing also produce a structured error response.
+Use each prepared `workspace` with `jira deliver`; delivery is separately reviewed.
 
 The command prints each prepared workspace and its exact second command. Run it
 when you are ready to review Jira delivery for that package:
@@ -176,8 +189,8 @@ Both commands automatically read `.env` in the current directory when present,
 without executing shell code; existing environment variables take precedence.
 Preparation uses the local `generation.config.yaml` when present. Configure the
 provider, model and credential environment variable there; the credential itself
-belongs in `.env` or the environment. Without that file the existing SDK
-generation defaults apply. `--config`, `--provider`, `--model` and `--env-file`
+belongs in `.env` or the environment. LLM generation requires a project
+configuration file or an explicit configuration path. `--config`, `--provider`, `--model` and `--env-file`
 remain optional overrides.
 
 For example, a project-local `generation.config.yaml` can select OpenAI
@@ -288,14 +301,13 @@ provider to propose up to three concepts, each with an exact source quotation.
 When the brief has an explicit `product_name` in YAML front matter, the SDK
 includes that name within the same three-concept budget. It is a search phrase,
 not an automatic product match.
-Search phrases may include proposed synonyms. The user reviews the concepts
-before the SDK sends them to the selected metadata platform. The model's reasons
-are proposals, not evidence.
+Search phrases may include proposed synonyms. The SDK searches the selected
+metadata platform automatically. The model's reasons are proposals, not evidence.
 
 Discovery executes up to three quoted phrase searches, four results per search,
-and inspects their available metadata and one-hop lineage. It displays possible
-product matches and allows the user to select at most one product for its linked
-assets and available contract content. It never guesses a product match.
+and inspects their available metadata and one-hop lineage. It automatically
+inspects up to three possible products for linked assets and available contracts.
+Those products remain unverified candidates; no match is asserted.
 Candidates, schemas, lineage, incomplete requests and source-backed query
 provenance are preserved in the local evidence snapshot. The provider review
 shows the candidate asset columns it will receive; the full snapshot is kept in
@@ -318,10 +330,9 @@ OpenMetadata 2.1.0 and Jira Cloud; it retained unresolved fields and catalog
 search limits. One earlier model concept response was rejected and its exact
 cause was not captured. These observations do not verify other inputs or deployments. The
 model assesses candidate fields against requirements during generation; these
-remain proposals rather than verified mappings. If discovery is disabled,
-the user declines discovery, or the service is unavailable, preparation can
-continue without catalog evidence. These guided commands require an interactive
-terminal. For scripting or more control, use the individual commands below.
+remain proposals rather than verified mappings. If discovery is disabled or the service is unavailable, preparation can
+continue without catalog evidence. Interactive preparation uses a terminal;
+non-interactive agent mode is described below.
 
 The independent OpenMetadata command space also provides read-only discovery:
 
@@ -410,24 +421,12 @@ The implementation-draft generator refuses an output directory containing a
 Git repository marker or OpenSpec configuration; generate separately and
 inspect the target workflow before any explicit import into a repository.
 
-## Generate locally
+## Generate from existing drafts with the Python API
 
-The existing generation configuration selects the provider and model. Preview
-prints the full business and ODPS text and candidate asset metadata that will be
-sent to the provider, so protect its output. The original ODPS is not included
-in the implementation package; its digest is retained for traceability. Review
-the package before sharing it. The rest of the context snapshot is
-not sent to the provider. Review the preview and use its digest for generation:
-
-```sh
-open-data-products handoff brief.md product.yaml --output handoffs \
-  --change customer-view --config generation.config.yaml \
-  --context context.json --asset-id ASSET_ID
-open-data-products handoff brief.md product.yaml --output handoffs \
-  --change customer-view --config generation.config.yaml \
-  --context context.json --asset-id ASSET_ID --execute \
-  --reviewed-sha256 REVIEW_DIGEST
-```
+For an existing business document and ODPS draft, Python callers can use
+`preview_implementation_handoff` and `generate_implementation_handoff`. Review
+the exact provider preview and its digest before generation. The CLI's guided
+entry point is `handover prepare` for business documents.
 
 The same context and asset selection must be supplied at execution. Asset IDs
 are explicit; catalog matches remain unverified candidates. The preview
@@ -498,12 +497,10 @@ Malformed responses or unsupported citations for core intent, requirements or
 tasks stop generation with an error. Optional ODPS enrichment with an unsupported
 citation is omitted and reported in the package findings.
 
-`--business-product-id` checks an explicitly supplied identifier against the
-ODPS product ID. `--business-reference` and `--product-reference` record source
-references but do not verify access. Full extracted business text is excluded
-unless `--include-full-business` is selected. Evidence contains selected
-quotations that may still be sensitive. Generated statements are model
-suggestions, even where a quotation matches a source, and require review.
+An explicitly supplied business product identifier is checked against the ODPS
+product ID. Source references do not verify access. Full business text is excluded
+unless explicitly included. Evidence can contain sensitive quotations; model
+suggestions require review.
 Python callers can use `preview_implementation_handoff` and
 `generate_implementation_handoff`; `preview_handoff` and `generate_handoff`
 continue to provide the preparation-only flow.
@@ -514,9 +511,9 @@ create or convert the input product.
 ## Optional OpenMetadata context
 
 ```sh
-open-data-products integrations discover metadata --config metadata.yaml \
+open-data-products openmetadata api discover metadata --config metadata.yaml \
   --id PRODUCT_UUID --query 'customer' --limit 20 --json > context.json
-# Add --context context.json and, after review, --asset-id ASSET_ID to handoff.
+# Supply the saved context and selected asset to the Python preview API after review.
 ```
 
 A product ID or user search query is required; both may be supplied. Discovery
@@ -614,3 +611,44 @@ is returned along with attachment failures, which can have an unknown remote
 outcome and require manual inspection before retrying. Uploads are limited to
 five files of at most 10 MiB each. Live Jira behavior remains unverified; the
 OpenSpec and OpenMetadata checks have the limited scope described above.
+
+### Deliver multiple prepared packages
+
+Save preparation results and pass them to Jira delivery:
+
+```sh
+open-data-products handover prepare --input briefs/ --json > results.json
+open-data-products jira deliver --input results.json --json > jira-results.json
+```
+
+Each issue and its attachments are reviewed separately. Delivery stops after an
+unknown outcome or incomplete attachment upload; inspect Jira and the workspace
+journal before retrying. A parent folder of prepared workspaces is also accepted.
+
+### Non-interactive agent mode
+
+Human mode is the default and asks for confirmation at the terminal. Specify
+`--mode agent` for a non-interactive workflow; it emits JSON on standard output
+without requiring `--json`.
+
+```sh
+open-data-products handover prepare --input briefs/ --discovery openmetadata --mode agent > results.json
+open-data-products jira deliver --input results.json --mode agent > jira-results.json
+```
+
+Selecting agent mode authorizes the SDK to send the business document and the
+model-generated ODPS draft to the configured LLM provider. When discovery is
+selected, bounded catalog evidence may also be sent. Jira agent mode creates
+issues and uploads attachments without interactive confirmation. Apply any
+organizational review policy before invoking these commands. Model output and
+catalog matches remain proposals, not approved facts.
+
+Input screening and evidence budgets still apply. The SDK checks for changes
+to the source and configuration during preparation and records the provider
+preview in each workspace. Jira delivery records its issue and attachment
+review and checks its digest before creating an issue. Those records and logs
+can contain sensitive source information.
+
+A recorded successful Jira delivery is reported as `already_created` on a later
+batch run. Unknown or incomplete results stop further delivery; inspect Jira and
+the local journal before retrying. Each issue's result is independent.

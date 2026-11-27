@@ -170,7 +170,9 @@ class DataHolderValidator(ValidationRule):
         errors = []
 
         if odp.data_holder:
-            if not ODPSValidator.validate_email(odp.data_holder.email):
+            if odp.data_holder.email and not ODPSValidator.validate_email(
+                odp.data_holder.email
+            ):
                 errors.append("dataHolder email must be a valid RFC 5322 email address")
             if odp.data_holder.url and not ODPSValidator.validate_url(
                 odp.data_holder.url
@@ -249,7 +251,10 @@ class URLValidator(ValidationRule):
                 )
 
         # Component URLs
-        if isinstance(odp.data_contract, DataContract) and odp.data_contract.contract_url:
+        if (
+            isinstance(odp.data_contract, DataContract)
+            and odp.data_contract.contract_url
+        ):
             if not ODPSValidator.validate_url(odp.data_contract.contract_url):
                 errors.append("Data contract contractURL must be a valid RFC 3986 URI")
 

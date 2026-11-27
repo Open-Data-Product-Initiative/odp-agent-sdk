@@ -161,13 +161,20 @@ def _metadata_discovery_reference(context):
             else "not available in the supplied metadata snapshot"
         ),
         "product": reference(product) or None,
+        "candidate_products": [
+            reference(item)
+            for item in context.get("candidate_products", [])[:3]
+            if isinstance(item, dict)
+        ],
         "assets": [reference(item) for item in assets[:20] if isinstance(item, dict)],
         "queries": [
             {"query": item["query"], "retrieved_at": item.get("retrieved_at")}
             for item in searches[:4]
             if isinstance(item, dict)
             and isinstance(item.get("query"), str)
-            and not item["query"].startswith("selected product: ")
+            and not item["query"].startswith(
+                ("selected product: ", "candidate product: ")
+            )
         ],
         "latest_retrieval_at": context.get("retrieved_at"),
         "contract_evidence": [

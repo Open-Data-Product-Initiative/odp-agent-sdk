@@ -10,6 +10,7 @@ import shlex
 import subprocess
 import sys
 import tempfile
+import unicodedata
 from urllib.parse import urlsplit, urlunsplit
 
 import yaml
@@ -18,7 +19,7 @@ from ._guided_handoff import _load_env_file, _resolve_discovery_profile
 from .generation import BUILT_IN_PROVIDERS, resolve_generation_settings
 from .integrations.adapter import open_integration
 from .integrations.config import _UniqueLoader
-from .integrations.jira import JiraCloudAdapter, load_jira_connection
+from .integrations.jira import JiraCloudAdapter, JiraConnection, load_jira_connection
 
 
 def _read(path):
@@ -198,6 +199,114 @@ def _connection_mode(profile, action):
     profile["read_only"] = mode == "read-only"
 
 
+def _lookup_label(value):
+    return "".join(
+        " " if unicodedata.category(char) in {"Cc", "Cf"} else char for char in value
+    )[:100]
+
+
+def _choose_jira_option(label, options, identifier):
+    if not options:
+        print("No selectable " + label + " returned; enter it manually.")
+        return None
+    for index, item in enumerate(options, 1):
+        print(
+            "  "
+            + str(index)
+            + ". "
+            + item[identifier]
+            + " — "
+            + _lookup_label(item["name"])
+        )
+    selected = input(
+        "Choose " + label + " number, or press Enter for manual entry: "
+    ).strip()
+    if not selected:
+        return None
+    if (
+        not selected.isascii()
+        or not selected.isdigit()
+        or not 1 <= int(selected) <= len(options)
+    ):
+        print("Selection not recognised; enter it manually.")
+        return None
+    return options[int(selected) - 1][identifier]
+
+
+def _discover_jira_setup(name, profile, values, env_path):
+    """Offer bounded read-only Jira discovery without storing credentials."""
+    saved = dict(os.environ)
+    project = None
+    try:
+        if env_path.exists():
+            _load_env_file(str(env_path))
+        auth = profile["auth"]
+        if any(
+            variable in saved and variable in values
+            for variable in (auth["email_env"], auth["token_env"])
+        ):
+            print(
+                "Existing process environment credentials take precedence over newly entered values during lookup."
+            )
+        for variable in (auth["email_env"], auth["token_env"]):
+            if variable not in saved and variable in values:
+                os.environ[variable] = values[variable]
+        if not os.environ.get(auth["email_env"]) or not os.environ.get(
+            auth["token_env"]
+        ):
+            print(
+                "Jira credentials are not available for discovery; enter project and issue type manually."
+            )
+            return None, None
+        answer = (
+            input(
+                "Find Jira projects and issue types now using read-only requests? [Y/n]: "
+            )
+            .strip()
+            .lower()
+        )
+        if answer not in ("", "y", "yes"):
+            return None, None
+        http = profile.get("http", {})
+        connection = JiraConnection(
+            name=name,
+            base_url=profile["base_url"],
+            email_env=auth["email_env"],
+            token_env=auth["token_env"],
+            read_only=profile.get("read_only", True),
+            timeout_seconds=http.get("timeout_seconds", 30),
+        )
+        adapter = JiraCloudAdapter(connection)
+        listing = adapter.list_setup_projects()
+        if listing["truncated"]:
+            print(
+                "Showing the first 50 projects; use manual entry if yours is not listed."
+            )
+        project = _choose_jira_option("project", listing["projects"], "key")
+        if not project:
+            return None, None
+        types = adapter.list_setup_issue_types(project)
+        if types["truncated"]:
+            print(
+                "Showing the first 50 issue types; use manual entry if yours is not listed."
+            )
+        issue = _choose_jira_option("standalone issue type", types["issue_types"], "id")
+        print(
+            "Selection does not guarantee issue creation; Jira delivery checks required fields and permissions."
+        )
+        return project, issue
+    except Exception as exc:
+        print(
+            "Jira lookup unavailable ("
+            + _test_failure(exc)
+            + "); enter remaining values manually."
+        )
+        return project, None
+    finally:
+        os.environ.clear()
+        os.environ.update(saved)
+
+
 def _env_update(original, values):
     text = original.decode("utf-8") if original else ""
     lines = text.splitlines(keepends=True)
@@ -249,9 +358,9 @@ def _write(path, data, previous):
             os.unlink(name)
 
 
-def _print_setup_overview():
+def _print_setup_overview(title="Current settings (local checks only):"):
     """Show existing local settings without contacting services or revealing secrets."""
-    print("Current settings (local checks only):")
+    print(title)
     try:
         status = config_status()
     except Exception:
@@ -259,6 +368,13 @@ def _print_setup_overview():
             "  Some settings cannot be read. Check generation.config.yaml, connections.yaml and .env."
         )
         return
+    organization = status["organization"]
+    print(
+        "  Organization: "
+        + organization.get("status", "unknown")
+        + ("; " + organization["legalName"] if organization.get("legalName") else "")
+    )
+    print("    Change: open-data-products config organization edit")
     generation = status["generation"]
     if generation.get("status") == "configured":
         print(
@@ -276,7 +392,7 @@ def _print_setup_overview():
             item for item in status["connections"] if item.get("platform") == platform
         ]
         if not connections:
-            print("  " + label + ": not configured")
+            print("  " + label + ": not configured (optional)")
         for item in connections:
             print(
                 "  "
@@ -291,13 +407,90 @@ def _print_setup_overview():
                     else ""
                 )
             )
+    return status
 
 
-def run_setup(*, llm_only=False, connection_action=None, connection_name=None):
+def _print_setting_section(kind):
+    """Show the selected settings and safe commands for changing them."""
+    labels = {"llm": "LLM", "openmetadata": "OpenMetadata", "jira_cloud": "Jira"}
+    print("\nCurrent " + labels[kind] + " settings (local checks only):")
+    try:
+        status = config_status()
+    except Exception:
+        print("  Settings cannot be read; check the project configuration files.")
+        return
+    if kind == "llm":
+        item = status["generation"]
+        if item.get("status") == "configured":
+            print("  Provider: " + item["provider"] + "; model: " + item["model"])
+            if item.get("endpoint_origin"):
+                print("  Endpoint origin: " + item["endpoint_origin"])
+            print("  Credential: " + item["credential"] + " (value hidden)")
+            variable = item.get("credential_variable")
+            if variable and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", variable):
+                print(
+                    "  Change credential: open-data-products config credentials set --name "
+                    + variable
+                )
+        else:
+            print("  " + item.get("status", "unknown"))
+        print("  List: open-data-products config llm list")
+        print("  Add: open-data-products config llm add")
+        print("  Select: open-data-products config llm use --name PROVIDER")
+        print(
+            "  Edit model or endpoint: open-data-products config llm edit --name PROVIDER"
+        )
+        return
+    entries = [item for item in status["connections"] if item.get("platform") == kind]
+    if not entries:
+        print("  Not configured (optional)")
+    for item in entries:
+        name = str(item.get("name", ""))
+        print(
+            "  "
+            + name
+            + ": "
+            + item.get("status", "unknown")
+            + ("; " + item["mode"] if item.get("mode") else "")
+            + ("; credential " + item["credential"] if item.get("credential") else "")
+        )
+        if item.get("endpoint_origin"):
+            print("    Endpoint origin: " + item["endpoint_origin"])
+        if kind == "jira_cloud":
+            print(
+                "    Project: "
+                + item.get("project_key", item.get("project", "missing"))
+                + "; issue type ID: "
+                + item.get("issue_type_id", item.get("issue_type", "missing"))
+            )
+        print(
+            "    Change connection: open-data-products config connections edit --name "
+            + shlex.quote(name)
+        )
+        variables = item.get("credential_variables", [])
+        if item.get("credential_variable"):
+            variables = [item["credential_variable"]]
+        elif item.get("credential") == "not checked (Keychain)":
+            print("    Change credential using your system Keychain tools.")
+        for variable in variables:
+            if isinstance(variable, str) and re.fullmatch(
+                r"[A-Za-z_][A-Za-z0-9_]*", variable
+            ):
+                print(
+                    "    Change credential: open-data-products config credentials set --name "
+                    + variable
+                )
+    print("  List: open-data-products config connections list")
+    print("  Add: open-data-products config connections add")
+
+
+def run_setup(
+    *, llm_only=False, llm_edit_name=None, connection_action=None, connection_name=None
+):
     """Review and save selected local configuration interactively."""
     if not sys.stdin.isatty() or not sys.stdout.isatty():
         raise ValueError("Configuration setup requires an interactive terminal")
-    if llm_only:
+    if llm_only or llm_edit_name:
         choice = "1"
     elif connection_action == "add":
         print("Connection type: 1) OpenMetadata  2) Jira Cloud")
@@ -317,14 +510,49 @@ def run_setup(*, llm_only=False, connection_action=None, connection_name=None):
         choice = "2" if platform == "openmetadata" else "3"
     else:
         _print_setup_overview()
-        print("Configure: 1) LLM provider  2) OpenMetadata  3) Jira  4) All")
+        print("Start from a goal: 6) Get to a first result (recommended)")
+        print(
+            "Configure: 1) LLM provider  2) OpenMetadata  3) Jira  4) LLM and connections  5) Organization"
+        )
         choice = _prompt("Selection")
-    if choice not in ("1", "2", "3", "4"):
-        raise ValueError("Choose 1, 2, 3 or 4")
+        if choice == "6":
+            print("Choose a first result:")
+            print("  1) Generate an ODPS product from a business document (LLM)")
+            print("  2) Generate an ODPS product from an ODCS contract (offline)")
+            print(
+                "  3) Prepare a handover and deliver to Jira (LLM and Jira; metadata optional)"
+            )
+            goal = _prompt("Selection")
+            if goal == "2":
+                print(
+                    "No LLM or platform setup is required. Optional organization defaults: open-data-products config organization edit"
+                )
+                print(
+                    "Next: open-data-products product wrap-contract --input contract.yaml --output product.yaml"
+                )
+                return 0
+            if goal == "1":
+                print(
+                    "Configure the LLM now. Organization and platform connections are optional."
+                )
+                choice = "1"
+            elif goal == "3":
+                print(
+                    "Configure the LLM and Jira connection. OpenMetadata discovery is optional."
+                )
+                choice = "7"
+            else:
+                raise ValueError("Choose a first result: 1, 2 or 3")
+    if choice == "5":
+        from ._organization import edit_organization
+
+        return edit_organization()
+    if choice not in ("1", "2", "3", "4", "7"):
+        raise ValueError("Choose 1, 2, 3, 4 or 5")
     llm, metadata, jira = (
-        choice in ("1", "4"),
+        choice in ("1", "4", "7"),
         choice in ("2", "4"),
-        choice in ("3", "4"),
+        choice in ("3", "4", "7"),
     )
     generation, connections, env = (
         Path("generation.config.yaml"),
@@ -355,6 +583,7 @@ def run_setup(*, llm_only=False, connection_action=None, connection_name=None):
     jira_name = None
     review = []
     if llm:
+        _print_setting_section("llm")
         providers = gen.setdefault("providers", {})
         if not isinstance(providers, dict):
             raise ValueError("Existing providers must be a mapping")
@@ -364,10 +593,21 @@ def run_setup(*, llm_only=False, connection_action=None, connection_name=None):
         print(
             "Enter an existing provider name, or a new name to add a custom provider."
         )
-        provider = _prompt("Provider", str(gen.get("provider") or "ollama"))
+        provider = llm_edit_name or _prompt(
+            "Provider", str(gen.get("provider") or "ollama")
+        )
         if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*", provider):
             raise ValueError("Invalid provider name")
         existing = providers.get(provider)
+        if (
+            llm_edit_name
+            and existing is None
+            and provider == (gen.get("provider") or "ollama")
+            and provider in BUILT_IN_PROVIDERS
+        ):
+            existing = dict(BUILT_IN_PROVIDERS[provider])
+        if llm_edit_name and not isinstance(existing, dict):
+            raise ValueError("Provider is not configured; use config llm add first")
         if llm_only and provider in providers:
             raise ValueError("Provider already exists; use config llm use to select it")
         new_custom = existing is None and provider not in BUILT_IN_PROVIDERS
@@ -413,6 +653,23 @@ def run_setup(*, llm_only=False, connection_action=None, connection_name=None):
                 + provider_type
                 + ("; URL: " + profile["baseUrl"] if "baseUrl" in profile else "")
             )
+        if llm_edit_name:
+            print(
+                "Editing provider: "
+                + provider
+                + "; current model: "
+                + _lookup_label(str(profile.get("model") or "not specified"))
+            )
+            current_origin = _origin(profile.get("baseUrl"))
+            if current_origin:
+                print(
+                    "Current endpoint origin: " + current_origin + " (URL path omitted)"
+                )
+        if llm_edit_name and profile.get("type") != "llama-cpp":
+            endpoint = input("Provider base URL (blank to keep current): ").strip()
+            if endpoint:
+                profile["baseUrl"] = _provider_url(endpoint)
+                review.append("Provider endpoint: " + profile["baseUrl"])
         model = _prompt(
             "Model",
             None if new_custom else str(profile.get("model") or gen.get("model") or ""),
@@ -423,10 +680,10 @@ def run_setup(*, llm_only=False, connection_action=None, connection_name=None):
                 "Local model file path", str(profile.get("modelPath") or "")
             )
         providers[provider] = profile
-        if not llm_only:
+        if not llm_only and not llm_edit_name:
             gen["provider"] = provider
         review.append("LLM provider: " + provider + "; model: " + model)
-        if llm_only:
+        if llm_only or llm_edit_name:
             review.append(
                 "The active provider will not change; use config llm use to select the new provider."
             )
@@ -443,6 +700,7 @@ def run_setup(*, llm_only=False, connection_action=None, connection_name=None):
                 values[key] = secret
         changed.append(generation)
     if metadata:
+        _print_setting_section("openmetadata")
         name = (
             connection_name
             if connection_action == "edit"
@@ -524,6 +782,7 @@ def run_setup(*, llm_only=False, connection_action=None, connection_name=None):
                 values[token_env] = secret
         changed.append(connections)
     if jira:
+        _print_setting_section("jira_cloud")
         name = (
             connection_name
             if connection_action == "edit"
@@ -580,14 +839,23 @@ def run_setup(*, llm_only=False, connection_action=None, connection_name=None):
             values[email_env] = email
         if token:
             values[token_env] = token
+        found_project, found_issue_type = _discover_jira_setup(
+            name, profile, values, env
+        )
         if connection_action == "edit":
-            project = input("Jira project key (blank to leave unchanged): ").strip()
-            issue_type = input(
-                "Jira numeric issue type ID (blank to leave unchanged): "
-            ).strip()
+            project = (
+                found_project
+                or input("Jira project key (blank to leave unchanged): ").strip()
+            )
+            issue_type = (
+                found_issue_type
+                or input(
+                    "Jira numeric issue type ID (blank to leave unchanged): "
+                ).strip()
+            )
         else:
-            project = _prompt("Jira project key")
-            issue_type = _prompt("Jira numeric issue type ID")
+            project = found_project or _prompt("Jira project key")
+            issue_type = found_issue_type or _prompt("Jira numeric issue type ID")
         if issue_type and not issue_type.isdigit():
             raise ValueError("Jira issue type ID must be numeric")
         if project:
@@ -661,12 +929,29 @@ def run_setup(*, llm_only=False, connection_action=None, connection_name=None):
     except (OSError, ValueError):
         print("Saved before error: " + (", ".join(written) or "none"), file=sys.stderr)
         raise
-    print("Saved. Run open-data-products config show to inspect local configuration.")
+    saved_status = _print_setup_overview("Setup saved (local checks only):")
+    print("For details: open-data-products config show")
     if llm_only:
         print("Next: open-data-products config llm use --name " + shlex.quote(provider))
+    elif llm_edit_name:
+        print("Provider updated; the active provider selection is unchanged.")
     elif llm:
+        if saved_status:
+            for step in saved_status["next_steps"]:
+                if step["scope"] == "LLM":
+                    print("Before LLM generation: " + step["command"])
+        print("Choose a first result:")
         print(
-            "Next: open-data-products config test (sends a short LLM prompt; may incur cost)"
+            "Draft a product: open-data-products generate --input BUSINESS_DOCUMENT --kind odps-product --output products/"
+        )
+        print(
+            "Prepare a handover: open-data-products handover prepare --input BUSINESS_DOCUMENT"
+        )
+        print(
+            "Wrap a contract without an LLM: open-data-products product wrap-contract --input CONTRACT --output PRODUCT"
+        )
+        print(
+            "Optional check: open-data-products config test (sends a short LLM prompt; may incur cost)"
         )
     elif metadata or jira:
         print(
@@ -687,6 +972,22 @@ def config_status(*, test=False, llm_test=False):
             "Endpoint origins are shown without paths, user information or query strings.",
         ],
     }
+    from ._organization import load_organization
+
+    try:
+        organization = load_organization()
+        result["organization"] = (
+            {
+                "status": "configured",
+                "legalName": organization["dataHolder"]["legalName"],
+                "language": organization["language"],
+                "fields": sorted(organization["dataHolder"]),
+            }
+            if organization
+            else {"status": "not configured"}
+        )
+    except ValueError:
+        result["organization"] = {"status": "invalid configuration"}
     if test and not llm_test:
         result["notes"][
             0
@@ -947,6 +1248,17 @@ def run_status(*, as_json=False, test=False, llm_test=False):
                 print("  Model test: " + generation["connectivity"])
         else:
             print("  " + generation["status"])
+        organization = result["organization"]
+        print(
+            "Organization: "
+            + organization["status"]
+            + (
+                "; " + organization["legalName"]
+                if organization.get("legalName")
+                else ""
+            )
+        )
+        print("  Change: open-data-products config organization edit")
         print("Connections:")
         for connection in result["connections"]:
             print(
@@ -1034,9 +1346,16 @@ def run_credentials_set(name):
     try:
         if original:
             _load_env_file(str(path))
+        if saved.get(name):
+            current = "set in the process environment"
+        elif os.environ.get(name):
+            current = "set in .env"
+        else:
+            current = "not set"
     finally:
         os.environ.clear()
         os.environ.update(saved)
+    print("Current credential " + name + ": " + current + " (value hidden)")
     value = getpass.getpass("Value for " + name + " (hidden): ")
     if not value or "\r" in value or "\n" in value:
         raise ValueError("Credential must be nonempty and cannot contain newlines")
@@ -1059,6 +1378,11 @@ def run_credentials_set(name):
 def run_llm_add():
     """Add an LLM provider without changing the active provider."""
     return run_setup(llm_only=True)
+
+
+def run_llm_edit(name):
+    """Edit a configured LLM provider without changing the active selection."""
+    return run_setup(llm_edit_name=name)
 
 
 def run_connections_add():

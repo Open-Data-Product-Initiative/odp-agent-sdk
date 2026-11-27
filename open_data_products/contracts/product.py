@@ -136,6 +136,9 @@ def wrap_contract(
                 _apply_ai_extended_details(document, proposals, metadata)
         except Exception as exc:
             errors.append(f"AI enrichment failed: {type(exc).__name__}")
+    from .._organization import apply_organization, load_organization
+
+    warnings.extend(apply_organization(document, load_organization()))
     validation = validate_document(document)
     output_path = str(Path(output)) if output else None
     if output and not dry_run:

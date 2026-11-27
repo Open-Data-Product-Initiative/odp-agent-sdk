@@ -61,7 +61,7 @@ platform. `--owner` and `--tag` may be repeated for explicit assignments.
 The short creation command never writes without a terminal confirmation.
 With `--json`, or when there is no interactive terminal, it returns a structured
 or readable review-only report and a nonzero status. Scripts must use the
-existing `integrations products create` review and `--execute
+existing `openmetadata api products create` review and `--execute
 --reviewed-sha256` commands for explicit execution. Other short commands accept
 `--json` for structured output. CLI product list and search now return ODPC
 catalogs, including in the existing integration commands; this changes their
@@ -86,7 +86,7 @@ open-data-products openmetadata products update --id PRODUCT_UUID \
   --domain "Retail Banking" --owner user:USERNAME --tag Classification.ExistingTag
 ```
 
-Use the domain's exact `fullyQualifiedName` from `integrations domains`. Quote
+Use the domain's exact `fullyQualifiedName` from `openmetadata api domains`. Quote
 multiword values; an OpenMetadata display name may differ from its FQN. Domain
 changes may affect associated assets and relationships, as noted in the review.
 The owner and tag must already exist in OpenMetadata.
@@ -174,14 +174,14 @@ the target deployment. An SDK connection check only tests list access; it does
 not establish write access. 401 and 403 are reported separately.
 
 ```sh
-open-data-products integrations list --config ~/connections.yaml
-open-data-products integrations check openmetadata --config ~/connections.yaml
-open-data-products integrations domains openmetadata --config ~/connections.yaml --json
-open-data-products integrations products list openmetadata --config ~/connections.yaml --json
-open-data-products integrations products search openmetadata --config ~/connections.yaml --query "customer" --limit 20 --json
-open-data-products integrations products get openmetadata --config ~/connections.yaml --id PRODUCT_ID --format native --output native.json
-open-data-products integrations products get openmetadata --config ~/connections.yaml --id PRODUCT_ID --format native --include-domains --json
-open-data-products integrations products get openmetadata --config ~/connections.yaml --id PRODUCT_ID --output product.yaml --provenance product.provenance.json
+open-data-products openmetadata api list --config ~/connections.yaml
+open-data-products openmetadata api check openmetadata --config ~/connections.yaml
+open-data-products openmetadata api domains openmetadata --config ~/connections.yaml --json
+open-data-products openmetadata api products list openmetadata --config ~/connections.yaml --json
+open-data-products openmetadata api products search openmetadata --config ~/connections.yaml --query "customer" --limit 20 --json
+open-data-products openmetadata api products get openmetadata --config ~/connections.yaml --id PRODUCT_ID --format native --output native.json
+open-data-products openmetadata api products get openmetadata --config ~/connections.yaml --id PRODUCT_ID --format native --include-domains --json
+open-data-products openmetadata api products get openmetadata --config ~/connections.yaml --id PRODUCT_ID --output product.yaml --provenance product.provenance.json
 open-data-products validate product.yaml
 ```
 
@@ -215,7 +215,7 @@ derived document, pass `--normalize-updated-timestamps` with an output and a
 provenance path:
 
 ```sh
-open-data-products integrations products get openmetadata --config ~/connections.yaml \
+open-data-products openmetadata api products get openmetadata --config ~/connections.yaml \
   --id PRODUCT_ID --output product.yaml --provenance product.provenance.json \
   --normalize-updated-timestamps --strict false
 ```
@@ -281,18 +281,18 @@ generated document and validation findings before creation.
 
 Use the `openmetadata` connection profile with `read_only: false` and a token with the
 platform's create privilege. The SDK checks the profile before writing:
-Find the domain's `fullyQualifiedName` with `integrations domains`, then pass
+Find the domain's `fullyQualifiedName` with `openmetadata api domains`, then pass
 that exact value as `--domain` for both review and execution. The domain is
 bound to the review digest, and the SDK requests domain references on readback.
 If the target domain is absent or cannot be verified, the creation result and
 CLI status report the mismatch or uncertainty along with the product ID.
 
 ```sh
-open-data-products integrations products create openmetadata \
+open-data-products openmetadata api products create openmetadata \
   --config ~/connections.yaml --source product.yaml --domain "YOUR_DOMAIN"
 
 # Use review_sha256 from the review, without changing the source or target.
-open-data-products integrations products create openmetadata \
+open-data-products openmetadata api products create openmetadata \
   --config ~/connections.yaml --source product.yaml --domain "YOUR_DOMAIN" \
   --execute --reviewed-sha256 REVIEW_SHA256
 ```
@@ -366,13 +366,13 @@ to existing owners and tags. During an update, omit an option to leave that
 assignment unchanged.
 
 ```sh
-open-data-products integrations products create openmetadata \
+open-data-products openmetadata api products create openmetadata \
   --config ~/connections.yaml --source product.yaml --domain "Banking" \
   --owner user:jarkko --tag PII.NonSensitive --json
 # After inspecting the review, repeat the same arguments with:
 #   --execute --reviewed-sha256 REVIEW_DIGEST
 
-open-data-products integrations products update openmetadata \
+open-data-products openmetadata api products update openmetadata \
   --config ~/connections.yaml --id PRODUCT_UUID \
   --owner user:jarkko --tag PII.NonSensitive --json
 # Repeat the reviewed command with --execute --reviewed-sha256 REVIEW_DIGEST.
@@ -393,11 +393,11 @@ provide `--display-name` and a parent domain FQN with `--parent` to create a
 subdomain. Use a write-enabled profile:
 
 ```sh
-open-data-products integrations domain-create openmetadata \
+open-data-products openmetadata api domain-create openmetadata \
   --config ~/connections.yaml --name Retail --description "Retail data" \
   --type Aggregate
 
-open-data-products integrations domain-create openmetadata \
+open-data-products openmetadata api domain-create openmetadata \
   --config ~/connections.yaml --name Retail --description "Retail data" \
   --type Aggregate --execute --reviewed-sha256 REVIEW_SHA256
 ```
@@ -412,7 +412,7 @@ For an unknown create outcome, use the same source and domain in a read-only
 candidate lookup:
 
 ```sh
-open-data-products integrations products recover-create openmetadata \
+open-data-products openmetadata api products recover-create openmetadata \
   --config ~/connections.yaml --source product.yaml --domain "YOUR_DOMAIN" --json
 ```
 
@@ -428,7 +428,7 @@ Compare the reviewed source YAML with a retrieved product without writing to
 OpenMetadata:
 
 ```sh
-open-data-products integrations products compare openmetadata \
+open-data-products openmetadata api products compare openmetadata \
   --config ~/connections.yaml --id PRODUCT_UUID --source product.yaml \
   --domain "YOUR_DOMAIN" --output comparison.json --json
 ```
@@ -454,11 +454,11 @@ changes; retrieve it as `provenance.revision`. This revision is not an ODPS
 product release version and cannot be set directly through this operation.
 
 ```sh
-open-data-products integrations products update openmetadata \
+open-data-products openmetadata api products update openmetadata \
   --config ~/connections.yaml --id PRODUCT_UUID --title "Revised title" \
   --description "Revised description"
 
-open-data-products integrations products update openmetadata \
+open-data-products openmetadata api products update openmetadata \
   --config ~/connections.yaml --id PRODUCT_UUID --title "Revised title" \
   --description "Revised description" \
   --execute --reviewed-sha256 REVIEW_SHA256
@@ -475,10 +475,10 @@ To replace a product's existing domain assignments with one domain, use its
 domain FQN and review the consequences before executing:
 
 ```sh
-open-data-products integrations products update openmetadata \
+open-data-products openmetadata api products update openmetadata \
   --config ~/connections.yaml --id PRODUCT_UUID --domain "Retail"
 
-open-data-products integrations products update openmetadata \
+open-data-products openmetadata api products update openmetadata \
   --config ~/connections.yaml --id PRODUCT_UUID --domain "Retail" \
   --execute --reviewed-sha256 REVIEW_SHA256
 ```
@@ -499,14 +499,14 @@ Review and explicitly import a single ODCS 3.1.0 YAML document against the
 target product UUID:
 
 ```sh
-open-data-products integrations products contract-import openmetadata \
+open-data-products openmetadata api products contract-import openmetadata \
   --config ~/connections.yaml --id PRODUCT_UUID --source contract.yaml
 
-open-data-products integrations products contract-import openmetadata \
+open-data-products openmetadata api products contract-import openmetadata \
   --config ~/connections.yaml --id PRODUCT_UUID --source contract.yaml \
   --execute --reviewed-sha256 REVIEW_SHA256
 
-open-data-products integrations products contract-get openmetadata \
+open-data-products openmetadata api products contract-get openmetadata \
   --config ~/connections.yaml --id PRODUCT_UUID --json
 ```
 
@@ -532,7 +532,7 @@ this SDK-preserved source or its original version. Retrieve the exact preserved
 source through the SDK:
 
 ```sh
-open-data-products integrations products contract-source openmetadata \
+open-data-products openmetadata api products contract-source openmetadata \
   --config ~/connections.yaml --id PRODUCT_UUID --output original-contract.yaml
 ```
 
@@ -576,11 +576,11 @@ that server version. It does not offer a recoverable or non-recursive mode.
 Review the target using its platform UUID and a write-enabled profile:
 
 ```sh
-open-data-products integrations products delete openmetadata \
+open-data-products openmetadata api products delete openmetadata \
   --config ~/connections.yaml --id PRODUCT_UUID
 
 # After reviewing the target, consequences and review_sha256:
-open-data-products integrations products delete openmetadata \
+open-data-products openmetadata api products delete openmetadata \
   --config ~/connections.yaml --id PRODUCT_UUID --execute \
   --reviewed-sha256 REVIEW_SHA256 --confirm-permanent
 ```

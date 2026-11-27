@@ -53,6 +53,7 @@ Getting started:
 Examples:
   open-data-products validate product.yaml
   open-data-products generate --input brief.md --kind odps-product --output products/
+  open-data-products product wrap-contract --input contract.yaml --output product.yaml
   open-data-products handover prepare --input brief.md --discovery openmetadata
   open-data-products jira deliver --input WORKSPACE
   open-data-products openmetadata products create products/ --domain "Banking"
@@ -583,13 +584,15 @@ def _contract_source(record: Dict[str, object]) -> str:
 
 def main(argv: Optional[List[str]] = None) -> int:
     """Run the top-level Open Data Products CLI."""
+    from ._cli_help import TaskHelpFormatter
+
     cli_argv = list(sys.argv[1:] if argv is None else argv)
     parse_start_time = time.monotonic()
     parser = argparse.ArgumentParser(
         prog="open-data-products",
         description="Create, validate and work with Open Data Product artifacts.",
         epilog=TOP_LEVEL_HELP,
-        formatter_class=argparse.RawDescriptionHelpFormatter,
+        formatter_class=TaskHelpFormatter,
     )
     parser.add_argument(
         "-V",
@@ -673,6 +676,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             "  open-data-products config credentials set --name OPENAI_API_KEY\n"
             "  open-data-products config llm add\n"
             "  open-data-products config llm list\n"
+            "  open-data-products config llm edit --name company\n"
             "  open-data-products config llm use --name company\n"
             "  open-data-products config connections list\n"
             "  open-data-products config connections add\n"
@@ -696,6 +700,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             "llm",
             "connections",
             "credentials",
+            "organization",
         ],
         default="generation",
         help="Select interactive setup, status, or a template domain (default: generation).",
@@ -703,7 +708,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     config_parser.add_argument(
         "llm_action",
         nargs="?",
-        choices=["add", "list", "use", "edit", "set"],
+        choices=["add", "list", "use", "edit", "set", "show"],
         help="Provider, connection or credential operation.",
     )
     config_parser.add_argument(
@@ -1719,15 +1724,16 @@ def main(argv: Optional[List[str]] = None) -> int:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description=(
             "Generate an ODPS draft and coding-assistant handover for each input.\n"
-            "Reviews require an interactive terminal, including with --json.\n"
+            "Human mode requires an interactive terminal; agent mode runs without prompts and emits JSON.\n"
             "The local generation.config.yaml and .env are used when present;\n"
-            "review the source material before sending it to the provider.\n"
+            "Agent mode sends source material and selected evidence to the provider.\n"
             "Preparation does not create an OpenMetadata product or Jira issue."
         ),
         epilog=(
             "Examples:\n"
             "  open-data-products handover prepare --input business-brief.md\n"
             "  open-data-products handover prepare --input briefs/ --discovery openmetadata --json > results.json\n"
+            "  open-data-products handover prepare --input briefs/ --mode agent > results.json\n"
             "  open-data-products jira deliver --input WORKSPACE"
         ),
     )
@@ -1754,6 +1760,12 @@ def main(argv: Optional[List[str]] = None) -> int:
         "--json",
         action="store_true",
         help="Write results including workspace paths to stdout; interactive reviews go to stderr",
+    )
+    prepare_parser.add_argument(
+        "--mode",
+        choices=("human", "agent"),
+        default="human",
+        help="human: review interactively (default); agent: send source and evidence to the configured provider without prompts and emit JSON",
     )
     prepare_parser.add_argument(
         "--discovery",
@@ -1784,65 +1796,13 @@ def main(argv: Optional[List[str]] = None) -> int:
         "--json", action="store_true", help="Emit structured validation results"
     )
 
-    handoff_parser = subparsers.add_parser(
-        "handoff",
-        help="Review or generate an OpenSpec handoff from existing drafts",
-        description=(
-            "Review an existing business document and ODPS draft before generating a "
-            "local handoff. The default is a JSON preview; --execute requires the "
-            "reviewed digest. For a guided workflow, use handover prepare."
-        ),
-    )
-    handoff_parser.add_argument("business_document", help="Business source document")
-    handoff_parser.add_argument("product", help="Existing ODPS 4.1 or 4.2 draft")
-    handoff_parser.add_argument(
-        "--output", required=True, help="Output directory for the generated change"
-    )
-    handoff_parser.add_argument("--change", required=True, help="OpenSpec change name")
-    handoff_parser.add_argument("--config", help="Generation configuration YAML")
-    handoff_parser.add_argument("--provider", help="LLM provider override")
-    handoff_parser.add_argument("--model", help="LLM model override")
-    handoff_parser.add_argument(
-        "--business-product-id",
-        help="Explicit product identifier for the business document",
-    )
-    handoff_parser.add_argument(
-        "--business-reference",
-        help="Source reference to record for the business document",
-    )
-    handoff_parser.add_argument(
-        "--product-reference", help="Source reference to record for the ODPS draft"
-    )
-    handoff_parser.add_argument("--context", help="Saved OpenMetadata discovery JSON")
-    handoff_parser.add_argument(
-        "--asset-id", help="Explicit candidate asset ID from the context snapshot"
-    )
-    handoff_parser.add_argument(
-        "--preparation-only",
-        action="store_true",
-        help="Generate the earlier preparation-only package",
-    )
-    handoff_parser.add_argument(
-        "--include-full-business",
-        action="store_true",
-        help="Include the full business document in the local package",
-    )
-    handoff_parser.add_argument(
-        "--execute",
-        action="store_true",
-        help="Generate the package after reviewing the preview",
-    )
-    handoff_parser.add_argument(
-        "--reviewed-sha256", help="Digest returned by the preview"
-    )
-
     jira_parser = subparsers.add_parser(
         "jira",
         help="Review or create a Jira Cloud issue",
         description=(
-            "Guided delivery reviews and attaches a prepared handover before creating "
-            "a Jira issue. It requires an interactive terminal, a writable named Jira "
-            "connection, and JIRA_PROJECT and JIRA_ISSUE_TYPE_ID. Guided delivery "
+            "Delivery reviews and attaches a prepared handover before creating "
+            "a Jira issue. Human mode reviews interactively; agent mode creates issues "
+            "without prompts. Both require a writable Jira connection, JIRA_PROJECT and JIRA_ISSUE_TYPE_ID. Delivery "
             "loads .env when present. General issue requests use separate options."
         ),
         epilog=(
@@ -1855,7 +1815,9 @@ def main(argv: Optional[List[str]] = None) -> int:
         "action", nargs="?", help="Use 'deliver' for guided package delivery"
     )
     jira_parser.add_argument(
-        "--input", dest="workspace", help="Prepared handoff workspace for delivery"
+        "--input",
+        dest="workspace",
+        help="Prepared workspace, parent folder, or handover results JSON for delivery",
     )
     jira_parser.add_argument(
         "--env-file", help="Override the default local .env for guided delivery"
@@ -1905,6 +1867,17 @@ def main(argv: Optional[List[str]] = None) -> int:
         help="Explicit file to attach after issue creation",
     )
     jira_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Emit machine-readable delivery results; reviews remain interactive",
+    )
+    jira_parser.add_argument(
+        "--mode",
+        choices=("human", "agent"),
+        default="human",
+        help="human: review interactively (default); agent: create issues without prompts and emit JSON",
+    )
+    jira_parser.add_argument(
         "--execute",
         action="store_true",
         help="Execute a general issue request after review",
@@ -1914,9 +1887,6 @@ def main(argv: Optional[List[str]] = None) -> int:
     )
 
     add_product_subparser(subparsers)
-    from .integrations.cli import add_integrations_parser
-
-    add_integrations_parser(subparsers)
     from .integrations._guided_cli import add_guided_parsers
 
     add_guided_parsers(subparsers)
@@ -1928,7 +1898,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     if not cli_argv:
         if (
             not Path("generation.config.yaml").is_file()
-            or not Path("connections.yaml").is_file()
+            and not Path("connections.yaml").is_file()
         ):
             print(
                 "Welcome to Open Data Products. To configure LLM and platform access, run:"
@@ -1944,6 +1914,12 @@ def main(argv: Optional[List[str]] = None) -> int:
         _log_parse_failure(cli_argv, exit_code, parse_start_time)
         raise
 
+    if getattr(args, "mode", None) == "agent" and (
+        (args.command == "handover" and args.handover_command == "prepare")
+        or (args.command == "jira" and args.action == "deliver")
+    ):
+        args.json = True
+
     activity_context = ActivityContext()
     activity_start_time = time.monotonic()
 
@@ -1952,7 +1928,6 @@ def main(argv: Optional[List[str]] = None) -> int:
             "connect",
             "products",
             "openmetadata",
-            "integrations",
             "jira",
         ):
             from ._guided_handoff import _load_env_file
@@ -1967,7 +1942,6 @@ def main(argv: Optional[List[str]] = None) -> int:
         requires_llm = (
             args.command in ("generate", "odpg-build")
             or (args.command == "handover" and args.handover_command == "prepare")
-            or args.command == "handoff"
             or (
                 args.command == "portfolio"
                 and (
@@ -1988,7 +1962,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                 getattr(args, "config", None),
                 getattr(args, "env_file", None),
                 provider=getattr(args, "provider", None),
-                check_credentials=not (args.command == "handoff" and not args.execute),
+                check_credentials=True,
             )
         if args.command == "jira":
             if args.action == "deliver":
@@ -2021,13 +1995,13 @@ def main(argv: Optional[List[str]] = None) -> int:
                         "General Jira issue options cannot be combined with guided delivery"
                     )
                 args.connection = args.connection or "jira"
-                from ._guided_handoff import run_guided_delivery
+                from ._guided_handoff import run_delivery_input
 
                 return _finalize_activity(
                     args,
                     activity_context,
                     activity_start_time,
-                    run_guided_delivery(args),
+                    run_delivery_input(args),
                 )
             if args.action is not None or args.workspace is not None:
                 raise ValueError(
@@ -2117,87 +2091,17 @@ def main(argv: Optional[List[str]] = None) -> int:
             return _finalize_activity(
                 args, activity_context, activity_start_time, run_guided_handoff(args)
             )
-        if args.command == "handoff":
-            from .handoff import preview_handoff, generate_handoff
-            from ._handoff_implementation import (
-                preview_implementation_handoff,
-                generate_implementation_handoff,
-            )
-            from .generation import resolve_generation_settings
+        if args.command == "openmetadata" and args.guided_action == "api":
+            from .integrations.cli import handle_integrations
 
-            settings = resolve_generation_settings(
-                config_path=args.config, provider=args.provider, model=args.model
+            return _finalize_activity(
+                args, activity_context, activity_start_time, handle_integrations(args)
             )
-            context = (
-                json.loads(Path(args.context).read_text(encoding="utf-8"))
-                if args.context
-                else None
-            )
-            if args.preparation_only:
-                if args.asset_id:
-                    raise ValueError("--asset-id requires an implementation draft")
-                preview = preview_handoff(
-                    args.business_document,
-                    args.product,
-                    settings,
-                    business_product_id=args.business_product_id,
-                )
-            else:
-                preview = preview_implementation_handoff(
-                    args.business_document,
-                    args.product,
-                    settings,
-                    business_product_id=args.business_product_id,
-                    context_snapshot=context,
-                    asset_id=args.asset_id,
-                )
-            if not args.execute:
-                print(json.dumps(preview.to_dict(), indent=2))
-            else:
-                if not args.reviewed_sha256:
-                    raise ValueError(
-                        "Execution requires --reviewed-sha256 from preview"
-                    )
-                kwargs = {
-                    "reviewed_sha256": args.reviewed_sha256,
-                    "include_full_business": args.include_full_business,
-                    "business_reference": args.business_reference,
-                    "product_reference": args.product_reference,
-                }
-                if args.preparation_only:
-                    path = generate_handoff(
-                        preview,
-                        args.output,
-                        args.change,
-                        settings,
-                        context_snapshot=context,
-                        **kwargs,
-                    )
-                else:
-                    path = generate_implementation_handoff(
-                        preview, args.output, args.change, settings, **kwargs
-                    )
-                print(
-                    json.dumps(
-                        {
-                            "change": str(path),
-                            "state": "draft",
-                            "openspec_cli_compatibility": "unverified",
-                        }
-                    )
-                )
-            return 0
         if args.command in ("connect", "products", "openmetadata"):
             from .integrations._guided_cli import handle_guided
 
             return _finalize_activity(
                 args, activity_context, activity_start_time, handle_guided(args)
-            )
-        if args.command == "integrations":
-            from .integrations.cli import handle_integrations
-
-            return _finalize_activity(
-                args, activity_context, activity_start_time, handle_integrations(args)
             )
         interop_exit_code = handle_interop_command(args)
         if interop_exit_code is not None:
@@ -2493,7 +2397,45 @@ def main(argv: Optional[List[str]] = None) -> int:
                         activity_start_time,
                         run_llm_use(args.name),
                     )
-                raise ValueError("Choose an LLM operation: add, list, or use")
+                if args.llm_action == "edit":
+                    if not args.name or args.json:
+                        raise ValueError(
+                            "config llm edit requires --name and does not accept --json"
+                        )
+                    from ._config_setup import run_llm_edit
+
+                    return _finalize_activity(
+                        args,
+                        activity_context,
+                        activity_start_time,
+                        run_llm_edit(args.name),
+                    )
+                raise ValueError("Choose an LLM operation: add, list, use, or edit")
+            if args.domain == "organization":
+                from ._organization import edit_organization, show_organization
+
+                if (
+                    args.name
+                    or args.test
+                    or any(
+                        (
+                            args.config_path,
+                            args.copy_to,
+                            args.copy_prompts_to,
+                            args.overwrite,
+                            args.check,
+                            args.print,
+                        )
+                    )
+                ):
+                    raise ValueError(
+                        "Organization settings do not accept these options"
+                    )
+                if args.llm_action == "edit" and not args.json:
+                    return edit_organization()
+                if args.llm_action in (None, "show"):
+                    return show_organization(as_json=args.json)
+                raise ValueError("Choose organization show or edit")
             if args.llm_action or args.name:
                 raise ValueError("LLM provider options require config llm")
             if args.domain in ("setup", "status", "show", "test"):
@@ -3039,6 +2981,10 @@ def main(argv: Optional[List[str]] = None) -> int:
                     print(f"- {artifact.name}: {artifact.output_path}")
                     for error in artifact.errors:
                         print(f"  - {error}")
+                    for note in artifact.review_notes:
+                        print(f"  Review: {note}")
+                    for gap in artifact.evidence_gaps:
+                        print(f"  Missing evidence: {gap}")
             return _finalize_activity(
                 args, activity_context, activity_start_time, 0 if valid_yaml else 1
             )

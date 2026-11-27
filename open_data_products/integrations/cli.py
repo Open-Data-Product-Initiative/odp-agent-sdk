@@ -17,16 +17,16 @@ from .openmetadata import OpenMetadataAdapter, normalize_openmetadata_updated_da
 def add_integrations_parser(subparsers: argparse._SubParsersAction) -> None:
     """Register the integrations command tree."""
     parser = subparsers.add_parser(
-        "integrations",
-        help="Use platform connection profiles",
+        "api",
+        help="Advanced reviewed OpenMetadata operations",
         description="Inspect connections and review platform operations.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
             "Examples:\n"
-            "  open-data-products integrations list --config connections.yaml\n"
-            "  open-data-products integrations check openmetadata --config connections.yaml\n\n"
+            "  open-data-products openmetadata api list --config connections.yaml\n"
+            "  open-data-products openmetadata api check openmetadata --config connections.yaml\n\n"
             "Next steps:\n"
-            "  Use open-data-products integrations COMMAND --help for options.\n"
+            "  Use open-data-products openmetadata api COMMAND --help for options.\n"
             "  Writes require review and explicit execution."
         ),
     )

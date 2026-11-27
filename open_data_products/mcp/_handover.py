@@ -121,7 +121,11 @@ def _business_review(args):
     settings = _settings(args)
     output = _workspace(args)
     source_hash = hashlib.sha256(data).hexdigest()
+    from .._organization import load_organization
+
+    organization = load_organization()
     review = {
+        "organization": organization,
         "source_name": path.name,
         "source_sha256": source_hash,
         "source_bytes": len(data),
@@ -140,6 +144,10 @@ def preview_business_handover(args):
     review.pop("output")
     review.pop("base_url")
     review.pop("settings")
+    organization = review.pop("organization")
+    review["organization_default_fields"] = (
+        sorted(organization["dataHolder"]) if organization else []
+    )
     review["provider_origin"] = _provider_origin(settings.base_url)
     review.update(
         reviewed_sha256=digest,
@@ -164,6 +172,7 @@ def create_business_odps_draft(args):
         client=create_generation_client(settings),
         profile="minimal",
         odps_version="4.1",
+        organization=review["organization"] or {},
     )
     if len(artifacts) != 1 or not artifacts[0].valid_yaml:
         raise ValueError("ODPS generation did not produce one valid draft")
@@ -176,6 +185,7 @@ def create_business_odps_draft(args):
             {
                 "source_sha256": review["source_sha256"],
                 "conservative_defaults": defaults,
+                "review_notes": getattr(artifacts[0], "review_notes", []),
             },
             indent=2,
         ),
@@ -189,6 +199,7 @@ def create_business_odps_draft(args):
             "odps_draft": "odps/" + artifact.name,
             "source_sha256": review["source_sha256"],
             "conservative_defaults": defaults,
+            "review_notes": getattr(artifacts[0], "review_notes", []),
             "next_step": "Review the ODPS draft and use preview_implementation_handover.",
         }
     )

@@ -41,6 +41,7 @@ def test_full_setup_preserves_existing_values_and_hides_credentials(
             "https://metadata.example.org",
             "",
             "https://jira.example.org",
+            "n",
             "TEST",
             "10001",
             "y",
@@ -87,6 +88,160 @@ def test_full_setup_preserves_existing_values_and_hides_credentials(
     assert "OPENAI_API_KEY" not in os.environ
 
 
+def test_jira_setup_discovers_project_and_issue_type_without_saving_credentials_early(
+    tmp_path, monkeypatch, capsys
+):
+    monkeypatch.chdir(tmp_path)
+    for key in ("JIRA_EMAIL", "JIRA_API_TOKEN", "JIRA_PROJECT", "JIRA_ISSUE_TYPE_ID"):
+        monkeypatch.delenv(key, raising=False)
+    calls = []
+
+    class Jira:
+        def __init__(self, connection):
+            assert connection.base_url == "https://jira.example.org"
+
+        def list_setup_projects(self):
+            assert os.environ["JIRA_EMAIL"] == "person@example.invalid"
+            assert os.environ["JIRA_API_TOKEN"] == "fake-jira-secret"
+            assert not (tmp_path / ".env").exists()
+            calls.append("projects")
+            return {"projects": [{"key": "DEMO", "name": "Demo"}], "truncated": False}
+
+        def list_setup_issue_types(self, project):
+            calls.append(("issue_types", project))
+            return {
+                "issue_types": [{"id": "10001", "name": "Task"}],
+                "truncated": False,
+            }
+
+    monkeypatch.setattr(setup, "JiraCloudAdapter", Jira)
+    _interactive(
+        monkeypatch,
+        ["3", "", "https://jira.example.org", "", "1", "1", "y"],
+        ["person@example.invalid", "fake-jira-secret"],
+    )
+    assert main(["config", "setup"]) == 0
+    output = capsys.readouterr().out
+    assert calls == ["projects", ("issue_types", "DEMO")]
+    assert "fake-jira-secret" not in output and "person@example.invalid" not in output
+    assert "Setup saved (local checks only)" in output
+    env = (tmp_path / ".env").read_text()
+    assert "JIRA_PROJECT=DEMO" in env and "JIRA_ISSUE_TYPE_ID=10001" in env
+    assert "JIRA_API_TOKEN" not in os.environ
+
+
+def test_jira_setup_lookup_failure_preserves_selected_project_for_manual_issue_type(
+    tmp_path, monkeypatch, capsys
+):
+    monkeypatch.chdir(tmp_path)
+    for key in ("JIRA_EMAIL", "JIRA_API_TOKEN", "JIRA_PROJECT", "JIRA_ISSUE_TYPE_ID"):
+        monkeypatch.delenv(key, raising=False)
+
+    class Jira:
+        def __init__(self, connection):
+            pass
+
+        def list_setup_projects(self):
+            return {"projects": [{"key": "DEMO", "name": "Demo"}], "truncated": True}
+
+        def list_setup_issue_types(self, project):
+            raise ValueError("HTTP 403 fake-secret-in-error")
+
+    monkeypatch.setattr(setup, "JiraCloudAdapter", Jira)
+    _interactive(
+        monkeypatch,
+        ["3", "", "https://jira.example.org", "y", "1", "10001", "y"],
+        ["person@example.invalid", "fake-jira-secret"],
+    )
+    assert main(["config", "setup"]) == 0
+    output = capsys.readouterr().out
+    assert "HTTP 403" in output and "first 50 projects" in output
+    assert "fake-secret-in-error" not in output and "fake-jira-secret" not in output
+    env = (tmp_path / ".env").read_text()
+    assert "JIRA_PROJECT=DEMO" in env and "JIRA_ISSUE_TYPE_ID=10001" in env
+
+
+def test_jira_setup_lookup_does_not_write_when_final_review_is_declined(
+    tmp_path, monkeypatch
+):
+    monkeypatch.chdir(tmp_path)
+    for key in ("JIRA_EMAIL", "JIRA_API_TOKEN"):
+        monkeypatch.delenv(key, raising=False)
+
+    class Jira:
+        def __init__(self, connection):
+            pass
+
+        def list_setup_projects(self):
+            return {"projects": [{"key": "DEMO", "name": "Demo"}], "truncated": False}
+
+        def list_setup_issue_types(self, project):
+            return {
+                "issue_types": [{"id": "10001", "name": "Task"}],
+                "truncated": False,
+            }
+
+    monkeypatch.setattr(setup, "JiraCloudAdapter", Jira)
+    _interactive(
+        monkeypatch,
+        ["3", "", "https://jira.example.org", "y", "1", "1", "n"],
+        ["person@example.invalid", "fake-jira-secret"],
+    )
+    assert main(["config", "setup"]) == 0
+    assert not (tmp_path / "connections.yaml").exists()
+    assert not (tmp_path / ".env").exists()
+    assert "JIRA_API_TOKEN" not in os.environ
+
+
+def test_jira_discovery_adapter_bounds_and_filters_results(monkeypatch):
+    from open_data_products.integrations.jira import JiraCloudAdapter, JiraConnection
+    from open_data_products.integrations.config import IntegrationError
+
+    adapter = JiraCloudAdapter(
+        JiraConnection(
+            name="jira",
+            base_url="https://jira.example.org",
+            email_env="TEST_EMAIL",
+            token_env="TEST_TOKEN",
+        )
+    )
+    calls = []
+
+    def request(method, path):
+        calls.append((method, path))
+        if path.startswith("project/search?"):
+            return {
+                "values": [{"key": "DEMO", "name": "Demo"}],
+                "total": 100,
+                "isLast": False,
+            }
+        return {
+            "issueTypes": [
+                {"id": "10001", "name": "Task", "subtask": False},
+                {"id": "10002", "name": "Subtask", "subtask": True},
+                {"id": "10003", "name": "Unknown"},
+            ],
+            "total": 3,
+        }
+
+    monkeypatch.setattr(adapter, "_request", request)
+    projects = adapter.list_setup_projects()
+    types = adapter.list_setup_issue_types("DEMO")
+    assert projects == {
+        "projects": [{"key": "DEMO", "name": "Demo"}],
+        "truncated": True,
+    }
+    assert types["issue_types"] == [{"id": "10001", "name": "Task"}]
+    assert calls == [
+        ("GET", "project/search?startAt=0&maxResults=50"),
+        ("GET", "issue/createmeta/DEMO/issuetypes?startAt=0&maxResults=50"),
+    ]
+    with pytest.raises(IntegrationError, match="limit"):
+        adapter.list_setup_projects(limit=51)
+    with pytest.raises(IntegrationError, match="Invalid Jira project key"):
+        adapter.list_setup_issue_types("../../other")
+
+
 def test_setup_decline_does_not_write(tmp_path, monkeypatch, capsys):
     monkeypatch.chdir(tmp_path)
     _interactive(monkeypatch, ["1", "openai", "model-example", "n"], ["fake-secret"])
@@ -94,6 +249,33 @@ def test_setup_decline_does_not_write(tmp_path, monkeypatch, capsys):
     assert not (tmp_path / "generation.config.yaml").exists()
     assert not (tmp_path / ".env").exists()
     assert "fake-secret" not in capsys.readouterr().out
+
+
+def test_llm_setup_summary_points_to_first_local_handover(
+    tmp_path, monkeypatch, capsys
+):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    _interactive(monkeypatch, ["1", "openai", "example-model", "y"], ["fake-secret"])
+    assert main(["config", "setup"]) == 0
+    output = capsys.readouterr().out
+    assert "Setup saved (local checks only)" in output
+    assert "openai / example-model; credential present" in output
+    assert "OpenMetadata: not configured (optional)" in output
+    assert "Jira: not configured (optional)" in output
+    assert "handover prepare --input BUSINESS_DOCUMENT" in output
+    assert "generate --input BUSINESS_DOCUMENT --kind odps-product" in output
+    assert "product wrap-contract --input CONTRACT --output PRODUCT" in output
+    assert "fake-secret" not in output
+
+
+def test_welcome_does_not_repeat_when_only_llm_is_configured(
+    tmp_path, monkeypatch, capsys
+):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "generation.config.yaml").write_text("provider: ollama\n")
+    assert main([]) == 0
+    assert "Welcome to Open Data Products" not in capsys.readouterr().out
 
 
 def test_setup_selects_existing_custom_provider_and_model(tmp_path, monkeypatch):
@@ -529,7 +711,10 @@ def test_mixed_connection_configuration_lists_both_platforms(
         },
     }
     (tmp_path / "connections.yaml").write_text(yaml.safe_dump(config))
-    assert main(["integrations", "list", "--config", "connections.yaml", "--json"]) == 0
+    assert (
+        main(["openmetadata", "api", "list", "--config", "connections.yaml", "--json"])
+        == 0
+    )
     assert {item["platform"] for item in json.loads(capsys.readouterr().out)} == {
         "openmetadata",
         "jira_cloud",
@@ -647,10 +832,12 @@ def test_credential_command_hides_value_and_preserves_other_settings(
     tmp_path, monkeypatch, capsys
 ):
     monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("TOKEN", raising=False)
     (tmp_path / ".env").write_text("KEEP=unchanged\nTOKEN=old-value\n")
     _interactive(monkeypatch, ["y"], ["new secret # value"])
     assert main(["config", "credentials", "set", "--name", "TOKEN"]) == 0
     output = capsys.readouterr().out
+    assert "Current credential TOKEN: set in .env (value hidden)" in output
     assert "new secret # value" not in output and "old-value" not in output
     env = (tmp_path / ".env").read_text()
     assert "KEEP=unchanged" in env and "old-value" not in env
@@ -743,6 +930,141 @@ def test_setup_shows_existing_state_and_specific_next_step(
     assert "No files changed" in output
 
 
+def test_selected_llm_section_shows_current_settings_and_change_commands(
+    tmp_path, monkeypatch, capsys
+):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "generation.config.yaml").write_text(
+        "provider: company\nproviders:\n  company:\n    type: openai-chat\n    model: existing-model\n    apiKeyEnv: COMPANY_KEY\n"
+    )
+    (tmp_path / ".env").write_text("COMPANY_KEY=fake-secret\n")
+    monkeypatch.delenv("COMPANY_KEY", raising=False)
+    _interactive(monkeypatch, ["1", "company", "", "n"], [""])
+    assert main(["config", "setup"]) == 0
+    text = capsys.readouterr().out
+    assert (
+        text.index("Configure:")
+        < text.index("Current LLM settings")
+        < text.index("Built-in providers:")
+    )
+    assert "Provider: company; model: existing-model" in text
+    assert "config llm edit --name PROVIDER" in text
+    assert "config credentials set --name COMPANY_KEY" in text
+    assert "fake-secret" not in text
+
+
+def test_llm_edit_updates_existing_provider_without_changing_selection(
+    tmp_path, monkeypatch, capsys
+):
+    monkeypatch.chdir(tmp_path)
+    source = {
+        "provider": "ollama",
+        "providers": {
+            "company": {
+                "type": "openai-chat",
+                "model": "old-model",
+                "baseUrl": "https://llm.example.org/v1",
+                "apiKeyEnv": "COMPANY_KEY",
+            }
+        },
+    }
+    (tmp_path / "generation.config.yaml").write_text(yaml.safe_dump(source))
+    _interactive(monkeypatch, ["", "new-model", "y"], [""])
+    assert main(["config", "llm", "edit", "--name", "company"]) == 0
+    config = yaml.safe_load((tmp_path / "generation.config.yaml").read_text())
+    assert config["provider"] == "ollama"
+    assert config["providers"]["company"]["model"] == "new-model"
+    assert config["providers"]["company"]["baseUrl"] == "https://llm.example.org/v1"
+    assert config["providers"]["company"]["apiKeyEnv"] == "COMPANY_KEY"
+    output = capsys.readouterr().out
+    assert "Editing provider: company; current model: old-model" in output
+    assert "Current endpoint origin: https://llm.example.org" in output
+    assert "active provider selection is unchanged" in output
+
+
+def test_llm_edit_requires_an_existing_provider_and_focused_help(
+    tmp_path, monkeypatch, capsys
+):
+    monkeypatch.chdir(tmp_path)
+    _interactive(monkeypatch, [], [])
+    assert main(["config", "llm", "edit", "--name", "missing"]) == 1
+    assert not (tmp_path / "generation.config.yaml").exists()
+    with pytest.raises(SystemExit) as exc_info:
+        main(["config", "llm", "edit", "--help"])
+    assert exc_info.value.code == 0
+    assert "--name" in capsys.readouterr().out
+
+
+def test_llm_edit_supports_active_builtin_without_explicit_provider_entry(
+    tmp_path, monkeypatch
+):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "generation.config.yaml").write_text("provider: ollama\n")
+    _interactive(monkeypatch, ["", "local-new-model", "y"], [])
+    assert main(["config", "llm", "edit", "--name", "ollama"]) == 0
+    config = yaml.safe_load((tmp_path / "generation.config.yaml").read_text())
+    assert config["provider"] == "ollama"
+    assert config["providers"]["ollama"]["model"] == "local-new-model"
+
+
+def test_selected_platform_sections_show_safe_change_tips(
+    tmp_path, monkeypatch, capsys
+):
+    monkeypatch.chdir(tmp_path)
+    config = {
+        "version": 1,
+        "default_connection": "catalog",
+        "connections": {
+            "catalog": {
+                "platform": "openmetadata",
+                "base_url": "https://metadata.example.org",
+                "read_only": True,
+                "auth": {
+                    "type": "bearer_token",
+                    "token": {"source": "env", "name": "META_KEY"},
+                },
+            },
+            "jira": {
+                "platform": "jira_cloud",
+                "base_url": "https://jira.example.org",
+                "read_only": True,
+                "auth": {
+                    "type": "basic_env",
+                    "email_env": "JIRA_EMAIL",
+                    "token_env": "JIRA_TOKEN",
+                },
+            },
+        },
+    }
+    (tmp_path / "connections.yaml").write_text(yaml.safe_dump(config))
+    (tmp_path / ".env").write_text(
+        "META_KEY=fake-metadata-secret\nJIRA_PROJECT=DEMO\nJIRA_ISSUE_TYPE_ID=10001\n"
+    )
+    for name in (
+        "META_KEY",
+        "JIRA_EMAIL",
+        "JIRA_TOKEN",
+        "JIRA_PROJECT",
+        "JIRA_ISSUE_TYPE_ID",
+    ):
+        monkeypatch.delenv(name, raising=False)
+    _interactive(monkeypatch, ["", "", "n"], [""])
+    assert main(["config", "connections", "edit", "--name", "catalog"]) == 0
+    text = capsys.readouterr().out
+    assert "Current OpenMetadata settings" in text
+    assert "config connections edit --name catalog" in text
+    assert "config credentials set --name META_KEY" in text
+    assert "fake-metadata-secret" not in text
+    _interactive(monkeypatch, ["", "", "", "", "n"], ["", ""])
+    assert main(["config", "connections", "edit", "--name", "jira"]) == 0
+    text = capsys.readouterr().out
+    assert "Current Jira settings" in text
+    assert "Project: DEMO; issue type ID: 10001" in text
+    assert "config connections edit --name jira" in text
+    assert "config credentials set --name JIRA_TOKEN" in text
+    assert "fake-metadata-secret" not in text
+
+
 def test_status_reports_actionable_missing_credentials_without_values(
     tmp_path, monkeypatch, capsys
 ):
@@ -833,3 +1155,15 @@ def test_test_reports_safe_action_for_auth_failure(tmp_path, monkeypatch, capsys
         "reason": "authentication failed (HTTP 401)",
         "command": "open-data-products config credentials set --name TEST_SETUP_KEY",
     } in json.loads(text)["next_steps"]
+
+
+def test_first_result_setup_guides_offline_contract_conversion(
+    tmp_path, monkeypatch, capsys
+):
+    monkeypatch.chdir(tmp_path)
+    _interactive(monkeypatch, ["6", "2"], [])
+    assert main(["config", "setup"]) == 0
+    output = capsys.readouterr().out
+    assert "No LLM or platform setup is required" in output
+    assert "product wrap-contract --input contract.yaml" in output
+    assert not (tmp_path / "generation.config.yaml").exists()

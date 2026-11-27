@@ -351,6 +351,7 @@ def _merge_discovery(concepts, snapshots):
     """Combine bounded discovery results and retain query provenance."""
     result = {
         "product": None,
+        "candidate_products": [],
         "candidates": [],
         "assets": [],
         "lineage": [],
@@ -381,8 +382,8 @@ def _merge_discovery(concepts, snapshots):
                 ],
             }
         )
-        if data.get("product") is not None:
-            result["product"] = data["product"]
+        if isinstance(data.get("product"), dict):
+            result["candidate_products"].append(data["product"])
         if data.get("retrieved_at"):
             result["retrieved_at"] = data["retrieved_at"]
         if data.get("discovery_target") is not None:
@@ -426,21 +427,22 @@ def _automatic_discovery(args, source_text, settings, profile):
             "No source-backed catalog search concepts identified; continuing without discovery."
         )
         return None
-    print(
-        "\nProposed metadata search concepts (model proposals, not verified matches):"
-    )
-    for concept in concepts:
+    if getattr(args, "mode", "human") == "agent":
+        print("Proposed metadata search concepts:", len(concepts), "(unverified)")
+    else:
         print(
-            " -",
-            _safe_display(concept["phrase"]),
-            "—",
-            _safe_display(concept["reason"]),
-            "| source:",
-            _safe_display(concept["source_quote"]),
+            "\nProposed metadata search concepts (model proposals, not verified matches):"
         )
-    if not _confirm("Search the configured metadata platform using these phrases?"):
-        print("Metadata discovery skipped.")
-        return None
+        for concept in concepts:
+            print(
+                " -",
+                _safe_display(concept["phrase"]),
+                "—",
+                _safe_display(concept["reason"]),
+                "| source:",
+                _safe_display(concept["source_quote"]),
+            )
+    print("Searching the configured metadata platform automatically (read-only).")
     config, name = profile
     target_profile = _resolve_discovery_profile(config, name)
     snapshots = []
@@ -471,38 +473,24 @@ def _automatic_discovery(args, source_text, settings, profile):
         and item.get("id")
     ]
     if products:
-        print("\nPossible metadata products (unverified candidates):")
-        for index, item in enumerate(products, 1):
-            print(
-                str(index) + ".",
-                _safe_display(
-                    item.get("fullyQualifiedName") or item.get("name") or item["id"]
-                ),
-                "[",
-                _safe_display(item["id"]),
-                "]",
-            )
-        selected = input(
-            "Select one product number to inspect linked assets and contract, or press Enter to skip: "
-        ).strip()
-        if selected:
-            if not selected.isdecimal() or not 1 <= int(selected) <= len(products):
-                raise ValueError("Invalid metadata product selection")
-            product = products[int(selected) - 1]
+        # Search results are hypotheses. Inspect a small bounded set, never select
+        # one as the verified product merely because it appears first.
+        for product in products[:3]:
+            product_id = str(product["id"])
             try:
                 snapshots.append(
                     (
-                        "selected product: " + str(product["id"]),
-                        _catalog_context(config, name, product["id"], None, limit=4),
+                        "candidate product: " + product_id,
+                        _catalog_context(config, name, product_id, None, limit=4),
                     )
                 )
             except IntegrationError as exc:
                 snapshots.append(
                     (
-                        "selected product: " + str(product["id"]),
+                        "candidate product: " + product_id,
                         {
                             "errors": [
-                                {"resource": "selected product", "message": str(exc)}
+                                {"resource": "candidate product", "message": str(exc)}
                             ],
                             "notes": [],
                             "candidates": [],
@@ -510,8 +498,13 @@ def _automatic_discovery(args, source_text, settings, profile):
                         },
                     )
                 )
-            merged = _merge_discovery(concepts, snapshots)
-            merged["discovery_target"] = _handover_discovery_target(target_profile)
+        merged = _merge_discovery(concepts, snapshots)
+        merged["discovery_target"] = _handover_discovery_target(target_profile)
+        merged["notes"].append(
+            "Inspected up to three candidate products automatically; none is a verified match."
+        )
+        if len(products) > 3:
+            merged["notes"].append("Candidate product inspection limited to three.")
     return merged
 
 
@@ -582,9 +575,22 @@ def _discovery_gate(brief, odps, settings, context):
 
 def run_guided_handoff(args):
     """Prepare one handoff per business document, with individual reviews."""
-    if getattr(args, "json", False):
+    agent_mode = getattr(args, "mode", "human") == "agent"
+    if agent_mode:
+        review, actual = _preparation_review(args)
+        args._automation_digest = actual
+        args._automation_sources = {
+            entry["path"]: entry["sha256"] for entry in review["documents"]
+        }
+    if getattr(args, "json", False) or agent_mode:
         with redirect_stdout(sys.stderr):
             code, result = _prepare_documents(args)
+        if agent_mode:
+            result["mode"] = "agent"
+            result["provider"] = review["provider"]
+            result["provider_origin"] = review["provider_origin"]
+            result["discovery"] = review["discovery"]
+            result["provider_scope"] = review["scope"]
         print(json.dumps(result, indent=2, ensure_ascii=False))
         return code
     code, _ = _prepare_documents(args)
@@ -659,12 +665,15 @@ def _prepare_documents(args):
 
 def _prepare_one(args, brief):
     """Review and generate a package for a single document."""
-    if (
+    automation = bool(getattr(args, "_automation_digest", None))
+    if automation and _preparation_review(args)[1] != args._automation_digest:
+        raise ValueError("Preparation inputs changed after review")
+    if not automation and (
         not sys.stdin.isatty()
         or not (sys.stderr if getattr(args, "json", False) else sys.stdout).isatty()
     ):
         raise ValueError(
-            "Guided handoff requires an interactive terminal; use handoff and jira previews for automation"
+            "Handover requires an interactive terminal in human mode; use --mode agent for automation"
         )
     if brief.is_symlink() or not brief.is_file():
         raise ValueError("Business document must be a regular file")
@@ -685,6 +694,11 @@ def _prepare_one(args, brief):
             "Business document exceeds the 1,000,000 character generation limit; shorten it before preparation"
         )
     source_sha = hashlib.sha256(brief.read_bytes()).hexdigest()
+    if (
+        automation
+        and getattr(args, "_automation_sources", {}).get(str(brief)) != source_sha
+    ):
+        raise ValueError("Business document changed after review")
     records = load_source_documents(brief)
     source_text = "\n\n".join(record.get("text", "") for record in records)
     if not source_text.strip():
@@ -722,14 +736,27 @@ def _prepare_one(args, brief):
         print(
             "Metadata discovery target:",
             _safe_display(profile[1]),
-            "(read-only discovery; proposed search phrases require review)",
+            "(automatic read-only discovery; matches are unverified)",
         )
         print(
             "The reviewed business content will also be sent to the provider to propose catalog search phrases."
         )
+    from ._organization import load_organization
+
+    organization = load_organization()
+    if organization:
+        print(
+            "Configured organization defaults will be added locally to the ODPS data holder:",
+            ", ".join(organization["dataHolder"]),
+        )
     print("Provider:", settings.provider, "Model:", settings.model)
-    print("\nBusiness content to be sent to the provider:\n\n" + source_text)
-    if not _confirm(
+    if not automation:
+        print("\nBusiness content to be sent to the provider:\n\n" + source_text)
+    else:
+        print("Agent mode: source material will be sent to the configured provider.")
+    if automation and _preparation_review(args)[1] != args._automation_digest:
+        raise ValueError("Preparation inputs changed after review")
+    if not automation and not _confirm(
         "Send this document to the selected provider and generate an ODPS draft?"
     ):
         print("Stopped before provider generation.")
@@ -755,6 +782,7 @@ def _prepare_one(args, brief):
         client=create_generation_client(settings),
         profile="minimal",
         odps_version="4.1",
+        organization=organization or {},
     )
     if len(artifacts) != 1 or not artifacts[0].valid_yaml:
         raise ValueError(
@@ -779,9 +807,7 @@ def _prepare_one(args, brief):
             context = _automatic_discovery(args, source_text, settings, profile)
         except (IntegrationError, ValueError, RuntimeError) as exc:
             print("Automatic metadata discovery unavailable:", _safe_display(str(exc)))
-            if not _confirm("Continue without catalog evidence?"):
-                print("Stopped after ODPS generation. ODPS draft:", odps)
-                return "declined"
+            print("Continuing without catalog evidence; discovery was incomplete.")
     budget_report = None
     if context is not None:
         target = context.get("discovery_target", {})
@@ -803,9 +829,18 @@ def _prepare_one(args, brief):
         preview = preview_implementation_handoff(brief, odps, settings)
     preview_file = workspace / "provider-preview.json"
     preview_file.write_text(json.dumps(preview.to_dict(), indent=2, ensure_ascii=False))
-    print("\nODPS draft and exact evidence to send for handoff generation:")
-    print(json.dumps(preview.to_dict(), indent=2, ensure_ascii=True))
-    if not _confirm("Generate the draft handoff using this reviewed content?"):
+    if not automation:
+        print("\nODPS draft and exact evidence to send for handoff generation:")
+        print(json.dumps(preview.to_dict(), indent=2, ensure_ascii=True))
+    else:
+        print(
+            "Agent mode: generated draft and bounded evidence will be sent to the provider."
+        )
+    if automation and _preparation_review(args)[1] != args._automation_digest:
+        raise ValueError("Preparation inputs changed during generation")
+    if not automation and not _confirm(
+        "Generate the draft handoff using this reviewed content?"
+    ):
         print("Stopped before handoff generation. ODPS draft:", odps)
         return "declined"
     if hashlib.sha256(brief.read_bytes()).hexdigest() != source_sha:
@@ -890,9 +925,10 @@ def _workspace_file(workspace, value, *, directory=False):
 
 def run_guided_delivery(args):
     """Review and deliver a previously prepared package to Jira."""
-    if not sys.stdin.isatty() or not sys.stdout.isatty():
+    automation = getattr(args, "mode", "human") == "agent"
+    if not automation and (not sys.stdin.isatty() or not sys.stdout.isatty()):
         raise ValueError(
-            "Guided delivery requires an interactive terminal; use jira previews for automation"
+            "Jira delivery requires an interactive terminal in human mode; use --mode agent for automation"
         )
     _load_env_file(_default_env_file(args.env_file))
     workspace = Path(args.workspace).expanduser()
@@ -987,11 +1023,16 @@ def run_guided_delivery(args):
     (workspace / "jira-preview.json").write_text(
         json.dumps(review, indent=2, ensure_ascii=False)
     )
-    print(
-        "\nJira issue and attachments to be created:\n"
-        + json.dumps(review, indent=2, ensure_ascii=False)
-    )
-    if not _confirm("Create this reviewed Jira issue and upload its attachments?"):
+    if not automation:
+        print(
+            "\nJira issue and attachments to be created:\n"
+            + json.dumps(review, indent=2, ensure_ascii=False)
+        )
+    else:
+        print("Agent mode: creating the issue and reviewed attachments in Jira.")
+    if not automation and not _confirm(
+        "Create this reviewed Jira issue and upload its attachments?"
+    ):
         print("Stopped before Jira creation. Draft package remains available locally.")
         return 0
     if hashlib.sha256(attachment.read_bytes()).hexdigest() != source_sha:
@@ -1032,3 +1073,224 @@ def run_guided_delivery(args):
         )
         return 1
     return 0
+
+
+def run_delivery_input(args):
+    """Deliver one workspace or a bounded set of prepared workspaces."""
+    import copy
+
+    source = Path(args.workspace).expanduser()
+    if source.is_symlink():
+        raise ValueError("Delivery input cannot be a symbolic link")
+    if source.is_dir() and (source / "prepare.json").is_file():
+        workspaces = [source]
+    elif source.is_dir():
+        workspaces = sorted(
+            (
+                p
+                for p in source.iterdir()
+                if not p.is_symlink() and p.is_dir() and (p / "prepare.json").is_file()
+            ),
+            key=lambda p: p.name.casefold(),
+        )
+    elif source.is_file():
+        if source.stat().st_size > 1024 * 1024:
+            raise ValueError("Preparation results JSON exceeds 1 MiB")
+        try:
+            data = json.loads(source.read_text(encoding="utf-8"))
+        except (OSError, UnicodeError, ValueError):
+            raise ValueError("Cannot read preparation results JSON") from None
+        if not isinstance(data, dict) or not isinstance(data.get("documents"), list):
+            raise ValueError("Expected handover prepare results with a documents list")
+        workspaces = []
+        for item in data["documents"]:
+            if not isinstance(item, dict):
+                raise ValueError("Invalid preparation result entry")
+            if item.get("status") == "prepared":
+                workspace = item.get("workspace")
+                if not isinstance(workspace, str) or not workspace:
+                    raise ValueError("Prepared result is missing its workspace")
+                workspaces.append(Path(workspace).expanduser())
+    else:
+        raise ValueError(
+            "Delivery input must be a workspace, folder or preparation results JSON"
+        )
+    if not workspaces or len(workspaces) > 100:
+        raise ValueError("Delivery requires between 1 and 100 prepared workspaces")
+    paths = [str(p.absolute()) for p in workspaces]
+    if len(set(paths)) != len(paths):
+        raise ValueError("Delivery input contains duplicate workspaces")
+    agent_mode = getattr(args, "mode", "human") == "agent"
+    if len(workspaces) == 1 and not getattr(args, "json", False) and not agent_mode:
+        selected = copy.copy(args)
+        selected.workspace = str(workspaces[0])
+        return run_guided_delivery(selected)
+    records = []
+    stop = False
+    for workspace in workspaces:
+        record = {"workspace": str(workspace)}
+        if stop:
+            record["status"] = "not_attempted"
+            records.append(record)
+            continue
+        selected = copy.copy(args)
+        selected.workspace = str(workspace)
+        journal = workspace / "jira-result.json"
+        if journal.is_file() and not journal.is_symlink():
+            try:
+                prior = json.loads(journal.read_text(encoding="utf-8"))
+                if prior.get("status") == "created" and not prior.get("result", {}).get(
+                    "attachment_failures"
+                ):
+                    record.update(status="already_created", result=prior.get("result"))
+                    records.append(record)
+                    continue
+            except (ValueError, OSError, AttributeError):
+                pass
+        try:
+            if getattr(args, "json", False) or agent_mode:
+                with redirect_stdout(sys.stderr):
+                    code = run_guided_delivery(selected)
+            else:
+                code = run_guided_delivery(selected)
+            journal = workspace / "jira-result.json"
+            if journal.is_file():
+                payload = json.loads(journal.read_text(encoding="utf-8"))
+                record["status"] = payload.get("status", "unknown")
+                if payload.get("result") is not None:
+                    record["result"] = payload["result"]
+                if code:
+                    record["status"] = "incomplete"
+                    stop = True
+            else:
+                record["status"] = "declined" if code == 0 else "failed"
+        except Exception as exc:
+            journal = workspace / "jira-result.json"
+            record["status"] = "unknown" if journal.exists() else "failed"
+            record["error"] = str(exc)
+            if record["status"] == "unknown":
+                record["next_step"] = (
+                    "Inspect Jira and the local journal before retrying."
+                )
+                stop = True
+        records.append(record)
+    result = {"deliveries": records}
+    if getattr(args, "json", False) or agent_mode:
+        print(json.dumps(result, indent=2, ensure_ascii=False))
+    else:
+        print("\nDelivery summary:")
+        for record in records:
+            print(" - " + record["workspace"] + ": " + record["status"])
+            if record.get("error"):
+                print("   " + _safe_display(record["error"]))
+    return (
+        1
+        if any(
+            r["status"] not in ("created", "already_created", "declined")
+            for r in records
+        )
+        else 0
+    )
+
+
+def _preparation_review(args):
+    """Bind source content, provider settings and the permitted discovery scope."""
+    from dataclasses import asdict
+    from ._organization import load_organization
+    from .mcp._handover import _business, _provider_origin
+    from .generation.prompts import list_generation_prompts, load_generation_prompt
+
+    source = Path(args.business_document).expanduser()
+    if source.is_symlink():
+        raise ValueError("Business input cannot be a symbolic link")
+    if source.is_dir():
+        paths = sorted(
+            (
+                p
+                for p in source.iterdir()
+                if not p.is_symlink()
+                and p.is_file()
+                and p.suffix.lower() in {".md", ".txt", ".docx"}
+            ),
+            key=lambda p: p.name.casefold(),
+        )
+    else:
+        paths = [source]
+    if not paths or len(paths) > 100:
+        raise ValueError("Preparation requires between 1 and 100 business documents")
+    documents = []
+    for path in paths:
+        path, data = _business(str(path))
+        text = load_generation_source(path)
+        records = load_source_documents(path)
+        extracted = "\n\n".join(record.get("text", "") for record in records)
+        documents.append(
+            {
+                "path": str(path.resolve()),
+                "sha256": hashlib.sha256(data).hexdigest(),
+                "provider_input": text,
+                "handover_input": extracted,
+            }
+        )
+    _load_env_file(_default_env_file(args.env_file))
+    settings = resolve_generation_settings(
+        config_path=args.config, provider=args.provider, model=args.model
+    )
+    prompt_hashes = {}
+    for name in list_generation_prompts(settings.prompt_path):
+        content = load_generation_prompt(name, settings.prompt_path)
+        if len(content.encode("utf-8")) > 1024 * 1024:
+            raise ValueError("Generation prompt exceeds 1 MiB")
+        prompt_hashes[name] = hashlib.sha256(content.encode("utf-8")).hexdigest()
+    profile = _automatic_metadata_profile(args)
+    discovery = None
+    if profile:
+        config, name = profile
+        config_path = Path(config).expanduser()
+        if (
+            config_path.is_symlink()
+            or not config_path.is_file()
+            or config_path.stat().st_size > 1024 * 1024
+        ):
+            raise ValueError(
+                "Discovery configuration must be a regular file at most 1 MiB"
+            )
+        resolved = _resolve_discovery_profile(config, name)
+        discovery = {
+            "connection": name,
+            "config_sha256": hashlib.sha256(config_path.read_bytes()).hexdigest(),
+            "target": _handover_discovery_target(resolved),
+            "snapshot_limit_bytes": _MAX_DISCOVERY_SNAPSHOT_BYTES,
+            "catalog_prompt_limit_bytes": _MAX_DISCOVERY_PROMPT_BYTES,
+        }
+    bound = {
+        "documents": documents,
+        "settings": asdict(settings),
+        "prompt_hashes": prompt_hashes,
+        "organization": load_organization(),
+        "output": str(Path(args.output).expanduser().absolute()),
+        "discovery": discovery,
+        "scope": "Business documents and model-derived ODPS drafts are sent to the provider; when discovery is selected, bounded unverified catalog evidence is also sent.",
+    }
+    digest = hashlib.sha256(
+        json.dumps(
+            bound, sort_keys=True, ensure_ascii=False, separators=(",", ":")
+        ).encode()
+    ).hexdigest()
+    display = {
+        "status": "preview",
+        "documents": documents,
+        "provider": settings.provider,
+        "provider_type": settings.provider_type,
+        "provider_origin": _provider_origin(settings.base_url),
+        "model": settings.model,
+        "prompt_hashes": prompt_hashes,
+        "output": bound["output"],
+        "organization_default_fields": (
+            sorted(bound["organization"]["dataHolder"]) if bound["organization"] else []
+        ),
+        "discovery": discovery,
+        "scope": bound["scope"],
+        "reviewed_sha256": digest,
+    }
+    return display, digest

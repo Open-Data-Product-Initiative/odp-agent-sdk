@@ -43,6 +43,9 @@ def add_guided_parsers(subparsers: argparse._SubParsersAction) -> None:
         ),
     )
     actions = products.add_subparsers(dest="guided_action", required=True)
+    from .cli import add_integrations_parser
+
+    add_integrations_parser(actions)
     _add_product_actions(actions)
     discover = actions.add_parser(
         "discover",
@@ -128,7 +131,7 @@ def _add_product_actions(
             p.description = (
                 "Review one ODPS 4.1 file or folder, then confirm creation in the selected\n"
                 "writable OpenMetadata 2.1.0 connection. Non-interactive and --json runs\n"
-                "only review; use integrations products create for scripted execution.\n"
+                "only review; use openmetadata api products create for scripted execution.\n"
                 "Creating metadata does not verify marketplace UI visibility."
             )
             p.epilog = 'Example:\n  open-data-products openmetadata products create products/ --domain "Retail Banking"'
@@ -342,7 +345,7 @@ def _create(adapter, args):  # type: ignore[no-untyped-def]
             "connection": adapter.profile.name,
             "domain": args.domain,
             "status": "review_only",
-            "message": "Creation requires an interactive terminal. For automation use integrations products create with --reviewed-sha256 and --execute.",
+            "message": "Creation requires an interactive terminal. For automation use openmetadata api products create with --reviewed-sha256 and --execute.",
             "products": [
                 {k: v for k, v in entry.items() if not k.startswith("_")}
                 for entry in entries

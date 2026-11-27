@@ -983,42 +983,13 @@ def test_selected_asset_must_be_unique_and_have_columns(tmp_path):
         )
 
 
-def test_cli_implementation_preview_and_execution(tmp_path, monkeypatch, capsys):
+def test_removed_handoff_cli_has_no_replacement_subcommand():
     from open_data_products.cli import main
 
-    monkeypatch.chdir(tmp_path)
-    (tmp_path / "generation.config.yaml").write_text("provider: ollama\n")
-
-    brief, product, context = setup_inputs(tmp_path)
-    snapshot = tmp_path / "context.json"
-    snapshot.write_text(json.dumps(context))
-    args = [
-        "handoff",
-        str(brief),
-        str(product),
-        "--output",
-        str(tmp_path / "out"),
-        "--change",
-        "holdings-change",
-        "--context",
-        str(snapshot),
-        "--asset-id",
-        "asset-1",
-    ]
-    assert main(args) == 0
-    preview = json.loads(capsys.readouterr().out)
-    assert preview["mode"] == "implementation-draft"
-    assert preview["selected_catalog_evidence_sent"]["id"] == "asset-1"
-    monkeypatch.setattr(
-        "open_data_products._handoff_implementation.create_generation_client",
-        lambda _: lambda prompt, model: reply(),
-    )
-    assert (
-        main(args + ["--execute", "--reviewed-sha256", preview["reviewed_sha256"]]) == 0
-    )
-    assert (
-        tmp_path / "out/openspec/changes/holdings-change/supporting/odcs-draft.yaml"
-    ).is_file()
+    with pytest.raises(SystemExit):
+        main(["handoff", "--help"])
+    with pytest.raises(SystemExit):
+        main(["handover", "from-drafts", "--help"])
 
 
 def test_v42_existing_contract_is_preserved(tmp_path, monkeypatch):

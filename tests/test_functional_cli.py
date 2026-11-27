@@ -65,6 +65,10 @@ def test_unified_cli_help_uses_compact_command_metavar(
     assert exc_info.value.code == 0
     help_text = capsys.readouterr().out
     assert "usage: open-data-products [-h] [-V] COMMAND ..." in help_text
+    assert "Start and configure:" in help_text
+    assert "Data products and delivery:" in help_text
+    assert "Validate and inspect:" in help_text
+    assert "Catalogs, graphs and portfolios:" in help_text
     assert "{validate,explain,refs" not in help_text
     assert "Examples:" in help_text
     assert "Next steps:" in help_text
@@ -266,7 +270,7 @@ def test_portfolio_cli_help_uses_human_first_examples(
 
 @pytest.mark.parametrize(
     "group",
-    ["product", "portfolio", "recipe", "integrations", "handover", "openmetadata"],
+    ["product", "portfolio", "recipe", "handover", "openmetadata"],
 )
 def test_command_group_help_has_examples_and_next_steps(group, capsys):
     with pytest.raises(SystemExit) as exc_info:
@@ -280,7 +284,7 @@ def test_command_group_help_has_examples_and_next_steps(group, capsys):
 
 def test_integration_leaf_help_explains_common_options(capsys):
     with pytest.raises(SystemExit) as exc_info:
-        main(["integrations", "products", "contract-import", "--help"])
+        main(["openmetadata", "api", "products", "contract-import", "--help"])
     assert exc_info.value.code == 0
     help_text = " ".join(capsys.readouterr().out.split())
     assert "Named connection profile" in help_text
@@ -316,20 +320,11 @@ def test_guided_leaf_help_only_shows_relevant_options(
     "command, expected",
     [
         (
-            ["handoff"],
-            [
-                "default is a JSON preview",
-                "--execute requires the reviewed digest",
-                "Existing ODPS 4.1 or 4.2 draft",
-                "Include the full business document",
-            ],
-        ),
-        (
             ["openmetadata", "products", "search"],
             ["Product search query", "Search result offset", "Maximum search results"],
         ),
         (
-            ["integrations", "products", "recover-create"],
+            ["openmetadata", "api", "products", "recover-create"],
             [
                 "ODPS source used in the uncertain create",
                 "Destination domain FQN",
@@ -337,7 +332,7 @@ def test_guided_leaf_help_only_shows_relevant_options(
             ],
         ),
         (
-            ["integrations", "products", "contract-source"],
+            ["openmetadata", "api", "products", "contract-source"],
             ["Target data product UUID", "Destination for preserved ODCS source"],
         ),
         (["product", "wrap-dprod"], ["Allow replacement of an existing output"]),
@@ -3420,3 +3415,58 @@ def test_portfolio_discover_contracts_uses_configured_ai_client(
     )
 
     assert json.loads(capsys.readouterr().out)["ai_enabled"] is True
+
+
+def test_generate_human_output_shows_review_notes(tmp_path, monkeypatch, capsys):
+    from open_data_products import generation
+
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "generation.config.yaml").write_text("provider: ollama\n")
+    (tmp_path / "brief.md").write_text("Business brief")
+    artifact = generation.GeneratedArtifact(
+        name="test",
+        prompt_name="fixture",
+        output_path=tmp_path / "out.yaml",
+        valid_yaml=True,
+        review_notes=["Existing dataHolder conflicts with configured organization"],
+        evidence_gaps=["Owner confirmation missing"],
+    )
+    monkeypatch.setattr(
+        generation,
+        "create_generation_client",
+        lambda settings: lambda prompt, model: "",
+    )
+    monkeypatch.setattr(
+        generation,
+        "generate_local_artifacts_for_kind",
+        lambda *args, **kwargs: [artifact],
+    )
+    assert (
+        main(
+            [
+                "generate",
+                "--input",
+                "brief.md",
+                "--kind",
+                "odps-product",
+                "--output",
+                "out",
+            ]
+        )
+        == 0
+    )
+    output = capsys.readouterr().out
+    assert "Review: Existing dataHolder conflicts" in output
+    assert "Missing evidence: Owner confirmation missing" in output
+
+
+def test_removed_cli_command_groups_are_not_registered(capsys):
+    for group in ("handoff", "integrations"):
+        with pytest.raises(SystemExit) as failure:
+            main([group, "--help"])
+        assert failure.value.code != 0
+    with pytest.raises(SystemExit):
+        main(["--help"])
+    output = capsys.readouterr().out
+    assert "    handoff " not in output
+    assert "    integrations " not in output
