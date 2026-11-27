@@ -349,6 +349,25 @@ the outcome unknown: inspect the destination before retrying. The SDK does not
 retry creates. Publication and approval are not implemented. A
 validated document is not evidence of business approval.
 
+### Publish an enriched handover product with its ODCS draft
+
+A handover package contains `supporting/product-enriched.odps.yaml` and the
+separate `supporting/odcs-draft.yaml` in the same directory. The ODPS draft
+references the contract with a relative `$ref`. When creating from this ODPS 4.1
+file, the SDK resolves and reviews the linked contract, creates the product,
+then imports and associates the ODCS draft in a separate operation:
+
+```sh
+open-data-products openmetadata products create path/to/change/supporting/product-enriched.odps.yaml --domain "Banking"
+```
+
+Keep the linked ODCS file alongside the ODPS file. A product without a linked
+contract is still a valid product-creation input; do not infer it has a contract.
+If contract import fails or its outcome is unknown, the product may already exist.
+Inspect its creation result and the platform before retrying. The complete ODCS
+source is preserved for discovery and integrity checking; OpenMetadata does not
+validate the preserved product schema natively. A draft is not business approval.
+
 ## Owners and tags
 
 When creating a product without `--owner`, the SDK resolves the authenticated
