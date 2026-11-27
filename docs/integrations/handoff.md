@@ -45,7 +45,91 @@ domain review; structural validation is not approval.
 
 ## Guided flow
 
-From the SDK checkout, prepare the handoff in one interactive command:
+After installing the SDK, run setup from the project directory where you want
+to keep the configuration. To configure a provider, OpenMetadata, Jira, or all
+three, run:
+
+```sh
+open-data-products config setup
+open-data-products config show
+```
+
+Setup requires an interactive terminal. It reviews the selected settings and
+files before saving. It first shows the existing local configuration and
+suggests a next command after saving. Credentials are entered without echo and stored in the
+local `.env`; connection and generation YAML files contain references to their
+environment variables. Existing unrelated values are retained, but editing
+YAML rewrites its comments and formatting. Selected connection profiles can be
+replaced, as shown during review. Existing process environment variables take
+precedence over `.env`; keep `.env` out of version control.
+
+Status reports local configuration and credential presence without printing
+secrets, with commands for missing credentials or other next steps. `--json`
+provides machine-readable output including `next_steps`. To perform read-only
+OpenMetadata and Jira connection checks, use:
+
+```sh
+open-data-products config status --test
+```
+
+These checks do not test the LLM provider, marketplace visibility, Jira project
+permissions or write permissions. Setup can select a built-in or existing
+configured provider, or add a custom provider using a supported SDK provider
+type and model. Custom remote provider URLs must use HTTPS; HTTP is allowed
+for localhost. Generation, guided handover and platform CLI commands load the
+local `.env` automatically; other workflows may require variables to be
+exported in the shell. Existing user-owned generation and connection
+configurations also satisfy setup; no separate setup marker is required.
+
+To add or select LLM providers later, run:
+
+```sh
+open-data-products config llm add
+open-data-products config llm list
+open-data-products config llm use --name company
+```
+
+Adding a provider does not select it automatically. The `use` command changes
+the active provider after review. The `list --json` form is machine-readable.
+
+To manage named platform connections, use:
+
+```sh
+open-data-products config connections list
+open-data-products config connections add
+open-data-products config connections edit --name openmetadata
+```
+
+The add and edit commands review changes before saving. They currently support
+OpenMetadata and Jira Cloud; listing also identifies unsupported platform types.
+An existing name is never replaced by `add`. Use `config show --json` for one
+view of the active provider and connections without credential values; endpoint
+origins are shown without URL paths or query strings.
+
+To set or replace a credential without putting its value in a command or shell
+history, run the following and enter the value at the hidden prompt:
+
+```sh
+open-data-products config credentials set --name OPENAI_API_KEY
+```
+
+Use the environment-variable name shown in `config show` for other providers
+and connections. The local `.env` is updated only after review; an existing
+process environment variable takes precedence. Jira project and issue type
+settings are shared by guided Jira delivery across Jira connections.
+
+To test the configured LLM, OpenMetadata and Jira connections together, run:
+
+```sh
+open-data-products config test
+```
+
+The LLM test sends the fixed prompt `Reply with OK.` and may incur provider
+costs. It does not send business documents. OpenMetadata and Jira checks are
+read-only, and do not establish write permissions, marketplace visibility or
+Jira project permissions. Only configured, supported connections are tested.
+
+From the project directory, prepare the handoff in one interactive command:
 
 ```sh
 open-data-products handover prepare --input business-brief.md

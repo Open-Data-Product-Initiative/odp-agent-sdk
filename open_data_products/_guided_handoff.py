@@ -932,16 +932,28 @@ def run_guided_delivery(args):
         raise ValueError("Staged business document does not match the package evidence")
     if not os.environ.get("JIRA_PROJECT") or not os.environ.get("JIRA_ISSUE_TYPE_ID"):
         raise ValueError(
-            "Jira delivery requires JIRA_PROJECT and JIRA_ISSUE_TYPE_ID in the environment"
+            "Jira delivery requires JIRA_PROJECT and JIRA_ISSUE_TYPE_ID. Run 'open-data-products config connections edit --name "
+            + shlex.quote(args.connection or "jira")
+            + "'."
         )
     connection = load_jira_connection(args.connections, args.connection)
     if connection.read_only:
         raise IntegrationError("The selected Jira connection is read-only")
-    if not os.environ.get(connection.email_env) or not os.environ.get(
-        connection.token_env
-    ):
+    missing = next(
+        (
+            name
+            for name in (connection.email_env, connection.token_env)
+            if not os.environ.get(name)
+        ),
+        None,
+    )
+    if missing:
         raise IntegrationError(
-            "Jira email and API token environment variables are required"
+            "Jira credential "
+            + missing
+            + " is missing. Run 'open-data-products config credentials set --name "
+            + missing
+            + "'."
         )
     if (workspace / "jira-result.json").exists():
         raise ValueError(

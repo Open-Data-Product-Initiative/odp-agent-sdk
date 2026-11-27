@@ -986,6 +986,9 @@ def test_selected_asset_must_be_unique_and_have_columns(tmp_path):
 def test_cli_implementation_preview_and_execution(tmp_path, monkeypatch, capsys):
     from open_data_products.cli import main
 
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "generation.config.yaml").write_text("provider: ollama\n")
+
     brief, product, context = setup_inputs(tmp_path)
     snapshot = tmp_path / "context.json"
     snapshot.write_text(json.dumps(context))

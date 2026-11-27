@@ -139,6 +139,8 @@ def test_prepare_cli_dispatches_the_guided_workflow(tmp_path, monkeypatch):
     import open_data_products._guided_handoff as guided
 
     monkeypatch.chdir(tmp_path)
+    (tmp_path / "generation.config.yaml").write_text("provider: ollama\n")
+    (tmp_path / ".env").write_text("")
     seen = []
     monkeypatch.setattr(
         guided, "run_guided_handoff", lambda args: seen.append(args) or 0
@@ -163,6 +165,7 @@ def test_prepare_cli_dispatches_the_guided_workflow(tmp_path, monkeypatch):
     monkeypatch.setattr(
         guided, "run_guided_delivery", lambda args: seen.append(args) or 0
     )
+    (tmp_path / "connections.yaml").write_text("version: 1\nconnections: {}\n")
     assert main(["jira", "deliver", "--input", "workspace"]) == 0
     assert seen[1].workspace == "workspace"
     with pytest.raises(SystemExit):
@@ -1238,6 +1241,8 @@ def test_documented_cli_flow_prepares_and_delivers_with_reviewed_mock_services(
 ):
     from open_data_products.cli import main
     import open_data_products._guided_handoff as guided
+
+    (tmp_path / "generation.config.yaml").write_text("provider: openai\n")
 
     args = _args(tmp_path)
     config = tmp_path / "connections.yaml"

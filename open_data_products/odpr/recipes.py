@@ -393,6 +393,7 @@ def execute_recipe_run(
     model: Optional[str] = None,
     allow_llm: bool = False,
     approve_review: bool = False,
+    generation_config_override: Optional[PathLike] = None,
 ) -> Dict[str, object]:
     """Execute deterministic and report-only recipe steps with a run manifest."""
     config = _load_optional_recipe_config(config_path)
@@ -479,7 +480,12 @@ def execute_recipe_run(
             result = _execute_step(
                 execution_step,
                 root,
-                _execution_generation_config(plan, root),
+                _execution_generation_config(plan, root)
+                or (
+                    Path(generation_config_override).resolve()
+                    if generation_config_override
+                    else None
+                ),
             )
             step_results.append(result)
             if result["status"] == "failed":
@@ -891,9 +897,7 @@ def explain_recipe(
         recipe_path = value
     else:
         catalog = (
-            Path(catalog_path)
-            if catalog_path is not None
-            else DEFAULT_STARTER_CATALOG
+            Path(catalog_path) if catalog_path is not None else DEFAULT_STARTER_CATALOG
         )
         starter = resolve_starter_recipe(str(identifier), catalog_path=catalog)
         entry_path = _string(starter.get("path"))

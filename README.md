@@ -21,6 +21,18 @@ a local MCP server, and a standards-aware API for AI agents.
 pip install open-data-products
 ```
 
+After installation, run setup in your project directory before using LLM or
+platform commands:
+
+```bash
+open-data-products config setup
+open-data-products config show
+```
+
+Offline validation and inspection commands do not require setup.
+Use `open-data-products config test` to test configured services; it sends a
+short LLM prompt and may incur provider costs.
+
 Optional extras:
 
 ```bash

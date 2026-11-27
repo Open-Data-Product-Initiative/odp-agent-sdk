@@ -164,12 +164,35 @@ class JiraCloudAdapter:
             ),
         )
 
-    def _request(self, method: str, path: str, body: Optional[dict] = None) -> dict:
-        email, token = os.getenv(self.connection.email_env), os.getenv(
-            self.connection.token_env
+    def _credentials(self):
+        email = os.getenv(self.connection.email_env)
+        token = os.getenv(self.connection.token_env)
+        missing = next(
+            (
+                name
+                for name, value in (
+                    (self.connection.email_env, email),
+                    (self.connection.token_env, token),
+                )
+                if not value
+            ),
+            None,
         )
-        if not email or not token or any(c in email + token for c in "\r\n"):
-            raise IntegrationError("Jira credentials are missing or invalid")
+        if missing:
+            raise IntegrationError(
+                "Jira credential "
+                + missing
+                + " is missing. Run 'open-data-products config credentials set --name "
+                + missing
+                + "'."
+            )
+        assert email is not None and token is not None
+        if any(c in email + token for c in "\r\n"):
+            raise IntegrationError("Jira credentials contain invalid characters")
+        return email, token
+
+    def _request(self, method: str, path: str, body: Optional[dict] = None) -> dict:
+        email, token = self._credentials()
         encoded = base64.b64encode((email + ":" + token).encode()).decode("ascii")
         data = json.dumps(body).encode() if body is not None else None
         req = request.Request(
@@ -401,11 +424,7 @@ class JiraCloudAdapter:
 
     def _upload_attachment(self, key: str, filename: str, data: bytes) -> None:
         """Upload one reviewed file without retrying an uncertain request."""
-        email, token = os.getenv(self.connection.email_env), os.getenv(
-            self.connection.token_env
-        )
-        if not email or not token or any(c in email + token for c in "\r\n"):
-            raise IntegrationError("Jira credentials are missing or invalid")
+        email, token = self._credentials()
         boundary = "odps-" + uuid4().hex
         body = (
             (

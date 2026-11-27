@@ -152,6 +152,8 @@ def test_generate_logs_llm_invocation_with_provider_and_model(
     monkeypatch.setattr(generation, "generate_local_artifacts_for_kind", fake_generate)
     monkeypatch.delenv("OPEN_DATA_PRODUCTS_ACTIVITY_LOG", raising=False)
     monkeypatch.chdir(tmp_path)
+    (tmp_path / "generation.config.yaml").write_text("provider: openai\n")
+    monkeypatch.setenv("OPENAI_API_KEY", "fake-test-key")
 
     assert (
         main(
