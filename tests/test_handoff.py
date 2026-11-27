@@ -735,3 +735,34 @@ def test_missing_contract_lookup_is_reported_once_without_claiming_absence(monke
     assert product_error["status"] == 404
     assert "cannot be distinguished" in product_error["message"]
     assert source_error["status"] is None and "not checked" in source_error["message"]
+
+
+def test_preparation_package_includes_metadata_reference(tmp_path, monkeypatch):
+    source, product = inputs(tmp_path)
+    settings = resolve_generation_settings()
+    preview = preview_handoff(source, product, settings)
+    monkeypatch.setattr(
+        "open_data_products.handoff.create_generation_client",
+        lambda _: lambda prompt, model: model_reply(),
+    )
+    context = {
+        "discovery_target": {"platform": "datahub", "connection": "catalog"},
+        "product": {"id": "product-1", "name": "customer"},
+        "assets": [{"id": "asset-1", "fullyQualifiedName": "warehouse.customer"}],
+        "incomplete": True,
+        "errors": [],
+    }
+    root = generate_handoff(
+        preview,
+        tmp_path / "out",
+        "customer-view",
+        settings,
+        reviewed_sha256=preview.digest,
+        context_snapshot=context,
+    )
+    refs = yaml.safe_load((root / "supporting/metadata-discovery.yaml").read_text())
+    assert refs["platform"] == "datahub" and refs["product"]["id"] == "product-1"
+    assert refs["platform_url"] is None
+    assert "not available" in refs["platform_url_status"]
+    assert refs["assets"][0]["fullyQualifiedName"] == "warehouse.customer"
+    assert "metadata-discovery.yaml" in (root / "preparation.md").read_text()

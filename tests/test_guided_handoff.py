@@ -1406,3 +1406,18 @@ def test_discovery_includes_explicit_product_name_within_search_budget(monkeypat
     assert result[0]["phrase"] == "Product Holdings"
     assert result[0]["source_quote"] == "product_name: Product Holdings"
     assert "unverified" in result[0]["reason"]
+
+
+def test_discovery_url_always_uses_origin_and_requires_valid_config():
+    import open_data_products._guided_handoff as guided
+
+    profile = SimpleNamespace(
+        name="banking",
+        platform="openmetadata",
+        base_url="https://metadata.example.org:8443/api",
+    )
+    target = guided._handover_discovery_target(profile)
+    assert target["platform_url"] == "https://metadata.example.org:8443"
+    profile.base_url = "https://user:secret@metadata.example.org"
+    with pytest.raises(ValueError, match="cannot be shared safely"):
+        guided._handover_discovery_target(profile)

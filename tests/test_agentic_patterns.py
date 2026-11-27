@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+
 try:
     import tomllib
 except ModuleNotFoundError:
@@ -122,6 +123,14 @@ EXPECTED_TOOLS = {
     "validate_dprod",
     "wrap_dprod_resource",
     "export_dprod",
+    "preview_implementation_handover",
+    "preview_business_handover",
+    "create_business_odps_draft",
+    "create_implementation_handover",
+    "review_jira_issue",
+    "create_jira_issue",
+    "review_jira_handover",
+    "deliver_jira_handover",
 }
 
 
@@ -381,6 +390,7 @@ class TestAgentManifest:
             "product-contracts",
             "dcat-catalog-intelligence",
             "dprod-beta2-interoperability",
+            "reviewed-handover-jira",
         }
         assert {item["id"] for item in manifest["standards"]} == {
             "odps",
@@ -417,6 +427,14 @@ class TestAgentManifest:
             "import-okf-bundle",
             "explore-vocabulary",
             "inspect-product-contracts",
+            "preview-business-handover",
+            "create-business-odps-draft",
+            "preview-implementation-handover",
+            "create-implementation-handover",
+            "review-jira-issue",
+            "create-jira-issue",
+            "review-jira-handover",
+            "deliver-jira-handover",
         }
         workflows = {item["id"]: item for item in manifest["workflows"]}
         assert workflows["configure-recipes"]["mcp_tools"] == [
@@ -640,6 +658,10 @@ class TestAgentManifest:
             "wrap_dcat_resource",
             "wrap_dprod_resource",
             "export_dprod",
+            "create_implementation_handover",
+            "create_business_odps_draft",
+            "create_jira_issue",
+            "deliver_jira_handover",
         ]
         assert "state-changing" in safety["cli_note"]
 

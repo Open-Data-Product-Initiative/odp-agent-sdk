@@ -353,6 +353,13 @@ def _capabilities() -> List[Dict[str, Any]]:
             ),
         },
         {
+            "id": "reviewed-handover-jira",
+            "title": "Reviewed data product handover and Jira delivery",
+            "standards": ["odps"],
+            "interfaces": ["python", "cli", "mcp"],
+            "summary": "Review business and provider inputs, create local OpenSpec and ODCS drafts, then review and deliver a package or general issue to Jira.",
+        },
+        {
             "id": "bundled-resources",
             "title": "Bundled schemas, prompts, and retrieval indexes",
             "standards": ["odps", "odpc", "odpg", "odpv"],
@@ -367,6 +374,54 @@ def _capabilities() -> List[Dict[str, Any]]:
 
 def _workflows() -> List[Dict[str, Any]]:
     return [
+        {
+            "id": "preview-business-handover",
+            "title": "Review business source and provider",
+            "commands": [],
+            "mcp_tools": ["preview_business_handover"],
+        },
+        {
+            "id": "create-business-odps-draft",
+            "title": "Generate a reviewed ODPS draft",
+            "commands": [],
+            "mcp_tools": ["create_business_odps_draft"],
+        },
+        {
+            "id": "preview-implementation-handover",
+            "title": "Review handover inputs and metadata evidence",
+            "commands": [],
+            "mcp_tools": ["preview_implementation_handover"],
+        },
+        {
+            "id": "create-implementation-handover",
+            "title": "Generate a reviewed OpenSpec handover",
+            "commands": ["open-data-products handover prepare --input brief.md"],
+            "mcp_tools": ["create_implementation_handover"],
+        },
+        {
+            "id": "review-jira-issue",
+            "title": "Review a general Jira issue",
+            "commands": [],
+            "mcp_tools": ["review_jira_issue"],
+        },
+        {
+            "id": "create-jira-issue",
+            "title": "Create a reviewed general Jira issue",
+            "commands": [],
+            "mcp_tools": ["create_jira_issue"],
+        },
+        {
+            "id": "review-jira-handover",
+            "title": "Review Jira package delivery",
+            "commands": [],
+            "mcp_tools": ["review_jira_handover"],
+        },
+        {
+            "id": "deliver-jira-handover",
+            "title": "Deliver a reviewed package to Jira",
+            "commands": ["open-data-products jira deliver --input WORKSPACE"],
+            "mcp_tools": ["deliver_jira_handover"],
+        },
         {
             "id": "validate-artifact",
             "title": "Validate and explain one standards artifact",
@@ -654,10 +709,14 @@ def _safety() -> Dict[str, Any]:
             "wrap_dcat_resource",
             "wrap_dprod_resource",
             "export_dprod",
+            "create_implementation_handover",
+            "create_business_odps_draft",
+            "create_jira_issue",
+            "deliver_jira_handover",
         ],
         "mcp_note": (
-            "MCP tools are safe/read-only except explicitly approved workspace "
-            "initialization and portfolio build tools classified as state-changing."
+            "MCP includes state-changing workspace, provider and Jira tools; "
+            "handover generation and Jira creation require reviewed digests."
         ),
         "cli_note": (
             "Some CLI workflows are state-changing because they write generated "

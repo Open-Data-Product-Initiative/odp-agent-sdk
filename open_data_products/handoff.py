@@ -72,6 +72,126 @@ def _without_samples(value):
     return value
 
 
+def _discovery_package_context(snapshot):
+    """Remove samples and validate any recorded platform URL."""
+    from urllib.parse import urlsplit
+
+    context = _without_samples(snapshot)
+    if not isinstance(context, dict):
+        return context
+    target = context.get("discovery_target")
+    if not isinstance(target, dict):
+        return context
+    target = {
+        key: target[key]
+        for key in ("platform", "connection", "platform_url")
+        if key in target
+    }
+    context["discovery_target"] = target
+    if target.get("platform_url") is not None:
+        if not isinstance(target.get("platform_url"), str):
+            raise ValueError("Shared metadata platform URL must be a string")
+        platform_url = target["platform_url"]
+        parts = urlsplit(platform_url)
+        if (
+            any(c.isspace() or ord(c) < 32 for c in platform_url)
+            or parts.scheme not in ("http", "https")
+            or not parts.hostname
+            or parts.username
+            or parts.password
+            or parts.query
+            or parts.fragment
+            or parts.path not in ("", "/")
+        ):
+            raise ValueError(
+                "Shared metadata platform URL must be an HTTP(S) origin without credentials"
+            )
+        try:
+            parts.port
+        except ValueError:
+            raise ValueError(
+                "Shared metadata platform URL has an invalid port"
+            ) from None
+    return context
+
+
+def _metadata_discovery_reference(context):
+    """Summarize observed catalog references without copying credentials or content."""
+    if not isinstance(context, dict):
+        return None
+    target = context.get("discovery_target")
+    target = target if isinstance(target, dict) else {}
+    product = context.get("product")
+    product = product if isinstance(product, dict) else {}
+
+    def reference(item):
+        return {
+            key: item[key]
+            for key in ("id", "name", "type", "fullyQualifiedName")
+            if isinstance(item.get(key), str)
+        }
+
+    assets = context.get("assets")
+    assets = assets if isinstance(assets, list) else []
+    searches = context.get("discovery_queries")
+    searches = searches if isinstance(searches, list) else []
+    contracts = context.get("contracts")
+    contracts = contracts if isinstance(contracts, list) else []
+    errors = context.get("errors")
+    errors = errors if isinstance(errors, list) else []
+    platform = target.get("platform")
+    connection = target.get("connection")
+    result = {
+        "platform": (
+            platform
+            if isinstance(platform, str)
+            and re.fullmatch(r"[A-Za-z0-9_.-]{1,128}", platform)
+            else None
+        ),
+        "connection": (
+            connection
+            if isinstance(connection, str)
+            and re.fullmatch(r"[A-Za-z0-9_.-]{1,128}", connection)
+            else None
+        ),
+        "platform_url": target.get("platform_url"),
+        "platform_url_status": (
+            "recorded origin; verify access and any reverse-proxy path"
+            if target.get("platform_url")
+            else "not available in the supplied metadata snapshot"
+        ),
+        "product": reference(product) or None,
+        "assets": [reference(item) for item in assets[:20] if isinstance(item, dict)],
+        "queries": [
+            {"query": item["query"], "retrieved_at": item.get("retrieved_at")}
+            for item in searches[:4]
+            if isinstance(item, dict)
+            and isinstance(item.get("query"), str)
+            and not item["query"].startswith("selected product: ")
+        ],
+        "latest_retrieval_at": context.get("retrieved_at"),
+        "contract_evidence": [
+            {
+                "origin": item.get("origin"),
+                "contract_id": (item.get("provenance") or {}).get("contract_id"),
+                "retrieved_at": (item.get("provenance") or {}).get("retrieved_at"),
+                "validation_status": item.get("validation_status"),
+            }
+            for item in contracts[:20]
+            if isinstance(item, dict) and isinstance(item.get("provenance"), dict)
+        ],
+        "incomplete": bool(context.get("incomplete", True)),
+        "unavailable_resources": [
+            {"resource": item.get("resource"), "status": item.get("status")}
+            for item in errors[:100]
+            if isinstance(item, dict)
+        ],
+        "snapshot": "catalog-evidence.yaml",
+        "access_note": "Confirm the assistant has authorized access. Review the saved snapshot if live access is unavailable; candidates are not verified sources.",
+    }
+    return result
+
+
 def _sha(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
@@ -207,6 +327,8 @@ def generate_handoff(
     """Generate an initial change after the caller reviews the provider input."""
     if not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", change_name):
         raise ValueError("Change name must be kebab-case")
+    if context_snapshot is not None:
+        _discovery_package_context(context_snapshot)
     current = preview_handoff(
         preview.business_path,
         preview.product_path,
@@ -336,15 +458,22 @@ def generate_handoff(
         yaml.safe_dump(evidence, sort_keys=False, allow_unicode=True), encoding="utf-8"
     )
     if context_snapshot is not None:
+        clean_context = _discovery_package_context(context_snapshot)
         (sources / "catalog-evidence.yaml").write_text(
+            yaml.safe_dump(clean_context, sort_keys=False, allow_unicode=True),
+            encoding="utf-8",
+        )
+        (sources / "metadata-discovery.yaml").write_text(
             yaml.safe_dump(
-                _without_samples(context_snapshot), sort_keys=False, allow_unicode=True
+                _metadata_discovery_reference(clean_context),
+                sort_keys=False,
+                allow_unicode=True,
             ),
             encoding="utf-8",
         )
         with (root / "preparation.md").open("a", encoding="utf-8") as handle:
             handle.write(
-                "\nA supplied metadata snapshot is in supporting/catalog-evidence.yaml. Treat its candidates and errors as evidence to review, not verified matches.\n"
+                "\nA supplied metadata snapshot is in supporting/catalog-evidence.yaml; platform and source references are in supporting/metadata-discovery.yaml. Treat candidates and errors as evidence to review, not verified matches. Confirm live access before querying.\n"
             )
     manifest = {
         "format": "odps-assistant-handoff",

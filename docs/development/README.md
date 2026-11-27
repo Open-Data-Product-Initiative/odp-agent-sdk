@@ -41,7 +41,7 @@ Use these pages when changing complex SDK behavior:
 - [SDK input documents plan](sdk-input-documents-plan.md): implemented
   portfolio document formats, optional Outlook support, warning-only source
   classes, and future intake adapters.
-- [MCP development](mcp.md): MCP tool registry, safe-class policy,
+- [MCP development](mcp.md): MCP tool registry, tool classifications,
   stdio server behavior, ARWS manifest generation, and tests.
 - [SDK activity logging plan](sdk-activity-logging-plan.md): fixed-format
   command activity events, classification, rotation, redaction, and CLI

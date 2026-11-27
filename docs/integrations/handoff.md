@@ -2,6 +2,47 @@
 
 For a short business starting point, use the [data product idea one-pager](../user/business-one-pager.md).
 
+For development timing tests from a synthetic business brief through OpenMetadata and Jira, see the [end-to-end timing benchmark](../../examples/integrations/HANDOFF_TIMING_BENCHMARK.md).
+
+## MCP tools
+
+The SDK MCP server exposes reviewed, per-document handover and Jira operations.
+Configure the generation provider and named Jira connection as for the guided
+CLI. MCP clients should render the supplied source files for the user to review;
+preview responses contain source filenames, hashes, provider origin and bounded
+catalog summaries rather than full document bodies.
+
+1. Call `preview_business_handover` with `business_document` and a new `output`
+   directory. After review, call `create_business_odps_draft` with the same
+   arguments and `reviewed_sha256`. The tool stages the reviewed source and
+   generates a local ODPS draft.
+2. Call `preview_implementation_handover` with the staged business document,
+   ODPS draft, a **new** package `output` directory and a `change_name`. An
+   optional `context_file` supplies a JSON metadata snapshot; `asset_id` selects
+   an optional catalog asset. The snapshot's safe platform origin, when
+   recorded, is included automatically. Review the inputs and provider, then call
+   `create_implementation_handover` with the same arguments and returned digest.
+   The result identifies the OpenSpec change and ZIP relative to the chosen
+   output directory. The package includes a separate ODCS draft.
+3. Call `review_jira_handover` with that change, project, issue type and exactly
+   one package delivery method (`package_attachment`, `package_url` or
+   `shared_filesystem`). Supply the business document as an attachment or an
+   accessible HTTPS reference. The preview states access assumptions and binds
+   the issue and attachments to a digest. After review, call
+   `deliver_jira_handover` with the same inputs, digest and a new `journal_file`.
+
+`review_jira_issue` and `create_jira_issue` provide the same reviewed Jira
+workflow for general issues without any handover dependencies. Create calls
+use an exclusive local journal before contacting Jira. Existing journals block
+retries; inspect Jira after a failed or unknown outcome. A partial attachment
+upload is returned as an MCP error with the issue key and journal status so the
+client can investigate. These create tools are classified as state-changing.
+
+MCP package generation accepts existing metadata snapshots; it does not run
+automatic catalog discovery itself. The SDK remains usable without Jira or a
+metadata platform. Output schemas, contracts and plans are drafts requiring
+domain review; structural validation is not approval.
+
 ## Guided flow
 
 From the SDK checkout, prepare the handoff in one interactive command:
@@ -143,6 +184,20 @@ configured elsewhere. The target must advertise the read-only metadata discovery
 capability. OpenMetadata is currently implemented; another platform such as
 DataHub needs an implemented and registered adapter and configuration support.
 The connection name is a YAML key, which can be different from the platform type.
+
+When a snapshot is supplied, the package includes
+`supporting/metadata-discovery.yaml`: a platform-neutral summary of the target,
+selected product and assets, available search queries and retrieval times,
+contract provenance, and incomplete or unavailable resources. It references
+`catalog-evidence.yaml` and asks the coding assistant to confirm live access.
+These are supporting artifacts, not native OpenSpec files. For SDK discovery,
+the configured HTTP(S) **origin** is included automatically and is covered by
+the handover review digest. Credentials, query strings, fragments and
+reverse-proxy paths are not included. A supplied snapshot can record the
+credential-free origin as `discovery_target.platform_url`; if it lacks one,
+the package reports that the address is unavailable instead of guessing. The
+origin does not establish that the assistant has access, and the snapshot may
+contain other sensitive information. Review it before sharing.
 
 For each brief, the SDK sends the already reviewed text to the configured
 provider to propose up to three concepts, each with an exact source quotation.
