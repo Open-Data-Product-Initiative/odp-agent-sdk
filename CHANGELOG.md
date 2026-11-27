@@ -2,12 +2,11 @@
 
 ## Unreleased
 
+## 0.9.0
+
 - Associate the generated ODCS draft with the benchmark's new OpenMetadata
   product, verify its product association and preserved-source integrity, and
   stop with a recorded partial outcome if contract import is uncertain.
-
-## 0.9.0
-
 - Add guided project setup, named LLM provider and platform connection management,
   hidden credential entry, combined configuration status and connection checks.
 - Add project-local organization defaults for ODPS data holders in generated and
