@@ -15,25 +15,13 @@ if TYPE_CHECKING:
 
 
 PRODUCT_HELP = """\
-Data Contract workflow commands:
-  resolve-contracts   Find Data Contract references in an ODPS product
-  contract-report     Generate a static product-contract report
-  audit               Run product checks, including referenced contracts
-  check-contract      Validate a product and an external Data Contract
-  align-contract      Check static ODPS-to-Data Contract alignment
-  contract-schema     Extract models and fields from a Data Contract
-  export-contract     Export a Data Contract through datacontract-cli
-  wrap-contract       Generate an ODPS 4.2 draft from an ODCS contract
-  wrap-dcat           Generate an ODPS 4.2 draft from a selected DCAT resource
-  wrap-dprod          Generate an ODPS 4.2 draft from an explicit DPROD product
-  export-dprod        Export an ODPS 4.2 definition as DPROD Turtle and JSON-LD
-
 Examples:
   open-data-products product resolve-contracts product.yaml --json
-  open-data-products product contract-report product.yaml contract.yaml --json
   open-data-products product audit product.yaml --contract contract.yaml --json
-  open-data-products product wrap-contract --input contracts/orders.yaml --output products/orders.yaml
-  open-data-products product wrap-dcat --input catalog.ttl --resource https://example.test/dataset/orders --output products/orders.yaml
+  open-data-products product wrap-contract --input contract.yaml --output product.yaml
+
+Next steps:
+  Use open-data-products product COMMAND --help for options and examples.
 """
 
 
@@ -42,6 +30,7 @@ def add_product_subparser(subparsers: argparse._SubParsersAction) -> None:
     product_parser = subparsers.add_parser(
         "product",
         help="Product-level orchestration workflows",
+        description="Inspect data products, contracts and standards mappings.",
         epilog=PRODUCT_HELP,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -232,7 +221,11 @@ def add_product_subparser(subparsers: argparse._SubParsersAction) -> None:
     wrap_dprod_parser.add_argument(
         "--output", "-o", required=True, help="Output ODPS YAML path"
     )
-    wrap_dprod_parser.add_argument("--overwrite", action="store_true")
+    wrap_dprod_parser.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="Allow replacement of an existing output",
+    )
     wrap_dprod_parser.add_argument("--json", action="store_true", help="Emit JSON")
     export_dprod_parser = product_subparsers.add_parser(
         "export-dprod", help="Write deterministic DPROD Turtle and JSON-LD from ODPS"
@@ -243,7 +236,9 @@ def add_product_subparser(subparsers: argparse._SubParsersAction) -> None:
     export_dprod_parser.add_argument(
         "--output", "-o", required=True, help="Output basename"
     )
-    export_dprod_parser.add_argument("--overwrite", action="store_true")
+    export_dprod_parser.add_argument(
+        "--overwrite", action="store_true", help="Allow replacement of existing outputs"
+    )
     export_dprod_parser.add_argument("--json", action="store_true", help="Emit JSON")
 
 

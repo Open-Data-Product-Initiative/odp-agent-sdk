@@ -10,92 +10,145 @@ import tempfile
 from typing import Dict, List, Tuple
 from uuid import UUID
 
-from .config import IntegrationError, load_integration_config
+from .config import IntegrationError, _UniqueLoader
 from .openmetadata import OpenMetadataAdapter, normalize_openmetadata_updated_dates
 
 
 def add_integrations_parser(subparsers: argparse._SubParsersAction) -> None:
     """Register the integrations command tree."""
     parser = subparsers.add_parser(
-        "integrations", help="Use platform connection profiles"
+        "api",
+        help="Advanced reviewed OpenMetadata operations",
+        description="Inspect connections and review platform operations.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=(
+            "Examples:\n"
+            "  open-data-products openmetadata api list --config connections.yaml\n"
+            "  open-data-products openmetadata api check openmetadata --config connections.yaml\n\n"
+            "Next steps:\n"
+            "  Use open-data-products openmetadata api COMMAND --help for options.\n"
+            "  Writes require review and explicit execution."
+        ),
     )
-    commands = parser.add_subparsers(dest="integration_command", required=True)
+    commands = parser.add_subparsers(
+        dest="integration_command", metavar="INTEGRATION_COMMAND", required=True
+    )
     profiles = commands.add_parser("list", help="List configured connection names")
-    profiles.add_argument("--config", required=True)
-    profiles.add_argument("--json", action="store_true")
+    profiles.add_argument(
+        "--config", required=True, help="Connection configuration YAML"
+    )
+    profiles.add_argument("--json", action="store_true", help="Emit structured JSON")
     check = commands.add_parser("check", help="Check read connectivity")
-    check.add_argument("connection")
-    check.add_argument("--config", required=True)
-    check.add_argument("--json", action="store_true")
+    check.add_argument("connection", help="Named connection profile")
+    check.add_argument("--config", required=True, help="Connection configuration YAML")
+    check.add_argument("--json", action="store_true", help="Emit structured JSON")
     discovery = commands.add_parser(
         "discover", help="Discover bounded read-only context"
     )
-    discovery.add_argument("connection")
-    discovery.add_argument("--config", required=True)
-    discovery.add_argument("--id")
-    discovery.add_argument("--query")
-    discovery.add_argument("--limit", type=int, default=20)
-    discovery.add_argument("--json", action="store_true")
+    discovery.add_argument("connection", help="Named connection profile")
+    discovery.add_argument(
+        "--config", required=True, help="Connection configuration YAML"
+    )
+    discovery.add_argument("--id", help="Data product UUID to inspect")
+    discovery.add_argument("--query", help="Catalog search query")
+    discovery.add_argument(
+        "--limit", type=int, default=20, help="Maximum results (default: 20)"
+    )
+    discovery.add_argument("--json", action="store_true", help="Emit structured JSON")
     domains = commands.add_parser("domains", help="List available OpenMetadata domains")
-    domains.add_argument("connection")
-    domains.add_argument("--config", required=True)
-    domains.add_argument("--limit", type=int, default=100)
-    domains.add_argument("--after")
-    domains.add_argument("--json", action="store_true")
+    domains.add_argument("connection", help="Named connection profile")
+    domains.add_argument(
+        "--config", required=True, help="Connection configuration YAML"
+    )
+    domains.add_argument(
+        "--limit", type=int, default=100, help="Maximum results (default: 100)"
+    )
+    domains.add_argument("--after", help="Pagination cursor from the previous page")
+    domains.add_argument("--json", action="store_true", help="Emit structured JSON")
     domain_create = commands.add_parser(
         "domain-create", help="Review or create an OpenMetadata domain"
     )
-    domain_create.add_argument("connection")
-    domain_create.add_argument("--config", required=True)
-    domain_create.add_argument("--name", required=True)
-    domain_create.add_argument("--description", required=True)
+    domain_create.add_argument("connection", help="Named connection profile")
+    domain_create.add_argument(
+        "--config", required=True, help="Connection configuration YAML"
+    )
+    domain_create.add_argument("--name", required=True, help="Domain name")
+    domain_create.add_argument(
+        "--description", required=True, help="Domain description"
+    )
     domain_create.add_argument(
         "--type",
         required=True,
         choices=("Source-aligned", "Consumer-aligned", "Aggregate"),
+        help="OpenMetadata domain type",
     )
-    domain_create.add_argument("--display-name")
+    domain_create.add_argument("--display-name", help="Optional display name")
     domain_create.add_argument("--parent", help="Parent domain FQN for a subdomain")
-    domain_create.add_argument("--execute", action="store_true")
-    domain_create.add_argument("--reviewed-sha256")
-    domain_create.add_argument("--json", action="store_true")
+    domain_create.add_argument(
+        "--execute",
+        action="store_true",
+        help="Execute the previously reviewed operation",
+    )
+    domain_create.add_argument(
+        "--reviewed-sha256", help="Digest from the reviewed operation"
+    )
+    domain_create.add_argument(
+        "--json", action="store_true", help="Emit structured JSON"
+    )
     products = commands.add_parser(
         "products", help="Read, create, update or delete platform products"
     )
     actions = products.add_subparsers(dest="integration_action", required=True)
     listing = actions.add_parser("list", help="List one page of products")
-    listing.add_argument("connection")
-    listing.add_argument("--config", required=True)
-    listing.add_argument("--limit", type=int, default=100)
-    listing.add_argument("--after")
-    listing.add_argument("--json", action="store_true")
+    listing.add_argument("connection", help="Named connection profile")
+    listing.add_argument(
+        "--config", required=True, help="Connection configuration YAML"
+    )
+    listing.add_argument(
+        "--limit", type=int, default=100, help="Maximum results (default: 100)"
+    )
+    listing.add_argument("--after", help="Pagination cursor from the previous page")
+    listing.add_argument("--json", action="store_true", help="Emit structured JSON")
     search = actions.add_parser("search", help="Search platform data products")
-    search.add_argument("connection")
-    search.add_argument("--config", required=True)
+    search.add_argument("connection", help="Named connection profile")
+    search.add_argument("--config", required=True, help="Connection configuration YAML")
     search.add_argument("--query", required=True, help="OpenMetadata search query")
-    search.add_argument("--offset", type=int, default=0)
-    search.add_argument("--limit", type=int, default=20)
-    search.add_argument("--json", action="store_true")
+    search.add_argument(
+        "--offset", type=int, default=0, help="Search result offset (default: 0)"
+    )
+    search.add_argument(
+        "--limit", type=int, default=20, help="Maximum results (default: 20)"
+    )
+    search.add_argument("--json", action="store_true", help="Emit structured JSON")
     compare = actions.add_parser(
         "compare", help="Compare source ODPS with a retrieved product"
     )
-    compare.add_argument("connection")
-    compare.add_argument("--config", required=True)
+    compare.add_argument("connection", help="Named connection profile")
+    compare.add_argument(
+        "--config", required=True, help="Connection configuration YAML"
+    )
     compare.add_argument("--id", required=True, help="Platform product ID")
     compare.add_argument("--source", required=True, help="Reviewed ODPS YAML")
     compare.add_argument(
         "--domain", required=True, help="Intended destination domain FQN"
     )
-    compare.add_argument("--language", default="en")
+    compare.add_argument(
+        "--language", default="en", help="ODPS detail language (default: en)"
+    )
     compare.add_argument(
         "--output", help="Save the comparison JSON without overwriting"
     )
-    compare.add_argument("--json", action="store_true")
+    compare.add_argument("--json", action="store_true", help="Emit structured JSON")
     get = actions.add_parser("get", help="Retrieve a product")
-    get.add_argument("connection")
-    get.add_argument("--config", required=True)
-    get.add_argument("--id", required=True)
-    get.add_argument("--format", choices=("odps", "native"), default="odps")
+    get.add_argument("connection", help="Named connection profile")
+    get.add_argument("--config", required=True, help="Connection configuration YAML")
+    get.add_argument("--id", required=True, help="Platform product UUID")
+    get.add_argument(
+        "--format",
+        choices=("odps", "native"),
+        default="odps",
+        help="Response format (default: odps)",
+    )
     get.add_argument(
         "--include-extensions",
         action="store_true",
@@ -119,19 +172,21 @@ def add_integrations_parser(subparsers: argparse._SubParsersAction) -> None:
         default="true",
         help="Block invalid ODPS when true (default); allow it with findings when false",
     )
-    get.add_argument("--json", action="store_true")
+    get.add_argument("--json", action="store_true", help="Emit structured JSON")
     create = actions.add_parser(
         "create", help="Review or explicitly create an ODPS product"
     )
-    create.add_argument("connection")
-    create.add_argument("--config", required=True)
+    create.add_argument("connection", help="Named connection profile")
+    create.add_argument("--config", required=True, help="Connection configuration YAML")
     create.add_argument("--source", required=True, help="Local ODPS YAML source")
     create.add_argument(
         "--domain",
         required=True,
         help="Destination OpenMetadata domain FQN; quote multiword values",
     )
-    create.add_argument("--language", default="en")
+    create.add_argument(
+        "--language", default="en", help="ODPS detail language (default: en)"
+    )
     create.add_argument(
         "--owner",
         action="append",
@@ -155,49 +210,82 @@ def add_integrations_parser(subparsers: argparse._SubParsersAction) -> None:
     create.add_argument(
         "--reviewed-sha256", help="Digest from a previous create review"
     )
-    create.add_argument("--json", action="store_true")
+    create.add_argument("--json", action="store_true", help="Emit structured JSON")
     recover = actions.add_parser(
         "recover-create",
         help="Find possible outcomes of an uncertain create (read-only)",
     )
-    recover.add_argument("connection")
-    recover.add_argument("--config", required=True)
-    recover.add_argument("--source", required=True)
-    recover.add_argument("--domain", required=True)
-    recover.add_argument("--language", default="en")
-    recover.add_argument("--max-pages", type=int, default=10)
-    recover.add_argument("--json", action="store_true")
+    recover.add_argument("connection", help="Named connection profile")
+    recover.add_argument(
+        "--config", required=True, help="Connection configuration YAML"
+    )
+    recover.add_argument(
+        "--source", required=True, help="ODPS source used in the uncertain create"
+    )
+    recover.add_argument(
+        "--domain",
+        required=True,
+        help="Destination domain FQN used in the create; quote the value",
+    )
+    recover.add_argument(
+        "--language", default="en", help="ODPS detail language (default: en)"
+    )
+    recover.add_argument(
+        "--max-pages",
+        type=int,
+        default=10,
+        help="Maximum product-list pages to inspect (default: 10)",
+    )
+    recover.add_argument("--json", action="store_true", help="Emit structured JSON")
     contract = actions.add_parser(
         "contract-import", help="Review or import an ODCS contract for a data product"
     )
-    contract.add_argument("connection")
-    contract.add_argument("--config", required=True)
+    contract.add_argument("connection", help="Named connection profile")
+    contract.add_argument(
+        "--config", required=True, help="Connection configuration YAML"
+    )
     contract.add_argument("--id", required=True, help="Target data product UUID")
     contract.add_argument("--source", required=True, help="Local ODCS YAML document")
     contract.add_argument(
         "--object-name", help="Explicit schema object name for multi-object contracts"
     )
-    contract.add_argument("--execute", action="store_true")
-    contract.add_argument("--reviewed-sha256")
-    contract.add_argument("--json", action="store_true")
+    contract.add_argument(
+        "--execute",
+        action="store_true",
+        help="Execute the previously reviewed operation",
+    )
+    contract.add_argument(
+        "--reviewed-sha256", help="Digest from the reviewed operation"
+    )
+    contract.add_argument("--json", action="store_true", help="Emit structured JSON")
     contract_get = actions.add_parser(
         "contract-get", help="Retrieve a data product's effective contract"
     )
-    contract_get.add_argument("connection")
-    contract_get.add_argument("--config", required=True)
+    contract_get.add_argument("connection", help="Named connection profile")
+    contract_get.add_argument(
+        "--config", required=True, help="Connection configuration YAML"
+    )
     contract_get.add_argument("--id", required=True, help="Target data product UUID")
-    contract_get.add_argument("--json", action="store_true")
+    contract_get.add_argument(
+        "--json", action="store_true", help="Emit structured JSON"
+    )
     contract_source = actions.add_parser(
         "contract-source", help="Save the original SDK-preserved ODCS contract"
     )
-    contract_source.add_argument("connection")
-    contract_source.add_argument("--config", required=True)
-    contract_source.add_argument("--id", required=True)
-    contract_source.add_argument("--output", required=True)
-    contract_source.add_argument("--json", action="store_true")
+    contract_source.add_argument("connection", help="Named connection profile")
+    contract_source.add_argument(
+        "--config", required=True, help="Connection configuration YAML"
+    )
+    contract_source.add_argument("--id", required=True, help="Target data product UUID")
+    contract_source.add_argument(
+        "--output", required=True, help="Destination for preserved ODCS source"
+    )
+    contract_source.add_argument(
+        "--json", action="store_true", help="Emit structured JSON"
+    )
     delete = actions.add_parser("delete", help="Review or permanently delete a product")
-    delete.add_argument("connection")
-    delete.add_argument("--config", required=True)
+    delete.add_argument("connection", help="Named connection profile")
+    delete.add_argument("--config", required=True, help="Connection configuration YAML")
     delete.add_argument("--id", required=True, help="Platform product UUID")
     delete.add_argument(
         "--execute", action="store_true", help="Execute a reviewed deletion"
@@ -210,18 +298,18 @@ def add_integrations_parser(subparsers: argparse._SubParsersAction) -> None:
         action="store_true",
         help="Acknowledge permanent, recursive deletion",
     )
-    delete.add_argument("--json", action="store_true")
+    delete.add_argument("--json", action="store_true", help="Emit structured JSON")
     update = actions.add_parser(
         "update", help="Review or update a product's title, description or domain"
     )
-    update.add_argument("connection")
-    update.add_argument("--config", required=True)
+    update.add_argument("connection", help="Named connection profile")
+    update.add_argument("--config", required=True, help="Connection configuration YAML")
     update.add_argument("--id", required=True, help="Platform product UUID")
-    update.add_argument("--title")
+    update.add_argument("--title", help="New product display title")
     update.add_argument(
         "--input", "-i", help="ODPS YAML or JSON file to review for this update"
     )
-    update.add_argument("--description")
+    update.add_argument("--description", help="New product description")
     update.add_argument(
         "--owner",
         action="append",
@@ -237,11 +325,15 @@ def add_integrations_parser(subparsers: argparse._SubParsersAction) -> None:
     update.add_argument(
         "--domain", help="Replace existing domains with this domain FQN"
     )
-    update.add_argument("--execute", action="store_true")
+    update.add_argument(
+        "--execute",
+        action="store_true",
+        help="Execute the previously reviewed operation",
+    )
     update.add_argument(
         "--reviewed-sha256", help="Digest from a previous update review"
     )
-    update.add_argument("--json", action="store_true")
+    update.add_argument("--json", action="store_true", help="Emit structured JSON")
 
 
 def _save_output_set(files: List[Tuple[Path, str]]) -> None:
@@ -300,22 +392,49 @@ def _save_output_set(files: List[Tuple[Path, str]]) -> None:
 def handle_integrations(args: argparse.Namespace) -> int:
     """Execute an integration command and return its exit status."""
     try:
-        config = load_integration_config(args.config)
+        if not Path(args.config).expanduser().is_file():
+            raise IntegrationError(
+                "Connection configuration is required. Run 'open-data-products config setup' or supply an existing --config."
+            )
+        from ._guided_cli import _select
+
         if args.integration_command == "list":
-            profiles = [
-                {"name": p.name, "platform": p.platform, "read_only": p.read_only}
-                for p in config.connections.values()
-            ]
+            import yaml
+            from .jira import load_jira_connection
+
+            try:
+                root = yaml.load(
+                    Path(args.config).expanduser().read_text(encoding="utf-8"),
+                    Loader=_UniqueLoader,
+                )
+            except (OSError, UnicodeError, yaml.YAMLError):
+                raise IntegrationError("Cannot read connection configuration") from None
+            if (
+                not isinstance(root, dict)
+                or root.get("version") != 1
+                or not isinstance(root.get("connections"), dict)
+            ):
+                raise IntegrationError("Invalid connection configuration")
+            profiles = []
+            for name, entry in root["connections"].items():
+                platform = entry.get("platform") if isinstance(entry, dict) else None
+                if platform == "openmetadata":
+                    profile = _select(args.config, name)[1]
+                elif platform == "jira_cloud":
+                    profile = load_jira_connection(args.config, name)
+                else:
+                    raise IntegrationError("Connection adapter is unavailable")
+                profiles.append(
+                    {"name": name, "platform": platform, "read_only": profile.read_only}
+                )
             print(
                 json.dumps(profiles, indent=2)
                 if args.json
-                else "\n".join(
-                    p.name + "\t" + p.platform for p in config.connections.values()
-                )
+                else "\n".join(p["name"] + "\t" + p["platform"] for p in profiles)
             )
             return 0
         payload: Dict[str, object]
-        with OpenMetadataAdapter(config.select(args.connection)) as adapter:
+        with OpenMetadataAdapter(_select(args.config, args.connection)[1]) as adapter:
             if args.integration_command == "check":
                 payload = dict(adapter.check_connection())
             elif args.integration_command == "discover":

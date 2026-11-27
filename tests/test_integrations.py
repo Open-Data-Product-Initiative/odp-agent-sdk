@@ -80,7 +80,8 @@ def test_non_utf8_create_source_is_sanitized(config_file, tmp_path, capsys):
     assert (
         main(
             [
-                "integrations",
+                "openmetadata",
+                "api",
                 "products",
                 "create",
                 "--no-owner",
@@ -208,7 +209,8 @@ def test_invalid_odps_and_cli_preserves_original(
     provenance = tmp_path / "provenance.json"
     exit_code = main(
         [
-            "integrations",
+            "openmetadata",
+            "api",
             "products",
             "get",
             "dev",
@@ -246,7 +248,8 @@ def test_legacy_get_cli_rejects_name_without_platform_request(
     assert (
         main(
             [
-                "integrations",
+                "openmetadata",
+                "api",
                 "products",
                 "get",
                 "dev",
@@ -265,7 +268,10 @@ def test_legacy_get_cli_rejects_name_without_platform_request(
 
 def test_cli_list_does_not_require_credentials(config_file, monkeypatch, capsys):
     monkeypatch.delenv("TEST_INTEGRATION_TOKEN", raising=False)
-    assert main(["integrations", "list", "--config", str(config_file), "--json"]) == 0
+    assert (
+        main(["openmetadata", "api", "list", "--config", str(config_file), "--json"])
+        == 0
+    )
     assert len(json.loads(capsys.readouterr().out)) == 2
 
 
@@ -327,7 +333,8 @@ product:
     provenance = tmp_path / "provenance.json"
     status = main(
         [
-            "integrations",
+            "openmetadata",
+            "api",
             "products",
             "get",
             "dev",
@@ -370,7 +377,8 @@ def test_strict_validation_blocks_saving_and_reports_reasons(
     output = tmp_path / "invalid.yaml"
     status = main(
         [
-            "integrations",
+            "openmetadata",
+            "api",
             "products",
             "get",
             "dev",
@@ -402,7 +410,8 @@ def test_strict_is_enabled_by_default(config_file, monkeypatch, tmp_path, capsys
     output = tmp_path / "invalid.yaml"
     status = main(
         [
-            "integrations",
+            "openmetadata",
+            "api",
             "products",
             "get",
             "dev",
@@ -663,7 +672,17 @@ def test_list_domains_and_native_domain_retrieval(config_file, monkeypatch, caps
         lambda *args: opener,
     )
     assert (
-        main(["integrations", "domains", "dev", "--config", str(config_file), "--json"])
+        main(
+            [
+                "openmetadata",
+                "api",
+                "domains",
+                "dev",
+                "--config",
+                str(config_file),
+                "--json",
+            ]
+        )
         == 0
     )
     result = json.loads(capsys.readouterr().out)
@@ -672,7 +691,8 @@ def test_list_domains_and_native_domain_retrieval(config_file, monkeypatch, caps
     assert (
         main(
             [
-                "integrations",
+                "openmetadata",
+                "api",
                 "products",
                 "get",
                 "dev",
@@ -739,7 +759,8 @@ def test_create_review_cli_reports_invalid_without_network(
     source.write_text(VALID_ODPS.replace("type: dataset", ""))
     status = main(
         [
-            "integrations",
+            "openmetadata",
+            "api",
             "products",
             "create",
             "--no-owner",
@@ -852,7 +873,8 @@ def test_cli_create_reports_unverified_without_retry(
     )
     status = main(
         [
-            "integrations",
+            "openmetadata",
+            "api",
             "products",
             "create",
             "--no-owner",
@@ -933,7 +955,8 @@ def test_create_recovery_cli_is_read_only(config_file, tmp_path, monkeypatch, ca
     )
     status = main(
         [
-            "integrations",
+            "openmetadata",
+            "api",
             "products",
             "recover-create",
             "dev",
@@ -1124,7 +1147,8 @@ def test_cli_review_product_with_relative_contract(
         lambda *args: opener,
     )
     command = [
-        "integrations",
+        "openmetadata",
+        "api",
         "products",
         "create",
         "--no-owner",
@@ -1309,7 +1333,8 @@ def test_contract_import_cli_review_and_execute(
         lambda *args: opener,
     )
     command = [
-        "integrations",
+        "openmetadata",
+        "api",
         "products",
         "contract-import",
         "dev",
@@ -1341,7 +1366,8 @@ def test_contract_get_cli_returns_product_contract(config_file, monkeypatch, cap
     assert (
         main(
             [
-                "integrations",
+                "openmetadata",
+                "api",
                 "products",
                 "contract-get",
                 "dev",
@@ -1393,7 +1419,8 @@ def test_preserved_contract_source_cli_saves_exact_yaml(
     assert (
         main(
             [
-                "integrations",
+                "openmetadata",
+                "api",
                 "products",
                 "contract-source",
                 "dev",
@@ -1715,7 +1742,8 @@ def test_delete_cli_unverified_returns_nonzero_with_target(
     )
     status = main(
         [
-            "integrations",
+            "openmetadata",
+            "api",
             "products",
             "delete",
             "dev",
@@ -1801,7 +1829,8 @@ def test_delete_cli_requires_confirmation_before_any_network(
     )
     status = main(
         [
-            "integrations",
+            "openmetadata",
+            "api",
             "products",
             "delete",
             "dev",
@@ -2271,7 +2300,8 @@ def test_domain_create_cli_review_and_execute(config_file, monkeypatch, capsys):
         lambda *args: opener,
     )
     command = [
-        "integrations",
+        "openmetadata",
+        "api",
         "domain-create",
         "dev",
         "--config",
@@ -2508,7 +2538,8 @@ def test_compare_cli_saves_report_without_platform_writes(
     assert (
         main(
             [
-                "integrations",
+                "openmetadata",
+                "api",
                 "products",
                 "compare",
                 "dev",
@@ -2552,7 +2583,8 @@ def test_legacy_compare_cli_rejects_names_without_platform_request(
     assert (
         main(
             [
-                "integrations",
+                "openmetadata",
+                "api",
                 "products",
                 "compare",
                 "dev",
@@ -2602,7 +2634,8 @@ def test_domain_update_cli_review_and_execute(config_file, monkeypatch, capsys):
         lambda *args: opener,
     )
     command = [
-        "integrations",
+        "openmetadata",
+        "api",
         "products",
         "update",
         "dev",
@@ -2785,7 +2818,8 @@ def test_native_cli_can_retrieve_extensions(config_file, monkeypatch, capsys):
     )
     status = main(
         [
-            "integrations",
+            "openmetadata",
+            "api",
             "products",
             "get",
             "dev",
@@ -2963,7 +2997,8 @@ def test_product_search_cli(config_file, monkeypatch, capsys):
     )
     status = main(
         [
-            "integrations",
+            "openmetadata",
+            "api",
             "products",
             "search",
             "dev",
@@ -3056,7 +3091,8 @@ def test_cli_list_outputs_odpc_catalog(config_file, monkeypatch, capsys):
     assert (
         main(
             [
-                "integrations",
+                "openmetadata",
+                "api",
                 "products",
                 "list",
                 "dev",

@@ -3,7 +3,8 @@
 This development harness measures a complete, sequential workflow from each
 fictional Markdown business brief through fresh LLM generation, OpenMetadata
 product creation and search verification, metadata discovery, OpenSpec/ODPS/ODCS
-validation, Jira creation and attachment hash readback. It does not reuse generated
+validation, ODCS contract association and discovery readback, Jira creation and
+attachment hash readback. It does not reuse generated
 ODPS drafts, packages or existing products. Each case receives a unique synthetic
 product identity. The source brief is copied and its test-only identity is changed;
 the original file is not modified. A fictional-test label is added to the generated
@@ -34,15 +35,20 @@ python3 -m examples.integrations.handoff_timing_benchmark \
   --output /tmp/odp-benchmark-six --domain Banking --execute
 ```
 
-Execution creates one new OpenMetadata product and one Jira issue for each successful
-case. Results remain in those systems; the harness never deletes them. It uses the
+Execution creates one new OpenMetadata product, associates the generated ODCS
+draft with it, and creates one Jira issue for each successful case. Product and
+contract creation are separate writes; a failure can leave the product in place.
+The ODCS schema is integrity-checked as preserved source, not validated by
+OpenMetadata. Results remain in those systems; the harness never deletes them. It uses the
 SDK's review digests, rejects changed inputs and duplicate candidates, and records
 local journals. On an incomplete or uncertain write, it stops and requires inspection
 before another run. Do not blindly retry an uncertain create.
 
 The output directory contains a plan, per-case reviews and results, source hashes,
-catalog snapshots and Jira journals, plus `benchmark-results.json` and
-`benchmark-results.md`. Each case records distinct wall-clock phase timings, total
+contract reviews and verification, catalog snapshots and Jira journals, plus `benchmark-results.json` and
+`benchmark-results.md`. The initial catalog snapshot is captured before the generated
+contract exists and can report its lookup as unavailable. The subsequent
+`contract_verification` result records the post-import discovery and source hash. Each case records distinct wall-clock phase timings, total
 elapsed time, product and issue IDs, structural validation and readback outcomes.
 The total includes preflight, MCP startup, model calls, OpenMetadata requests and
 indexing waits, package construction, validation, Jira attachment upload and hash

@@ -11,7 +11,10 @@ import yaml
 from open_data_products import __version__
 from open_data_products.cli import main
 
-pytestmark = pytest.mark.functional
+pytestmark = [
+    pytest.mark.functional,
+    pytest.mark.usefixtures("isolated_cli_generation_configuration"),
+]
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 ODPS_PRODUCT = (
@@ -65,81 +68,23 @@ def test_unified_cli_help_uses_compact_command_metavar(
     assert exc_info.value.code == 0
     help_text = capsys.readouterr().out
     assert "usage: open-data-products [-h] [-V] COMMAND ..." in help_text
+    assert "Start and configure:" in help_text
+    assert "Data products and delivery:" in help_text
+    assert "Validate and inspect:" in help_text
+    assert "Catalogs, graphs and portfolios:" in help_text
     assert "{validate,explain,refs" not in help_text
-    assert "Common workflows:" in help_text
-    assert "Validate one artifact:" in help_text
-    assert "Generate ODPC fragments from source notes:" in help_text
-    assert "Build catalog and graph review artifacts:" in help_text
-    assert "Build a portfolio workspace:" in help_text
-    assert "Exchange OKF context bundles:" in help_text
-    assert "Use --json when scripting" in help_text
-    assert "Core document commands:" in help_text
-    assert "OKF context bundle commands:" in help_text
-    assert "resources --id okf.spec" in help_text
-    assert "MCP validate_okf_bundle" in help_text
-    assert "MCP list_okf_concepts" in help_text
-    assert "ODPC catalog commands:" in help_text
-    assert "resources --id odpc.objects" in help_text
-    assert "MCP search_objects" in help_text
-    assert "ODPV vocabulary commands:" in help_text
-    assert "resources --id odpv.terms" in help_text
-    assert "MCP search_terms" in help_text
-    assert "Discovery and agent commands:" in help_text
-    assert "config       Show or copy editable SDK config templates" in help_text
-    assert "ODPC catalog commands:" in help_text
-    assert "odpc-summary" in help_text
-    assert "odpc-search" in help_text
-    assert "ODPV vocabulary commands:" in help_text
-    assert "odpv-summary" in help_text
-    assert "odpv-search" in help_text
-    assert "ODPR recipe commands:" in help_text
-    assert "resources --id odpr.schema.yaml" in help_text
-    assert "ODPG graph commands:" in help_text
-    assert "odpg-build" in help_text
-    assert "odpg-generate" in help_text
-    assert "odpg-convert" in help_text
-    assert "Product/Data Contract commands:" in help_text
-    assert "LLM generation commands:" in help_text
-    assert "generate     Use configured LLM prompts" in help_text
     assert "Examples:" in help_text
+    assert "Next steps:" in help_text
+    assert "open-data-products COMMAND --help" in help_text
     assert "open-data-products validate product.yaml" in help_text
+    assert "open-data-products handover prepare --input brief.md" in help_text
+    assert "open-data-products jira deliver --input WORKSPACE" in help_text
     assert (
-        "open-data-products product contract-report product.yaml contract.yaml --json"
+        'open-data-products openmetadata products create products/ --domain "Banking"'
         in help_text
     )
-    assert "open-data-products resources --id odpc.objects --json" in help_text
-    assert "open-data-products resources --id odpv.terms --json" in help_text
-    assert "open-data-products resources --id odpr.schema.yaml --json" in help_text
-    assert "open-data-products recipe search localization --json" in help_text
-    assert "open-data-products okf-summary knowledge-bundle/ --json" in help_text
-    assert "open-data-products resources --id okf.spec --json" in help_text
-    assert (
-        "open-data-products odpg-generate graph.yaml --output graph-explorer.html"
-        in help_text
-    )
-    assert (
-        "open-data-products odpg-convert --input graph.graphml --output graph.yaml"
-        in help_text
-    )
-    assert (
-        "open-data-products generate --input source_docs/ --kind product-reference --output generated/"
-        in help_text
-    )
-    assert (
-        "open-data-products generate --input product.md --kind odps-product --output generated/"
-        in help_text
-    )
-    assert (
-        "open-data-products config generation --copy-prompts-to prompts/" in help_text
-    )
-    assert (
-        "open-data-products generate --config my-generation.config.yaml --prompts prompts/ --input source_docs/ --kind graph --output generated/"
-        in help_text
-    )
-    assert "open-data-products odpg-build fragments/ --output graph.yaml" in help_text
-    assert "generation.config.yaml --json" not in help_text
-    assert "validate" in help_text
-    assert "product" in help_text
+    assert "Discovery is optional" in help_text
+    assert "reviews may still be interactive" in help_text
 
 
 def test_unified_cli_generate_help_is_provider_neutral(
@@ -152,6 +97,73 @@ def test_unified_cli_generate_help_is_provider_neutral(
     help_text = capsys.readouterr().out
     assert "Generate selected YAML artifacts with configured LLMs" in help_text
     assert "local LLM" not in help_text
+
+
+@pytest.mark.parametrize(
+    "command, expected",
+    [
+        (
+            [],
+            [
+                "handover prepare --input",
+                "jira deliver --input WORKSPACE",
+                '--domain "Banking"',
+            ],
+        ),
+        (
+            ["handover", "prepare"],
+            [
+                "interactive terminal",
+                "omit to skip discovery",
+                "workspace paths",
+                "does not create an OpenMetadata product or Jira issue",
+            ],
+        ),
+        (
+            ["handover", "validate"],
+            [
+                "missing CLI means validation was not performed",
+                "npm install -g @fission-ai/openspec@2.2.0",
+                "not business approval",
+            ],
+        ),
+        (
+            ["jira", "deliver"],
+            [
+                "JIRA_PROJECT",
+                "JIRA_ISSUE_TYPE_ID",
+                "WORKSPACE is printed by handover prepare",
+                "inspect Jira before retrying",
+            ],
+        ),
+        (["openmetadata"], ['--domain "Banking"']),
+        (
+            ["openmetadata", "products", "create"],
+            [
+                '--domain "Retail Banking"',
+                "Non-interactive and --json runs only review",
+                "ODPS 4.1",
+            ],
+        ),
+        (
+            ["openmetadata", "discover"],
+            ["without modifying OpenMetadata", '--query "customer accounts"'],
+        ),
+    ],
+)
+def test_cli_help_guides_handover_and_platform_workflows(command, expected, capsys):
+    with pytest.raises(SystemExit) as exc_info:
+        main(command + ["--help"])
+    assert exc_info.value.code == 0
+    help_text = capsys.readouterr().out
+    output = " ".join(help_text.split())
+    for item in expected:
+        assert item in output
+    if command == ["openmetadata", "products", "create"]:
+        assert (
+            'open-data-products openmetadata products create products/ --domain "Retail Banking"'
+            in help_text
+        )
 
 
 @pytest.mark.parametrize(
@@ -230,7 +242,7 @@ def test_product_cli_help_uses_compact_command_metavar_and_examples(
     help_text = capsys.readouterr().out
     assert "usage: open-data-products product [-h] PRODUCT_COMMAND ..." in help_text
     assert "{check-contract,resolve-contracts" not in help_text
-    assert "Data Contract workflow commands:" in help_text
+    assert "Next steps:" in help_text
     assert "Examples:" in help_text
     assert (
         "open-data-products product resolve-contracts product.yaml --json" in help_text
@@ -250,25 +262,93 @@ def test_portfolio_cli_help_uses_human_first_examples(
     assert exc_info.value.code == 0
     help_text = capsys.readouterr().out
     assert "usage: open-data-products portfolio [-h] PORTFOLIO_COMMAND ..." in help_text
-    assert "Portfolio workflow commands:" in help_text
-    assert (
-        "open-data-products portfolio build --objectives sources/objectives/ --use-cases sources/use-cases/ --signals sources/signals/ --products sources/products/ --output generated/portfolio/"
-        in help_text
-    )
-    assert (
-        "open-data-products portfolio intake --objectives sources/objectives/ --use-cases sources/use-cases/ --signals sources/signals/ --products sources/products/ --config generation.config.yaml --json"
-        in help_text
-    )
-    assert "open-data-products portfolio refresh generated/portfolio/" in help_text
-    assert "open-data-products portfolio sync generated/portfolio/" in help_text
-    assert (
-        'open-data-products portfolio localize generated/portfolio/ --languages "fi,sv" --provider claude --model claude-sonnet-4-5'
-        in help_text
-    )
-    assert (
-        "portfolio build --objectives sources/objectives/ --use-cases sources/use-cases/ --signals sources/signals/ --products sources/products/ --output generated/portfolio/ --json"
-        not in help_text
-    )
+    assert "Examples:" in help_text
+    assert "Next steps:" in help_text
+    assert "open-data-products portfolio COMMAND --help" in help_text
+    assert "open-data-products portfolio intake" in help_text
+    assert "open-data-products portfolio sync portfolio/" in help_text
+    assert "discover-dcat" in help_text
+    assert "discover-dprod" in help_text
+
+
+@pytest.mark.parametrize(
+    "group",
+    ["product", "portfolio", "recipe", "handover", "openmetadata"],
+)
+def test_command_group_help_has_examples_and_next_steps(group, capsys):
+    with pytest.raises(SystemExit) as exc_info:
+        main([group, "--help"])
+    assert exc_info.value.code == 0
+    help_text = capsys.readouterr().out
+    assert "Examples:" in help_text
+    assert "Next steps:" in help_text
+    assert "open-data-products {} COMMAND --help".format(group) in help_text
+
+
+def test_integration_leaf_help_explains_common_options(capsys):
+    with pytest.raises(SystemExit) as exc_info:
+        main(["openmetadata", "api", "products", "contract-import", "--help"])
+    assert exc_info.value.code == 0
+    help_text = " ".join(capsys.readouterr().out.split())
+    assert "Named connection profile" in help_text
+    assert "Connection configuration YAML" in help_text
+    assert "Execute the previously reviewed operation" in help_text
+    assert "Digest from the reviewed operation" in help_text
+    assert "Emit structured JSON" in help_text
+
+
+@pytest.mark.parametrize(
+    "command, expected, absent",
+    [
+        (["config", "llm", "add"], "Interactively add", "--copy-to"),
+        (["config", "llm", "use"], "--name", "--copy-to"),
+        (["config", "connections", "edit"], "--name", "--copy-prompts-to"),
+        (["config", "credentials", "set"], "hidden prompt", "--copy-to"),
+        (["config", "test"], "may incur cost", "--copy-to"),
+        (["jira", "deliver"], "--input", "--package-url"),
+    ],
+)
+def test_guided_leaf_help_only_shows_relevant_options(
+    command, expected, absent, capsys
+):
+    with pytest.raises(SystemExit) as exc_info:
+        main(command + ["--help"])
+    assert exc_info.value.code == 0
+    text = capsys.readouterr().out
+    assert expected in text
+    assert absent not in text
+
+
+@pytest.mark.parametrize(
+    "command, expected",
+    [
+        (
+            ["openmetadata", "products", "search"],
+            ["Product search query", "Search result offset", "Maximum search results"],
+        ),
+        (
+            ["openmetadata", "api", "products", "recover-create"],
+            [
+                "ODPS source used in the uncertain create",
+                "Destination domain FQN",
+                "Maximum product-list pages",
+            ],
+        ),
+        (
+            ["openmetadata", "api", "products", "contract-source"],
+            ["Target data product UUID", "Destination for preserved ODCS source"],
+        ),
+        (["product", "wrap-dprod"], ["Allow replacement of an existing output"]),
+        (["product", "export-dprod"], ["Allow replacement of existing outputs"]),
+    ],
+)
+def test_legacy_cli_help_explains_inputs_and_effects(command, expected, capsys):
+    with pytest.raises(SystemExit) as exc_info:
+        main(command + ["--help"])
+    assert exc_info.value.code == 0
+    output = " ".join(capsys.readouterr().out.split())
+    for item in expected:
+        assert item in output
 
 
 def test_recipe_cli_validates_and_dry_runs_recipe(
@@ -2205,6 +2285,9 @@ def test_unified_cli_local_generation(
 ) -> None:
     from open_data_products import generation
 
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "generation.config.yaml").write_text("provider: ollama\n")
+
     def fake_generate_local_artifacts_for_kind(
         artifact_kind: str,
         source_dir: Union[str, Path],
@@ -2271,6 +2354,9 @@ def test_unified_cli_local_generation_can_select_one_kind(
     tmp_path: Path,
 ) -> None:
     from open_data_products import generation
+
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "generation.config.yaml").write_text("provider: ollama\n")
 
     def fake_generate_local_artifacts_for_kind(
         artifact_kind: str,
@@ -2472,12 +2558,16 @@ def test_unified_cli_generation_accepts_model_override(
     assert payload["model"] == "llama3.2"
 
 
-def test_unified_cli_generation_uses_claude_without_config(
+def test_unified_cli_generation_uses_claude_override(
     capsys: pytest.CaptureFixture[str],
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
     from open_data_products import generation
+
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "generation.config.yaml").write_text("provider: ollama\n")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "fake-test-key")
 
     source = tmp_path / "signal-source.md"
     source.write_text(
@@ -2675,6 +2765,8 @@ def test_unified_cli_generation_uses_config_provider(
     tmp_path: Path,
 ) -> None:
     from open_data_products import generation
+
+    monkeypatch.setenv("TEST_OPENAI_API_KEY", "fake-test-key")
 
     config = tmp_path / "generation.config.yaml"
     output_dir = tmp_path / "configured-output"
@@ -3326,3 +3418,58 @@ def test_portfolio_discover_contracts_uses_configured_ai_client(
     )
 
     assert json.loads(capsys.readouterr().out)["ai_enabled"] is True
+
+
+def test_generate_human_output_shows_review_notes(tmp_path, monkeypatch, capsys):
+    from open_data_products import generation
+
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "generation.config.yaml").write_text("provider: ollama\n")
+    (tmp_path / "brief.md").write_text("Business brief")
+    artifact = generation.GeneratedArtifact(
+        name="test",
+        prompt_name="fixture",
+        output_path=tmp_path / "out.yaml",
+        valid_yaml=True,
+        review_notes=["Existing dataHolder conflicts with configured organization"],
+        evidence_gaps=["Owner confirmation missing"],
+    )
+    monkeypatch.setattr(
+        generation,
+        "create_generation_client",
+        lambda settings: lambda prompt, model: "",
+    )
+    monkeypatch.setattr(
+        generation,
+        "generate_local_artifacts_for_kind",
+        lambda *args, **kwargs: [artifact],
+    )
+    assert (
+        main(
+            [
+                "generate",
+                "--input",
+                "brief.md",
+                "--kind",
+                "odps-product",
+                "--output",
+                "out",
+            ]
+        )
+        == 0
+    )
+    output = capsys.readouterr().out
+    assert "Review: Existing dataHolder conflicts" in output
+    assert "Missing evidence: Owner confirmation missing" in output
+
+
+def test_removed_cli_command_groups_are_not_registered(capsys):
+    for group in ("handoff", "integrations"):
+        with pytest.raises(SystemExit) as failure:
+            main([group, "--help"])
+        assert failure.value.code != 0
+    with pytest.raises(SystemExit):
+        main(["--help"])
+    output = capsys.readouterr().out
+    assert "    handoff " not in output
+    assert "    integrations " not in output

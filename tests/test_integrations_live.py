@@ -572,7 +572,8 @@ def test_live_odcs_contract_import(tmp_path):
             assert (
                 main(
                     [
-                        "integrations",
+                        "openmetadata",
+                        "api",
                         "products",
                         "contract-source",
                         profile_name,

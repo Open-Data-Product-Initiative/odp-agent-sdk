@@ -16,3 +16,5 @@ dist/
 /tests/fixtures/openmetadata_banking_poc/comparison.local.json
 .open-data-products/activity.log
 .open-data-products/integrations.yaml
+
+.open-data-products/organization.yaml

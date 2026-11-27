@@ -56,6 +56,17 @@ guides such as [commands.md](../user/commands.md),
 [generation.md](../user/generation.md), and
 [data-contracts.md](../user/data-contracts.md).
 
+## CLI help conventions
+
+Keep the root help focused on the parser's command list, a few representative
+examples, and a pointer to `COMMAND --help`. For command groups, use a short
+description, the generated subcommand list, `Examples`, and `Next steps`.
+Leaf command help should explain required inputs, meaningful defaults, output,
+and any review, external-service, or write requirements. Preserve complete
+copyable examples and quote domain values. Explain when `--json` still requires
+an interactive review. Test the rendered help alongside command behavior; do
+not maintain a second manually duplicated command list.
+
 ## Refactor Compatibility Posture
 
 Keep `open-data-products` as the primary CLI contract. The legacy

@@ -1520,6 +1520,7 @@ def generate_local_artifacts_for_kind(
     max_source_chars: Optional[int] = None,
     overwrite: bool = False,
     odps_version: Optional[str] = None,
+    organization: Optional[dict] = None,
 ) -> List[GeneratedArtifact]:
     """Generate selected YAML artifacts by processing each source document."""
     destination = Path(output_dir)
@@ -1533,6 +1534,10 @@ def generate_local_artifacts_for_kind(
     if odps_version is not None and task.name != "odps_products":
         raise ValueError("ODPS version selection requires an ODPS product")
     if task.name == "odps_products":
+        if organization is None:
+            from .._organization import load_organization
+
+            organization = load_organization()
         return _generate_odps_product_artifacts(
             source,
             destination,
@@ -1544,6 +1549,7 @@ def generate_local_artifacts_for_kind(
             max_source_chars=max_source_chars,
             overwrite=overwrite,
             odps_version=odps_version,
+            organization=organization,
         )
     artifacts: List[GeneratedArtifact] = []
     for source_path in _source_document_paths(source):
@@ -1574,6 +1580,7 @@ def _generate_odps_product_artifacts(
     max_source_chars: Optional[int] = None,
     overwrite: bool = False,
     odps_version: Optional[str] = None,
+    organization: Optional[dict] = None,
 ) -> List[GeneratedArtifact]:
     if odps_version is not None and normalize_version(odps_version) not in (
         "4.1",
@@ -1602,6 +1609,7 @@ def _generate_odps_product_artifacts(
             overwrite=overwrite,
             written_paths=written_paths,
             odps_version=target_version,
+            organization=organization,
         )
         for source_path in _source_document_paths(source)
     ]
@@ -1649,6 +1657,7 @@ def _generate_one_odps_product(
     overwrite: bool,
     written_paths: set,
     odps_version: Optional[str],
+    organization: Optional[dict] = None,
 ) -> GeneratedArtifact:
     task = _generation_task_for("odps-product")
     if source.stat().st_size > 20 * 1024 * 1024:
@@ -1830,6 +1839,15 @@ def _generate_one_odps_product(
                     + field
                     + " differs from the labelled source value; review it before use."
                 )
+
+    if organization:
+        from .._organization import apply_organization
+
+        notes = apply_organization(document, organization)
+        review_notes.extend(notes)
+        if isinstance(document.get("product"), dict):
+            final_yaml = yaml.safe_dump(document, sort_keys=False, allow_unicode=True)
+            errors = _odps_generation_errors(task, final_yaml, odps_version)
 
     return _write_odps_product_artifact(
         task,

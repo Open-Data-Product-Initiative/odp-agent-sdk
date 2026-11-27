@@ -21,6 +21,18 @@ a local MCP server, and a standards-aware API for AI agents.
 pip install open-data-products
 ```
 
+After installation, run setup in your project directory before using LLM or
+platform commands:
+
+```bash
+open-data-products config setup
+open-data-products config show
+```
+
+Offline validation and inspection commands do not require setup.
+Use `open-data-products config test` to test configured services; it sends a
+short LLM prompt and may incur provider costs.
+
 Optional extras:
 
 ```bash
@@ -91,6 +103,19 @@ open-data-products validate examples/product.yaml
 open-data-products explain examples/product.yaml --json
 ```
 
+Create an ODPS draft from a business document using the configured LLM:
+
+```bash
+open-data-products generate --input business-brief.md --kind odps-product --output products/
+```
+
+Or create a draft product from an existing data contract without configuring
+an LLM or metadata platform:
+
+```bash
+open-data-products product wrap-contract --input contract.yaml --output product.yaml
+```
+
 Prepare a coding-assistant handover from one business document or a folder:
 
 The handover and Jira commands require SDK 0.9.0 or later. Check the installed
@@ -102,10 +127,12 @@ open-data-products handover prepare --input business-briefs/ --json > results.js
 open-data-products jira deliver --input handoffs/data-product-WORKSPACE
 ```
 
-Use the workspace returned in `results.json`. Preparation and Jira delivery are
-separately reviewed; the resulting OpenSpec and data product artifacts are
-unapproved drafts. See the [handover guide](docs/integrations/handoff.md) for
-provider, discovery and Jira setup, evidence limits and review requirements.
+Use the workspace returned in `results.json`. Preparation and Jira delivery support
+interactive reviews by default or non-interactive operation with `--mode agent`.
+Agent mode sends business content to the selected provider and creates Jira issues
+without confirmation. The resulting artifacts are unapproved drafts. See the
+[handover guide](docs/integrations/handoff.md) for setup, evidence limits and
+review requirements.
 
 Create OpenMetadata products from reviewed ODPS 4.1 documents:
 
@@ -130,10 +157,9 @@ open-data-products openmetadata products update --id PRODUCT_UUID \
   --input product.yaml
 ```
 
-The connection file references an environment variable, like `OPENAI_API_KEY`;
-the standalone platform commands do not automatically load `.env`. Guided
-handover preparation and Jira delivery do read `.env` from the working directory
-when present. The platform command requires a
+The connection file references environment variables such as `OPENMETADATA_TOKEN`.
+Generation, OpenMetadata, handover and Jira CLI commands load `.env` from the
+working directory when present; existing process environment values take precedence. The platform command requires a
 write-enabled profile and appropriate platform permissions. It checks for
 possible duplicates and reports fields that might not be imported; generated
 metadata is not evidence of approval. See the [integration guide](docs/integrations/openmetadata.md)
@@ -297,6 +323,29 @@ Before publishing a package, verify the PyPI description renders:
 python3 -m build
 python3 -m twine check dist/*
 ```
+
+### Organization defaults for ODPS
+
+Configure the organization used as the default data holder in generated ODPS drafts:
+
+```sh
+open-data-products config organization edit
+open-data-products config organization show
+open-data-products config show
+```
+
+You can also select **Organization** in `config setup`. The editor supports all
+data holder fields in ODPS 4.1 and 4.2, including optional contact and address
+details. It reviews the values before saving them in
+`.open-data-products/organization.yaml`; this project-local file is ignored by
+Git in this SDK checkout. Treat contact details as potentially personal data.
+
+The configured details are added locally to generated ODPS drafts, including
+products wrapped from ODCS, DCAT and DPROD. ODPS 4.1 uses `product.dataHolder`; ODPS 4.2
+uses a language-keyed holder. Existing conflicting holder values are preserved
+and reported for review. These defaults are proposals, not proof of ownership.
+Organization details in a generated ODPS may be sent to an LLM during subsequent
+handover preparation, subject to that workflow's provider review.
 
 ## Acknowledgments
 

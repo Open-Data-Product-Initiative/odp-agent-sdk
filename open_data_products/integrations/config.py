@@ -99,7 +99,15 @@ class ConnectionProfile:
         else:
             raise ConfigurationError("Unsupported credential source")
         if not value:
-            raise ConfigurationError("Configured credential is missing")
+            if self.token_source == "env":
+                raise ConfigurationError(
+                    "Credential "
+                    + self.token_env
+                    + " is missing. Run 'open-data-products config credentials set --name "
+                    + self.token_env
+                    + "'."
+                )
+            raise ConfigurationError("Configured Keychain credential is missing")
         if "\r" in value or "\n" in value:
             raise ConfigurationError("Credential contains invalid characters")
         return value

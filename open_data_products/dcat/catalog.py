@@ -108,6 +108,9 @@ def wrap_dcat_resource(
             warnings.append("AI_ENRICHMENT_FAILED: {}".format(type(exc).__name__))
     else:
         mapping_report["ai_generated_fields"] = []
+    from .._organization import apply_organization, load_organization
+
+    warnings.extend(apply_organization(document, load_organization()))
     validation = validate_document(document)
     output_path: Optional[str] = None
     if output:

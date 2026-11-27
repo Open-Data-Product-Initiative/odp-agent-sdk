@@ -150,6 +150,33 @@ def test_wrap_contract_cli_accepts_named_input(tmp_path: Path) -> None:
     assert output.is_file()
 
 
+def test_wrap_contract_cli_does_not_require_llm_or_platform_setup(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    contract = tmp_path / "orders.yaml"
+    contract.write_text(
+        "apiVersion: v3.2.0\nkind: DataContract\nid: ORDERS\ndataProduct: Orders\n",
+        encoding="utf-8",
+    )
+    assert (
+        main(
+            [
+                "product",
+                "wrap-contract",
+                "--input",
+                str(contract),
+                "--output",
+                "product.yaml",
+            ]
+        )
+        == 0
+    )
+    assert (tmp_path / "product.yaml").is_file()
+    assert not (tmp_path / "generation.config.yaml").exists()
+    assert not (tmp_path / "connections.yaml").exists()
+
+
 def test_wrap_contract_inline_preserves_complete_contract_and_access_profile(
     tmp_path: Path,
 ) -> None:

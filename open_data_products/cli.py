@@ -46,166 +46,24 @@ if TYPE_CHECKING:
 
 
 TOP_LEVEL_HELP = """\
-Common workflows:
-  Validate one artifact:
-    open-data-products validate product.yaml
-
-  Generate ODPC fragments from source notes:
-    open-data-products generate --input source_docs/ --kind product-reference --output generated/
-
-  Generate a full ODPS product draft:
-    open-data-products generate --input product.md --kind odps-product --output products/
-
-  Build catalog and graph review artifacts:
-    open-data-products odpc-build fragments/ --output catalog.yaml --html catalog.html --toon catalog.toon --gcf catalog.gcf
-    open-data-products odpg-build fragments/ --output graph.yaml --toon graph.toon --gcf graph.gcf
-    open-data-products odpg-generate graph.yaml --output graph-explorer.html
-
-  Build a portfolio workspace:
-    open-data-products portfolio build --objectives sources/objectives/ --use-cases sources/use-cases/ --signals sources/signals/ --products sources/products/ --output portfolio/
-
-  Exchange OKF context bundles:
-    open-data-products okf-validate knowledge-bundle/ --json
-    open-data-products okf-import knowledge-bundle/ --output source_docs/
-    open-data-products okf-export catalog.yaml --output okf-bundle/
-
-  Use --json when scripting or handing command output to agents.
-
-Core document commands:
-  validate     Validate ODPS, ODPC, ODPG, or ODPV documents
-  explain      Print an agent-readable document summary
-  refs         List document references
-  summary      Return lightweight file metadata
-
-OKF context bundle commands:
-  okf-validate         Validate an Open Knowledge Format bundle
-  okf-summary          Summarize OKF concepts without returning bodies
-  okf-import           Write OKF concepts as generation source documents
-  okf-export           Export ODPC catalog or portfolio artifacts as OKF
-  resources --id okf.spec        Return OKF adapter/spec reference metadata
-  MCP validate_okf_bundle        Validate OKF bundles from agents
-  MCP list_okf_concepts          List concept metadata without Markdown bodies
-
-ODPC catalog commands:
-  odpc-build           Build one ODPC catalog from YAML/JSON fragments
-  odpc-summary         Summarize catalog metadata and item counts
-  odpc-search          Search bundled catalog object guidance
-  odpc-artifacts       Generate or check derived catalog schema artifacts
-  resources --id odpc.objects   Return catalog object guidance records
-  MCP search_objects            Search ODPC guidance from agents
-
-ODPV vocabulary commands:
-  odpv-summary         Summarize vocabulary sections and term counts
-  odpv-search          Search bundled vocabulary terms
-  odpv-resolve         Resolve text or aliases to a canonical term
-  odpv-explain         Return one canonical term packet
-  odpv-relationship    Check relationship domain/range compatibility
-  odpv-context         Return an agent-ready term context packet
-  resources --id odpv.terms     Return vocabulary term records
-  MCP search_terms              Search ODPV terms from agents
-  odpv-profile-validate         Validate an exact draft ODPV 1.1 profile
-  odpv-profile-resolve          Resolve a mapping after explicit draft opt-in
-  odpv-profile-transform        Transform a bounded document through a profile
-
-ODPR recipe commands:
-  recipe list           List workflow recipe metadata
-  recipe validate       Validate an ODPR Recipe, Provider, or RecipeCatalog
-  recipe catalog        Build a metadata-only RecipeCatalog
-  recipe init           Create a workspace from a packaged starter recipe
-  recipe explain        Explain a starter or local recipe without executing it
-  recipe plan           Alias for recipe run --dry-run
-  recipe dry-run        Alias for recipe run --dry-run
-  resources --id odpr.schema.yaml          Return the bundled ODPR YAML schema
-  resources --id odpr.recipe-config-template  Return the recipe runner config template
-  resources --id odpr.recipes              Return bundled ODPR recipe guidance records
-
-Discovery and agent commands:
-  resources    List bundled schemas, vocabularies, and indexes
-  config       Show or copy editable SDK config templates
-  recipe       List, validate, and dry-run workflow recipes
-  manifest     Emit the MCP/agent manifest
-  serve        Run the MCP server over stdio
-
-LLM generation commands:
-  generate     Use configured LLM prompts to create selected YAML artifacts
-
-ODPG graph commands:
-  odpg-build           Build one ODPG graph from ODPC fragments with LLM-inferred edges
-  odpg-summary         Summarize graph metadata and relationship counts
-  odpg-traverse        Discover relationship paths from a focus node
-  odpg-analyze         Run governance and strategic graph checks
-  odpg-agent-context   Extract graph context around a node for agents
-  odpg-generate        Generate a standalone graph explorer HTML file
-  odpg-convert         Convert JSON-LD, GraphML, GraphSON, RDF, Cypher, GQL, or Gremlin to ODPG YAML
-
-Product/Data Contract commands:
-  product resolve-contracts   Resolve Data Contract references
-  product contract-report     Generate a product-contract report
-  product audit               Run static product and contract checks
-  product check-contract      Validate a product plus an external contract
-  product align-contract      Check static ODPS/Data Contract alignment
-  product contract-schema     Summarize a Data Contract schema
-  product export-contract     Export through datacontract-cli
-  product wrap-contract       Generate an ODPS 4.2 draft from an ODCS contract
-
-Portfolio workflow commands:
-  portfolio build     Build a portfolio workspace from source lanes
-  portfolio refresh   Refresh a portfolio workspace from saved source lanes
-  portfolio sync      Sync edited YAML artifacts without calling an LLM
-  portfolio localize  Localize portfolio HTML without changing YAML artifacts
-  portfolio render    Render one static portfolio index.html
-  portfolio explain   Summarize a portfolio workspace
+Getting started:
+  open-data-products config setup
+  LLM and platform commands require configuration; offline validation does not.
 
 Examples:
   open-data-products validate product.yaml
-  open-data-products explain catalog.yaml
-  open-data-products odpc-build fragments/ --output catalog.yaml
-  open-data-products odpc-build fragments/ --output catalog.yaml --html catalog.html
-  open-data-products odpc-build fragments/ --output catalog.yaml --toon catalog.toon --gcf catalog.gcf
-  open-data-products odpc-summary catalog.yaml
-  open-data-products odpc-search "catalog data" --limit 3
-  open-data-products odpc-artifacts open_data_products/generation/fragments/ --check
-  open-data-products okf-validate knowledge-bundle/ --json
-  open-data-products okf-summary knowledge-bundle/ --json
-  open-data-products okf-import knowledge-bundle/ --output source_docs/
-  open-data-products okf-export catalog.yaml --output okf-bundle/
-  open-data-products resources --id okf.spec --json
-  open-data-products odpv-summary
-  open-data-products odpv-search "governance policy risk" --limit 3
-  open-data-products odpv-context DataProduct
-  open-data-products resources --id odpc.objects --json
-  open-data-products resources --id odpv.terms --json
-  open-data-products config generation --copy-to my-generation.config.yaml
-  open-data-products config generation --copy-prompts-to prompts/
-  open-data-products resources --id odpr.schema.yaml --json
-  open-data-products resources --id odpr.recipe-config-template --json
-  open-data-products recipe search localization --json
-  open-data-products recipe search --id RecipeCatalog --json
-  open-data-products recipe list --json
-  open-data-products recipe init build-data-product-portfolio --json
-  open-data-products recipe init build-data-product-portfolio --parameterized --json
-  open-data-products recipe explain build-data-product-portfolio --json
-  open-data-products recipe plan --json
-  open-data-products recipe list --config recipes.config.yaml --json
-  open-data-products recipe validate recipes/release-portfolio-review.yaml --json
-  open-data-products recipe run --allow-llm --approve-review --json
-  open-data-products resources --json
-  open-data-products generate --input source_docs/ --kind product-reference --output generated/
-  open-data-products generate --input product.md --kind odps-product --output generated/
-  open-data-products generate --input transcripts/ --kind odps-product --profile complete-draft --include-components SLA,dataQuality,pricingPlans --output products/
-  open-data-products generate --input use-case.md --kind use-case --output generated/
-  open-data-products generate --config my-generation.config.yaml --provider groq --model openai/gpt-oss-120b --input source_docs/ --kind signal --output generated/
-  open-data-products generate --config my-generation.config.yaml --prompts prompts/ --input source_docs/ --kind graph --output generated/
-  open-data-products odpg-build fragments/ --output graph.yaml --toon graph.toon --gcf graph.gcf
-  open-data-products odpg-agent-context graph.yaml --node DATA-PRODUCT-001
-  open-data-products odpg-generate graph.yaml --output graph-explorer.html
-  open-data-products odpg-convert --input graph.graphml --output graph.yaml
-  open-data-products portfolio build --objectives sources/objectives/ --use-cases sources/use-cases/ --signals sources/signals/ --products sources/products/ --output generated/portfolio/
-  open-data-products portfolio sync generated/portfolio/
-  open-data-products portfolio localize generated/portfolio/ --languages "fi,sv" --provider claude --model claude-sonnet-4-5
-  open-data-products portfolio render generated/portfolio/
-  open-data-products product contract-report product.yaml contract.yaml --json
-  open-data-products serve
+  open-data-products generate --input brief.md --kind odps-product --output products/
+  open-data-products product wrap-contract --input contract.yaml --output product.yaml
+  open-data-products handover prepare --input brief.md --discovery openmetadata
+  open-data-products jira deliver --input WORKSPACE
+  open-data-products openmetadata products create products/ --domain "Banking"
+  open-data-products recipe list
+
+Next steps:
+  Use open-data-products COMMAND --help for options and examples.
+  Preparation prints the workspace used for Jira delivery. Discovery is optional.
+  Where supported, --json returns structured output; reviews may still be interactive.
+  Configure provider credentials and platform connections before using integrations.
 """
 
 
@@ -508,25 +366,13 @@ def _print_odpg_paths(start: str, paths: List[Dict[str, object]]) -> None:
 
 
 PORTFOLIO_HELP = """\
-Portfolio workflow commands:
-  build       Build a portfolio workspace from source lanes
-  intake      Inspect source intake limits without calling an LLM
-  refresh     Refresh a portfolio workspace from saved source lanes
-  sync        Sync edited YAML artifacts without calling an LLM
-  localize    Localize portfolio HTML without changing YAML artifacts
-  render      Render one static browser-viewable portfolio page
-  explain     Summarize portfolio artifacts, counts, and browser entry point
-
 Examples:
-  open-data-products portfolio build --objectives sources/objectives/ --use-cases sources/use-cases/ --signals sources/signals/ --products sources/products/ --output generated/portfolio/
-  open-data-products portfolio intake --objectives sources/objectives/ --use-cases sources/use-cases/ --signals sources/signals/ --products sources/products/ --config generation.config.yaml --json
-  open-data-products portfolio build --objectives sources/objectives/ --products sources/products/ --output generated/portfolio/ --strict-validation
-  open-data-products portfolio refresh generated/portfolio/
-  open-data-products portfolio refresh generated/portfolio/ --all-sources
-  open-data-products portfolio sync generated/portfolio/
-  open-data-products portfolio localize generated/portfolio/ --languages "fi,sv" --provider claude --model claude-sonnet-4-5
-  open-data-products portfolio render generated/portfolio/
-  open-data-products portfolio explain generated/portfolio/
+  open-data-products portfolio build --objectives sources/objectives/ --products sources/products/ --output portfolio/
+  open-data-products portfolio intake --objectives sources/objectives/ --products sources/products/ --json
+  open-data-products portfolio sync portfolio/
+
+Next steps:
+  Use open-data-products portfolio COMMAND --help for options and examples.
 """
 
 
@@ -738,21 +584,22 @@ def _contract_source(record: Dict[str, object]) -> str:
 
 def main(argv: Optional[List[str]] = None) -> int:
     """Run the top-level Open Data Products CLI."""
+    from ._cli_help import TaskHelpFormatter
+
     cli_argv = list(sys.argv[1:] if argv is None else argv)
     parse_start_time = time.monotonic()
     parser = argparse.ArgumentParser(
         prog="open-data-products",
-        description=(
-            "Validate, inspect, and expose Open Data Product family artifacts."
-        ),
+        description="Create, validate and work with Open Data Product artifacts.",
         epilog=TOP_LEVEL_HELP,
-        formatter_class=argparse.RawDescriptionHelpFormatter,
+        formatter_class=TaskHelpFormatter,
     )
     parser.add_argument(
         "-V",
         "--version",
         action="version",
         version=f"%(prog)s {__version__}",
+        help="Show the SDK version and exit",
     )
     subparsers = parser.add_subparsers(
         dest="command",
@@ -817,14 +664,55 @@ def main(argv: Optional[List[str]] = None) -> int:
     okf_export_parser.add_argument("--json", action="store_true", help="Emit JSON")
 
     config_parser = subparsers.add_parser(
-        "config", help="Show or copy SDK config templates"
+        "config",
+        help="Set up, inspect or copy SDK configuration",
+        description="Set up local settings, inspect status, or work with configuration templates.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=(
+            "Examples:\n"
+            "  open-data-products config setup\n"
+            "  open-data-products config show\n"
+            "  open-data-products config test\n"
+            "  open-data-products config credentials set --name OPENAI_API_KEY\n"
+            "  open-data-products config llm add\n"
+            "  open-data-products config llm list\n"
+            "  open-data-products config llm edit --name company\n"
+            "  open-data-products config llm use --name company\n"
+            "  open-data-products config connections list\n"
+            "  open-data-products config connections add\n"
+            "  open-data-products config connections edit --name openmetadata\n"
+            "  open-data-products config status --json\n"
+            "  open-data-products config status --test\n"
+            "  open-data-products config generation --check"
+        ),
     )
     config_parser.add_argument(
         "domain",
         nargs="?",
-        choices=["generation", "recipes", "integrations"],
+        choices=[
+            "generation",
+            "recipes",
+            "integrations",
+            "setup",
+            "status",
+            "show",
+            "test",
+            "llm",
+            "connections",
+            "credentials",
+            "organization",
+        ],
         default="generation",
-        help="Config domain to inspect. Defaults to generation.",
+        help="Select interactive setup, status, or a template domain (default: generation).",
+    )
+    config_parser.add_argument(
+        "llm_action",
+        nargs="?",
+        choices=["add", "list", "use", "edit", "set", "show"],
+        help="Provider, connection or credential operation.",
+    )
+    config_parser.add_argument(
+        "--name", help="Provider, connection or credential environment variable name."
     )
     config_parser.add_argument(
         "--config",
@@ -859,6 +747,11 @@ def main(argv: Optional[List[str]] = None) -> int:
         help="Validate the config file without contacting the LLM provider.",
     )
     config_parser.add_argument(
+        "--test",
+        action="store_true",
+        help="For config status, test OpenMetadata and Jira connections (read-only).",
+    )
+    config_parser.add_argument(
         "--print",
         action="store_true",
         help="Print the raw YAML config template or selected config file.",
@@ -868,6 +761,15 @@ def main(argv: Optional[List[str]] = None) -> int:
     recipe_parser = subparsers.add_parser(
         "recipe",
         help="List, validate, and dry-run workflow recipes",
+        description="Inspect and run workflow recipes and starter workspaces.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=(
+            "Examples:\n"
+            "  open-data-products recipe list\n"
+            "  open-data-products recipe plan --json\n\n"
+            "Next steps:\n"
+            "  Use open-data-products recipe COMMAND --help for options and examples."
+        ),
     )
     recipe_subparsers = recipe_parser.add_subparsers(
         dest="recipe_command",
@@ -1531,6 +1433,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     portfolio_parser = subparsers.add_parser(
         "portfolio",
         help="Portfolio workspace workflows",
+        description="Build and inspect data product portfolio workspaces.",
         epilog=PORTFOLIO_HELP,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -1801,22 +1704,49 @@ def main(argv: Optional[List[str]] = None) -> int:
     )
 
     handover_parser = subparsers.add_parser(
-        "handover", help="Prepare coding-assistant handovers"
+        "handover",
+        help="Prepare and validate coding-assistant handovers",
+        description="Generate draft packages from business documents.\nJira delivery is a separate reviewed operation.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=(
+            "Examples:\n"
+            "  open-data-products handover prepare --input business-brief.md\n\n"
+            "Next steps:\n"
+            "  Use open-data-products handover COMMAND --help for options and examples."
+        ),
     )
     handover_commands = handover_parser.add_subparsers(
         dest="handover_command", required=True
     )
     prepare_parser = handover_commands.add_parser(
-        "prepare", help="Prepare a draft handoff for each business document"
+        "prepare",
+        help="Prepare a draft handoff for each business document",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=(
+            "Generate an ODPS draft and coding-assistant handover for each input.\n"
+            "Human mode requires an interactive terminal; agent mode runs without prompts and emits JSON.\n"
+            "The local generation.config.yaml and .env are used when present;\n"
+            "Agent mode sends source material and selected evidence to the provider.\n"
+            "Preparation does not create an OpenMetadata product or Jira issue."
+        ),
+        epilog=(
+            "Examples:\n"
+            "  open-data-products handover prepare --input business-brief.md\n"
+            "  open-data-products handover prepare --input briefs/ --discovery openmetadata --json > results.json\n"
+            "  open-data-products handover prepare --input briefs/ --mode agent > results.json\n"
+            "  open-data-products jira deliver --input WORKSPACE"
+        ),
     )
     prepare_parser.add_argument(
         "--input",
         dest="business_document",
         required=True,
-        help="Business document or folder of documents to review and use",
+        help="Business document (.md, .txt or .docx), or folder scanned at its top level",
     )
     prepare_parser.add_argument(
-        "--output", default="handoffs", help="Directory for local draft packages"
+        "--output",
+        default="handoffs",
+        help="Directory for local draft packages (default: handoffs/)",
     )
     prepare_parser.add_argument(
         "--config", help="Override local generation.config.yaml"
@@ -1829,19 +1759,33 @@ def main(argv: Optional[List[str]] = None) -> int:
     prepare_parser.add_argument(
         "--json",
         action="store_true",
-        help="Write machine-readable preparation results to stdout; reviews go to stderr",
+        help="Write results including workspace paths to stdout; interactive reviews go to stderr",
     )
     prepare_parser.add_argument(
-        "--discovery", help="Named metadata discovery connection"
+        "--mode",
+        choices=("human", "agent"),
+        default="human",
+        help="human: review interactively (default); agent: send source and evidence to the configured provider without prompts and emit JSON",
+    )
+    prepare_parser.add_argument(
+        "--discovery",
+        help="Named metadata connection in connections.yaml; omit to skip discovery",
     )
     prepare_parser.add_argument(
         "--connections",
         default="connections.yaml",
-        help="Named integration configuration",
+        help="Integration configuration for discovery (default: connections.yaml)",
     )
 
     handover_validate = handover_commands.add_parser(
-        "validate", help="Validate a generated handover with the OpenSpec CLI"
+        "validate",
+        help="Validate a generated handover with the OpenSpec CLI",
+        description=(
+            "Validate OpenSpec structure using the installed CLI. Preparation-only "
+            "packages may be incomplete; missing CLI means validation was not performed. "
+            "Structural validation is not business approval or implementation readiness."
+        ),
+        epilog="Install the CLI separately: npm install -g @fission-ai/openspec@2.2.0",
     )
     handover_validate.add_argument(
         "--input",
@@ -1852,40 +1796,28 @@ def main(argv: Optional[List[str]] = None) -> int:
         "--json", action="store_true", help="Emit structured validation results"
     )
 
-    handoff_parser = subparsers.add_parser(
-        "handoff", help="Prepare an OpenSpec handoff"
-    )
-    handoff_parser.add_argument("business_document")
-    handoff_parser.add_argument("product")
-    handoff_parser.add_argument("--output", required=True)
-    handoff_parser.add_argument("--change", required=True)
-    handoff_parser.add_argument("--config")
-    handoff_parser.add_argument("--provider")
-    handoff_parser.add_argument("--model")
-    handoff_parser.add_argument("--business-product-id")
-    handoff_parser.add_argument("--business-reference")
-    handoff_parser.add_argument("--product-reference")
-    handoff_parser.add_argument("--context", help="Saved OpenMetadata discovery JSON")
-    handoff_parser.add_argument(
-        "--asset-id", help="Explicit candidate asset ID from the context snapshot"
-    )
-    handoff_parser.add_argument(
-        "--preparation-only",
-        action="store_true",
-        help="Generate the earlier preparation-only package",
-    )
-    handoff_parser.add_argument("--include-full-business", action="store_true")
-    handoff_parser.add_argument("--execute", action="store_true")
-    handoff_parser.add_argument("--reviewed-sha256")
-
     jira_parser = subparsers.add_parser(
-        "jira", help="Review or create a Jira Cloud issue"
+        "jira",
+        help="Review or create a Jira Cloud issue",
+        description=(
+            "Delivery reviews and attaches a prepared handover before creating "
+            "a Jira issue. Human mode reviews interactively; agent mode creates issues "
+            "without prompts. Both require a writable Jira connection, JIRA_PROJECT and JIRA_ISSUE_TYPE_ID. Delivery "
+            "loads .env when present. General issue requests use separate options."
+        ),
+        epilog=(
+            "Guided example: open-data-products jira deliver --input WORKSPACE. "
+            "WORKSPACE is printed by handover prepare and included in its JSON results. "
+            "If a create outcome is unknown, inspect Jira before retrying."
+        ),
     )
     jira_parser.add_argument(
         "action", nargs="?", help="Use 'deliver' for guided package delivery"
     )
     jira_parser.add_argument(
-        "--input", dest="workspace", help="Prepared handoff workspace for delivery"
+        "--input",
+        dest="workspace",
+        help="Prepared workspace, parent folder, or handover results JSON for delivery",
     )
     jira_parser.add_argument(
         "--env-file", help="Override the default local .env for guided delivery"
@@ -1903,10 +1835,17 @@ def main(argv: Optional[List[str]] = None) -> int:
         "--request", help="JSON file containing a general issue request"
     )
     jira_parser.add_argument("--handoff", help="Local handoff change directory")
-    jira_parser.add_argument("--project")
-    jira_parser.add_argument("--issue-type-id")
+    jira_parser.add_argument(
+        "--project", help="Jira project key for general handoff requests"
+    )
+    jira_parser.add_argument(
+        "--issue-type-id",
+        help="Numeric Jira issue type ID for general handoff requests",
+    )
     delivery = jira_parser.add_mutually_exclusive_group()
-    delivery.add_argument("--package-url")
+    delivery.add_argument(
+        "--package-url", help="Accessible HTTPS reference to the package"
+    )
     delivery.add_argument(
         "--package-attachment", help="ZIP containing exactly the handoff change files"
     )
@@ -1914,8 +1853,12 @@ def main(argv: Optional[List[str]] = None) -> int:
         "--shared-filesystem",
         help="Absolute path on a filesystem shared with the assistant",
     )
-    jira_parser.add_argument("--business-url")
-    jira_parser.add_argument("--product-url")
+    jira_parser.add_argument(
+        "--business-url", help="Accessible HTTPS business document reference"
+    )
+    jira_parser.add_argument(
+        "--product-url", help="Accessible HTTPS ODPS document reference"
+    )
     jira_parser.add_argument("--fields", help="JSON file containing Jira custom fields")
     jira_parser.add_argument(
         "--attachment",
@@ -1923,16 +1866,46 @@ def main(argv: Optional[List[str]] = None) -> int:
         default=[],
         help="Explicit file to attach after issue creation",
     )
-    jira_parser.add_argument("--execute", action="store_true")
-    jira_parser.add_argument("--reviewed-sha256")
+    jira_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Emit machine-readable delivery results; reviews remain interactive",
+    )
+    jira_parser.add_argument(
+        "--mode",
+        choices=("human", "agent"),
+        default="human",
+        help="human: review interactively (default); agent: create issues without prompts and emit JSON",
+    )
+    jira_parser.add_argument(
+        "--execute",
+        action="store_true",
+        help="Execute a general issue request after review",
+    )
+    jira_parser.add_argument(
+        "--reviewed-sha256", help="Digest from the reviewed general issue request"
+    )
 
     add_product_subparser(subparsers)
-    from .integrations.cli import add_integrations_parser
-
-    add_integrations_parser(subparsers)
     from .integrations._guided_cli import add_guided_parsers
 
     add_guided_parsers(subparsers)
+
+    from ._cli_help import show_focused_help
+
+    if show_focused_help(cli_argv):
+        raise SystemExit(0)
+    if not cli_argv:
+        if (
+            not Path("generation.config.yaml").is_file()
+            and not Path("connections.yaml").is_file()
+        ):
+            print(
+                "Welcome to Open Data Products. To configure LLM and platform access, run:"
+            )
+            print("  open-data-products config setup\n")
+        parser.print_help()
+        return 0
 
     try:
         args = parser.parse_args(cli_argv)
@@ -1941,15 +1914,65 @@ def main(argv: Optional[List[str]] = None) -> int:
         _log_parse_failure(cli_argv, exit_code, parse_start_time)
         raise
 
+    if getattr(args, "mode", None) == "agent" and (
+        (args.command == "handover" and args.handover_command == "prepare")
+        or (args.command == "jira" and args.action == "deliver")
+    ):
+        args.json = True
+
     activity_context = ActivityContext()
     activity_start_time = time.monotonic()
 
     try:
+        if args.command in (
+            "connect",
+            "products",
+            "openmetadata",
+            "jira",
+        ):
+            from ._guided_handoff import _load_env_file
+
+            env_file = getattr(args, "env_file", None) or ".env"
+            if (
+                getattr(args, "env_file", None)
+                or Path(env_file).exists()
+                or Path(env_file).is_symlink()
+            ):
+                _load_env_file(env_file)
+        requires_llm = (
+            args.command in ("generate", "odpg-build")
+            or (args.command == "handover" and args.handover_command == "prepare")
+            or (
+                args.command == "portfolio"
+                and (
+                    args.portfolio_command in ("build", "refresh", "localize")
+                    or (args.portfolio_command == "discover-contracts" and args.ai)
+                )
+            )
+            or (
+                args.command == "product"
+                and args.product_command in ("wrap-contract", "wrap-dcat")
+                and args.enrich
+            )
+        )
+        if requires_llm:
+            from ._config_setup import require_llm_configuration
+
+            args.config = require_llm_configuration(
+                getattr(args, "config", None),
+                getattr(args, "env_file", None),
+                provider=getattr(args, "provider", None),
+                check_credentials=True,
+            )
         if args.command == "jira":
             if args.action == "deliver":
                 if not args.workspace:
                     raise ValueError(
                         "Jira delivery requires --input with a prepared workspace"
+                    )
+                if not Path(args.connections).expanduser().is_file():
+                    raise ValueError(
+                        "Jira connection configuration is required. Run 'open-data-products config setup' or pass an existing --connections file."
                     )
                 if any(
                     (
@@ -1972,13 +1995,13 @@ def main(argv: Optional[List[str]] = None) -> int:
                         "General Jira issue options cannot be combined with guided delivery"
                     )
                 args.connection = args.connection or "jira"
-                from ._guided_handoff import run_guided_delivery
+                from ._guided_handoff import run_delivery_input
 
                 return _finalize_activity(
                     args,
                     activity_context,
                     activity_start_time,
-                    run_guided_delivery(args),
+                    run_delivery_input(args),
                 )
             if args.action is not None or args.workspace is not None:
                 raise ValueError(
@@ -1986,7 +2009,11 @@ def main(argv: Optional[List[str]] = None) -> int:
                 )
             if not args.config or not args.connection:
                 raise ValueError(
-                    "General Jira issue requests require --config and --connection"
+                    "General Jira issue requests require --config and --connection; run 'open-data-products config setup' to configure Jira"
+                )
+            if not Path(args.config).expanduser().is_file():
+                raise ValueError(
+                    "Jira connection configuration is required. Run 'open-data-products config setup' or provide an existing --config."
                 )
             from .integrations.jira import (
                 JiraCloudAdapter,
@@ -2064,87 +2091,17 @@ def main(argv: Optional[List[str]] = None) -> int:
             return _finalize_activity(
                 args, activity_context, activity_start_time, run_guided_handoff(args)
             )
-        if args.command == "handoff":
-            from .handoff import preview_handoff, generate_handoff
-            from ._handoff_implementation import (
-                preview_implementation_handoff,
-                generate_implementation_handoff,
-            )
-            from .generation import resolve_generation_settings
+        if args.command == "openmetadata" and args.guided_action == "api":
+            from .integrations.cli import handle_integrations
 
-            settings = resolve_generation_settings(
-                config_path=args.config, provider=args.provider, model=args.model
+            return _finalize_activity(
+                args, activity_context, activity_start_time, handle_integrations(args)
             )
-            context = (
-                json.loads(Path(args.context).read_text(encoding="utf-8"))
-                if args.context
-                else None
-            )
-            if args.preparation_only:
-                if args.asset_id:
-                    raise ValueError("--asset-id requires an implementation draft")
-                preview = preview_handoff(
-                    args.business_document,
-                    args.product,
-                    settings,
-                    business_product_id=args.business_product_id,
-                )
-            else:
-                preview = preview_implementation_handoff(
-                    args.business_document,
-                    args.product,
-                    settings,
-                    business_product_id=args.business_product_id,
-                    context_snapshot=context,
-                    asset_id=args.asset_id,
-                )
-            if not args.execute:
-                print(json.dumps(preview.to_dict(), indent=2))
-            else:
-                if not args.reviewed_sha256:
-                    raise ValueError(
-                        "Execution requires --reviewed-sha256 from preview"
-                    )
-                kwargs = {
-                    "reviewed_sha256": args.reviewed_sha256,
-                    "include_full_business": args.include_full_business,
-                    "business_reference": args.business_reference,
-                    "product_reference": args.product_reference,
-                }
-                if args.preparation_only:
-                    path = generate_handoff(
-                        preview,
-                        args.output,
-                        args.change,
-                        settings,
-                        context_snapshot=context,
-                        **kwargs,
-                    )
-                else:
-                    path = generate_implementation_handoff(
-                        preview, args.output, args.change, settings, **kwargs
-                    )
-                print(
-                    json.dumps(
-                        {
-                            "change": str(path),
-                            "state": "draft",
-                            "openspec_cli_compatibility": "unverified",
-                        }
-                    )
-                )
-            return 0
         if args.command in ("connect", "products", "openmetadata"):
             from .integrations._guided_cli import handle_guided
 
             return _finalize_activity(
                 args, activity_context, activity_start_time, handle_guided(args)
-            )
-        if args.command == "integrations":
-            from .integrations.cli import handle_integrations
-
-            return _finalize_activity(
-                args, activity_context, activity_start_time, handle_integrations(args)
             )
         interop_exit_code = handle_interop_command(args)
         if interop_exit_code is not None:
@@ -2312,6 +2269,209 @@ def main(argv: Optional[List[str]] = None) -> int:
             return _finalize_activity(args, activity_context, activity_start_time, 0)
 
         if args.command == "config":
+            if args.domain == "credentials":
+                from ._config_setup import run_credentials_set
+
+                if (
+                    args.llm_action != "set"
+                    or not args.name
+                    or args.json
+                    or any(
+                        (
+                            args.config_path,
+                            args.copy_to,
+                            args.copy_prompts_to,
+                            args.overwrite,
+                            args.check,
+                            args.print,
+                            args.test,
+                        )
+                    )
+                ):
+                    raise ValueError(
+                        "Use config credentials set --name ENVIRONMENT_VARIABLE in an interactive terminal"
+                    )
+                return _finalize_activity(
+                    args,
+                    activity_context,
+                    activity_start_time,
+                    run_credentials_set(args.name),
+                )
+            if args.domain == "connections":
+                from ._config_setup import (
+                    run_connections_add,
+                    run_connections_edit,
+                    run_connections_list,
+                )
+
+                if any(
+                    (
+                        args.config_path,
+                        args.copy_to,
+                        args.copy_prompts_to,
+                        args.overwrite,
+                        args.check,
+                        args.print,
+                        args.test,
+                    )
+                ):
+                    raise ValueError(
+                        "Connection management does not accept template options"
+                    )
+                if args.llm_action == "list":
+                    if args.name:
+                        raise ValueError(
+                            "--name is only supported by config connections edit"
+                        )
+                    return _finalize_activity(
+                        args,
+                        activity_context,
+                        activity_start_time,
+                        run_connections_list(as_json=args.json),
+                    )
+                if args.llm_action == "add":
+                    if args.name or args.json:
+                        raise ValueError(
+                            "Interactive config connections add does not accept --name or --json"
+                        )
+                    return _finalize_activity(
+                        args,
+                        activity_context,
+                        activity_start_time,
+                        run_connections_add(),
+                    )
+                if args.llm_action == "edit":
+                    if not args.name or args.json:
+                        raise ValueError(
+                            "config connections edit requires --name and does not accept --json"
+                        )
+                    return _finalize_activity(
+                        args,
+                        activity_context,
+                        activity_start_time,
+                        run_connections_edit(args.name),
+                    )
+                raise ValueError("Choose a connection operation: add, list, or edit")
+            if args.domain == "llm":
+                from ._config_setup import run_llm_add, run_llm_list, run_llm_use
+
+                if any(
+                    (
+                        args.config_path,
+                        args.copy_to,
+                        args.copy_prompts_to,
+                        args.overwrite,
+                        args.check,
+                        args.print,
+                        args.test,
+                    )
+                ):
+                    raise ValueError(
+                        "LLM provider commands do not accept template options"
+                    )
+                if args.llm_action == "list":
+                    if args.name:
+                        raise ValueError("--name is only supported by config llm use")
+                    return _finalize_activity(
+                        args,
+                        activity_context,
+                        activity_start_time,
+                        run_llm_list(as_json=args.json),
+                    )
+                if args.llm_action == "add":
+                    if args.name or args.json:
+                        raise ValueError(
+                            "Interactive config llm add does not accept --name or --json"
+                        )
+                    return _finalize_activity(
+                        args, activity_context, activity_start_time, run_llm_add()
+                    )
+                if args.llm_action == "use":
+                    if not args.name or args.json:
+                        raise ValueError(
+                            "config llm use requires --name and does not accept --json"
+                        )
+                    return _finalize_activity(
+                        args,
+                        activity_context,
+                        activity_start_time,
+                        run_llm_use(args.name),
+                    )
+                if args.llm_action == "edit":
+                    if not args.name or args.json:
+                        raise ValueError(
+                            "config llm edit requires --name and does not accept --json"
+                        )
+                    from ._config_setup import run_llm_edit
+
+                    return _finalize_activity(
+                        args,
+                        activity_context,
+                        activity_start_time,
+                        run_llm_edit(args.name),
+                    )
+                raise ValueError("Choose an LLM operation: add, list, use, or edit")
+            if args.domain == "organization":
+                from ._organization import edit_organization, show_organization
+
+                if (
+                    args.name
+                    or args.test
+                    or any(
+                        (
+                            args.config_path,
+                            args.copy_to,
+                            args.copy_prompts_to,
+                            args.overwrite,
+                            args.check,
+                            args.print,
+                        )
+                    )
+                ):
+                    raise ValueError(
+                        "Organization settings do not accept these options"
+                    )
+                if args.llm_action == "edit" and not args.json:
+                    return edit_organization()
+                if args.llm_action in (None, "show"):
+                    return show_organization(as_json=args.json)
+                raise ValueError("Choose organization show or edit")
+            if args.llm_action or args.name:
+                raise ValueError("LLM provider options require config llm")
+            if args.domain in ("setup", "status", "show", "test"):
+                from ._config_setup import run_setup, run_status
+
+                if any(
+                    (
+                        args.config_path,
+                        args.copy_to,
+                        args.copy_prompts_to,
+                        args.overwrite,
+                        args.check,
+                        args.print,
+                    )
+                ):
+                    raise ValueError("Setup and status do not accept template options")
+                if args.domain == "setup":
+                    if args.json or args.test:
+                        raise ValueError(
+                            "Interactive setup does not support --json or --test"
+                        )
+                    return _finalize_activity(
+                        args, activity_context, activity_start_time, run_setup()
+                    )
+                return _finalize_activity(
+                    args,
+                    activity_context,
+                    activity_start_time,
+                    run_status(
+                        as_json=args.json,
+                        test=args.test or args.domain == "test",
+                        llm_test=args.domain == "test",
+                    ),
+                )
+            if args.test:
+                raise ValueError("--test is only available for config status")
             from .generation import (
                 copy_config_template,
                 copy_generation_prompts,
@@ -2559,6 +2719,46 @@ def main(argv: Optional[List[str]] = None) -> int:
                     if execute_requested:
                         from .odpr import execute_recipe_run
 
+                        recipe_options = {}
+                        if args.allow_llm:
+                            preview = plan_recipe_run(
+                                args.recipe,
+                                config_path=args.config,
+                                provider_ref=args.provider_ref,
+                                model=args.model,
+                            )
+                            if any(
+                                isinstance(step, dict)
+                                and step.get("classification") == "llm-backed"
+                                for step in preview.get("steps", [])
+                            ):
+                                from ._config_setup import require_llm_configuration
+                                from .odpr.recipes import (
+                                    _execution_generation_config,
+                                    _load_optional_recipe_config,
+                                    _project_root,
+                                    _resolve_recipe_path,
+                                )
+
+                                recipe_config = _load_optional_recipe_config(
+                                    args.config
+                                )
+                                recipe_path, _ = _resolve_recipe_path(
+                                    args.recipe, args.config, None, recipe_config
+                                )
+                                recipe_root = _project_root(
+                                    recipe_path, args.config, None, recipe_config
+                                )
+                                configured = _execution_generation_config(
+                                    preview, recipe_root
+                                )
+                                chosen = require_llm_configuration(
+                                    str(configured) if configured else None
+                                )
+                                recipe_options["generation_config_override"] = str(
+                                    Path(chosen).resolve()
+                                )
+
                         payload = execute_recipe_run(
                             args.recipe,
                             config_path=args.config,
@@ -2566,6 +2766,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                             model=args.model,
                             allow_llm=args.allow_llm,
                             approve_review=args.approve_review,
+                            **recipe_options,
                         )
                         exit_code = int(payload["exitCode"])
                     else:
@@ -2780,6 +2981,10 @@ def main(argv: Optional[List[str]] = None) -> int:
                     print(f"- {artifact.name}: {artifact.output_path}")
                     for error in artifact.errors:
                         print(f"  - {error}")
+                    for note in artifact.review_notes:
+                        print(f"  Review: {note}")
+                    for gap in artifact.evidence_gaps:
+                        print(f"  Missing evidence: {gap}")
             return _finalize_activity(
                 args, activity_context, activity_start_time, 0 if valid_yaml else 1
             )

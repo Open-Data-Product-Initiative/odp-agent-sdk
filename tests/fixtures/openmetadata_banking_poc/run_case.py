@@ -80,7 +80,8 @@ def main():
         for name in PRODUCTS:
             source = ROOT / "products" / ("odps_product_" + name + ".yaml")
             status, candidates = cli(
-                "integrations",
+                "openmetadata",
+                "api",
                 "products",
                 "recover-create",
                 args.profile,
@@ -99,7 +100,8 @@ def main():
                 raise RuntimeError("Product lookup was missing or ambiguous: " + name)
             product_id = candidates["candidates"][0]["id"]
             status, report = cli(
-                "integrations",
+                "openmetadata",
+                "api",
                 "products",
                 "compare",
                 args.profile,
@@ -143,7 +145,8 @@ def main():
         ):
             raise RuntimeError("Draft identity or safety fields differ for " + name)
         command = (
-            "integrations",
+            "openmetadata",
+            "api",
             "products",
             "create",
             args.profile,
@@ -162,7 +165,8 @@ def main():
                 "Create review failed for " + name + ": " + json.dumps(review)
             )
         status, candidates = cli(
-            "integrations",
+            "openmetadata",
+            "api",
             "products",
             "recover-create",
             args.profile,
@@ -200,7 +204,8 @@ def main():
     for name in PRODUCTS:
         source, command, digest, source_sha256 = reviews[name]
         status, candidates = cli(
-            "integrations",
+            "openmetadata",
+            "api",
             "products",
             "recover-create",
             args.profile,
@@ -228,7 +233,8 @@ def main():
             )
         platform_id = result["product_id"]
         status, native = cli(
-            "integrations",
+            "openmetadata",
+            "api",
             "products",
             "get",
             args.profile,
@@ -246,7 +252,8 @@ def main():
         ):
             raise RuntimeError("Native retrieval did not verify " + name)
         status, comparison = cli(
-            "integrations",
+            "openmetadata",
+            "api",
             "products",
             "compare",
             args.profile,
@@ -269,7 +276,8 @@ def main():
         records[-1]["comparison"] = comparison
         result_file.write_text(json.dumps(records, indent=2) + "\n", encoding="utf-8")
         status, listing = cli(
-            "integrations",
+            "openmetadata",
+            "api",
             "products",
             "recover-create",
             args.profile,
@@ -287,7 +295,8 @@ def main():
         deadline = time.monotonic() + 45
         while True:
             status, found = cli(
-                "integrations",
+                "openmetadata",
+                "api",
                 "products",
                 "search",
                 args.profile,

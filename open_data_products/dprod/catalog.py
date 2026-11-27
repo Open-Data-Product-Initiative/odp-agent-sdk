@@ -84,6 +84,9 @@ def wrap_dprod_resource(
         resource, is_valid=lambda value: validate_document(value).valid
     )
     warnings.extend(_conversion_warnings(product))
+    from .._organization import apply_organization, load_organization
+
+    warnings.extend(apply_organization(document, load_organization()))
     mappings = _dprod_to_odps_mappings(product, document)
     report = {
         "profile": "DPROD 1.0 Beta 2 to ODPS 4.2",

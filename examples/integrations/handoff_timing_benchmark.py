@@ -54,6 +54,9 @@ PHASES = (
     "handover_review",
     "handover_generation",
     "structural_validation",
+    "contract_review",
+    "contract_import",
+    "contract_verification",
     "jira_review",
     "jira_delivery",
     "jira_verification",
@@ -278,13 +281,17 @@ class LiveServices:
     def review_marketplace(self, product_path, identity):
         text = product_path.read_text(encoding="utf-8")
         review = self.metadata.review_create(text, domain=self.domain)
-        if (
-            not review.executable
-            or review.product_id != identity["product_id"]
-            or review.product_name != identity["product_name"]
-        ):
+        if not review.executable:
             raise ValueError(
-                "Generated ODPS identity does not match the unique synthetic test identity or is not executable"
+                "Generated ODPS is not executable for OpenMetadata creation"
+            )
+        if review.product_id != identity["product_id"]:
+            raise ValueError(
+                "Generated ODPS product ID does not match the synthetic source"
+            )
+        if review.product_name != identity["product_name"]:
+            raise ValueError(
+                "Generated ODPS product name does not match the synthetic source"
             )
         matches = self.metadata.find_create_candidates(text, domain=self.domain)
         if not matches.get("complete"):
@@ -382,6 +389,57 @@ class LiveServices:
             "odcs_tool_version": odcs.tool_version,
             "openspec": openspec,
             "business_approval": "not assessed",
+        }
+
+    def review_contract(self, product_id, contract_path):
+        source = contract_path.read_text(encoding="utf-8")
+        review = self.metadata.review_contract_import(source, product_id=product_id)
+        if not review.executable:
+            raise ValueError(
+                "Generated ODCS draft cannot be imported; inspect the contract review"
+            )
+        return review.to_dict()
+
+    def import_contract(self, product_id, contract_path, review):
+        source = contract_path.read_text(encoding="utf-8")
+        result = self.metadata.import_contract(
+            source, product_id=product_id, reviewed_sha256=review["review_sha256"]
+        )
+        return result.to_dict()
+
+    def verify_contract(self, product_id, contract_path):
+        expected = hashlib.sha256(contract_path.read_bytes()).hexdigest()
+        context = self.metadata.discover_context(product_id=product_id, limit=2)
+        evidence = context.get("contracts", [])
+        native = [
+            item
+            for item in evidence
+            if item.get("origin") == "OpenMetadata product contract"
+        ]
+        preserved = [
+            item
+            for item in evidence
+            if item.get("origin") == "SDK-preserved ODCS source"
+        ]
+        if (
+            len(native) != 1
+            or len(preserved) != 1
+            or preserved[0].get("sha256") != expected
+            or native[0].get("provenance", {}).get("product_id") != product_id
+            or preserved[0].get("provenance", {}).get("product_id") != product_id
+            or not native[0].get("provenance", {}).get("contract_id")
+            or native[0].get("provenance", {}).get("contract_id")
+            != preserved[0].get("provenance", {}).get("contract_id")
+        ):
+            raise ValueError(
+                "Contract association or preserved ODCS source could not be verified"
+            )
+        return {
+            "contract_id": native[0].get("provenance", {}).get("contract_id"),
+            "source_sha256": expected,
+            "preserved_source_integrity": "matched",
+            "platform_schema_validation": "not established; ODCS schema is preserved separately",
+            "discovery_errors": context.get("errors", []),
         }
 
     def verify_jira(self, issue_key, review):
@@ -562,6 +620,32 @@ def run_case(source, case_dir, unique_id, service, clock=time.perf_counter):
         active = "structural_validation"
         with _phase(record, active, clock):
             record["validation"] = service.validate(change)
+        contract_path = change / "supporting" / "odcs-draft.yaml"
+        active = "contract_review"
+        with _phase(record, active, clock):
+            contract_review = service.review_contract(
+                created["product_id"], contract_path
+            )
+            _write_json(case_dir / "contract-review.json", contract_review)
+        record["write_outcome"] = "contract_import_pending"
+        _write_json(state_path, record)
+        active = "contract_import"
+        with _phase(record, active, clock):
+            imported = service.import_contract(
+                created["product_id"], contract_path, contract_review
+            )
+            record["contract_import_result"] = imported
+            if imported.get("status") != "created":
+                raise RuntimeError(
+                    "Contract import was not verified; inspect before retrying"
+                )
+            record["write_outcome"] = "contract_imported"
+            _write_json(state_path, record)
+        active = "contract_verification"
+        with _phase(record, active, clock):
+            record["contract_verification"] = service.verify_contract(
+                created["product_id"], contract_path
+            )
         issue_args = {
             "connections": service.config,
             "connection": service.jira_name,
@@ -613,7 +697,11 @@ def run_case(source, case_dir, unique_id, service, clock=time.perf_counter):
         record["status"] = (
             "unknown_write_outcome"
             if record["write_outcome"]
-            in ("marketplace_create_pending", "jira_create_pending")
+            in (
+                "marketplace_create_pending",
+                "contract_import_pending",
+                "jira_create_pending",
+            )
             else "failed"
         )
         record["failed_phase"] = active
@@ -621,6 +709,13 @@ def run_case(source, case_dir, unique_id, service, clock=time.perf_counter):
         if record["status"] == "unknown_write_outcome":
             record["next_step"] = (
                 "Inspect the target and local journal before retrying; no create is automatically retried."
+            )
+        elif record.get("write_outcome") in (
+            "marketplace_created",
+            "contract_imported",
+        ):
+            record["next_step"] = (
+                "The product already exists; inspect its contract and the recorded result before retrying."
             )
     finally:
         try:
@@ -702,7 +797,7 @@ def write_report(output, records, planned):
         ),
         "",
         "OpenMetadata listing and search were checked for the configured account; marketplace UI publication and access by other users were not verified.",
-        "OpenMetadata creation imports only supported ODPS fields and does not automatically attach the generated Jira ODCS draft.",
+        "The generated ODCS draft is imported and associated after product creation; its preserved schema is not claimed to be validated by OpenMetadata.",
         "",
     ]
     if summary["average_phase_seconds_successful"]:
@@ -807,7 +902,7 @@ def main(argv=None):
         "domain": args.domain,
         "discovery_connection": args.discovery,
         "jira_connection": args.jira,
-        "writes": "One new synthetic OpenMetadata product and Jira issue per successful case; no deletion.",
+        "writes": "One new synthetic OpenMetadata product, an associated ODCS draft contract, and one Jira issue per successful case; no deletion.",
         "measurement": "Sequential end-to-end wall time including SDK review checks, discovery, validation and Jira readback; human approval wait is not included.",
     }
     print(json.dumps(plan, indent=2), flush=True)

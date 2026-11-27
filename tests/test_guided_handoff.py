@@ -139,6 +139,8 @@ def test_prepare_cli_dispatches_the_guided_workflow(tmp_path, monkeypatch):
     import open_data_products._guided_handoff as guided
 
     monkeypatch.chdir(tmp_path)
+    (tmp_path / "generation.config.yaml").write_text("provider: ollama\n")
+    (tmp_path / ".env").write_text("")
     seen = []
     monkeypatch.setattr(
         guided, "run_guided_handoff", lambda args: seen.append(args) or 0
@@ -163,6 +165,9 @@ def test_prepare_cli_dispatches_the_guided_workflow(tmp_path, monkeypatch):
     monkeypatch.setattr(
         guided, "run_guided_delivery", lambda args: seen.append(args) or 0
     )
+    (tmp_path / "connections.yaml").write_text("version: 1\nconnections: {}\n")
+    (tmp_path / "workspace").mkdir()
+    (tmp_path / "workspace" / "prepare.json").write_text("{}")
     assert main(["jira", "deliver", "--input", "workspace"]) == 0
     assert seen[1].workspace == "workspace"
     with pytest.raises(SystemExit):
@@ -849,7 +854,7 @@ def test_automatic_discovery_uses_reviewed_concepts_and_selected_product(
     monkeypatch.setattr(guided, "_catalog_context", discover)
     monkeypatch.setattr(sys.stdin, "isatty", lambda: True)
     monkeypatch.setattr(sys.stdout, "isatty", lambda: True)
-    answers = iter(["y", "y", "1", "y"])
+    answers = iter(["y", "y"])
     monkeypatch.setattr("builtins.input", lambda prompt: next(answers))
     assert run_guided_handoff(args) == 0
     assert calls == [
@@ -859,7 +864,11 @@ def test_automatic_discovery_uses_reviewed_concepts_and_selected_product(
     ]
     workspace = next((tmp_path / "handoffs").iterdir())
     context = json.loads((workspace / "catalog-context.json").read_text())
-    assert len(context["assets"]) == 1 and context["product"]["id"] == "product-1"
+    assert (
+        len(context["assets"]) == 1
+        and context["product"] is None
+        and context["candidate_products"][0]["id"] == "product-1"
+    )
     assert context["contracts"][0]["validation_status"] == "not validated by discovery"
     assert len(context["discovery_queries"]) == 3
     budget = json.loads((workspace / "discovery-budget.json").read_text())
@@ -1239,6 +1248,8 @@ def test_documented_cli_flow_prepares_and_delivers_with_reviewed_mock_services(
     from open_data_products.cli import main
     import open_data_products._guided_handoff as guided
 
+    (tmp_path / "generation.config.yaml").write_text("provider: openai\n")
+
     args = _args(tmp_path)
     config = tmp_path / "connections.yaml"
     config.write_text(
@@ -1421,3 +1432,175 @@ def test_discovery_url_always_uses_origin_and_requires_valid_config():
     profile.base_url = "https://user:secret@metadata.example.org"
     with pytest.raises(ValueError, match="cannot be shared safely"):
         guided._handover_discovery_target(profile)
+
+
+def test_batch_delivery_reads_preparation_results_and_stops_after_unknown(
+    tmp_path, monkeypatch, capsys
+):
+    import open_data_products._guided_handoff as guided
+
+    workspaces = [tmp_path / str(i) for i in range(3)]
+    for workspace in workspaces:
+        workspace.mkdir()
+    results = tmp_path / "results.json"
+    results.write_text(
+        json.dumps(
+            {
+                "documents": [
+                    {"status": "prepared", "workspace": str(p)} for p in workspaces
+                ]
+                + [{"status": "failed"}]
+            }
+        )
+    )
+    calls = []
+
+    def deliver(args):
+        calls.append(args.workspace)
+        if len(calls) == 1:
+            Path(args.workspace, "jira-result.json").write_text(
+                json.dumps({"status": "created", "result": {"key": "TEST-1"}})
+            )
+            return 0
+        Path(args.workspace, "jira-result.json").write_text(
+            json.dumps({"status": "unknown"})
+        )
+        raise guided.JiraUnknownOutcome("timeout")
+
+    monkeypatch.setattr(guided, "run_guided_delivery", deliver)
+    args = SimpleNamespace(workspace=str(results), json=True)
+    assert guided.run_delivery_input(args) == 1
+    output = json.loads(capsys.readouterr().out)
+    assert [r["status"] for r in output["deliveries"]] == [
+        "created",
+        "unknown",
+        "not_attempted",
+    ]
+    assert output["deliveries"][0]["result"]["key"] == "TEST-1"
+    assert len(calls) == 2
+
+
+def test_batch_delivery_refuses_duplicate_workspaces_before_action(
+    tmp_path, monkeypatch
+):
+    import open_data_products._guided_handoff as guided
+
+    results = tmp_path / "results.json"
+    results.write_text(
+        json.dumps(
+            {"documents": [{"status": "prepared", "workspace": str(tmp_path)}] * 2}
+        )
+    )
+    monkeypatch.setattr(
+        guided, "run_guided_delivery", lambda args: pytest.fail("must not deliver")
+    )
+    with pytest.raises(ValueError, match="duplicate"):
+        guided.run_delivery_input(SimpleNamespace(workspace=str(results), json=False))
+
+
+def test_agent_mode_cli_runs_without_prompts_and_resumes(tmp_path, monkeypatch, capsys):
+    from open_data_products.cli import main
+
+    (tmp_path / "generation.config.yaml").write_text("provider: openai\n")
+    (tmp_path / "connections.yaml").write_text("version: 1\nconnections: {}\n")
+    events = []
+    _fake_services(monkeypatch, events)
+    brief_dir = tmp_path / "briefs"
+    brief_dir.mkdir()
+    for name in ("first.md", "second.md"):
+        (brief_dir / name).write_text(
+            "# Business need\n\nCustomers need product status information.\n"
+        )
+    monkeypatch.setattr(sys.stdin, "isatty", lambda: False)
+    monkeypatch.setattr("builtins.input", lambda prompt: pytest.fail("must not prompt"))
+    assert (
+        main(
+            [
+                "handover",
+                "prepare",
+                "--input",
+                str(brief_dir),
+                "--output",
+                str(tmp_path / "handoffs"),
+                "--mode",
+                "agent",
+            ]
+        )
+        == 0
+    )
+    captured = capsys.readouterr()
+    assert "Customers need product status information" not in captured.err
+    result = json.loads(captured.out)
+    assert result["mode"] == "agent"
+    assert len(result["documents"]) == 2
+    results = tmp_path / "results.json"
+    results.write_text(json.dumps(result))
+    delivery = [
+        "jira",
+        "deliver",
+        "--input",
+        str(results),
+        "--connections",
+        "connections.yaml",
+        "--mode",
+        "agent",
+    ]
+    assert main(delivery) == 0
+    delivered = json.loads(capsys.readouterr().out)
+    assert [item["status"] for item in delivered["deliveries"]] == [
+        "created",
+        "created",
+    ]
+    assert events.count("create") == 2
+    assert main(delivery) == 0
+    replay = json.loads(capsys.readouterr().out)
+    assert [item["status"] for item in replay["deliveries"]] == [
+        "already_created",
+        "already_created",
+    ]
+    assert events.count("create") == 2
+
+
+def test_agent_mode_detects_changed_source_during_generation(
+    tmp_path, monkeypatch, capsys
+):
+    import open_data_products._guided_handoff as guided
+
+    args = _args(tmp_path)
+    args.mode = "agent"
+    events = []
+    _fake_services(monkeypatch, events)
+    original = guided.generate_local_artifacts_for_kind
+
+    def change_input(*inner_args, **inner_kwargs):
+        result = original(*inner_args, **inner_kwargs)
+        Path(args.business_document).write_text("changed")
+        return result
+
+    monkeypatch.setattr(guided, "generate_local_artifacts_for_kind", change_input)
+    monkeypatch.setattr(sys.stdin, "isatty", lambda: False)
+    monkeypatch.setattr("builtins.input", lambda prompt: pytest.fail("must not prompt"))
+    with pytest.raises(ValueError, match="changed"):
+        guided.run_guided_handoff(args)
+    assert "create" not in events
+
+
+def test_agent_mode_json_errors_before_generation(tmp_path, monkeypatch, capsys):
+    from open_data_products.cli import main
+
+    (tmp_path / "generation.config.yaml").write_text("provider: openai\n")
+    monkeypatch.setenv("OPENAI_API_KEY", "test-token")
+    assert (
+        main(["handover", "prepare", "--input", "missing.md", "--mode", "agent"]) == 1
+    )
+    assert json.loads(capsys.readouterr().out)["valid"] is False
+
+
+def test_human_is_default_mode_and_requires_terminal(tmp_path, monkeypatch, capsys):
+    from open_data_products.cli import main
+
+    (tmp_path / "generation.config.yaml").write_text("provider: openai\n")
+    monkeypatch.setenv("OPENAI_API_KEY", "fixture-token")
+    monkeypatch.setattr(sys.stdin, "isatty", lambda: False)
+    assert main(["handover", "prepare", "--input", "brief.md"]) == 1
+    assert "interactive terminal in human mode" in capsys.readouterr().err

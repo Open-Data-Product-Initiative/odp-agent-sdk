@@ -164,12 +164,107 @@ class JiraCloudAdapter:
             ),
         )
 
-    def _request(self, method: str, path: str, body: Optional[dict] = None) -> dict:
-        email, token = os.getenv(self.connection.email_env), os.getenv(
-            self.connection.token_env
+    def _credentials(self):
+        email = os.getenv(self.connection.email_env)
+        token = os.getenv(self.connection.token_env)
+        missing = next(
+            (
+                name
+                for name, value in (
+                    (self.connection.email_env, email),
+                    (self.connection.token_env, token),
+                )
+                if not value
+            ),
+            None,
         )
-        if not email or not token or any(c in email + token for c in "\r\n"):
-            raise IntegrationError("Jira credentials are missing or invalid")
+        if missing:
+            raise IntegrationError(
+                "Jira credential "
+                + missing
+                + " is missing. Run 'open-data-products config credentials set --name "
+                + missing
+                + "'."
+            )
+        assert email is not None and token is not None
+        if any(c in email + token for c in "\r\n"):
+            raise IntegrationError("Jira credentials contain invalid characters")
+        return email, token
+
+    def list_setup_projects(self, *, limit=50):
+        """List a bounded page of Jira projects visible to the account."""
+        if (
+            not isinstance(limit, int)
+            or isinstance(limit, bool)
+            or not 1 <= limit <= 50
+        ):
+            raise IntegrationError("Project lookup limit must be between 1 and 50")
+        page = self._request(
+            "GET", "project/search?" + urlencode({"startAt": 0, "maxResults": limit})
+        )
+        values = page.get("values")
+        if not isinstance(values, list) or len(values) > limit:
+            raise IntegrationError("Unexpected Jira project lookup response")
+        projects = []
+        for item in values:
+            if not isinstance(item, dict):
+                continue
+            key, name = item.get("key"), item.get("name")
+            if (
+                isinstance(key, str)
+                and re.fullmatch(r"[A-Za-z][A-Za-z0-9_]{0,63}", key)
+                and isinstance(name, str)
+            ):
+                projects.append({"key": key, "name": name})
+        total = page.get("total")
+        return {
+            "projects": projects,
+            "truncated": page.get("isLast") is False
+            or (isinstance(total, int) and total > len(values)),
+        }
+
+    def list_setup_issue_types(self, project, *, limit=50):
+        """List a bounded page of standalone issue types available for creation."""
+        if not isinstance(project, str) or not re.fullmatch(
+            r"[A-Za-z][A-Za-z0-9_]{0,63}", project
+        ):
+            raise IntegrationError("Invalid Jira project key")
+        if (
+            not isinstance(limit, int)
+            or isinstance(limit, bool)
+            or not 1 <= limit <= 50
+        ):
+            raise IntegrationError("Issue type lookup limit must be between 1 and 50")
+        path = (
+            "issue/createmeta/"
+            + quote(project, safe="")
+            + "/issuetypes?"
+            + urlencode({"startAt": 0, "maxResults": limit})
+        )
+        page = self._request("GET", path)
+        values = page.get("issueTypes")
+        if not isinstance(values, list) or len(values) > limit:
+            raise IntegrationError("Unexpected Jira issue type lookup response")
+        types = []
+        for item in values:
+            if not isinstance(item, dict) or item.get("subtask") is not False:
+                continue
+            identifier, name = item.get("id"), item.get("name")
+            if (
+                isinstance(identifier, str)
+                and re.fullmatch(r"[0-9]{1,20}", identifier)
+                and isinstance(name, str)
+            ):
+                types.append({"id": identifier, "name": name})
+        total = page.get("total")
+        return {
+            "issue_types": types,
+            "truncated": page.get("isLast") is False
+            or (isinstance(total, int) and total > len(values)),
+        }
+
+    def _request(self, method: str, path: str, body: Optional[dict] = None) -> dict:
+        email, token = self._credentials()
         encoded = base64.b64encode((email + ":" + token).encode()).decode("ascii")
         data = json.dumps(body).encode() if body is not None else None
         req = request.Request(
@@ -401,11 +496,7 @@ class JiraCloudAdapter:
 
     def _upload_attachment(self, key: str, filename: str, data: bytes) -> None:
         """Upload one reviewed file without retrying an uncertain request."""
-        email, token = os.getenv(self.connection.email_env), os.getenv(
-            self.connection.token_env
-        )
-        if not email or not token or any(c in email + token for c in "\r\n"):
-            raise IntegrationError("Jira credentials are missing or invalid")
+        email, token = self._credentials()
         boundary = "odps-" + uuid4().hex
         body = (
             (

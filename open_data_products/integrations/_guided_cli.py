@@ -12,7 +12,7 @@ import yaml
 
 from ..odpc.catalog import iter_catalog_input_files
 from .adapter import open_integration
-from .config import ConnectionProfile, IntegrationError, load_integration_config
+from .config import ConnectionProfile, IntegrationError
 from .create import UnknownCreateOutcome
 from .openmetadata import PlatformError
 
@@ -22,27 +22,45 @@ SETTINGS = Path(".open-data-products/integrations.yaml")
 def add_guided_parsers(subparsers: argparse._SubParsersAction) -> None:
     """Add optional short commands alongside the established integrations tree."""
     connect = subparsers.add_parser(
-        "connect", help="Select a platform connection for this workspace"
+        "connect",
+        help="Select a platform connection for this workspace",
+        description="Select a named profile from the connection configuration for guided OpenMetadata commands.",
+        epilog="Example: open-data-products connect openmetadata --config connections.yaml",
     )
     connect.add_argument("connection", nargs="?", help="Connection profile name")
     connect.add_argument("--config", help="Connection configuration YAML")
-    connect.add_argument("--json", action="store_true")
+    connect.add_argument("--json", action="store_true", help="Emit structured JSON")
     products = subparsers.add_parser(
         "openmetadata",
         aliases=["products"],
+        formatter_class=argparse.RawDescriptionHelpFormatter,
         help="Work with products in OpenMetadata (products is a compatibility alias)",
-        epilog="Examples: open-data-products openmetadata search campaign; open-data-products openmetadata create ./products --domain Banking",
+        description="Discover catalog evidence or review product operations using an OpenMetadata connection.",
+        epilog=(
+            'Examples:\n  open-data-products openmetadata products search "campaign"\n'
+            '  open-data-products openmetadata products create ./products --domain "Banking"\n\n'
+            "Next steps:\n  Use open-data-products openmetadata COMMAND --help for options and examples."
+        ),
     )
     actions = products.add_subparsers(dest="guided_action", required=True)
+    from .cli import add_integrations_parser
+
+    add_integrations_parser(actions)
     _add_product_actions(actions)
     discover = actions.add_parser(
-        "discover", help="Discover read-only catalog evidence"
+        "discover",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        help="Discover read-only catalog evidence",
+        description="Retrieve available product and catalog evidence without modifying OpenMetadata.",
+        epilog='Examples:\n  open-data-products openmetadata discover --id PRODUCT_UUID --json\n  open-data-products openmetadata discover --query "customer accounts" --json',
     )
     discover.add_argument("--config", help="Override connection configuration")
     discover.add_argument("--connection", help="Override connection profile")
     discover.add_argument("--id", help="Explicit product UUID")
     discover.add_argument("--query", help="Catalog search query")
-    discover.add_argument("--limit", type=int, default=20)
+    discover.add_argument(
+        "--limit", type=int, default=20, help="Candidate limit, 1 to 100 (default: 20)"
+    )
     discover.add_argument("--json", action="store_true", help="Emit structured JSON")
     nested = actions.add_parser("products", help="Manage OpenMetadata data products")
     _add_product_actions(
@@ -59,6 +77,7 @@ def _add_product_actions(
     for name in names:
         p = actions.add_parser(
             name,
+            formatter_class=argparse.RawDescriptionHelpFormatter,
             help={
                 "list": "List products",
                 "search": "Search products",
@@ -74,9 +93,19 @@ def _add_product_actions(
         p.add_argument("--connection", help="Override connection profile")
         p.add_argument("--json", action="store_true", help="Emit structured JSON")
         if name == "search":
-            p.add_argument("query")
-            p.add_argument("--offset", type=int, default=0)
-            p.add_argument("--limit", type=int, default=20)
+            p.add_argument("query", help="Product search query")
+            p.add_argument(
+                "--offset",
+                type=int,
+                default=0,
+                help="Search result offset (default: 0)",
+            )
+            p.add_argument(
+                "--limit",
+                type=int,
+                default=20,
+                help="Maximum search results (default: 20)",
+            )
         if name in ("get", "compare"):
             p.add_argument(
                 "product",
@@ -87,22 +116,43 @@ def _add_product_actions(
                 "--id", help="OpenMetadata product UUID; names are not accepted"
             )
         if name == "get":
-            p.add_argument("--format", choices=("native", "odps"), default="native")
+            p.add_argument(
+                "--format",
+                choices=("native", "odps"),
+                default="native",
+                help="Response format (default: native)",
+            )
         if name == "compare":
-            p.add_argument("--source", required=True)
+            p.add_argument("--source", required=True, help="Local ODPS file to compare")
             p.add_argument(
                 "--domain", help="Expected destination domain; inferred when unique"
             )
         if name == "create":
-            p.description = "Review one file or a folder, then confirm creation in the selected OpenMetadata deployment. Non-interactive and --json runs only review; use the existing integrations commands to execute in scripts."
+            p.description = (
+                "Review one ODPS 4.1 file or folder, then confirm creation in the selected\n"
+                "writable OpenMetadata 2.1.0 connection. Non-interactive and --json runs\n"
+                "only review; use openmetadata api products create for scripted execution.\n"
+                "Creating metadata does not verify marketplace UI visibility."
+            )
+            p.epilog = 'Example:\n  open-data-products openmetadata products create products/ --domain "Retail Banking"'
             p.add_argument("source", help="ODPS YAML/JSON file or folder")
             p.add_argument(
                 "--domain",
                 required=True,
-                help="Destination OpenMetadata domain FQN; quote multiword values",
+                help="Existing destination domain fully qualified name; quote the value",
             )
-            p.add_argument("--owner", action="append", dest="owners")
-            p.add_argument("--tag", action="append", dest="tags")
+            p.add_argument(
+                "--owner",
+                action="append",
+                dest="owners",
+                help="Existing user:NAME or team:FQN; repeatable",
+            )
+            p.add_argument(
+                "--tag",
+                action="append",
+                dest="tags",
+                help="Existing classification tag FQN; repeatable",
+            )
         if name == "export":
             p.add_argument(
                 "--output",
@@ -173,10 +223,25 @@ def _select(
 ) -> Tuple[str, ConnectionProfile]:
     settings = {} if config_path else _settings()
     path = config_path or settings.get("config") or "connections.yaml"
-    config = load_integration_config(path)
-    # An explicit configuration uses its own default unless a profile is also explicit.
-    name = connection or (None if config_path else settings.get("connection"))
-    return str(Path(path).expanduser().resolve()), config.select(name)
+    target = Path(path).expanduser()
+    if not target.is_file():
+        raise IntegrationError(
+            "Connection configuration is required. Run 'open-data-products config setup' or supply an existing --config."
+        )
+    from .config import _UniqueLoader
+    from .._guided_handoff import _resolve_discovery_profile
+
+    try:
+        root = yaml.load(target.read_text(encoding="utf-8"), Loader=_UniqueLoader)
+        default = root.get("default_connection") if isinstance(root, dict) else None
+    except (OSError, UnicodeError, yaml.YAMLError):
+        raise IntegrationError("Cannot read connection configuration") from None
+    name = (
+        connection or (None if config_path else settings.get("connection")) or default
+    )
+    if not name:
+        raise IntegrationError("Select an OpenMetadata connection by name")
+    return str(target.resolve()), _resolve_discovery_profile(str(target), name)
 
 
 def _emit(value, structured=False):  # type: ignore[no-untyped-def]
@@ -280,7 +345,7 @@ def _create(adapter, args):  # type: ignore[no-untyped-def]
             "connection": adapter.profile.name,
             "domain": args.domain,
             "status": "review_only",
-            "message": "Creation requires an interactive terminal. For automation use integrations products create with --reviewed-sha256 and --execute.",
+            "message": "Creation requires an interactive terminal. For automation use openmetadata api products create with --reviewed-sha256 and --execute.",
             "products": [
                 {k: v for k, v in entry.items() if not k.startswith("_")}
                 for entry in entries
