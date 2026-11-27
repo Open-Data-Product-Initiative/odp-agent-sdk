@@ -217,6 +217,8 @@ def _discovery_adapter(profile):
 
 def _catalog_context(config_path, connection, product_id, query, *, limit=20):
     """Use the configured adapter's bounded read-only discovery capability."""
+    from datetime import datetime, timezone
+
     profile = _resolve_discovery_profile(config_path, connection)
     with _discovery_adapter(profile) as adapter:
         result = adapter.discover_context(
@@ -224,10 +226,8 @@ def _catalog_context(config_path, connection, product_id, query, *, limit=20):
         )
     if not isinstance(result, dict):
         raise IntegrationError("Discovery adapter returned an invalid evidence bundle")
-    result["discovery_target"] = {
-        "connection": profile.name,
-        "platform": profile.platform,
-    }
+    result["discovery_target"] = _handover_discovery_target(profile)
+    result["retrieved_at"] = datetime.now(timezone.utc).isoformat()
     return result
 
 
@@ -240,6 +240,30 @@ def _automatic_metadata_profile(args):
     adapter = _discovery_adapter(profile)
     adapter.close()
     return config, args.discovery
+
+
+def _handover_discovery_target(profile):
+    from urllib.parse import urlsplit
+
+    target = {"connection": profile.name, "platform": profile.platform}
+    if getattr(profile, "base_url", None):
+        parts = urlsplit(profile.base_url)
+        if (
+            parts.scheme not in ("http", "https")
+            or not parts.hostname
+            or parts.username
+            or parts.password
+            or parts.query
+            or parts.fragment
+        ):
+            raise ValueError("Metadata platform URL cannot be shared safely")
+        host = parts.hostname
+        if ":" in host:
+            host = "[" + host + "]"
+        target["platform_url"] = (
+            parts.scheme + "://" + host + (":" + str(parts.port) if parts.port else "")
+        )
+    return target
 
 
 def _brief_search_concepts(source_text, settings):
@@ -344,6 +368,7 @@ def _merge_discovery(concepts, snapshots):
         result["discovery_queries"].append(
             {
                 "query": query,
+                "retrieved_at": data.get("retrieved_at"),
                 "candidate_ids": [
                     item.get("id")
                     for item in data.get("candidates", [])
@@ -358,6 +383,8 @@ def _merge_discovery(concepts, snapshots):
         )
         if data.get("product") is not None:
             result["product"] = data["product"]
+        if data.get("retrieved_at"):
+            result["retrieved_at"] = data["retrieved_at"]
         if data.get("discovery_target") is not None:
             result["discovery_target"] = data["discovery_target"]
         result["errors"].extend(data.get("errors", []))
@@ -436,10 +463,7 @@ def _automatic_discovery(args, source_text, settings, profile):
                 )
             )
     merged = _merge_discovery(concepts, snapshots)
-    merged["discovery_target"] = {
-        "connection": target_profile.name,
-        "platform": target_profile.platform,
-    }
+    merged["discovery_target"] = _handover_discovery_target(target_profile)
     products = [
         item
         for item in merged["candidates"]
@@ -487,10 +511,7 @@ def _automatic_discovery(args, source_text, settings, profile):
                     )
                 )
             merged = _merge_discovery(concepts, snapshots)
-            merged["discovery_target"] = {
-                "connection": target_profile.name,
-                "platform": target_profile.platform,
-            }
+            merged["discovery_target"] = _handover_discovery_target(target_profile)
     return merged
 
 
@@ -763,6 +784,12 @@ def _prepare_one(args, brief):
                 return "declined"
     budget_report = None
     if context is not None:
+        target = context.get("discovery_target", {})
+        if isinstance(target, dict) and target.get("platform_url"):
+            print(
+                "Metadata platform origin to include in the handover:",
+                _safe_display(target["platform_url"]),
+            )
         preview, budget_report = _discovery_gate(brief, odps, settings, context)
         print("\nMetadata discovery budget and completeness:")
         print(json.dumps(budget_report, indent=2, ensure_ascii=True))

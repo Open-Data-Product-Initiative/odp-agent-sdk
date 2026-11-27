@@ -162,7 +162,7 @@ than manage a standard's vocabulary:
 |------|-----------------------------------|
 | Cross-spec API | Detect, load, validate, explain, summarize, and resolve references across ODPS, ODPC, ODPG, and ODPV documents |
 | Unified CLI | Run validation, generation, catalog, graph, vocabulary, portfolio, OKF context, contract, resource, manifest, and MCP workflows through `open-data-products` |
-| MCP + ARWS | Run a safe-class stdio MCP server, expose agent tools, and generate an ARWS-compatible manifest |
+| MCP + ARWS | Run a stdio MCP server with classified read-only and state-changing agent tools, and generate an ARWS-compatible manifest |
 | LLM generation | Draft ODPC fragments, ODPG graphs, and ODPS product YAML from source notes with Ollama, embedded llama.cpp, OpenAI-compatible providers, or Claude |
 | Compact context | Generate and consume TOON/GCF sidecars for ODPC catalogs and ODPG graphs while keeping YAML as the source of truth |
 | OKF context bundles | Validate Open Knowledge Format Markdown/frontmatter bundles, import them as generation source docs, and export ODPC catalog or portfolio artifacts as OKF context |

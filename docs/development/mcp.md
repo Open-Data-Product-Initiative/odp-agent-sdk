@@ -29,8 +29,10 @@ Tool classes follow the ARWS taxonomy:
 - `state-changing`
 - `destructive`
 
-Today the MCP surface is safe/read-only. If a future tool changes state or can
-destroy data, set the class correctly and update agentic-pattern tests.
+The MCP surface contains both safe and state-changing tools. Handover creation
+can send reviewed content to a provider and write local files; Jira creation
+can write to an external service. Set each tool's class correctly and update
+the agentic-pattern tests whenever that surface changes.
 
 ## Handler Rules
 
@@ -88,16 +90,17 @@ providers.
 
 ## Safe Surface Policy
 
-The MCP surface should avoid:
+MCP handlers should avoid:
 
-- writing generated files;
 - returning full document bodies for lightweight summary calls;
 - running live external tests;
-- requiring credentials;
 - exposing destructive filesystem operations.
 
-State-changing SDK features can still exist in Python or CLI. Exposing them to
-MCP requires an explicit class decision and tests.
+State-changing tools must clearly disclose their effects and use the SDK's
+reviewed-write safeguards. Credentials are resolved from configured environment
+references, never supplied as tool arguments. Handover and Jira tools require
+matching review digests; Jira execution also requires a new local journal so an
+unknown outcome is not automatically retried.
 
 ## Tests
 

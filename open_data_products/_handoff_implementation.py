@@ -19,6 +19,8 @@ from .generation import _strip_markdown_fence, create_generation_client
 from .handoff import (
     HandoffPreview,
     OPENSPEC_REVISION,
+    _discovery_package_context,
+    _metadata_discovery_reference,
     preview_handoff,
     _without_samples,
 )
@@ -168,6 +170,7 @@ def preview_implementation_handoff(
     if context_snapshot is not None:
         if not isinstance(context_snapshot, dict):
             raise ValueError("Metadata context snapshot must be an object")
+        _discovery_package_context(context_snapshot)
         encoded = json.dumps(
             context_snapshot, ensure_ascii=False, sort_keys=True
         ).encode()
@@ -1520,8 +1523,9 @@ def generate_implementation_handoff(
             "semantic_match_verification": "not_verified",
             "owner_approval": "not_confirmed",
         }
-    cleaned_context = _without_samples(preview.context)
-    if cleaned_context != preview.context:
+    without_samples = _without_samples(preview.context)
+    cleaned_context = _discovery_package_context(preview.context)
+    if without_samples != preview.context:
         findings.append("Sample data was omitted from the saved catalog snapshot.")
     if contract:
         reference = {
@@ -1683,6 +1687,7 @@ def generate_implementation_handoff(
     task += "- Separate ODCS draft: `supporting/odcs-draft.yaml`; incomplete terms require review.\n"
     if preview.context is not None:
         task += "- Optional catalog snapshot: `supporting/catalog-evidence.yaml`.\n"
+        task += "- Metadata platform and source references: `supporting/metadata-discovery.yaml`; confirm access and verify evidence before use.\n"
     task += "\nSupporting files are SDK artifacts, not native OpenSpec artifacts.\n"
     (root / "preparation.md").write_text(task)
     supporting = root / "supporting"
@@ -1723,6 +1728,13 @@ def generate_implementation_handoff(
     if preview.context is not None:
         (supporting / "catalog-evidence.yaml").write_text(
             yaml.safe_dump(cleaned_context, sort_keys=False, allow_unicode=True)
+        )
+        (supporting / "metadata-discovery.yaml").write_text(
+            yaml.safe_dump(
+                _metadata_discovery_reference(cleaned_context),
+                sort_keys=False,
+                allow_unicode=True,
+            )
         )
     if output_schema:
         (supporting / "output-schema.yaml").write_text(

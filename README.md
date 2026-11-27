@@ -52,7 +52,7 @@ management, and contract attachment. It was tested against one OpenMetadata
 | CLI | Run validation, generation, catalog, graph, vocabulary, portfolio, OKF, contract, resource, manifest, and MCP workflows through `open-data-products` |
 | Portfolio workflows | Build, refresh, sync, render, localize, explain, and inspect portfolio workspaces from objectives, use cases, signals, and product source lanes |
 | Document intake | Read Markdown, text, YAML, JSON, EML, MSG with the `email` extra, DOCX, PPTX, PDF, CSV, and XLSX source files for portfolio workflows |
-| Agent surfaces | Run a safe-class stdio MCP server and generate an ARWS-compatible agent manifest |
+| Agent surfaces | Run a stdio MCP server with reviewed handover and Jira tools, and generate an ARWS-compatible agent manifest |
 | LLM generation | Generate ODPC fragments, ODPG graphs, and ODPS product YAML from source notes using local or hosted providers |
 | OpenMetadata | Connect, review and create products, manage domains, compare retrieved metadata, and attach ODCS contracts |
 | Coding-assistant handover | Prepare OpenSpec planning drafts, enriched ODPS and a separate ODCS draft from business documents, with optional metadata discovery |

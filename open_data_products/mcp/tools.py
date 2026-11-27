@@ -88,6 +88,7 @@ from ..summary import load_summary
 from ._response import envelope as _envelope
 from ._response import json_envelope as _json_envelope
 from ._response import redact_local_paths as _redact_local_paths
+from ._handover import tool_definitions as _handover_tool_definitions
 from .interop import (
     discover_dcat_catalog_handler as _discover_dcat_catalog_handler,
     discover_dprod_catalog_handler as _discover_dprod_catalog_handler,
@@ -1405,6 +1406,8 @@ TOOLS: List[Dict[str, Any]] = [
         "handler": _h_search_recipe_guidance,
     },
 ]
+
+TOOLS.extend(_handover_tool_definitions(_object_schema))
 
 
 def get_tool(name: str) -> Optional[Dict[str, Any]]:

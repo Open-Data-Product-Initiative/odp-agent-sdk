@@ -1496,3 +1496,94 @@ def test_preserved_contract_sample_content_is_withheld_from_package():
     assert "yaml" not in result
     assert result["sha256"] == "original"
     assert "withheld" in result["content_status"]
+
+
+def test_metadata_discovery_references_include_url_and_bind_changes(
+    tmp_path, monkeypatch
+):
+    brief, product, context = setup_inputs(tmp_path)
+    context.update(
+        {
+            "discovery_target": {
+                "platform": "openmetadata",
+                "connection": "banking",
+                "platform_url": "https://metadata.example.org",
+                "token": "synthetic-secret",
+            },
+            "product": {
+                "id": "product-1",
+                "name": "holdings",
+                "fullyQualifiedName": "bank.holdings",
+            },
+            "discovery_queries": [
+                {"query": "holdings", "retrieved_at": "2026-11-26T10:00:00Z"}
+            ],
+            "retrieved_at": "2026-11-26T10:00:01Z",
+            "incomplete": True,
+            "errors": [{"resource": "contract", "status": 404}],
+        }
+    )
+    settings = resolve_generation_settings()
+    monkeypatch.setattr(
+        "open_data_products._handoff_implementation.create_generation_client",
+        lambda _: lambda prompt, name: reply(),
+    )
+    preview = preview_implementation_handoff(
+        brief, product, settings, context_snapshot=context, asset_id="asset-1"
+    )
+    root = generate_implementation_handoff(
+        preview,
+        tmp_path / "out",
+        "holdings-change",
+        settings,
+        reviewed_sha256=preview.digest,
+    )
+    refs = yaml.safe_load((root / "supporting/metadata-discovery.yaml").read_text())
+    raw = (root / "supporting/catalog-evidence.yaml").read_text()
+    assert refs["platform"] == "openmetadata" and refs["connection"] == "banking"
+    assert refs["product"]["id"] == "product-1" and refs["assets"][0]["id"] == "asset-1"
+    assert (
+        refs["queries"][0]["query"] == "holdings"
+        and refs["latest_retrieval_at"] == "2026-11-26T10:00:01Z"
+    )
+    assert refs["unavailable_resources"][0]["status"] == 404 and refs["incomplete"]
+    assert refs["platform_url"] == "https://metadata.example.org"
+    assert "metadata.example.org" in raw and "synthetic-secret" not in raw
+    assert "metadata-discovery.yaml" in (root / "preparation.md").read_text()
+    context["discovery_target"]["platform_url"] = "https://other.example.org"
+    shared = preview_implementation_handoff(
+        brief, product, settings, context_snapshot=context, asset_id="asset-1"
+    )
+    assert shared.digest != preview.digest
+    root = generate_implementation_handoff(
+        shared,
+        tmp_path / "shared",
+        "holdings-change",
+        settings,
+        reviewed_sha256=shared.digest,
+    )
+    refs = yaml.safe_load((root / "supporting/metadata-discovery.yaml").read_text())
+    assert refs["platform_url"] == "https://other.example.org"
+    assert (
+        "synthetic-secret"
+        not in (root / "supporting/catalog-evidence.yaml").read_text()
+    )
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://user:secret@example.org",
+        "https://example.org?token=secret",
+        "https://example.org/private/path",
+    ],
+)
+def test_metadata_reference_rejects_unsafe_platform_url_before_provider(
+    tmp_path, monkeypatch, url
+):
+    brief, product, context = setup_inputs(tmp_path)
+    context["discovery_target"] = {"platform_url": url}
+    with pytest.raises(ValueError, match="origin without credentials"):
+        preview_implementation_handoff(
+            brief, product, resolve_generation_settings(), context_snapshot=context
+        )

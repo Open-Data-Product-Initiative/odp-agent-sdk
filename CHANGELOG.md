@@ -10,9 +10,14 @@
 - Support optional read-only metadata discovery by named connection, with bounded
   searches, provenance, incomplete-result reporting and a 1 MiB evidence gate.
   OpenMetadata is the first implemented discovery adapter.
+- Include platform-neutral metadata discovery references and the configured
+  platform origin in handovers, bound to review and without connection credentials.
 - Add an independent Jira Cloud REST adapter and reviewed delivery of handover
   packages, enriched ODPS, source documents and ODCS drafts. Report
   uncertain outcomes without automatic retries.
+- Expose reviewed business-to-handover generation and Jira issue or package
+  delivery through classified MCP tools, with digest-bound execution and local
+  journals for Jira outcomes.
 - Add `handover validate`, which invokes an optional OpenSpec CLI in an isolated
   temporary project, reports its version and distinguishes passed, failed,
   incomplete and not-performed results. CI tests OpenSpec CLI 2.2.0; SDK
