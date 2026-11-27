@@ -11,7 +11,10 @@ import yaml
 from open_data_products import __version__
 from open_data_products.cli import main
 
-pytestmark = pytest.mark.functional
+pytestmark = [
+    pytest.mark.functional,
+    pytest.mark.usefixtures("isolated_cli_generation_configuration"),
+]
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 ODPS_PRODUCT = (

@@ -37,6 +37,8 @@ from open_data_products.generation.models import (
     PortfolioSourceBudget,
 )
 
+pytestmark = pytest.mark.usefixtures("isolated_cli_generation_configuration")
+
 PORTFOLIO_PLAN_YAML = """
 metadata:
   id: generated-demo
@@ -2685,7 +2687,10 @@ def test_build_portfolio_creates_workspace_artifacts_from_source_lanes(
     assert (
         generated_product["product"]["details"]["en"]["productID"] == "customer-product"
     )
-    assert generated_product["schema"] == "https://opendataproducts.org/v4.2/schema/odps.json"
+    assert (
+        generated_product["schema"]
+        == "https://opendataproducts.org/v4.2/schema/odps.json"
+    )
     assert generated_product["version"] == "4.2"
     assert validate_document(generated_product).valid is True
     generated_reference = load_mapping(

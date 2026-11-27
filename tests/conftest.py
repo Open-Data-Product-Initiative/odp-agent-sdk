@@ -89,3 +89,25 @@ def invalid_odps_data():
             "type": "invalid",  # Invalid: not in allowed values
         },
     }
+
+
+@pytest.fixture
+def isolated_cli_generation_configuration(tmp_path, monkeypatch):
+    """Give legacy CLI tests a deterministic config instead of a developer's files."""
+    from open_data_products import _config_setup
+
+    config = tmp_path / "fixture-generation-settings.yaml"
+    config.write_text("provider: ollama\n", encoding="utf-8")
+    env = tmp_path / "fixture-empty.env"
+    env.write_text("", encoding="utf-8")
+    original = _config_setup.require_llm_configuration
+    repo = Path(__file__).resolve().parents[1]
+
+    def resolve(config_path=None, env_file=None, **kwargs):
+        if config_path is None and Path.cwd().resolve() == repo:
+            config_path = str(config)
+            if env_file is None:
+                env_file = str(env)
+        return original(config_path, env_file, **kwargs)
+
+    monkeypatch.setattr(_config_setup, "require_llm_configuration", resolve)

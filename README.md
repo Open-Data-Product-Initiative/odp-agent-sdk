@@ -128,9 +128,11 @@ open-data-products jira deliver --input handoffs/data-product-WORKSPACE
 ```
 
 Use the workspace returned in `results.json`. Preparation and Jira delivery support
-interactive reviews by default or non-interactive operation with `--mode agent`;
-the resulting OpenSpec and data product artifacts are unapproved drafts. See the [handover guide](docs/integrations/handoff.md) for
-provider, discovery and Jira setup, evidence limits and review requirements.
+interactive reviews by default or non-interactive operation with `--mode agent`.
+Agent mode sends business content to the selected provider and creates Jira issues
+without confirmation. The resulting artifacts are unapproved drafts. See the
+[handover guide](docs/integrations/handoff.md) for setup, evidence limits and
+review requirements.
 
 Create OpenMetadata products from reviewed ODPS 4.1 documents:
 
@@ -155,10 +157,9 @@ open-data-products openmetadata products update --id PRODUCT_UUID \
   --input product.yaml
 ```
 
-The connection file references an environment variable, like `OPENAI_API_KEY`;
-the standalone platform commands do not automatically load `.env`. Guided
-handover preparation and Jira delivery do read `.env` from the working directory
-when present. The platform command requires a
+The connection file references environment variables such as `OPENMETADATA_TOKEN`.
+Generation, OpenMetadata, handover and Jira CLI commands load `.env` from the
+working directory when present; existing process environment values take precedence. The platform command requires a
 write-enabled profile and appropriate platform permissions. It checks for
 possible duplicates and reports fields that might not be imported; generated
 metadata is not evidence of approval. See the [integration guide](docs/integrations/openmetadata.md)
@@ -323,17 +324,6 @@ python3 -m build
 python3 -m twine check dist/*
 ```
 
-## Acknowledgments
-
-Thanks to the Open Data Product Initiative community, Chris Howard / Kitard for
-the original `odps-python` foundation, devlouie for the MCP layer and agent
-surface, the OpenMetadata platform, and the Data Contract CLI project for the
-optional contract execution engine.
-
-## License
-
-Apache License 2.0. See `LICENSE` for details.
-
 ### Organization defaults for ODPS
 
 Configure the organization used as the default data holder in generated ODPS drafts:
@@ -350,9 +340,20 @@ details. It reviews the values before saving them in
 `.open-data-products/organization.yaml`; this project-local file is ignored by
 Git in this SDK checkout. Treat contact details as potentially personal data.
 
-The configured details are added locally after product generation and to
-offline ODCS-to-ODPS drafts. ODPS 4.1 uses `product.dataHolder`; ODPS 4.2
+The configured details are added locally to generated ODPS drafts, including
+products wrapped from ODCS, DCAT and DPROD. ODPS 4.1 uses `product.dataHolder`; ODPS 4.2
 uses a language-keyed holder. Existing conflicting holder values are preserved
 and reported for review. These defaults are proposals, not proof of ownership.
 Organization details in a generated ODPS may be sent to an LLM during subsequent
 handover preparation, subject to that workflow's provider review.
+
+## Acknowledgments
+
+Thanks to the Open Data Product Initiative community, Chris Howard / Kitard for
+the original `odps-python` foundation, devlouie for the MCP layer and agent
+surface, the OpenMetadata platform, and the Data Contract CLI project for the
+optional contract execution engine.
+
+## License
+
+Apache License 2.0. See `LICENSE` for details.

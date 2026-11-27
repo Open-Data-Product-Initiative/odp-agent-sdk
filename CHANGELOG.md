@@ -4,6 +4,19 @@
 
 ## 0.9.0
 
+- Add guided project setup, named LLM provider and platform connection management,
+  hidden credential entry, combined configuration status and connection checks.
+- Add project-local organization defaults for ODPS data holders in generated and
+  converted products; preserve and report conflicting source information.
+- Make handover preparation and Jira delivery interactive by default, with an
+  explicit non-interactive `--mode agent` and JSON results for automation. Agent
+  mode sends source material to the configured provider and may create Jira issues.
+- Support Jira delivery from preparation result files and folders; preserve local
+  journals, skip confirmed deliveries and stop on unknown or incomplete outcomes.
+- Remove the top-level `handoff` and `integrations` CLI commands. Use `handover`
+  for preparation and `openmetadata api` for advanced OpenMetadata operations.
+- Inspect a bounded set of unverified metadata candidates automatically without
+  a selection prompt, and surface generation review notes in human output.
 - Add a reviewed coding-assistant handover workflow for one business brief or a
   folder, with generated OpenSpec planning drafts, enriched ODPS, field mappings,
   proposed output schemas and separate ODCS drafts; unsupported details remain open.

@@ -140,13 +140,14 @@ only. Never commit a private URL, token, or customer metadata. Named profiles
 can use different URLs and credentials. No network requests or credential
 resolution occur when the configuration is loaded. The recommended configuration
 references `OPENMETADATA_TOKEN` in the process environment, exactly as the
-generation provider references `OPENAI_API_KEY`. The SDK does not load `.env`
-files automatically.
+generation provider references `OPENAI_API_KEY`. OpenMetadata CLI commands load
+`.env` from the current directory when present; existing process environment
+variables take precedence. Other SDK workflows may require exported variables.
 
 For local use, copy `.env.example` to `.env`, replace the placeholder in a
 private editor, and keep `.env` out of version control. On POSIX systems,
-restrict access with `chmod 600 .env`. Then load the simple `KEY=value` file
-into each shell session before running the SDK:
+restrict access with `chmod 600 .env`. If a workflow does not load `.env`,
+export simple `KEY=value` entries into the shell before running it:
 
 ```sh
 set -a
